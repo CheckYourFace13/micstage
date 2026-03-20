@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+html,
+body {
+  height: 100%;
+}
+
+:root {
+  --om-neon: 255 45 149;
+  --om-purple: 123 97 255;
+  --om-cyan: 34 211 238;
+}
+
+.om-heading {
+  font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+
+/* Brighter field outlines site-wide; focus ring matches MicStage pink */
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]),
+textarea,
+select {
+  border-color: rgb(255 255 255 / 0.48) !important;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none !important;
+  border-color: rgb(var(--om-neon)) !important;
+  box-shadow:
+    0 0 0 1px rgb(var(--om-neon)),
+    0 0 0 4px rgba(255, 45, 149, 0.24) !important;
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid rgb(var(--om-neon));
+  outline-offset: 2px;
+}
+

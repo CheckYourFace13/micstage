@@ -1,0 +1,376 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum VenueRole {
+  ADMIN
+  MANAGER
+}
+
+enum Weekday {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+enum SlotStatus {
+  AVAILABLE
+  RESERVED
+  CANCELLED
+}
+
+// What acts / setups the venue allows (one primary choice for search).
+enum VenuePerformanceFormat {
+  OPEN_VARIETY
+  ACOUSTIC_ONLY
+  GUITAR_VOCAL_ONLY
+  FULL_BANDS_ALLOWED
+  COMEDY_SPOKEN_WORD
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+}
+
+enum BookingRestrictionMode {
+  NONE
+  ATTENDEE_DAY_OF
+  HOURS_BEFORE
+  ON_PREMISE
+}
+
+enum PasswordResetAccountType {
+  VENUE
+  MUSICIAN
+}
+
+model VenueOwner {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email        String @unique
+  passwordHash String
+
+  venues Venue[]
+}
+
+model Venue {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   VenueOwner @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId String
+
+  name String
+  slug String @unique
+
+  // Google Places reference
+  googlePlaceId    String @unique
+  formattedAddress String
+  city             String?
+  region           String?
+  country          String?
+  lat              Float?
+  lng              Float?
+  timeZone         String  @default("America/Chicago")
+
+  // Profile (searchable later)
+  about String?
+  // Direct media fields for public profile
+  logoUrl         String?
+  imagePrimaryUrl String?
+  imageSecondaryUrl String?
+
+  // Website + socials
+  websiteUrl       String?
+  facebookUrl      String?
+  instagramUrl     String?
+  twitterUrl       String?
+  tiktokUrl        String?
+  youtubeUrl       String?
+  soundcloudUrl    String?
+
+  // Open mic series window (optional). If set, slots/bookings only allowed inside this range.
+  seriesStartDate DateTime?
+  seriesEndDate   DateTime?
+
+  // How many calendar days ahead from today performers may book (e.g. 60).
+  bookingOpensDaysAhead Int @default(60)
+
+  subscriptionTier SubscriptionTier @default(FREE)
+
+  // How bookings are released within the booking window.
+  bookingRestrictionMode BookingRestrictionMode @default(NONE)
+  // For HOURS_BEFORE and ON_PREMISE: only allow booking within this many hours before slot start.
+  restrictionHoursBefore Int @default(6)
+  // For ON_PREMISE: max allowed distance from venue (meters) for booking.
+  onPremiseMaxDistanceMeters Int @default(1000)
+
+  performanceFormat VenuePerformanceFormat @default(OPEN_VARIETY)
+
+  // What the venue provides for musicians (filterable later)
+  providesPA             Boolean @default(false)
+  providesSpeakersMics   Boolean @default(false)
+  providesMonitors       Boolean @default(false)
+  providesDrumKit        Boolean @default(false)
+  providesBassAmp        Boolean @default(false)
+  providesGuitarAmp      Boolean @default(false)
+  providesKeyboard       Boolean @default(false)
+  providesDiBox          Boolean @default(false)
+  providesLightingBasic  Boolean @default(false)
+  providesBacklineShared Boolean @default(false)
+
+  managerAccess VenueManagerAccess[]
+
+  eventTemplates EventTemplate[]
+
+  pastPerformers        MusicianPastVenue[]
+  interestedMusicians   MusicianVenueInterest[]
+}
+
+model VenueManager {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email        String @unique
+  passwordHash String
+
+  access VenueManagerAccess[]
+}
+
+model VenueManagerAccess {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  venue   Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueId String
+
+  manager   VenueManager @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  managerId String
+
+  role VenueRole @default(MANAGER)
+
+  @@unique([venueId, managerId])
+  @@index([managerId])
+}
+
+model MusicianUser {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email        String @unique
+  passwordHash String
+
+  stageName String
+
+  firstName String?
+  lastName  String?
+  bio       String?
+
+  websiteUrl   String?
+  imageUrl     String?
+  facebookUrl  String?
+  instagramUrl String?
+  twitterUrl   String?
+  tiktokUrl    String?
+  youtubeUrl   String?
+  soundcloudUrl String?
+
+  // Stored as JSON string arrays, e.g. ["VOCALS","GUITAR"]
+  specializations Json?
+  instruments     Json?
+
+  yearsPlaying Int?
+  openToHire   Boolean @default(false)
+
+  hireRateDescription String?
+  setLengthMinutes    Int?
+
+  collaborationsText String?
+
+  // Home base for discovery / future radius search & email targeting (city pick from Google or manual city/region).
+  homeGooglePlaceId     String?
+  homeFormattedAddress  String?
+  homeLat               Float?
+  homeLng               Float?
+  homeCity              String?
+  homeRegion            String?
+  // How far from home base they’ll travel to perform (miles).
+  travelRadiusMiles     Int?
+
+  // Optional second area + radius (e.g. frequent second market).
+  secondaryGooglePlaceId     String?
+  secondaryFormattedAddress  String?
+  secondaryLat               Float?
+  secondaryLng               Float?
+  secondaryCity              String?
+  secondaryRegion            String?
+  secondaryRadiusMiles       Int?
+
+  bookings          Booking[]
+  pastVenues        MusicianPastVenue[]
+  interestedVenues  MusicianVenueInterest[]
+}
+
+// Venues this musician says they have performed at (marketing + trust signals).
+model MusicianPastVenue {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  musician   MusicianUser @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  musicianId String
+  venue      Venue        @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueId    String
+
+  @@unique([musicianId, venueId])
+  @@index([venueId])
+}
+
+// Venues the musician wants to track / explore (open mics near them).
+model MusicianVenueInterest {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  musician   MusicianUser @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+  musicianId String
+  venue      Venue        @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueId    String
+
+  @@unique([musicianId, venueId])
+  @@index([venueId])
+}
+
+model EventTemplate {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueId String
+
+  title       String
+  description String?
+
+  weekday      Weekday
+  startTimeMin Int // minutes from midnight, local to tz
+  endTimeMin   Int // minutes from midnight, local to tz
+  timeZone     String @default("America/Chicago")
+
+  slotMinutes  Int
+  breakMinutes Int @default(0)
+
+  isPublic Boolean @default(true)
+
+  // Booking release rules for this specific time block.
+  bookingRestrictionMode BookingRestrictionMode @default(NONE)
+  restrictionHoursBefore Int @default(6)
+  onPremiseMaxDistanceMeters Int @default(1000)
+
+  instances EventInstance[]
+
+  @@index([venueId, weekday])
+}
+
+model EventInstance {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  template   EventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId String
+
+  // stored as midnight UTC for the local date
+  date DateTime
+
+  startTimeMinOverride Int?
+  endTimeMinOverride   Int?
+  isCancelled          Boolean @default(false)
+
+  slots Slot[]
+
+  @@unique([templateId, date])
+  @@index([date])
+}
+
+model Slot {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  instance   EventInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  instanceId String
+
+  startMin Int
+  endMin   Int
+
+  status SlotStatus @default(AVAILABLE)
+
+  booking Booking?
+
+  @@unique([instanceId, startMin])
+  @@index([instanceId, status])
+}
+
+model Booking {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slot   Slot   @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  slotId String @unique
+
+  musician   MusicianUser? @relation(fields: [musicianId], references: [id], onDelete: SetNull)
+  musicianId String?
+
+  performerName  String
+  performerEmail String?
+  notes          String?
+
+  cancelledAt DateTime?
+
+  @@index([musicianId])
+}
+
+model PasswordResetToken {
+  id          String                   @id @default(cuid())
+  createdAt   DateTime                 @default(now())
+  accountType PasswordResetAccountType
+  email       String
+  tokenHash   String                   @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+
+  @@index([email, accountType])
+  @@index([expiresAt])
+}
+
+model AuthRateLimitCounter {
+  id      String   @id @default(cuid())
+  key     String
+  bucket  String
+  count   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([key, bucket])
+  @@index([updatedAt])
+}

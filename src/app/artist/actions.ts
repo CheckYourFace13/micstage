@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireMusicianSession } from "@/lib/authz";
 import { MUSICIAN_INSTRUMENTS, MUSICIAN_SPECIALIZATIONS } from "@/lib/musicianProfile";
@@ -171,8 +170,8 @@ export async function updateMusicianProfile(formData: FormData) {
         tiktokUrl,
         youtubeUrl,
         soundcloudUrl,
-        specializations: specializations.length ? specializations : Prisma.JsonNull,
-        instruments: instruments.length ? instruments : Prisma.JsonNull,
+        specializations: specializations.length ? specializations : null,
+        instruments: instruments.length ? instruments : null,
         yearsPlaying,
         openToHire,
         hireRateDescription,

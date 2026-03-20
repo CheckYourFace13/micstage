@@ -13,9 +13,11 @@ function titleCaseSlug(slug: string): string {
 export async function generateMetadata(props: { params: Promise<{ locationSlug: string }> }) {
   const { locationSlug } = await props.params;
   const city = titleCaseSlug(locationSlug);
+  const canonical = `https://micstage.com/locations/${locationSlug}/performers`;
   return {
     title: `${city} open mic performers | MicStage`,
     description: `See who's playing upcoming open mics in ${city}. Public, shareable performer list.`,
+    alternates: { canonical },
   };
 }
 

@@ -5,6 +5,9 @@ import { asStringArrayJson } from "@/lib/musicianProfile";
 export const metadata = {
   title: "Find performers | MicStage",
   description: "Search MicStage performers by stage name. Legal names are never shown here.",
+  alternates: {
+    canonical: "https://micstage.com/performers",
+  },
 };
 
 export default async function PerformersPage({

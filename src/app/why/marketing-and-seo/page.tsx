@@ -4,6 +4,9 @@ export const metadata = {
   title: "Marketing and SEO for open mic venues and artists",
   description:
     "MicStage combines artist discovery, venue pages, and SEO-ready routing so your local open mic can attract more performers, fans, and repeat traffic.",
+  alternates: {
+    canonical: "https://micstage.com/why/marketing-and-seo",
+  },
 };
 
 export default function WhyMarketingAndSeoPage() {

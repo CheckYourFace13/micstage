@@ -1,5 +1,13 @@
 import Link from "next/link";
 
+export const metadata = {
+  title: "MicStage",
+  description: "Open mic scheduling, performer discovery, and marketing-ready SEO pages.",
+  alternates: {
+    canonical: "https://micstage.com/",
+  },
+};
+
 export default function Home() {
   return (
     <div className="relative min-h-dvh overflow-hidden bg-black text-white">

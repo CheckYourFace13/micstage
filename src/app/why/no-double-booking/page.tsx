@@ -4,6 +4,9 @@ export const metadata = {
   title: "No double-booking: dependable open mic reservations",
   description:
     "See how MicStage protects venue operations with slot locking and predictable reservations, reducing confusion and improving performer confidence.",
+  alternates: {
+    canonical: "https://micstage.com/why/no-double-booking",
+  },
 };
 
 export default function WhyNoDoubleBookingPage() {

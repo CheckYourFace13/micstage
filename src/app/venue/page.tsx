@@ -7,6 +7,9 @@ import { VenueProfileForm } from "./VenueProfileForm";
 
 export const metadata = {
   title: "Venue portal | MicStage",
+  alternates: {
+    canonical: "https://micstage.com/venue",
+  },
 };
 
 export default async function VenuePortalPage({

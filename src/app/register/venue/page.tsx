@@ -1,5 +1,8 @@
 export const metadata = {
   title: "Venue registration | MicStage",
+  alternates: {
+    canonical: "https://micstage.com/register/venue",
+  },
 };
 
 import { registerVenue } from "./actions";

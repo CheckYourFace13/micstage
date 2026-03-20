@@ -1,9 +1,16 @@
 import { finalizeVenuePasswordReset } from "../actions";
 import { verifyResetToken } from "@/lib/passwordReset";
 
-export const metadata = {
-  title: "Set new venue password | MicStage",
-};
+export async function generateMetadata(props: { params: Promise<{ token: string }> }) {
+  const { token } = await props.params;
+  return {
+    title: "Set new venue password | MicStage",
+    alternates: {
+      canonical: `https://micstage.com/reset/venue/${token}`,
+    },
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function VenueResetTokenPage(props: { params: Promise<{ token: string }> }) {
   const { token } = await props.params;

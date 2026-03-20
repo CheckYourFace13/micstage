@@ -1,5 +1,8 @@
 export const metadata = {
   title: "Artist login | MicStage",
+  alternates: {
+    canonical: "https://micstage.com/login/musician",
+  },
 };
 
 import { loginMusician } from "./serverActions";

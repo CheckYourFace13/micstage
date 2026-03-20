@@ -6,6 +6,9 @@ export const metadata = {
   title: "Open mic venues by city",
   description:
     "Search MicStage-registered venues with open mics. Browse by city and see public performer activity.",
+  alternates: {
+    canonical: "https://micstage.com/locations",
+  },
 };
 
 export default async function LocationsPage() {

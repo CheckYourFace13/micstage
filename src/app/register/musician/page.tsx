@@ -1,5 +1,8 @@
 export const metadata = {
   title: "Artist registration | MicStage",
+  alternates: {
+    canonical: "https://micstage.com/register/musician",
+  },
 };
 
 import { registerMusician } from "./actions";

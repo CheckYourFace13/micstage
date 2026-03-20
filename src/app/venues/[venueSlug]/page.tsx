@@ -11,10 +11,16 @@ import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 export async function generateMetadata(props: { params: Promise<{ venueSlug: string }> }) {
   const { venueSlug } = await props.params;
   const venue = await prisma.venue.findUnique({ where: { slug: venueSlug } });
-  if (!venue) return { title: "Venue not found | MicStage" };
+  const canonical = `https://micstage.com/venues/${venueSlug}`;
+  if (!venue)
+    return {
+      title: "Venue not found | MicStage",
+      alternates: { canonical },
+    };
   return {
     title: `${venue.name} open mic schedule | ${venue.city ?? ""}`.trim(),
     description: `Book an open mic slot at ${venue.name}. View who’s playing and when.`,
+    alternates: { canonical },
   };
 }
 

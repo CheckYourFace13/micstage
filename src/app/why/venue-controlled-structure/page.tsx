@@ -4,6 +4,9 @@ export const metadata = {
   title: "Venue-controlled open mic structure that scales",
   description:
     "Learn how MicStage helps venues define open mic schedules once, generate consistent slot pages, and rank for local search with clean, indexable venue content.",
+  alternates: {
+    canonical: "https://micstage.com/why/venue-controlled-structure",
+  },
 };
 
 export default function WhyVenueControlledStructurePage() {

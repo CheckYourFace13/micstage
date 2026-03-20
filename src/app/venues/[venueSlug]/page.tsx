@@ -8,6 +8,8 @@ import { bookingBlockReason, slotRestrictionBlockReason } from "@/lib/venueBooki
 import { equipmentProvidedList, performanceFormatLabel } from "@/lib/venueDisplay";
 import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(props: { params: Promise<{ venueSlug: string }> }) {
   const { venueSlug } = await props.params;
   const venue = await prisma.venue.findUnique({ where: { slug: venueSlug } });

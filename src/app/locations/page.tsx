@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { LocationsDirectory, type LocationRow } from "./LocationsDirectory";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Open mic venues by city",
   description:

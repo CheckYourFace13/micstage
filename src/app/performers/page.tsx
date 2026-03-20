@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { asStringArrayJson } from "@/lib/musicianProfile";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Find performers | MicStage",
   description: "Search MicStage performers by stage name. Legal names are never shown here.",

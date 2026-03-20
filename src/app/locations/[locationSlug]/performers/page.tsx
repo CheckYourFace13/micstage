@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { minutesToTimeLabel } from "@/lib/time";
 
+export const dynamic = "force-dynamic";
+
 function titleCaseSlug(slug: string): string {
   return slug
     .split("-")

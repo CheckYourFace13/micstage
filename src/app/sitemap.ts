@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 
+export const dynamic = "force-dynamic";
+
 function baseUrl(): string {
   const raw = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://micstage.com";
   return raw.replace(/\/$/, "");

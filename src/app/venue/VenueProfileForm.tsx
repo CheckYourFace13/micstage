@@ -1,5 +1,5 @@
 import { discoverVenueSocials, upgradeVenuePlan, updateVenueProfile } from "./actions";
-import type { Venue } from "@prisma/client";
+import type { Venue } from "@/generated/prisma/client";
 
 type Props = { venue: Venue };
 

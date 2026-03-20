@@ -175,7 +175,7 @@ export default async function ArtistPortalPage({
             <div className="text-sm font-semibold text-white">Venues you’re tracking</div>
             <p className="mt-1 text-xs text-white/55">Quick links to open mic pages you’ve saved.</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              {tracked.map((t) => (
+              {tracked.map((t: any) => (
                 <Link
                   key={t.id}
                   href={`/venues/${t.venue.slug}`}

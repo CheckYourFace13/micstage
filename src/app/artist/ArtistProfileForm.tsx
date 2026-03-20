@@ -1,5 +1,6 @@
 import { updateMusicianProfile } from "./actions";
-import type { MusicianUser } from "@prisma/client";
+type MusicianUser = any;
+
 import {
   MUSICIAN_INSTRUMENTS,
   MUSICIAN_SPECIALIZATIONS,
@@ -28,10 +29,8 @@ type Props = {
 export function ArtistProfileForm({ musician, allVenues, venuesForInterest }: Props) {
   const specs = asStringArrayJson(musician.specializations);
   const insts = asStringArrayJson(musician.instruments);
-  const interestIds = musician.interestedVenues.map((i) => i.venueId);
-  const pastVenueChips = musician.pastVenues.map((p) => ({
-    id: p.venue.id,
-    name: p.venue.name,
+  const interestIds = musician.interestedVenues.map((i: any) => i.venueId);
+  const pastVenueChips = musician.pastVenues.map((p: any) => ({
     city: p.venue.city,
     region: p.venue.region,
   }));

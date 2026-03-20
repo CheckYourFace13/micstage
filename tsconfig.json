@@ -18,8 +18,10 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/generated/*": ["./src/generated/*"]
     }
   },
   "include": [
@@ -32,4 +34,3 @@
   ],
   "exclude": ["node_modules", "openmic"]
 }
-

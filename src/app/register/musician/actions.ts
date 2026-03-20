@@ -34,5 +34,6 @@ export async function registerMusician(formData: FormData) {
   });
 
   await setSession({ kind: "musician", musicianId: musician.id, email: musician.email });
+  redirect("/artist");
 }
 

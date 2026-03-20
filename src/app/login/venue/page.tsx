@@ -7,10 +7,11 @@ export const metadata = {
 
 import { loginVenue } from "./serverActions";
 
-export default async function VenueLoginPage(props: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await props.searchParams;
+export default async function VenueLoginPage(props: { searchParams: Promise<{ error?: string; reset?: string }> }) {
+  const { error, reset } = await props.searchParams;
   const showInvalid = error === "invalid";
   const showRate = error === "rate";
+  const showResetSuccess = reset === "success";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -23,6 +24,11 @@ export default async function VenueLoginPage(props: { searchParams: Promise<{ er
         <p className="mt-2 text-sm text-white/70">Log in to manage your venue schedule and invite managers.</p>
 
         <form action={loginVenue} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+          {showResetSuccess ? (
+            <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+              Password updated successfully. You can log in now.
+            </div>
+          ) : null}
           {showInvalid ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Invalid email or password.{" "}

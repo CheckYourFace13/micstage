@@ -76,7 +76,7 @@ export async function consumeResetToken(input: {
   const rec = await verifyResetToken({ token: input.token, accountType: input.accountType });
   if (!rec) return { ok: false as const };
 
-  await prisma.$transaction(async (tx) => {
+  const changed = await prisma.$transaction(async (tx) => {
     if (input.accountType === "VENUE") {
       const owner = await tx.venueOwner.findUnique({ where: { email: rec.email } });
       if (owner) {
@@ -92,12 +92,12 @@ export async function consumeResetToken(input: {
             data: { passwordHash: input.newPasswordHash },
           });
         } else {
-          return;
+          return false;
         }
       }
     } else {
       const user = await tx.musicianUser.findUnique({ where: { email: rec.email } });
-      if (!user) return;
+      if (!user) return false;
       await tx.musicianUser.update({
         where: { email: rec.email },
         data: { passwordHash: input.newPasswordHash },
@@ -108,8 +108,11 @@ export async function consumeResetToken(input: {
       where: { id: rec.id },
       data: { usedAt: new Date() },
     });
+
+    return true;
   });
 
+  if (!changed) return { ok: false as const };
   return { ok: true as const };
 }
 

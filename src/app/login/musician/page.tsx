@@ -7,10 +7,13 @@ export const metadata = {
 
 import { loginMusician } from "./serverActions";
 
-export default async function MusicianLoginPage(props: { searchParams: Promise<{ error?: string; next?: string }> }) {
-  const { error, next } = await props.searchParams;
+export default async function MusicianLoginPage(props: {
+  searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
+}) {
+  const { error, next, reset } = await props.searchParams;
   const showInvalid = error === "invalid";
   const showRate = error === "rate";
+  const showResetSuccess = reset === "success";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -31,6 +34,11 @@ export default async function MusicianLoginPage(props: { searchParams: Promise<{
 
         <form action={loginMusician} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
           <input type="hidden" name="next" value={next ?? ""} />
+          {showResetSuccess ? (
+            <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+              Password updated successfully. You can log in now.
+            </div>
+          ) : null}
           {showInvalid ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Invalid email or password.{" "}

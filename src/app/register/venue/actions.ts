@@ -91,6 +91,6 @@ export async function registerVenue(formData: FormData) {
     await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
   });
 
-  // Form actions must return void (or redirect).
+  redirect("/venue");
 }
 

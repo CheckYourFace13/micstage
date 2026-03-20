@@ -2,17 +2,15 @@
   "name": "openmic",
   "version": "0.1.0",
   "private": true,
- 
- "scripts": {
-  "dev": "next dev",
-  "build": "prisma generate && next build",
-  "start": "next start",
-  "lint": "eslint",
-  "postinstall": "prisma generate",
-  "check:env": "node scripts/check-production-env.mjs",
-  "check:env:production": "node scripts/check-production-env.mjs --production"
-}
-
+  "scripts": {
+    "dev": "next dev",
+    "build": "npx prisma generate --schema=prisma/schema.prisma && next build",
+    "start": "next start",
+    "lint": "eslint",
+    "postinstall": "npx prisma generate --schema=prisma/schema.prisma",
+    "check:env": "node scripts/check-production-env.mjs",
+    "check:env:production": "node scripts/check-production-env.mjs --production"
+  },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.5.0",
     "@prisma/client": "^7.5.0",

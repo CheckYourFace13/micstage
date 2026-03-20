@@ -2,14 +2,17 @@
   "name": "openmic",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "check:env": "node scripts/check-production-env.mjs",
-    "check:env:production": "node scripts/check-production-env.mjs --production"
-  },
+ 
+ "scripts": {
+  "dev": "next dev",
+  "build": "prisma generate && next build",
+  "start": "next start",
+  "lint": "eslint",
+  "postinstall": "prisma generate",
+  "check:env": "node scripts/check-production-env.mjs",
+  "check:env:production": "node scripts/check-production-env.mjs --production"
+}
+
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.5.0",
     "@prisma/client": "^7.5.0",
@@ -21,10 +24,10 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.9.4",
-    "tz-lookup": "^6.1.25"
+    "tz-lookup": "^6.1.25",
+    "@tailwindcss/postcss": "^4.2.2"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
     "@types/google.maps": "^3.58.1",
     "@types/node": "^20",
     "@types/react": "^19",

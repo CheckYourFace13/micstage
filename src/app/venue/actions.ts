@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
 import { bookingBlockReason, isDateInSeriesRange } from "@/lib/venueBookingRules";
-import { BookingRestrictionMode, VenuePerformanceFormat, Weekday } from "@/generated/prisma/enums";
+import { BookingRestrictionMode, VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);

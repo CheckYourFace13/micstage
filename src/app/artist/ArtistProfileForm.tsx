@@ -1,5 +1,5 @@
 import { updateMusicianProfile } from "./actions";
-import type { MusicianUser } from "@/generated/prisma/client";
+import type { MusicianUser } from "@prisma/client";
 import {
   MUSICIAN_INSTRUMENTS,
   MUSICIAN_SPECIALIZATIONS,

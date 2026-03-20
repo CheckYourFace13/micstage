@@ -1,4 +1,4 @@
-import type { VenuePerformanceFormat } from "@/generated/prisma/enums";
+import type { VenuePerformanceFormat } from "@/generated/prisma/client";
 
 export function performanceFormatLabel(f: VenuePerformanceFormat): string {
   switch (f) {

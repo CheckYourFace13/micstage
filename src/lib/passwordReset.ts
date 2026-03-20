@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/mailer";
-import { PasswordResetAccountType } from "@/generated/prisma/enums";
+import { PasswordResetAccountType } from "@/generated/prisma/client";
 
 const TOKEN_TTL_MINUTES = 30;
 

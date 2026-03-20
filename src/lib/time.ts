@@ -1,4 +1,4 @@
-import { Weekday } from "@/generated/prisma/enums";
+import { Weekday } from "@/generated/prisma/client";
 
 export function weekdayToLabel(d: Weekday): string {
   switch (d) {

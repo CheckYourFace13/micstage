@@ -11,7 +11,7 @@ export const REMINDER_24H_WINDOW_MS = { min: 23 * MS_H, max: 25 * MS_H };
 export const REMINDER_2H_WINDOW_MS = { min: 1.5 * MS_H, max: 2.5 * MS_H };
 
 /** Max rows loaded per reminder kind per cron run (keeps Hostinger / small DB work low). */
-const REMINDER_QUERY_BATCH = 50;
+const REMINDER_QUERY_BATCH = 25;
 
 function appUrl(): string {
   return process.env.APP_URL?.replace(/\/$/, "") || process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "http://localhost:3000";

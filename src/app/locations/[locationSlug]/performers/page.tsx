@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { minutesToTimeLabel } from "@/lib/time";
-import { buildPublicMetadata } from "@/lib/publicSeo";
+import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
+import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -31,45 +32,50 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
-  const allCityBookings = await prisma.booking.findMany({
-    where: {
-      cancelledAt: null,
-      slot: {
-        instance: {
-          date: { gte: today },
-          template: { venue: { city: { not: null } } },
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    return <PublicDataUnavailable title="Performer list unavailable" />;
+  }
+
+  try {
+    const allCityBookings = await prisma.booking.findMany({
+      where: {
+        cancelledAt: null,
+        slot: {
+          instance: {
+            date: { gte: today },
+            template: { venue: { city: { not: null } } },
+          },
         },
       },
-    },
-    orderBy: [{ slot: { instance: { date: "asc" } } }, { slot: { startMin: "asc" } }],
-    take: 200,
-    include: {
-      slot: {
-        include: {
-          instance: {
-            include: {
-              template: {
-                include: { venue: true },
+      orderBy: [{ slot: { instance: { date: "asc" } } }, { slot: { startMin: "asc" } }],
+      take: 200,
+      include: {
+        slot: {
+          include: {
+            instance: {
+              include: {
+                template: {
+                  include: { venue: true },
+                },
               },
             },
           },
         },
       },
-    },
-  });
+    });
 
-  const bookings = allCityBookings.filter(
-    (b) => (b.slot.instance.template.venue.city ?? "").toLowerCase() === cityGuess.toLowerCase(),
-  );
+    const bookings = allCityBookings.filter(
+      (b) => (b.slot.instance.template.venue.city ?? "").toLowerCase() === cityGuess.toLowerCase(),
+    );
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const shareUrl = `${origin}/locations/${locationSlug}/performers`;
-  const shareText = `Who's playing upcoming open mics in ${cityGuess}?`;
-  const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-  const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
-  const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
+    const shareUrl = absoluteUrl(`/locations/${locationSlug}/performers`);
+    const shareText = `Who's playing upcoming open mics in ${cityGuess}?`;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
 
-  return (
+    return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-5xl px-6 py-12">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -131,6 +137,9 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
         )}
       </main>
     </div>
-  );
+    );
+  } catch {
+    return <PublicDataUnavailable title="Performer list unavailable" />;
+  }
 }
 

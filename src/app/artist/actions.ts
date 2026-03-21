@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "../../generated/prisma/client";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { requireMusicianSession } from "@/lib/authz";
 import { MUSICIAN_INSTRUMENTS, MUSICIAN_SPECIALIZATIONS } from "@/lib/musicianProfile";
 
 export async function lookupMicStageVenueByGooglePlaceId(googlePlaceId: string) {
   if (!googlePlaceId?.trim()) return null;
-  return prisma.venue.findUnique({
+  return requirePrisma().venue.findUnique({
     where: { googlePlaceId: googlePlaceId.trim() },
     select: { id: true, name: true, city: true, region: true },
   });
@@ -146,12 +146,12 @@ export async function updateMusicianProfile(formData: FormData) {
 
   const allPicked = [...new Set([...pastIds, ...interestIds])];
   if (allPicked.length) {
-    const count = await prisma.venue.count({ where: { id: { in: allPicked } } });
+    const count = await requirePrisma().venue.count({ where: { id: { in: allPicked } } });
     if (count !== allPicked.length) {
       redirect("/artist?profileError=venues");
     }
   }
-  await prisma.$transaction(async (tx) => {
+  await requirePrisma().$transaction(async (tx) => {
     await tx.musicianPastVenue.deleteMany({ where: { musicianId } });
     await tx.musicianVenueInterest.deleteMany({ where: { musicianId } });
 

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { getSession, type Session } from "@/lib/session";
 
 export async function requireVenueSession() {
@@ -19,6 +19,7 @@ export async function venueIdsForVenueSession(session: Session | null): Promise<
   if (!session || session.kind !== "venue") return [];
 
   if (session.venueOwnerId) {
+    const prisma = requirePrisma();
     const venues = await prisma.venue.findMany({
       where: { ownerId: session.venueOwnerId },
       select: { id: true },
@@ -27,6 +28,7 @@ export async function venueIdsForVenueSession(session: Session | null): Promise<
   }
 
   if (session.venueManagerId) {
+    const prisma = requirePrisma();
     const access = await prisma.venueManagerAccess.findMany({
       where: { managerId: session.venueManagerId },
       select: { venueId: true },

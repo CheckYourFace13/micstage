@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 
 function nowBucket(windowSec: number): string {
   return Math.floor(Date.now() / (windowSec * 1000)).toString();
@@ -26,6 +26,7 @@ export async function consumeRateLimit(input: {
   const key = `${input.scope}:${normalizeIdentifier(input.identifier)}:${ip}`;
   const bucket = nowBucket(input.windowSec);
 
+  const prisma = requirePrisma();
   const updated = await prisma.authRateLimitCounter.upsert({
     where: { key_bucket: { key, bucket } },
     update: { count: { increment: 1 } },

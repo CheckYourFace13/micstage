@@ -2,7 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import tzLookup from "tz-lookup";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
@@ -58,12 +58,12 @@ export async function registerVenue(formData: FormData) {
   const baseSlug = slugify(venueName) || "venue";
   let slug = baseSlug;
   for (let i = 0; i < 25; i++) {
-    const exists = await prisma.venue.findUnique({ where: { slug } });
+    const exists = await requirePrisma().venue.findUnique({ where: { slug } });
     if (!exists) break;
     slug = `${baseSlug}-${i + 2}`;
   }
 
-  await prisma.$transaction(async (tx) => {
+  await requirePrisma().$transaction(async (tx) => {
     const existing = await tx.venueOwner.findUnique({ where: { email } });
     if (existing) {
       const ok = await bcrypt.compare(password, existing.passwordHash);

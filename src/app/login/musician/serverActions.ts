@@ -1,7 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
@@ -25,6 +25,7 @@ export async function loginMusician(formData: FormData) {
   });
   if (!rl.allowed) redirect("/login/musician?error=rate");
 
+  const prisma = requirePrisma();
   const user = await prisma.musicianUser.findUnique({ where: { email } });
   if (!user) redirect("/login/musician?error=invalid");
   const ok = await bcrypt.compare(password, user.passwordHash);

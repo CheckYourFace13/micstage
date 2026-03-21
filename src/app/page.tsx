@@ -63,13 +63,15 @@ export default function Home() {
               <div className="text-xs font-medium uppercase tracking-widest text-white/60">Start here</div>
               <div className="mt-3 grid gap-3">
                 <a
-                  href="/register/musician"
+                  href="/locations"
                   className="group rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold">Find Open Mics Near You</div>
-                      <div className="mt-1 text-sm text-white/70">Claim a slot, share your set time, build momentum.</div>
+                      <div className="font-semibold">Find open mics near you</div>
+                      <div className="mt-1 text-sm text-white/70">
+                        Browse venues by city, then book a slot on public schedules.
+                      </div>
                     </div>
                     <div className="text-white/60 group-hover:text-white">→</div>
                   </div>
@@ -89,6 +91,17 @@ export default function Home() {
                   </div>
                 </a>
               </div>
+              <p className="mt-4 text-xs text-white/50">
+                Artists:{" "}
+                <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
+                  browse performers
+                </Link>{" "}
+                or{" "}
+                <Link className="underline hover:text-white" href="/register/musician">
+                  create an account
+                </Link>
+                .
+              </p>
             </div>
           </div>
         </header>

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { buildPublicMetadata } from "@/lib/publicSeo";
+import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { LocationsDirectory, type LocationRow } from "./LocationsDirectory";
 
 export const dynamic = "force-dynamic";
@@ -14,30 +15,40 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default async function LocationsPage() {
-  const venues = await prisma.venue.findMany({
-    where: { city: { not: null } },
-    select: { city: true, region: true, id: true },
-  });
-
-  const grouped = new Map<string, { city: string; region: string | null; count: number }>();
-  for (const v of venues) {
-    const city = (v.city ?? "").trim();
-    if (!city) continue;
-    const key = `${city.toLowerCase()}|${(v.region ?? "").toLowerCase()}`;
-    const cur = grouped.get(key);
-    if (cur) cur.count += 1;
-    else grouped.set(key, { city, region: v.region, count: 1 });
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    return <PublicDataUnavailable title="Venue directory unavailable" />;
   }
 
-  const locations = Array.from(grouped.values()).sort((a, b) => a.city.localeCompare(b.city));
+  let rows: LocationRow[] = [];
+  try {
+    const venues = await prisma.venue.findMany({
+      where: { city: { not: null } },
+      select: { city: true, region: true, id: true },
+    });
 
-  const rows: LocationRow[] = locations.map((l) => ({
-    key: `${l.city}|${l.region ?? ""}`,
-    city: l.city,
-    region: l.region,
-    count: l.count,
-    slug: slugify(l.city),
-  }));
+    const grouped = new Map<string, { city: string; region: string | null; count: number }>();
+    for (const v of venues) {
+      const city = (v.city ?? "").trim();
+      if (!city) continue;
+      const key = `${city.toLowerCase()}|${(v.region ?? "").toLowerCase()}`;
+      const cur = grouped.get(key);
+      if (cur) cur.count += 1;
+      else grouped.set(key, { city, region: v.region, count: 1 });
+    }
+
+    const locations = Array.from(grouped.values()).sort((a, b) => a.city.localeCompare(b.city));
+
+    rows = locations.map((l) => ({
+      key: `${l.city}|${l.region ?? ""}`,
+      city: l.city,
+      region: l.region,
+      count: l.count,
+      slug: slugify(l.city),
+    }));
+  } catch {
+    return <PublicDataUnavailable title="Venue directory unavailable" />;
+  }
 
   return (
     <div className="min-h-dvh bg-black text-white">

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
@@ -41,7 +41,7 @@ export async function bookSlot(formData: FormData) {
 
   const session = await getSession();
 
-  const slotPreview = await prisma.slot.findUnique({
+  const slotPreview = await requirePrisma().slot.findUnique({
     where: { id: slotId },
     include: { booking: true, instance: { include: { template: { include: { venue: true } } } } },
   });
@@ -75,7 +75,7 @@ export async function bookSlot(formData: FormData) {
     redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(templateRestrictionBlock)}`);
   }
 
-  await prisma.$transaction(async (tx) => {
+  await requirePrisma().$transaction(async (tx) => {
     const slot = await tx.slot.findUnique({
       where: { id: slotId },
       include: { booking: true, instance: { include: { template: { include: { venue: true } } } } },
@@ -153,7 +153,7 @@ export async function cancelBooking(formData: FormData) {
     redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Sign in to cancel a booking.")}`);
   }
 
-  const bookingVenueId = await prisma.booking
+  const bookingVenueId = await requirePrisma().booking
     .findUnique({
       where: { id: bookingId },
       select: { slot: { select: { instance: { select: { template: { select: { venueId: true } } } } } } },
@@ -167,7 +167,7 @@ export async function cancelBooking(formData: FormData) {
   const allowedVenueIds = await venueIdsForVenueSession(session);
 
   if (session.kind === "musician") {
-    const full = await prisma.booking.findUnique({
+    const full = await requirePrisma().booking.findUnique({
       where: { id: bookingId },
       select: { musicianId: true, slot: { select: { instance: { select: { template: { select: { venue: { select: { slug: true } } } } } } } } },
     });
@@ -185,7 +185,7 @@ export async function cancelBooking(formData: FormData) {
     redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Sign in to cancel a booking.")}`);
   }
 
-  await prisma.$transaction(async (tx) => {
+  await requirePrisma().$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
       include: { slot: { include: { instance: { include: { template: { include: { venue: true } } } } } } },

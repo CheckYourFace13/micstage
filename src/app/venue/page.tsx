@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { createEventTemplate, generateDateSchedule, houseBookSlot, inviteManager } from "./actions";
 import { minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
@@ -24,6 +24,7 @@ export default async function VenuePortalPage({
   const q = await searchParams;
   const session = await requireVenueSession();
   const venueIds = await venueIdsForSession(session);
+  const prisma = requirePrisma();
 
   const venues = await prisma.venue.findMany({
     where: { id: { in: venueIds } },

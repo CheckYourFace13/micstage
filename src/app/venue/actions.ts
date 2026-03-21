@@ -3,7 +3,7 @@
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
 import { bookingBlockReason, isDateInSeriesRange, slotStartInstant } from "@/lib/venueBookingRules";
@@ -118,7 +118,7 @@ export async function createEventTemplate(formData: FormData) {
     redirect("/venue?profileError=badRange");
   }
 
-  const venue = await prisma.venue.findUnique({
+  const venue = await requirePrisma().venue.findUnique({
     where: { id: venueId },
     select: {
       timeZone: true,
@@ -155,7 +155,7 @@ export async function createEventTemplate(formData: FormData) {
   const restrictionHoursBefore = optInt(formData, "restrictionHoursBefore") ?? venue?.restrictionHoursBefore ?? 6;
   const onPremiseMaxDistanceMeters = optInt(formData, "onPremiseMaxDistanceMeters") ?? venue?.onPremiseMaxDistanceMeters ?? 1000;
 
-  await prisma.eventTemplate.create({
+  await requirePrisma().eventTemplate.create({
     data: {
       venueId,
       title,
@@ -172,7 +172,7 @@ export async function createEventTemplate(formData: FormData) {
     },
   });
 
-  await prisma.venue.update({
+  await requirePrisma().venue.update({
     where: { id: venueId },
     data: {
       seriesStartDate,
@@ -203,7 +203,7 @@ export async function updateVenueProfile(formData: FormData) {
   const soundcloudUrl = normalizeUrl(optString(formData, "soundcloudUrl"));
   const performanceFormat = parsePerformanceFormat(reqString(formData, "performanceFormat"));
 
-  await prisma.venue.update({
+  await requirePrisma().venue.update({
     where: { id: venueId },
     data: {
       about,
@@ -232,7 +232,7 @@ export async function updateVenueProfile(formData: FormData) {
   });
 
   revalidatePath("/venue");
-  const v = await prisma.venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+  const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
 }
 
@@ -242,7 +242,7 @@ export async function discoverVenueSocials(formData: FormData) {
   const allowed = await venueIdsForSession(session);
   if (!allowed.includes(venueId)) throw new Error("Not allowed");
 
-  const venue = await prisma.venue.findUnique({
+  const venue = await requirePrisma().venue.findUnique({
     where: { id: venueId },
     select: { websiteUrl: true, slug: true },
   });
@@ -266,7 +266,7 @@ export async function discoverVenueSocials(formData: FormData) {
   const youtubeUrl = firstMatchingLink(links, [/youtube\.com\//i, /youtu\.be\//i]);
   const soundcloudUrl = firstMatchingLink(links, [/soundcloud\.com\//i]);
 
-  await prisma.venue.update({
+  await requirePrisma().venue.update({
     where: { id: venueId },
     data: {
       facebookUrl,
@@ -288,7 +288,7 @@ export async function generateDateSchedule(formData: FormData) {
   const templateId = reqString(formData, "templateId");
   const date = reqDate(formData, "date");
 
-  const template = await prisma.eventTemplate.findUnique({
+  const template = await requirePrisma().eventTemplate.findUnique({
     where: { id: templateId },
     include: { venue: true },
   });
@@ -302,10 +302,10 @@ export async function generateDateSchedule(formData: FormData) {
   }
 
   const instance =
-    (await prisma.eventInstance.findUnique({
+    (await requirePrisma().eventInstance.findUnique({
       where: { templateId_date: { templateId: template.id, date } },
     })) ??
-    (await prisma.eventInstance.create({
+    (await requirePrisma().eventInstance.create({
       data: { templateId: template.id, date },
     }));
 
@@ -316,9 +316,9 @@ export async function generateDateSchedule(formData: FormData) {
     breakMinutes: template.breakMinutes,
   });
 
-  await prisma.$transaction(
+  await requirePrisma().$transaction(
     slots.map((s) =>
-      prisma.slot.upsert({
+      requirePrisma().slot.upsert({
         where: { instanceId_startMin: { instanceId: instance.id, startMin: s.startMin } },
         update: { endMin: s.endMin, status: "AVAILABLE" },
         create: { instanceId: instance.id, startMin: s.startMin, endMin: s.endMin, status: "AVAILABLE" },
@@ -343,7 +343,7 @@ export async function inviteManager(formData: FormData) {
 
   const passwordHash = await bcrypt.hash(tempPassword, 12);
 
-  await prisma.$transaction(async (tx) => {
+  await requirePrisma().$transaction(async (tx) => {
     const manager =
       (await tx.venueManager.findUnique({ where: { email: managerEmail } })) ??
       (await tx.venueManager.create({ data: { email: managerEmail, passwordHash } }));
@@ -367,7 +367,7 @@ export async function houseBookSlot(formData: FormData) {
   const allowed = await venueIdsForSession(session);
   if (!allowed.includes(venueId)) throw new Error("Not allowed");
 
-  await prisma.$transaction(async (tx) => {
+  await requirePrisma().$transaction(async (tx) => {
     const slot = await tx.slot.findUnique({
       where: { id: slotId },
       include: {
@@ -425,7 +425,7 @@ export async function houseBookSlot(formData: FormData) {
   });
 
   revalidatePath("/venue");
-  const v = await prisma.venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+  const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
 }
 
@@ -442,13 +442,13 @@ export async function upgradeVenuePlan(formData: FormData) {
     redirect("/venue?planError=paymentsDisabled");
   }
 
-  await prisma.venue.update({
+  await requirePrisma().venue.update({
     where: { id: venueId },
     data: { subscriptionTier: "PRO" },
   });
 
   revalidatePath("/venue");
-  const v = await prisma.venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+  const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
 }
 

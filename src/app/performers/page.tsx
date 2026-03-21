@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { asStringArrayJson } from "@/lib/musicianProfile";
 import { buildPublicMetadata } from "@/lib/publicSeo";
+import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -21,35 +22,41 @@ export default async function PerformersPage({
   const { q } = await searchParams;
   const query = q?.trim() ?? "";
 
-  // SQLite: no case-insensitive `contains` in Prisma — scan a bounded set then filter.
-  const base = await prisma.musicianUser.findMany({
-    select: {
-      id: true,
-      stageName: true,
-      bio: true,
-      imageUrl: true,
-      homeCity: true,
-      homeRegion: true,
-      secondaryCity: true,
-      secondaryRegion: true,
-      openToHire: true,
-      travelRadiusMiles: true,
-      secondaryRadiusMiles: true,
-      specializations: true,
-      instruments: true,
-      hireRateDescription: true,
-      setLengthMinutes: true,
-    },
-    orderBy: { stageName: "asc" },
-    take: query ? 400 : 80,
-  });
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    return <PublicDataUnavailable title="Performer directory unavailable" />;
+  }
 
-  const qLower = query.toLowerCase();
-  const musicians = query
-    ? base.filter((m) => m.stageName.toLowerCase().includes(qLower)).slice(0, 80)
-    : base;
+  try {
+    // Scan a bounded set then filter (stage name contains).
+    const base = await prisma.musicianUser.findMany({
+      select: {
+        id: true,
+        stageName: true,
+        bio: true,
+        imageUrl: true,
+        homeCity: true,
+        homeRegion: true,
+        secondaryCity: true,
+        secondaryRegion: true,
+        openToHire: true,
+        travelRadiusMiles: true,
+        secondaryRadiusMiles: true,
+        specializations: true,
+        instruments: true,
+        hireRateDescription: true,
+        setLengthMinutes: true,
+      },
+      orderBy: { stageName: "asc" },
+      take: query ? 400 : 80,
+    });
 
-  return (
+    const qLower = query.toLowerCase();
+    const musicians = query
+      ? base.filter((m) => m.stageName.toLowerCase().includes(qLower)).slice(0, 80)
+      : base;
+
+    return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-3xl px-6 py-14">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -184,5 +191,8 @@ export default async function PerformersPage({
         </p>
       </main>
     </div>
-  );
+    );
+  } catch {
+    return <PublicDataUnavailable title="Performer directory unavailable" />;
+  }
 }

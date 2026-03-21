@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/mailer";
 import { PasswordResetAccountType } from "@/generated/prisma/client";
 
@@ -17,6 +17,7 @@ export async function createPasswordReset(input: {
   accountType: PasswordResetAccountType;
   email: string;
 }): Promise<{ sent: boolean }> {
+  const prisma = requirePrisma();
   const email = input.email.trim().toLowerCase();
 
   const exists =
@@ -59,6 +60,7 @@ export async function verifyResetToken(input: {
   token: string;
   accountType: PasswordResetAccountType;
 }) {
+  const prisma = requirePrisma();
   const tokenHash = hashToken(input.token);
   const rec = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
   if (!rec) return null;
@@ -76,6 +78,7 @@ export async function consumeResetToken(input: {
   const rec = await verifyResetToken({ token: input.token, accountType: input.accountType });
   if (!rec) return { ok: false as const };
 
+  const prisma = requirePrisma();
   const changed = await prisma.$transaction(async (tx) => {
     if (input.accountType === "VENUE") {
       const owner = await tx.venueOwner.findUnique({ where: { email: rec.email } });

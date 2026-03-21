@@ -38,7 +38,20 @@ export function LocationsDirectory({ rows }: { rows: LocationRow[] }) {
           autoComplete="off"
         />
       </label>
-      {filtered.length === 0 ? (
+      {rows.length === 0 ? (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/65">
+          <p>No MicStage venues list a city yet. When venues add their address, they&apos;ll appear here.</p>
+          <p className="mt-3">
+            <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
+              Register a venue
+            </Link>{" "}
+            ·{" "}
+            <Link className="underline hover:text-white" href="/performers">
+              Browse performers
+            </Link>
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/65">
           No locations match that search.
         </div>

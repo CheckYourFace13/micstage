@@ -1,7 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
@@ -24,6 +24,7 @@ export async function loginVenue(formData: FormData) {
   });
   if (!rl.allowed) redirect("/login/venue?error=rate");
 
+  const prisma = requirePrisma();
   const owner = await prisma.venueOwner.findUnique({ where: { email } });
   if (owner && (await bcrypt.compare(password, owner.passwordHash))) {
     await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });

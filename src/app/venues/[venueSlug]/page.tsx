@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { buildPublicMetadata } from "@/lib/publicSeo";
+import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { bookSlot, cancelBooking } from "./actions";
 import { venueIdsForVenueSession } from "@/lib/authz";
@@ -15,19 +16,36 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: { params: Promise<{ venueSlug: string }> }): Promise<Metadata> {
   const { venueSlug } = await props.params;
-  const venue = await prisma.venue.findUnique({ where: { slug: venueSlug } });
   const path = `/venues/${venueSlug}`;
-  if (!venue) {
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
     return buildPublicMetadata({
-      title: "Venue not found",
-      description: "This MicStage venue page could not be found. Browse open mic venues and performers from the home page.",
+      title: "Open mic venue",
+      description: "MicStage public venue pages show schedules and bookings when available.",
       path,
     });
   }
-  const place = [venue.city, venue.region].filter(Boolean).join(", ");
-  const title = place ? `${venue.name} open mic · ${place}` : `${venue.name} open mic schedule`;
-  const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules and who’s playing on MicStage.`;
-  return buildPublicMetadata({ title, description, path });
+  try {
+    const venue = await prisma.venue.findUnique({ where: { slug: venueSlug } });
+    if (!venue) {
+      return buildPublicMetadata({
+        title: "Venue not found",
+        description:
+          "This MicStage venue page could not be found. Browse open mic venues and performers from the home page.",
+        path,
+      });
+    }
+    const place = [venue.city, venue.region].filter(Boolean).join(", ");
+    const title = place ? `${venue.name} open mic · ${place}` : `${venue.name} open mic schedule`;
+    const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules and who’s playing on MicStage.`;
+    return buildPublicMetadata({ title, description, path });
+  } catch {
+    return buildPublicMetadata({
+      title: "Open mic venue",
+      description: "MicStage public venue pages show schedules and bookings when available.",
+      path,
+    });
+  }
 }
 
 export default async function VenuePublicPage(props: {
@@ -39,22 +57,32 @@ export default async function VenuePublicPage(props: {
   const session = await getSession();
   const now = new Date();
 
-  const venue = await prisma.venue.findUnique({
-    where: { slug: venueSlug },
-    include: {
-      eventTemplates: {
-        where: { isPublic: true },
-        orderBy: [{ weekday: "asc" }, { startTimeMin: "asc" }],
-        include: {
-          instances: {
-            orderBy: { date: "desc" },
-            take: 8,
-            include: { slots: { orderBy: { startMin: "asc" }, include: { booking: true } } },
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    return <PublicDataUnavailable title="Venue page unavailable" />;
+  }
+
+  let venue;
+  try {
+    venue = await prisma.venue.findUnique({
+      where: { slug: venueSlug },
+      include: {
+        eventTemplates: {
+          where: { isPublic: true },
+          orderBy: [{ weekday: "asc" }, { startTimeMin: "asc" }],
+          include: {
+            instances: {
+              orderBy: { date: "desc" },
+              take: 8,
+              include: { slots: { orderBy: { startMin: "asc" }, include: { booking: true } } },
+            },
           },
         },
       },
-    },
-  });
+    });
+  } catch {
+    return <PublicDataUnavailable title="Venue page unavailable" />;
+  }
 
   if (!venue) notFound();
 

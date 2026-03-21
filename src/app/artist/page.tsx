@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { requirePrisma } from "@/lib/prisma";
 import { requireMusicianSession } from "@/lib/authz";
 import { minutesToTimeLabel } from "@/lib/time";
 import { ArtistProfileForm } from "./ArtistProfileForm";
@@ -18,6 +18,7 @@ export default async function ArtistPortalPage({
 }) {
   const q = await searchParams;
   const session = await requireMusicianSession();
+  const prisma = requirePrisma();
 
   const musician = await prisma.musicianUser.findUnique({
     where: { id: session.musicianId },

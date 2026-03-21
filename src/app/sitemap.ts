@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { prisma } from "@/lib/prisma";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 
 export const dynamic = "force-dynamic";
@@ -33,33 +33,42 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: path === "" ? 1 : 0.85,
   }));
 
-  const venues = await prisma.venue.findMany({
-    select: { slug: true, updatedAt: true },
-  });
-
-  const venueEntries: MetadataRoute.Sitemap = venues.map((v) => ({
-    url: `${base}/venues/${v.slug}`,
-    lastModified: v.updatedAt,
-    changeFrequency: "weekly",
-    priority: 0.75,
-  }));
-
-  const withCity = await prisma.venue.findMany({
-    where: { city: { not: null } },
-    select: { city: true },
-  });
-  const citySlugs = new Set<string>();
-  for (const v of withCity) {
-    const c = v.city?.trim();
-    if (c) citySlugs.add(slugify(c));
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    return staticEntries;
   }
 
-  const locationEntries: MetadataRoute.Sitemap = [...citySlugs].map((slug) => ({
-    url: `${base}/locations/${slug}/performers`,
-    lastModified: now,
-    changeFrequency: "weekly",
-    priority: 0.65,
-  }));
+  try {
+    const venues = await prisma.venue.findMany({
+      select: { slug: true, updatedAt: true },
+    });
 
-  return [...staticEntries, ...venueEntries, ...locationEntries];
+    const venueEntries: MetadataRoute.Sitemap = venues.map((v) => ({
+      url: `${base}/venues/${v.slug}`,
+      lastModified: v.updatedAt,
+      changeFrequency: "weekly",
+      priority: 0.75,
+    }));
+
+    const withCity = await prisma.venue.findMany({
+      where: { city: { not: null } },
+      select: { city: true },
+    });
+    const citySlugs = new Set<string>();
+    for (const v of withCity) {
+      const c = v.city?.trim();
+      if (c) citySlugs.add(slugify(c));
+    }
+
+    const locationEntries: MetadataRoute.Sitemap = [...citySlugs].map((slug) => ({
+      url: `${base}/locations/${slug}/performers`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.65,
+    }));
+
+    return [...staticEntries, ...venueEntries, ...locationEntries];
+  } catch {
+    return staticEntries;
+  }
 }

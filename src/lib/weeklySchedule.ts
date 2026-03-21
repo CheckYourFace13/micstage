@@ -49,6 +49,11 @@ export type WeeklySchedulePreview = {
 /**
  * Counts how many venue-calendar evenings match selected weekdays between series bounds,
  * and total slot rows that would exist if each night used the same grid (no DB reads).
+ *
+ * Date iteration uses Luxon calendar steps in the venue zone (`plus({ days: 1 })` from local
+ * `startOf("day")`), which follows civil dates through DST (no 25h/23h UTC bugs for “which
+ * day is it?”). Instance `storageDate` is always `YYYY-MM-DDT00:00:00.000Z` for that civil
+ * label — same invariant as the rest of the app (`slotStartInstant` interprets show times).
  */
 export function computeWeeklySchedulePreview(input: WeeklySchedulePreviewInput): WeeklySchedulePreview | null {
   const { seriesStart, seriesEnd, weekdays, timeZone, startTimeMin, endTimeMin, slotMinutes, breakMinutes } = input;
@@ -103,7 +108,11 @@ export function computeWeeklySchedulePreview(input: WeeklySchedulePreviewInput):
   };
 }
 
-/** Every calendar day in the series range as stored instance dates (UTC midnight of yyyy-mm-dd). */
+/**
+ * Every calendar day in the series range as stored instance dates (`YYYY-MM-DDT00:00:00.000Z`).
+ * Walks the venue’s local calendar; DST transitions shift wall-clock but not the sequence of
+ * civil dates (fall-back “repeat hour” is not modeled — open-mic ranges rarely start at 1:00 local).
+ */
 export function* iterStorageDatesInVenueSeries(seriesStart: Date, seriesEnd: Date, timeZone: string): Generator<{
   storageDate: Date;
   weekday: Weekday;

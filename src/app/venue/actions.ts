@@ -165,7 +165,16 @@ export async function createEventTemplate(formData: FormData) {
   const restrictionHoursBefore = optInt(formData, "restrictionHoursBefore") ?? venue?.restrictionHoursBefore ?? 6;
   const onPremiseMaxDistanceMeters = optInt(formData, "onPremiseMaxDistanceMeters") ?? venue?.onPremiseMaxDistanceMeters ?? 1000;
 
-  await requirePrisma().eventTemplate.create({
+  const prisma = requirePrisma();
+  const existingSameDay = await prisma.eventTemplate.findFirst({
+    where: { venueId, weekday },
+    select: { id: true },
+  });
+  if (existingSameDay) {
+    redirect("/venue?profileError=duplicateWeekday");
+  }
+
+  await prisma.eventTemplate.create({
     data: {
       venueId,
       title,
@@ -182,7 +191,7 @@ export async function createEventTemplate(formData: FormData) {
     },
   });
 
-  await requirePrisma().venue.update({
+  await prisma.venue.update({
     where: { id: venueId },
     data: {
       seriesStartDate,
@@ -198,6 +207,7 @@ export async function createEventTemplate(formData: FormData) {
  * Create or update one template per selected weekday (latest match per day wins),
  * update venue booking window, then materialize instances + slots for all templates
  * in range. Booked slots are never overwritten or removed.
+ * Bulk generation runs only the newest template per weekday (see dedupe below).
  */
 export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
   const session = await requireVenueSession();
@@ -317,9 +327,16 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
   });
   if (!venueForRules) throw new Error("Venue not found");
 
-  const templates = await prisma.eventTemplate.findMany({
+  const allVenueTemplates = await prisma.eventTemplate.findMany({
     where: { venueId },
-    orderBy: [{ weekday: "asc" }, { startTimeMin: "asc" }],
+    orderBy: { updatedAt: "desc" },
+  });
+  /** One template per weekday for bulk sync: newest `updatedAt` wins (matches weekly upsert target). */
+  const seenWeekday = new Set<Weekday>();
+  const templates = allVenueTemplates.filter((t) => {
+    if (seenWeekday.has(t.weekday)) return false;
+    seenWeekday.add(t.weekday);
+    return true;
   });
 
   for (const template of templates) {

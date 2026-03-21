@@ -86,6 +86,13 @@ export default async function VenuePortalPage({
           </div>
         </header>
 
+        {q.profileError === "duplicateWeekday" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            You already have a recurring schedule for that weekday. Use{" "}
+            <span className="font-semibold text-white">Set weekly schedule</span> to change it — MicStage keeps one template per
+            weekday per venue.
+          </div>
+        ) : null}
         {q.profileError === "badRange" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             End date must be on or after start date.
@@ -207,11 +214,11 @@ export default async function VenuePortalPage({
                       <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
                         Optional
                       </div>
-                      <h3 className="om-heading mt-2 text-xl tracking-wide text-white">Add another recurring night</h3>
+                      <h3 className="om-heading mt-2 text-xl tracking-wide text-white">Add a recurring night (single weekday)</h3>
                       <p className="mt-2 max-w-2xl text-sm text-white/70">
-                        Use this if you need a <span className="text-white/90">second</span> show on the same weekday or different
-                        booking rules. Prefer{" "}
-                        <span className="font-medium text-white/90">Set weekly schedule</span> above for your main grid.
+                        Only if you don’t use the weekly form yet — you can add <span className="text-white/90">one</span> template
+                        per weekday. If that weekday already exists, use{" "}
+                        <span className="font-medium text-white/90">Set weekly schedule</span> instead.
                       </p>
                     </div>
                   </div>

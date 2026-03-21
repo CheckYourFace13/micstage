@@ -11,6 +11,7 @@ type SlotWithBooking = {
 
 /** True if this slot must not be reshaped or removed (active performer hold). */
 export function slotHasActiveBooking(slot: SlotWithBooking): boolean {
+  // RESERVED first: never reshape or delete even if booking row is missing (stale safety).
   if (slot.status === "RESERVED") return true;
   if (slot.booking && slot.booking.cancelledAt == null) return true;
   return false;

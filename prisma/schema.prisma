@@ -347,7 +347,14 @@ model Booking {
 
   cancelledAt DateTime?
 
+  /// Set when the ~24h-before-show email was successfully claimed/sent (idempotency).
+  reminderEmail24hSentAt DateTime?
+  /// Set when the ~2h-before-show email was successfully claimed/sent (idempotency).
+  reminderEmail2hSentAt DateTime?
+
   @@index([musicianId])
+  @@index([cancelledAt, reminderEmail24hSentAt])
+  @@index([cancelledAt, reminderEmail2hSentAt])
 }
 
 model PasswordResetToken {

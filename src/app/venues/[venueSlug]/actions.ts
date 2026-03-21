@@ -142,6 +142,7 @@ export async function bookSlot(formData: FormData) {
 
   revalidatePath(`/venues/${venueSlug}`);
   revalidatePath("/artist");
+  redirect(`/venues/${venueSlug}?booked=1`);
 }
 
 export async function cancelBooking(formData: FormData) {
@@ -206,5 +207,6 @@ export async function cancelBooking(formData: FormData) {
 
   revalidatePath(`/venues/${venueSlug}`);
   revalidatePath("/artist");
+  redirect(`/venues/${venueSlug}?cancelled=1`);
 }
 

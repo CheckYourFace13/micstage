@@ -5,6 +5,7 @@ import { requirePrisma } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
+import { JOINED_MUSICIAN, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -34,6 +35,6 @@ export async function registerMusician(formData: FormData) {
   });
 
   await setSession({ kind: "musician", musicianId: musician.id, email: musician.email });
-  redirect("/artist");
+  redirect(`/artist?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_MUSICIAN}`);
 }
 

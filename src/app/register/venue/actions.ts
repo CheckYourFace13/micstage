@@ -7,6 +7,7 @@ import { slugify } from "@/lib/slug";
 import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
+import { JOINED_VENUE, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -91,6 +92,6 @@ export async function registerVenue(formData: FormData) {
     await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
   });
 
-  redirect("/venue");
+  redirect(`/venue?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_VENUE}`);
 }
 

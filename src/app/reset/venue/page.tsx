@@ -2,9 +2,6 @@ import { requestVenuePasswordReset } from "./actions";
 
 export const metadata = {
   title: "Reset venue password | MicStage",
-  alternates: {
-    canonical: "https://micstage.com/reset/venue",
-  },
 };
 
 export default async function ResetVenuePasswordPage(props: {

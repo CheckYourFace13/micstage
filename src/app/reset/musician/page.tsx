@@ -2,9 +2,6 @@ import { requestMusicianPasswordReset } from "./actions";
 
 export const metadata = {
   title: "Reset artist password | MicStage",
-  alternates: {
-    canonical: "https://micstage.com/reset/musician",
-  },
 };
 
 export default async function ResetMusicianPasswordPage(props: {

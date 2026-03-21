@@ -1,14 +1,12 @@
+import type { Metadata } from "next";
 import { finalizeMusicianPasswordReset } from "../actions";
 import { verifyResetToken } from "@/lib/passwordReset";
+import { privateNoIndexMetadata } from "@/lib/privateSeo";
 
-export async function generateMetadata(props: { params: Promise<{ token: string }> }) {
-  const { token } = await props.params;
+export async function generateMetadata(_props: { params: Promise<{ token: string }> }): Promise<Metadata> {
   return {
     title: "Set new artist password | MicStage",
-    alternates: {
-      canonical: `https://micstage.com/reset/musician/${token}`,
-    },
-    robots: { index: false, follow: false },
+    ...privateNoIndexMetadata,
   };
 }
 

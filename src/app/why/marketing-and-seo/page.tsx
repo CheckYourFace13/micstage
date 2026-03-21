@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Marketing and SEO for open mic venues and artists",
+  title: "Marketing & SEO for open mic venues and artists",
   description:
-    "MicStage combines artist discovery, venue pages, and SEO-ready URLs so your open mic attracts more performers, fans, and repeat traffic.",
+    "How MicStage combines artist discovery, venue pages, and crawl-friendly URLs so your open mic attracts more performers, fans, and search traffic.",
   path: "/why/marketing-and-seo",
 });
 

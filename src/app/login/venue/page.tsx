@@ -1,8 +1,5 @@
 export const metadata = {
   title: "Venue login | MicStage",
-  alternates: {
-    canonical: "https://micstage.com/login/venue",
-  },
 };
 
 import { redirect } from "next/navigation";

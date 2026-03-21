@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic venues by city",
   description:
-    "Browse MicStage-registered venues with open mics. Search by city or region, then open public schedules and performer activity.",
+    "Browse MicStage venues running open mics: search by city or region, then open public schedules, slots, and performer activity.",
   path: "/locations",
 });
 

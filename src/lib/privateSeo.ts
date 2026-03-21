@@ -5,5 +5,6 @@ export const privateNoIndexMetadata = {
   robots: {
     index: false,
     follow: false,
+    googleBot: { index: false, follow: false },
   },
 } satisfies Pick<Metadata, "robots">;

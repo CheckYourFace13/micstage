@@ -1,13 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { privateNoIndexMetadata } from "@/lib/privateSeo";
 import { getSession } from "@/lib/session";
 
 /** Friendly entry for bookmarks / “dashboard” links → venue or artist home. */
-export const metadata = {
-  title: "Dashboard | MicStage",
-  alternates: {
-    canonical: "https://micstage.com/dashboard",
-  },
-  robots: { index: false, follow: false },
+export const metadata: Metadata = {
+  title: "Dashboard",
+  ...privateNoIndexMetadata,
 };
 export default async function DashboardPage() {
   const s = await getSession();

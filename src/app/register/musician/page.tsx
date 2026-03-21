@@ -1,8 +1,5 @@
 export const metadata = {
   title: "Artist registration | MicStage",
-  alternates: {
-    canonical: "https://micstage.com/register/musician",
-  },
 };
 
 import { redirect } from "next/navigation";

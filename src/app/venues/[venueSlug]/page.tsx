@@ -39,8 +39,11 @@ export async function generateMetadata(props: { params: Promise<{ venueSlug: str
     }
     const place = [venue.city, venue.region].filter(Boolean).join(", ");
     const title = place ? `${venue.name} open mic · ${place}` : `${venue.name} open mic schedule`;
-    const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules and who’s playing on MicStage.`;
-    return buildPublicMetadata({ title, description, path });
+    const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules, slots, and who’s playing—on MicStage.`;
+    return {
+      ...buildPublicMetadata({ title, description, path }),
+      title: { absolute: `${title} | MicStage` },
+    };
   } catch {
     return buildPublicMetadata({
       title: "Open mic venue",

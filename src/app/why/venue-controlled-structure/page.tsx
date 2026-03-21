@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Venue-controlled open mic structure that scales",
+  title: "Venue-controlled open mic schedules that scale",
   description:
-    "Define open mic schedules once on MicStage, generate consistent slot pages, and publish indexable venue content for local discovery.",
+    "Define recurring open mic structure once on MicStage, generate bookable slots, and publish indexable venue pages for local discovery.",
   path: "/why/venue-controlled-structure",
 });
 

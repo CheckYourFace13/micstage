@@ -1,12 +1,8 @@
 import type { MetadataRoute } from "next";
-
-function baseUrl(): string {
-  const raw = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://micstage.com";
-  return raw.replace(/\/$/, "");
-}
+import { siteOrigin } from "@/lib/publicSeo";
 
 export default function robots(): MetadataRoute.Robots {
-  const base = baseUrl();
+  const base = siteOrigin();
   return {
     rules: {
       userAgent: "*",

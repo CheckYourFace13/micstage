@@ -2,13 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
-const homeTitle = "MicStage | Open mic venues, artist discovery & marketing";
+const homeTitle = "MicStage — Open mic venues, artist discovery & local SEO";
 
 export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
-      "MicStage helps venues and artists get found: structured open mic schedules, bookable slots, performer search, and public pages built for local marketing and search.",
+      "MicStage helps open mic venues and artists get found: structured schedules, bookable slots, performer search, and shareable public pages for local discovery.",
     path: "/",
   }),
   /** Avoid root layout `title.template` appending "| MicStage" twice. */

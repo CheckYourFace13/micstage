@@ -1,12 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { privateNoIndexMetadata } from "@/lib/privateSeo";
 import { logout } from "./actions";
 
-export const metadata = {
-  title: "Logged out | MicStage",
-  alternates: {
-    canonical: "https://micstage.com/logout",
-  },
-  robots: { index: false, follow: false },
+export const metadata: Metadata = {
+  title: "Signing out",
+  ...privateNoIndexMetadata,
 };
 
 export default async function LogoutPage() {

@@ -8,7 +8,7 @@ import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Find performers by stage name",
+  title: "Find open mic performers by stage name",
   description:
     "Search MicStage artists by public stage name. Discover open mic regulars and hire-ready acts—legal names stay private.",
   path: "/performers",

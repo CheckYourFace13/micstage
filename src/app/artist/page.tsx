@@ -6,9 +6,6 @@ import { ArtistProfileForm } from "./ArtistProfileForm";
 
 export const metadata = {
   title: "Artist portal | MicStage",
-  alternates: {
-    canonical: "https://micstage.com/artist",
-  },
 };
 
 export default async function ArtistPortalPage({

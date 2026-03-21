@@ -1,16 +1,12 @@
 import type { MetadataRoute } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
+import { siteOrigin } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
 
-function baseUrl(): string {
-  const raw = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://micstage.com";
-  return raw.replace(/\/$/, "");
-}
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = baseUrl();
+  const base = siteOrigin();
   const now = new Date();
 
   const staticPaths = [
@@ -23,10 +19,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/privacy",
     "/terms",
     "/contact",
-    "/login/musician",
-    "/login/venue",
-    "/register/musician",
-    "/register/venue",
   ];
 
   const staticEntries: MetadataRoute.Sitemap = staticPaths.map((path) => ({

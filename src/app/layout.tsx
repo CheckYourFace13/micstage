@@ -6,7 +6,7 @@ import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics"
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { isAnalyticsDisabled } from "@/lib/productAnalytics";
-import { siteOrigin } from "@/lib/publicSeo";
+import { absoluteUrl, siteOrigin } from "@/lib/publicSeo";
 import "./globals.css";
 
 const heading = Bebas_Neue({
@@ -22,7 +22,7 @@ const body = Inter({
 
 const origin = siteOrigin();
 const defaultDescription =
-  "MicStage connects open mic venues and artists: bookable schedules, performer discovery, and public pages built for local marketing and search.";
+  "MicStage connects open mic venues and artists—bookable slots, performer discovery, and public venue pages built for local SEO and sharing.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(origin),
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     siteName: "MicStage",
     type: "website",
     locale: "en_US",
-    url: `${origin}/`,
+    url: absoluteUrl("/"),
     title: "MicStage",
     description: defaultDescription,
   },

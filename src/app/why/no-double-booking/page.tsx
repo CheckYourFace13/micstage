@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "No double-booking: dependable open mic reservations",
+  title: "No double-booking: reliable open mic reservations",
   description:
-    "How MicStage uses slot locking and clear reservations so venues and artists see the same availability—less confusion, stronger trust.",
+    "MicStage uses slot locking and clear reservations so venues and artists see the same availability—less confusion, stronger trust.",
   path: "/why/no-double-booking",
 });
 

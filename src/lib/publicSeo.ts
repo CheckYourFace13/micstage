@@ -7,6 +7,17 @@ export function siteOrigin(): string {
   if (!/^https?:\/\//i.test(raw)) {
     raw = `https://${raw}`;
   }
+  const hostMatch = /^https?:\/\/([^/:?#]+)/i.exec(raw);
+  const host = (hostMatch?.[1] ?? "").toLowerCase();
+  const isLocal =
+    host === "localhost" ||
+    host.startsWith("127.") ||
+    host.endsWith(".local") ||
+    host.includes("localhost");
+  // Prefer HTTPS for any non-local host so metadataBase / canonicals never use accidental http:// in production.
+  if (!isLocal && raw.startsWith("http://")) {
+    raw = `https://${raw.slice("http://".length)}`;
+  }
   return raw;
 }
 
@@ -28,6 +39,11 @@ export function buildPublicMetadata(opts: {
     title: opts.title,
     description: opts.description,
     alternates: { canonical },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true },
+    },
     openGraph: {
       title: opts.title,
       description: opts.description,

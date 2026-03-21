@@ -10,6 +10,9 @@ export const REMINDER_24H_WINDOW_MS = { min: 23 * MS_H, max: 25 * MS_H };
 /** Slot start is between ~1.5h and ~2.5h from now → send “soon” reminder. */
 export const REMINDER_2H_WINDOW_MS = { min: 1.5 * MS_H, max: 2.5 * MS_H };
 
+/** Max rows loaded per reminder kind per cron run (keeps Hostinger / small DB work low). */
+const REMINDER_QUERY_BATCH = 50;
+
 function appUrl(): string {
   return process.env.APP_URL?.replace(/\/$/, "") || process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "http://localhost:3000";
 }
@@ -157,7 +160,7 @@ export async function runBookingReminderJob(now: Date = new Date()): Promise<Boo
       },
     },
     include: baseInclude,
-    take: 250,
+    take: REMINDER_QUERY_BATCH,
   });
 
   const candidates2 = await prisma.booking.findMany({
@@ -172,7 +175,7 @@ export async function runBookingReminderJob(now: Date = new Date()): Promise<Boo
       },
     },
     include: baseInclude,
-    take: 250,
+    take: REMINDER_QUERY_BATCH,
   });
 
   for (const booking of candidates24) {

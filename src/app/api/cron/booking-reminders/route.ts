@@ -8,14 +8,17 @@ export const runtime = "nodejs";
 /**
  * POST or GET /api/cron/booking-reminders
  *
- * Trigger from Vercel Cron, GitHub Actions, or any scheduler. Protect with a shared secret:
+ * Production: call from an **external** scheduler (e.g. Hostinger hPanel cron + curl, or cron-job.org)
+ * on a fixed interval (~every 30 minutes). Not invoked by the app itself.
+ *
+ * Auth (required in production):
  *   Authorization: Bearer <CRON_SECRET>
  * or:
  *   x-micstage-cron-secret: <CRON_SECRET>
  *
  * Env: CRON_SECRET (or MICSTAGE_CRON_SECRET). Optional: MICSTAGE_DISABLE_BOOKING_REMINDERS=1 to no-op.
  *
- * Email: reuses RESEND_API_KEY + EMAIL_FROM + APP_URL (see src/lib/mailer.ts).
+ * Email: RESEND_API_KEY + EMAIL_FROM + APP_URL (see src/lib/mailer.ts). See docs/BOOKING_REMINDERS.md.
  */
 function authorize(request: Request): boolean {
   const expected = process.env.CRON_SECRET?.trim() || process.env.MICSTAGE_CRON_SECRET?.trim();

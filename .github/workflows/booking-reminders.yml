@@ -1,0 +1,19 @@
+name: Booking reminders
+
+on:
+  schedule:
+    # Every 30 minutes (UTC). GitHub may delay runs slightly during high load.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/cron/booking-reminders
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -m 120 \
+            "https://micstage.com/api/cron/booking-reminders"

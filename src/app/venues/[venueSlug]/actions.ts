@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
-import { bookingBlockReason, slotRestrictionBlockReason } from "@/lib/venueBookingRules";
+import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -47,12 +48,16 @@ export async function bookSlot(formData: FormData) {
   if (!slotPreview) throw new Error("Slot not found");
   if (slotPreview.instance.template.venue.slug !== venueSlug) throw new Error("Venue mismatch");
   const venue = slotPreview.instance.template.venue;
+  if (slotPreview.instance.isCancelled) {
+    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("This date’s schedule was cancelled.")}`);
+  }
   const instanceBlock = bookingBlockReason(venue, slotPreview.instance.date);
   if (instanceBlock) {
     redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(instanceBlock)}`);
   }
 
-  const slotStartUtc = new Date(slotPreview.instance.date.getTime() + slotPreview.startMin * 60 * 1000);
+  const previewTz = slotPreview.instance.template.timeZone;
+  const slotStartUtc = slotStartInstant(slotPreview.instance.date, slotPreview.startMin, previewTz);
   const templateRestrictionBlock = slotRestrictionBlockReason(
     {
       bookingRestrictionMode: slotPreview.instance.template.bookingRestrictionMode,
@@ -64,6 +69,7 @@ export async function bookSlot(formData: FormData) {
     slotStartUtc,
     new Date(),
     clientLocation,
+    { restrictionTimeZone: previewTz },
   );
   if (templateRestrictionBlock) {
     redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(templateRestrictionBlock)}`);
@@ -76,12 +82,16 @@ export async function bookSlot(formData: FormData) {
     });
     if (!slot) throw new Error("Slot not found");
     if (slot.instance.template.venue.slug !== venueSlug) throw new Error("Venue mismatch");
+    if (slot.instance.isCancelled) {
+      redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("This date’s schedule was cancelled.")}`);
+    }
     if (slot.status !== "AVAILABLE") throw new Error("Slot is not available");
     if (slot.booking && !slot.booking.cancelledAt) throw new Error("Slot already booked");
 
     // Re-check restriction in transaction for consistency.
     const txVenue = slot.instance.template.venue;
-    const txSlotStartUtc = new Date(slot.instance.date.getTime() + slot.startMin * 60 * 1000);
+    const txTz = slot.instance.template.timeZone;
+    const txSlotStartUtc = slotStartInstant(slot.instance.date, slot.startMin, txTz);
     const txInstanceBlock = bookingBlockReason(txVenue, slot.instance.date);
     if (txInstanceBlock) redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(txInstanceBlock)}`);
     const txRestrictionBlock = slotRestrictionBlockReason(
@@ -95,6 +105,7 @@ export async function bookSlot(formData: FormData) {
       txSlotStartUtc,
       new Date(),
       clientLocation,
+      { restrictionTimeZone: txTz },
     );
     if (txRestrictionBlock) redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(txRestrictionBlock)}`);
 
@@ -138,6 +149,41 @@ export async function cancelBooking(formData: FormData) {
   const bookingId = reqString(formData, "bookingId");
 
   const session = await getSession();
+  if (!session) {
+    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Sign in to cancel a booking.")}`);
+  }
+
+  const bookingVenueId = await prisma.booking
+    .findUnique({
+      where: { id: bookingId },
+      select: { slot: { select: { instance: { select: { template: { select: { venueId: true } } } } } } },
+    })
+    .then((b) => b?.slot.instance.template.venueId);
+
+  if (!bookingVenueId) {
+    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Booking not found.")}`);
+  }
+
+  const allowedVenueIds = await venueIdsForVenueSession(session);
+
+  if (session.kind === "musician") {
+    const full = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { musicianId: true, slot: { select: { instance: { select: { template: { select: { venue: { select: { slug: true } } } } } } } } },
+    });
+    if (!full || full.slot.instance.template.venue.slug !== venueSlug) {
+      redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Booking not found.")}`);
+    }
+    if (!full.musicianId || full.musicianId !== session.musicianId) {
+      redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("You can only cancel your own bookings.")}`);
+    }
+  } else if (session.kind === "venue") {
+    if (!allowedVenueIds.includes(bookingVenueId)) {
+      redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Not allowed to cancel this booking.")}`);
+    }
+  } else {
+    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Sign in to cancel a booking.")}`);
+  }
 
   await prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
@@ -146,11 +192,6 @@ export async function cancelBooking(formData: FormData) {
     });
     if (!booking) throw new Error("Booking not found");
     if (booking.slot.instance.template.venue.slug !== venueSlug) throw new Error("Venue mismatch");
-
-    // Musicians can only cancel their own booking if tied to their account.
-    if (session?.kind === "musician" && booking.musicianId && booking.musicianId !== session.musicianId) {
-      throw new Error("Not allowed");
-    }
 
     await tx.booking.update({
       where: { id: booking.id },

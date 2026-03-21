@@ -11,7 +11,16 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/artist", "/venue", "/dashboard", "/logout"],
+      disallow: [
+        "/artist",
+        "/venue",
+        "/dashboard",
+        "/logout",
+        "/api",
+        "/login",
+        "/register",
+        "/reset",
+      ],
     },
     sitemap: `${base}/sitemap.xml`,
   };

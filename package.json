@@ -19,6 +19,7 @@
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
     "jose": "^6.2.2",
+    "luxon": "^3.7.2",
     "next": "16.2.0",
     "pg": "^8.20.0",
     "prisma": "^7.5.0",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@types/google.maps": "^3.58.1",
+    "@types/luxon": "^3.7.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

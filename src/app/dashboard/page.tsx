@@ -7,6 +7,7 @@ export const metadata = {
   alternates: {
     canonical: "https://micstage.com/dashboard",
   },
+  robots: { index: false, follow: false },
 };
 export default async function DashboardPage() {
   const s = await getSession();

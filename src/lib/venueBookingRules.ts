@@ -1,37 +1,61 @@
+import { DateTime } from "luxon";
 import { BookingRestrictionMode } from "@/generated/prisma/client";
 
-function startOfUtcDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+/** YYYY-MM-DD for dates stored as UTC midnight representing a chosen calendar day. */
+function storageYmd(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
 type SeriesAndWindow = {
   seriesStartDate: Date | null;
   seriesEndDate: Date | null;
   bookingOpensDaysAhead: number;
+  /** Venue IANA timezone for “today” vs event-day comparisons. */
+  timeZone: string;
 };
+
+/**
+ * Absolute instant when a slot starts: local midnight on the instance’s calendar date
+ * in `timeZone`, plus `startMin` minutes from local midnight (template semantics).
+ */
+export function slotStartInstant(instanceDate: Date, startMin: number, timeZone: string): Date {
+  const tz = timeZone?.trim() || "America/Chicago";
+  const ymd = storageYmd(instanceDate);
+  const dt = DateTime.fromISO(`${ymd}T00:00:00`, { zone: tz }).plus({ minutes: startMin });
+  if (!dt.isValid) {
+    // Fallback if IANA id is wrong — avoids crashing booking
+    return new Date(instanceDate.getTime() + startMin * 60 * 1000);
+  }
+  return dt.toJSDate();
+}
 
 export function isDateInSeriesRange(
   venue: Pick<SeriesAndWindow, "seriesStartDate" | "seriesEndDate">,
   eventDate: Date,
 ): boolean {
-  const day = startOfUtcDay(eventDate).getTime();
+  const eventYmd = storageYmd(eventDate);
   if (venue.seriesStartDate) {
-    if (day < startOfUtcDay(venue.seriesStartDate).getTime()) return false;
+    const startYmd = storageYmd(venue.seriesStartDate);
+    if (eventYmd < startYmd) return false;
   }
   if (venue.seriesEndDate) {
-    if (day > startOfUtcDay(venue.seriesEndDate).getTime()) return false;
+    const endYmd = storageYmd(venue.seriesEndDate);
+    if (eventYmd > endYmd) return false;
   }
   return true;
 }
 
 export function isWithinBookingWindow(
-  venue: Pick<SeriesAndWindow, "bookingOpensDaysAhead">,
+  venue: Pick<SeriesAndWindow, "bookingOpensDaysAhead" | "timeZone">,
   eventDate: Date,
   now: Date = new Date(),
 ): boolean {
-  const today = startOfUtcDay(now).getTime();
-  const slotDay = startOfUtcDay(eventDate).getTime();
-  const diffDays = Math.round((slotDay - today) / (24 * 60 * 60 * 1000));
+  const tz = venue.timeZone?.trim() || "America/Chicago";
+  const eventYmd = storageYmd(eventDate);
+  const eventDay = DateTime.fromISO(eventYmd, { zone: tz }).startOf("day");
+  if (!eventDay.isValid) return false;
+  const todayDay = DateTime.fromJSDate(now, { zone: "utc" }).setZone(tz).startOf("day");
+  const diffDays = eventDay.diff(todayDay, "days").days;
   if (diffDays < 0) return false;
   if (diffDays > venue.bookingOpensDaysAhead) return false;
   return true;
@@ -58,17 +82,18 @@ export function slotRestrictionBlockReason(
   slotStartUtc: Date,
   now: Date = new Date(),
   clientLocation?: { lat: number; lng: number },
-  opts?: { onPremiseMissingLocationShouldBlock?: boolean },
+  opts?: { onPremiseMissingLocationShouldBlock?: boolean; restrictionTimeZone?: string },
 ): string | null {
   if (slotStartUtc.getTime() <= now.getTime()) return "This slot has already started.";
 
   const mode = restriction.bookingRestrictionMode;
+  const tz = opts?.restrictionTimeZone?.trim() || "America/Chicago";
 
   if (mode === "NONE") return null;
 
   if (mode === "ATTENDEE_DAY_OF") {
-    const nowDay = startOfUtcDay(now).getTime();
-    const slotDay = startOfUtcDay(slotStartUtc).getTime();
+    const nowDay = DateTime.fromJSDate(now, { zone: "utc" }).setZone(tz).startOf("day");
+    const slotDay = DateTime.fromJSDate(slotStartUtc, { zone: "utc" }).setZone(tz).startOf("day");
     if (nowDay < slotDay) return "Reserved for attendees. Booking opens on the day of the show.";
     return null;
   }
@@ -93,7 +118,6 @@ export function slotRestrictionBlockReason(
       return "Location permission required to reserve this slot.";
     }
 
-    // Haversine distance (meters)
     const R = 6371000;
     const toRad = (x: number) => (x * Math.PI) / 180;
     const dLat = toRad(clientLocation.lat - venueLat);

@@ -6,6 +6,7 @@ export const metadata = {
   alternates: {
     canonical: "https://micstage.com/logout",
   },
+  robots: { index: false, follow: false },
 };
 
 export default async function LogoutPage() {

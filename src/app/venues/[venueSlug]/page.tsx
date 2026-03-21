@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { bookSlot, cancelBooking } from "./actions";
+import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
-import { bookingBlockReason, slotRestrictionBlockReason } from "@/lib/venueBookingRules";
+import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 import { equipmentProvidedList, performanceFormatLabel } from "@/lib/venueDisplay";
 import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 
@@ -66,6 +67,8 @@ export default async function VenuePublicPage(props: {
   };
 
   const isMusician = session?.kind === "musician";
+  const venueStaffVenueIds =
+    session?.kind === "venue" ? await venueIdsForVenueSession(session) : [];
   const gear = equipmentProvidedList(venue);
   const socialLinks = [
     ["Facebook", venue.facebookUrl],
@@ -219,12 +222,16 @@ export default async function VenuePublicPage(props: {
                   <div className="mt-5 grid gap-5">
                     {t.instances.map((inst) => {
                       const instanceBookBlock = bookingBlockReason(venue, inst.date);
+                      const instanceCancelled = inst.isCancelled;
                       return (
                       <div key={inst.id} className="rounded-xl border border-white/10 bg-black/30 p-5">
                         <div className="flex items-baseline justify-between gap-3">
                           <div className="font-semibold">Schedule for {inst.date.toISOString().slice(0, 10)}</div>
                           <div className="text-xs text-white/50">{inst.slots.length} slots</div>
                         </div>
+                        {instanceCancelled ? (
+                          <div className="mt-2 text-xs text-amber-200/90">This date was cancelled — booking is closed.</div>
+                        ) : null}
                         {instanceBookBlock ? (
                           <div className="mt-2 text-xs text-amber-200/90">{instanceBookBlock}</div>
                         ) : null}
@@ -233,7 +240,7 @@ export default async function VenuePublicPage(props: {
                           {inst.slots.map((s) => {
                             const activeBooking = s.booking && !s.booking.cancelledAt ? s.booking : null;
                             const isReservedCandidate = reserve === s.id;
-                            const slotStartUtc = new Date(inst.date.getTime() + s.startMin * 60 * 1000);
+                            const slotStartUtc = slotStartInstant(inst.date, s.startMin, t.timeZone);
                             const slotBlockReason = slotRestrictionBlockReason(
                               {
                                 bookingRestrictionMode: t.bookingRestrictionMode,
@@ -245,10 +252,27 @@ export default async function VenuePublicPage(props: {
                               slotStartUtc,
                               now,
                               undefined,
-                              { onPremiseMissingLocationShouldBlock: false },
+                              {
+                                onPremiseMissingLocationShouldBlock: false,
+                                restrictionTimeZone: t.timeZone,
+                              },
                             );
 
-                            const canBook = !activeBooking && !instanceBookBlock && slotBlockReason == null;
+                            const slotUsable = s.status === "AVAILABLE";
+                            const canBook =
+                              !instanceCancelled &&
+                              slotUsable &&
+                              !activeBooking &&
+                              !instanceBookBlock &&
+                              slotBlockReason == null;
+
+                            const canCancelBooking =
+                              !!activeBooking &&
+                              !!session &&
+                              ((session.kind === "musician" &&
+                                !!activeBooking.musicianId &&
+                                activeBooking.musicianId === session.musicianId) ||
+                                (session.kind === "venue" && venueStaffVenueIds.includes(venue.id)));
                             return (
                               <div
                                 key={s.id}
@@ -259,11 +283,17 @@ export default async function VenuePublicPage(props: {
                                     {minutesToTimeLabel(s.startMin)}–{minutesToTimeLabel(s.endMin)}
                                   </span>
                                   <span className="ml-2 text-white/70">
-                                    {activeBooking ? `Booked: ${activeBooking.performerName}` : "Open slot"}
+                                    {activeBooking
+                                      ? `Booked: ${activeBooking.performerName}`
+                                      : !slotUsable
+                                        ? s.status === "CANCELLED"
+                                          ? "Cancelled slot"
+                                          : "Unavailable"
+                                        : "Open slot"}
                                   </span>
                                 </div>
 
-                                {activeBooking ? (
+                                {activeBooking && canCancelBooking ? (
                                   <form action={cancelBooking}>
                                     <input type="hidden" name="venueSlug" value={venue.slug} />
                                     <input type="hidden" name="bookingId" value={activeBooking.id} />
@@ -315,8 +345,16 @@ export default async function VenuePublicPage(props: {
                                       Click here to reserve
                                     </Link>
                                   )
-                                ) : (
-                                  <span className="text-xs text-white/45">{slotBlockReason ?? "Booking closed for this date"}</span>
+                                ) : activeBooking ? null : (
+                                  <span className="text-xs text-white/45">
+                                    {instanceCancelled
+                                      ? "Booking closed."
+                                      : !slotUsable
+                                        ? s.status === "CANCELLED"
+                                          ? "This slot was cancelled."
+                                          : "This slot is not available."
+                                        : slotBlockReason ?? "Booking closed for this date."}
+                                  </span>
                                 )}
                               </div>
                             );

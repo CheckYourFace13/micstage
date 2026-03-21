@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { getSession, type Session } from "@/lib/session";
 
 export async function requireVenueSession() {
   const s = await getSession();
@@ -14,7 +14,10 @@ export async function requireMusicianSession() {
   return s;
 }
 
-export async function venueIdsForSession(session: Awaited<ReturnType<typeof requireVenueSession>>) {
+/** Venue IDs the signed-in venue owner/manager may act for; empty if not a venue session. */
+export async function venueIdsForVenueSession(session: Session | null): Promise<string[]> {
+  if (!session || session.kind !== "venue") return [];
+
   if (session.venueOwnerId) {
     const venues = await prisma.venue.findMany({
       where: { ownerId: session.venueOwnerId },
@@ -32,5 +35,9 @@ export async function venueIdsForSession(session: Awaited<ReturnType<typeof requ
   }
 
   return [];
+}
+
+export async function venueIdsForSession(session: Awaited<ReturnType<typeof requireVenueSession>>) {
+  return venueIdsForVenueSession(session);
 }
 

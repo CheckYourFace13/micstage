@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
-import { bookingBlockReason, isDateInSeriesRange } from "@/lib/venueBookingRules";
+import { bookingBlockReason, isDateInSeriesRange, slotStartInstant } from "@/lib/venueBookingRules";
 import { BookingRestrictionMode, VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
 
 function reqString(formData: FormData, key: string): string {
@@ -382,7 +382,13 @@ export async function houseBookSlot(formData: FormData) {
     const instanceBlock = bookingBlockReason(instanceVenue, slot.instance.date);
     if (instanceBlock) throw new Error(instanceBlock);
 
-    const slotStartUtc = new Date(slot.instance.date.getTime() + slot.startMin * 60 * 1000);
+    if (slot.instance.isCancelled) throw new Error("This date’s schedule was cancelled.");
+
+    const slotStartUtc = slotStartInstant(
+      slot.instance.date,
+      slot.startMin,
+      slot.instance.template.timeZone,
+    );
     if (slotStartUtc.getTime() <= Date.now()) throw new Error("This slot has already started.");
 
     if (slot.booking && !slot.booking.cancelledAt) {

@@ -29,6 +29,12 @@ export function SiteHeader() {
           </Link>
           <Link
             className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
+            href="/contact"
+          >
+            Contact
+          </Link>
+          <Link
+            className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
             href="/login/musician"
           >
             Artist login

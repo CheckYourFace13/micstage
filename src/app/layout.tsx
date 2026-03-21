@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { Bebas_Neue, Inter } from "next/font/google";
 import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { isAnalyticsDisabled } from "@/lib/productAnalytics";
 import { siteOrigin } from "@/lib/publicSeo";
@@ -56,6 +57,7 @@ export default function RootLayout({
       <body className="min-h-full bg-black font-[var(--font-body)] text-white">
         <SiteHeader />
         {children}
+        <SiteFooter />
         {!isAnalyticsDisabled() ? <Analytics /> : null}
         {!isAnalyticsDisabled() ? (
           <Suspense fallback={null}>

@@ -20,6 +20,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/why/venue-controlled-structure",
     "/why/no-double-booking",
     "/why/marketing-and-seo",
+    "/privacy",
+    "/terms",
     "/login/musician",
     "/login/venue",
     "/register/musician",

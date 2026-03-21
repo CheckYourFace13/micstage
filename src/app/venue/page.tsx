@@ -4,6 +4,7 @@ import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { createEventTemplate, generateDateSchedule, houseBookSlot, inviteManager } from "./actions";
 import { minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
 import { VenueProfileForm } from "./VenueProfileForm";
+import { WeeklyScheduleForm } from "./WeeklyScheduleForm";
 
 export const metadata = {
   title: "Venue portal | MicStage",
@@ -18,6 +19,7 @@ export default async function VenuePortalPage({
   searchParams: Promise<{
     profileError?: string;
     scheduleError?: string;
+    scheduleSuccess?: string;
     planError?: string;
   }>;
 }) {
@@ -96,7 +98,18 @@ export default async function VenuePortalPage({
         ) : null}
         {q.scheduleError === "outsideSeries" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
-            That date is outside your venue’s open mic date range. Update the range in Step 1 or pick another date.
+            That date is outside your venue’s open mic date range. Update the booking window in your weekly schedule or pick
+            another date.
+          </div>
+        ) : null}
+        {q.scheduleError === "noWeekdays" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            Choose at least one weekday for your weekly schedule.
+          </div>
+        ) : null}
+        {q.scheduleSuccess === "weekly" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            Schedule saved and future slots updated. Booked slots were not changed.
           </div>
         ) : null}
         {q.profileError === "format" ? (
@@ -155,19 +168,50 @@ export default async function VenuePortalPage({
 
                 <VenueProfileForm venue={v} />
 
-                {/* Step 1: when the venue is available (recurring window) */}
+                {/* Primary: weekly schedule + bulk slot generation */}
                 <div className="mt-6 rounded-2xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.06)] p-6 shadow-[0_0_0_1px_rgba(255,45,149,0.12)]">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-                        Step 1
+                        Schedule
                       </div>
-                      <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">
-                        Set your available times
-                      </h3>
+                      <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">Set weekly schedule</h3>
                       <p className="mt-2 max-w-2xl text-sm text-white/70">
-                        Name this open mic night, pick the day/time, and set the booking window (start today and up to 60 days out on
-                        free). Create multiple templates if you run multiple nights.
+                        Pick which nights you run, your hours, and slot length. We create recurring templates and fill your booking
+                        window automatically. Re-run anytime to refresh open slots — existing bookings stay safe.
+                      </p>
+                    </div>
+                  </div>
+                  <WeeklyScheduleForm
+                    venueId={v.id}
+                    venueTimeZone={v.timeZone}
+                    todayIso={todayIso}
+                    horizonDays={horizonDaysFor(v.subscriptionTier)}
+                    defaultSeriesStart={v.seriesStartDate ? toIsoDateOnly(v.seriesStartDate) : todayIso}
+                    defaultSeriesEnd={
+                      v.seriesEndDate
+                        ? toIsoDateOnly(v.seriesEndDate)
+                        : plusDaysIso(horizonDaysFor(v.subscriptionTier))
+                    }
+                    defaultTitle={v.eventTemplates[0]?.title ?? "Open mic"}
+                    bookingRestrictionMode={v.bookingRestrictionMode}
+                    restrictionHoursBefore={v.restrictionHoursBefore ?? 6}
+                    onPremiseMaxDistanceMeters={v.onPremiseMaxDistanceMeters ?? 1000}
+                  />
+                </div>
+
+                {/* Optional: second recurring night on the same weekday or different rules */}
+                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
+                        Optional
+                      </div>
+                      <h3 className="om-heading mt-2 text-xl tracking-wide text-white">Add another recurring night</h3>
+                      <p className="mt-2 max-w-2xl text-sm text-white/70">
+                        Use this if you need a <span className="text-white/90">second</span> show on the same weekday or different
+                        booking rules. Prefer{" "}
+                        <span className="font-medium text-white/90">Set weekly schedule</span> above for your main grid.
                       </p>
                     </div>
                   </div>
@@ -347,17 +391,18 @@ export default async function VenuePortalPage({
                   </form>
                 </div>
 
-                {/* Step 2: generate bookable slots for a calendar date */}
+                {/* One-off: single date */}
                 <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-5">
                   <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-                    Step 2
+                    One-off
                   </div>
-                  <div className="mt-2 text-lg font-semibold text-white">Generate slots for a date</div>
+                  <div className="mt-2 text-lg font-semibold text-white">Generate slots for one date</div>
                   <p className="mt-1 text-sm text-white/60">
-                    After you’ve set times above, pick a date and click Generate so performers can book on your public page.
+                    Use this for a single calendar day without re-running the full window (same safe rules — booked slots are not
+                    overwritten).
                   </p>
                   {v.eventTemplates.length === 0 ? (
-                    <div className="mt-4 text-sm text-white/60">Complete Step 1 first — no schedules yet.</div>
+                    <div className="mt-4 text-sm text-white/60">Set a weekly schedule first — no templates yet.</div>
                   ) : (
                     <div className="mt-4 grid gap-3">
                       {v.eventTemplates.map((t) => (

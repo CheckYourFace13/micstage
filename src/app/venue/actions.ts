@@ -6,7 +6,17 @@ import { redirect } from "next/navigation";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
-import { bookingBlockReason, isDateInSeriesRange, slotStartInstant } from "@/lib/venueBookingRules";
+import { syncSlotsForInstance } from "@/lib/slotSync";
+import {
+  iterStorageDatesInVenueSeries,
+  parseWeekdaysFromForm,
+} from "@/lib/weeklySchedule";
+import {
+  bookingBlockReason,
+  isDateInSeriesRange,
+  isWithinBookingWindow,
+  slotStartInstant,
+} from "@/lib/venueBookingRules";
 import { BookingRestrictionMode, VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
 
 function reqString(formData: FormData, key: string): string {
@@ -184,6 +194,172 @@ export async function createEventTemplate(formData: FormData) {
   revalidatePath("/venue");
 }
 
+/**
+ * Create or update one template per selected weekday (latest match per day wins),
+ * update venue booking window, then materialize instances + slots for all templates
+ * in range. Booked slots are never overwritten or removed.
+ */
+export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
+  const session = await requireVenueSession();
+  const venueId = reqString(formData, "venueId");
+  const allowed = await venueIdsForSession(session);
+  if (!allowed.includes(venueId)) throw new Error("Not allowed");
+
+  const weekdays = parseWeekdaysFromForm(formData);
+  if (weekdays.length === 0) {
+    redirect("/venue?scheduleError=noWeekdays");
+  }
+
+  const title = reqString(formData, "title");
+  const startTimeMin = timeToMinutes(reqString(formData, "startTime"), "startTime");
+  const endTimeMin = timeToMinutes(reqString(formData, "endTime"), "endTime");
+  if (endTimeMin <= startTimeMin) throw new Error("End time must be after start time");
+
+  const slotMinutes = reqInt(formData, "slotMinutes");
+  const breakMinutes = reqInt(formData, "breakMinutes");
+  const seriesStartDate = reqDate(formData, "seriesStartDate");
+  const seriesEndDate = reqDate(formData, "seriesEndDate");
+  if (seriesEndDate.getTime() < seriesStartDate.getTime()) {
+    redirect("/venue?profileError=badRange");
+  }
+
+  const prisma = requirePrisma();
+  const venue = await prisma.venue.findUnique({
+    where: { id: venueId },
+    select: {
+      timeZone: true,
+      slug: true,
+      bookingRestrictionMode: true,
+      restrictionHoursBefore: true,
+      onPremiseMaxDistanceMeters: true,
+      subscriptionTier: true,
+    },
+  });
+  if (!venue) throw new Error("Venue not found");
+
+  const timeZone = optString(formData, "timeZone") ?? venue.timeZone ?? "America/Chicago";
+  const maxHorizonDays = venue.subscriptionTier === "FREE" ? 60 : 90;
+
+  const today = new Date();
+  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const horizonEndUtc = new Date(todayUtc.getTime() + maxHorizonDays * 24 * 60 * 60 * 1000);
+
+  if (seriesStartDate.getTime() < todayUtc.getTime() || seriesStartDate.getTime() > horizonEndUtc.getTime()) {
+    redirect("/venue?profileError=badRange");
+  }
+  if (seriesEndDate.getTime() < todayUtc.getTime() || seriesEndDate.getTime() > horizonEndUtc.getTime()) {
+    redirect("/venue?profileError=badRange");
+  }
+
+  const bookingOpensDaysAhead = Math.max(
+    1,
+    Math.min(maxHorizonDays, Math.round((seriesEndDate.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000))),
+  );
+
+  const bookingRestrictionModeStr =
+    optString(formData, "bookingRestrictionMode") ?? venue.bookingRestrictionMode ?? "NONE";
+  const allowedModes: BookingRestrictionMode[] = ["NONE", "ATTENDEE_DAY_OF", "HOURS_BEFORE", "ON_PREMISE"];
+  if (!allowedModes.includes(bookingRestrictionModeStr as BookingRestrictionMode)) redirect("/venue?profileError=format");
+  const bookingRestrictionMode = bookingRestrictionModeStr as BookingRestrictionMode;
+
+  const restrictionHoursBefore = optInt(formData, "restrictionHoursBefore") ?? venue.restrictionHoursBefore ?? 6;
+  const onPremiseMaxDistanceMeters =
+    optInt(formData, "onPremiseMaxDistanceMeters") ?? venue.onPremiseMaxDistanceMeters ?? 1000;
+
+  const templatePayload = {
+    title,
+    startTimeMin,
+    endTimeMin,
+    slotMinutes,
+    breakMinutes,
+    timeZone,
+    isPublic: true,
+    bookingRestrictionMode,
+    restrictionHoursBefore,
+    onPremiseMaxDistanceMeters,
+  };
+
+  for (const weekday of weekdays) {
+    const existing = await prisma.eventTemplate.findFirst({
+      where: { venueId, weekday },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true },
+    });
+    if (existing) {
+      await prisma.eventTemplate.update({
+        where: { id: existing.id },
+        data: templatePayload,
+      });
+    } else {
+      await prisma.eventTemplate.create({
+        data: { venueId, weekday, ...templatePayload },
+      });
+    }
+  }
+
+  await prisma.venue.update({
+    where: { id: venueId },
+    data: {
+      seriesStartDate,
+      seriesEndDate,
+      bookingOpensDaysAhead,
+    },
+  });
+
+  const venueForRules = await prisma.venue.findUnique({
+    where: { id: venueId },
+    select: {
+      seriesStartDate: true,
+      seriesEndDate: true,
+      bookingOpensDaysAhead: true,
+      timeZone: true,
+    },
+  });
+  if (!venueForRules) throw new Error("Venue not found");
+
+  const templates = await prisma.eventTemplate.findMany({
+    where: { venueId },
+    orderBy: [{ weekday: "asc" }, { startTimeMin: "asc" }],
+  });
+
+  for (const template of templates) {
+    const specs = generateSlotsForWindow({
+      startTimeMin: template.startTimeMin,
+      endTimeMin: template.endTimeMin,
+      slotMinutes: template.slotMinutes,
+      breakMinutes: template.breakMinutes,
+    });
+
+    for (const { storageDate, weekday } of iterStorageDatesInVenueSeries(
+      seriesStartDate,
+      seriesEndDate,
+      venueForRules.timeZone ?? timeZone,
+    )) {
+      if (weekday !== template.weekday) continue;
+      if (!isDateInSeriesRange(venueForRules, storageDate)) continue;
+      if (!isWithinBookingWindow(venueForRules, storageDate)) continue;
+
+      await prisma.$transaction(async (tx) => {
+        const inst =
+          (await tx.eventInstance.findUnique({
+            where: { templateId_date: { templateId: template.id, date: storageDate } },
+          })) ??
+          (await tx.eventInstance.create({
+            data: { templateId: template.id, date: storageDate },
+          }));
+
+        if (inst.isCancelled) return;
+
+        await syncSlotsForInstance(tx, inst.id, specs);
+      });
+    }
+  }
+
+  revalidatePath("/venue");
+  revalidatePath(`/venues/${venue.slug}`);
+  redirect("/venue?scheduleSuccess=weekly");
+}
+
 export async function updateVenueProfile(formData: FormData) {
   const session = await requireVenueSession();
   const venueId = reqString(formData, "venueId");
@@ -316,15 +492,11 @@ export async function generateDateSchedule(formData: FormData) {
     breakMinutes: template.breakMinutes,
   });
 
-  await requirePrisma().$transaction(
-    slots.map((s) =>
-      requirePrisma().slot.upsert({
-        where: { instanceId_startMin: { instanceId: instance.id, startMin: s.startMin } },
-        update: { endMin: s.endMin, status: "AVAILABLE" },
-        create: { instanceId: instance.id, startMin: s.startMin, endMin: s.endMin, status: "AVAILABLE" },
-      }),
-    ),
-  );
+  if (!instance.isCancelled) {
+    await requirePrisma().$transaction(async (tx) => {
+      await syncSlotsForInstance(tx, instance.id, slots);
+    });
+  }
 
   revalidatePath("/venue");
   revalidatePath(`/venues/${template.venue.slug}`);

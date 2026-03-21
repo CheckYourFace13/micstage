@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: POST /api/cron/booking-reminders
         run: |
-          curl -fsS -X POST \
+          curl -v -f -S -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -m 120 \
             "https://micstage.com/api/cron/booking-reminders"

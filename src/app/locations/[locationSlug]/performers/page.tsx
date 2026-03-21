@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
+import { assertKnownLocationSlugOrNotFound } from "@/lib/locationSlugValidation";
 import { minutesToTimeLabel } from "@/lib/time";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
@@ -27,6 +28,7 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
 
 export default async function LocationPerformersPage(props: { params: Promise<{ locationSlug: string }> }) {
   const { locationSlug } = await props.params;
+  await assertKnownLocationSlugOrNotFound(locationSlug);
   const cityGuess = titleCaseSlug(locationSlug);
 
   const today = new Date();

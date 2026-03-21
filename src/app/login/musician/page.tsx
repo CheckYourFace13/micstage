@@ -5,12 +5,20 @@ export const metadata = {
   },
 };
 
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
+import { safeAfterAuthPath } from "@/lib/safeRedirect";
 import { loginMusician } from "./serverActions";
 
 export default async function MusicianLoginPage(props: {
   searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
 }) {
   const { error, next, reset } = await props.searchParams;
+  const session = await getSession();
+  if (session?.kind === "musician") {
+    redirect(safeAfterAuthPath(next, "/artist"));
+  }
+
   const showInvalid = error === "invalid";
   const showRate = error === "rate";
   const showResetSuccess = reset === "success";

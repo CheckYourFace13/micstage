@@ -1,16 +1,28 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requirePrisma } from "@/lib/prisma";
+import { safeLoginNextPath } from "@/lib/safeRedirect";
 import { getSession, type Session } from "@/lib/session";
+
+async function loginRedirectPath(
+  loginBase: "/login/venue" | "/login/musician",
+  fallback: "/venue" | "/artist",
+) {
+  const h = await headers();
+  const fromHeader = h.get("x-micstage-pathname");
+  const next = safeLoginNextPath(fromHeader, fallback);
+  return `${loginBase}?next=${encodeURIComponent(next)}`;
+}
 
 export async function requireVenueSession() {
   const s = await getSession();
-  if (!s || s.kind !== "venue") redirect("/login/venue");
+  if (!s || s.kind !== "venue") redirect(await loginRedirectPath("/login/venue", "/venue"));
   return s;
 }
 
 export async function requireMusicianSession() {
   const s = await getSession();
-  if (!s || s.kind !== "musician") redirect("/login/musician");
+  if (!s || s.kind !== "musician") redirect(await loginRedirectPath("/login/musician", "/artist"));
   return s;
 }
 

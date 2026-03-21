@@ -5,11 +5,16 @@ export const metadata = {
   },
 };
 
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
 import { registerVenue } from "./actions";
 import { VenuePlaceFields } from "./venuePlaceFields";
 
 export default async function VenueRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await props.searchParams;
+  const session = await getSession();
+  if (session?.kind === "venue") redirect("/venue");
+
   const showRate = error === "rate";
 
   return (

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
+import { isValidPublicSlug } from "@/lib/locationSlugValidation";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: { params: Promise<{ venueSlug: string }> }): Promise<Metadata> {
   const { venueSlug } = await props.params;
+  if (!isValidPublicSlug(venueSlug)) notFound();
   const path = `/venues/${venueSlug}`;
   const prisma = getPrismaOrNull();
   if (!prisma) {
@@ -56,6 +58,8 @@ export default async function VenuePublicPage(props: {
   const { bookError, reserve } = await props.searchParams;
   const session = await getSession();
   const now = new Date();
+
+  if (!isValidPublicSlug(venueSlug)) notFound();
 
   const prisma = getPrismaOrNull();
   if (!prisma) {

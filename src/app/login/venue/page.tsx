@@ -5,10 +5,20 @@ export const metadata = {
   },
 };
 
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
+import { safeAfterAuthPath } from "@/lib/safeRedirect";
 import { loginVenue } from "./serverActions";
 
-export default async function VenueLoginPage(props: { searchParams: Promise<{ error?: string; reset?: string }> }) {
-  const { error, reset } = await props.searchParams;
+export default async function VenueLoginPage(props: {
+  searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
+}) {
+  const { error, next, reset } = await props.searchParams;
+  const session = await getSession();
+  if (session?.kind === "venue") {
+    redirect(safeAfterAuthPath(next, "/venue"));
+  }
+
   const showInvalid = error === "invalid";
   const showRate = error === "rate";
   const showResetSuccess = reset === "success";
@@ -24,6 +34,7 @@ export default async function VenueLoginPage(props: { searchParams: Promise<{ er
         <p className="mt-2 text-sm text-white/70">Log in to manage your venue schedule and invite managers.</p>
 
         <form action={loginVenue} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <input type="hidden" name="next" value={next ?? ""} />
           {showResetSuccess ? (
             <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
               Password updated successfully. You can log in now.

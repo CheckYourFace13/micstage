@@ -5,10 +5,15 @@ export const metadata = {
   },
 };
 
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
 import { registerMusician } from "./actions";
 
 export default async function MusicianRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await props.searchParams;
+  const session = await getSession();
+  if (session?.kind === "musician") redirect("/artist");
+
   const showRate = error === "rate";
 
   return (

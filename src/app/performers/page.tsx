@@ -1,16 +1,17 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { asStringArrayJson } from "@/lib/musicianProfile";
+import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Find performers | MicStage",
-  description: "Search MicStage performers by stage name. Legal names are never shown here.",
-  alternates: {
-    canonical: "https://micstage.com/performers",
-  },
-};
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Find performers by stage name",
+  description:
+    "Search MicStage artists by public stage name. Discover open mic regulars and hire-ready acts—legal names stay private.",
+  path: "/performers",
+});
 
 export default async function PerformersPage({
   searchParams,

@@ -1,13 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/lib/publicSeo";
 
-export const metadata = {
+export const metadata: Metadata = buildPublicMetadata({
   title: "Venue-controlled open mic structure that scales",
   description:
-    "Learn how MicStage helps venues define open mic schedules once, generate consistent slot pages, and rank for local search with clean, indexable venue content.",
-  alternates: {
-    canonical: "https://micstage.com/why/venue-controlled-structure",
-  },
-};
+    "Define open mic schedules once on MicStage, generate consistent slot pages, and publish indexable venue content for local discovery.",
+  path: "/why/venue-controlled-structure",
+});
 
 export default function WhyVenueControlledStructurePage() {
   return (

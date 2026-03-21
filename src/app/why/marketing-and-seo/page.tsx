@@ -1,13 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/lib/publicSeo";
 
-export const metadata = {
+export const metadata: Metadata = buildPublicMetadata({
   title: "Marketing and SEO for open mic venues and artists",
   description:
-    "MicStage combines artist discovery, venue pages, and SEO-ready routing so your local open mic can attract more performers, fans, and repeat traffic.",
-  alternates: {
-    canonical: "https://micstage.com/why/marketing-and-seo",
-  },
-};
+    "MicStage combines artist discovery, venue pages, and SEO-ready URLs so your open mic attracts more performers, fans, and repeat traffic.",
+  path: "/why/marketing-and-seo",
+});
 
 export default function WhyMarketingAndSeoPage() {
   return (

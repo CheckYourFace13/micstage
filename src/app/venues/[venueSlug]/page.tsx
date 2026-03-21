@@ -1,6 +1,8 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { buildPublicMetadata } from "@/lib/publicSeo";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { bookSlot, cancelBooking } from "./actions";
 import { venueIdsForVenueSession } from "@/lib/authz";
@@ -11,20 +13,21 @@ import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata(props: { params: Promise<{ venueSlug: string }> }) {
+export async function generateMetadata(props: { params: Promise<{ venueSlug: string }> }): Promise<Metadata> {
   const { venueSlug } = await props.params;
   const venue = await prisma.venue.findUnique({ where: { slug: venueSlug } });
-  const canonical = `https://micstage.com/venues/${venueSlug}`;
-  if (!venue)
-    return {
-      title: "Venue not found | MicStage",
-      alternates: { canonical },
-    };
-  return {
-    title: `${venue.name} open mic schedule | ${venue.city ?? ""}`.trim(),
-    description: `Book an open mic slot at ${venue.name}. View who’s playing and when.`,
-    alternates: { canonical },
-  };
+  const path = `/venues/${venueSlug}`;
+  if (!venue) {
+    return buildPublicMetadata({
+      title: "Venue not found",
+      description: "This MicStage venue page could not be found. Browse open mic venues and performers from the home page.",
+      path,
+    });
+  }
+  const place = [venue.city, venue.region].filter(Boolean).join(", ");
+  const title = place ? `${venue.name} open mic · ${place}` : `${venue.name} open mic schedule`;
+  const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules and who’s playing on MicStage.`;
+  return buildPublicMetadata({ title, description, path });
 }
 
 export default async function VenuePublicPage(props: {

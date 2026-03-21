@@ -1,17 +1,17 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
+import { buildPublicMetadata } from "@/lib/publicSeo";
 import { LocationsDirectory, type LocationRow } from "./LocationsDirectory";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
+export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic venues by city",
   description:
-    "Search MicStage-registered venues with open mics. Browse by city and see public performer activity.",
-  alternates: {
-    canonical: "https://micstage.com/locations",
-  },
-};
+    "Browse MicStage-registered venues with open mics. Search by city or region, then open public schedules and performer activity.",
+  path: "/locations",
+});
 
 export default async function LocationsPage() {
   const venues = await prisma.venue.findMany({

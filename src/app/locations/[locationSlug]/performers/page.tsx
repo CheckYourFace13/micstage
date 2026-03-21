@@ -1,6 +1,8 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { minutesToTimeLabel } from "@/lib/time";
+import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
 
@@ -12,15 +14,14 @@ function titleCaseSlug(slug: string): string {
     .join(" ");
 }
 
-export async function generateMetadata(props: { params: Promise<{ locationSlug: string }> }) {
+export async function generateMetadata(props: { params: Promise<{ locationSlug: string }> }): Promise<Metadata> {
   const { locationSlug } = await props.params;
   const city = titleCaseSlug(locationSlug);
-  const canonical = `https://micstage.com/locations/${locationSlug}/performers`;
-  return {
-    title: `${city} open mic performers | MicStage`,
-    description: `See who's playing upcoming open mics in ${city}. Public, shareable performer list.`,
-    alternates: { canonical },
-  };
+  return buildPublicMetadata({
+    title: `${city} open mic performers`,
+    description: `See who’s playing upcoming open mics in ${city}. Public, shareable performer list on MicStage.`,
+    path: `/locations/${locationSlug}/performers`,
+  });
 }
 
 export default async function LocationPerformersPage(props: { params: Promise<{ locationSlug: string }> }) {

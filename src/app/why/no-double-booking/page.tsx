@@ -1,13 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/lib/publicSeo";
 
-export const metadata = {
+export const metadata: Metadata = buildPublicMetadata({
   title: "No double-booking: dependable open mic reservations",
   description:
-    "See how MicStage protects venue operations with slot locking and predictable reservations, reducing confusion and improving performer confidence.",
-  alternates: {
-    canonical: "https://micstage.com/why/no-double-booking",
-  },
-};
+    "How MicStage uses slot locking and clear reservations so venues and artists see the same availability—less confusion, stronger trust.",
+  path: "/why/no-double-booking",
+});
 
 export default function WhyNoDoubleBookingPage() {
   return (

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, Inter } from "next/font/google";
 import { SiteHeader } from "@/components/SiteHeader";
+import { siteOrigin } from "@/lib/publicSeo";
 import "./globals.css";
 
 const heading = Bebas_Neue({
@@ -14,23 +15,30 @@ const body = Inter({
   variable: "--font-body",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://micstage.com";
+const origin = siteOrigin();
+const defaultDescription =
+  "MicStage connects open mic venues and artists: bookable schedules, performer discovery, and public pages built for local marketing and search.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(origin),
   title: {
     default: "MicStage",
     template: "%s | MicStage",
   },
-  description:
-    "MicStage markets your venue and your artists: open mic scheduling, performer discovery, and SEO-ready pages built in.",
+  description: defaultDescription,
   applicationName: "MicStage",
   openGraph: {
     siteName: "MicStage",
     type: "website",
+    locale: "en_US",
+    url: `${origin}/`,
+    title: "MicStage",
+    description: defaultDescription,
   },
   twitter: {
     card: "summary_large_image",
+    title: "MicStage",
+    description: defaultDescription,
   },
 };
 

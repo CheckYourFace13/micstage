@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "npx prisma generate --schema=prisma/schema.prisma && next build",
-    "start": "next start",
+    "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
     "postinstall": "npx prisma generate --schema=prisma/schema.prisma",
     "check:env": "node scripts/check-production-env.mjs",

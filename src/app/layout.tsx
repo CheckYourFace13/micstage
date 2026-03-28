@@ -21,6 +21,7 @@ const body = Inter({
 });
 
 const origin = siteOrigin();
+const siteTagline = "Artists to music to marketing";
 const defaultDescription =
   "MicStage connects open mic venues and artists—bookable slots, performer discovery, and public venue pages built for local SEO and sharing.";
 
@@ -30,8 +31,11 @@ export const metadata: Metadata = {
     default: "MicStage",
     template: "%s | MicStage",
   },
-  description: defaultDescription,
+  description: siteTagline,
   applicationName: "MicStage",
+  icons: {
+    icon: [{ url: "/favicon.png", type: "image/png" }],
+  },
   openGraph: {
     siteName: "MicStage",
     type: "website",
@@ -54,6 +58,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${heading.variable} ${body.variable} h-full antialiased`}>
+      <head>
+        <link rel="icon" href="/favicon.png" type="image/png" />
+      </head>
       <body className="min-h-full bg-black font-[var(--font-body)] text-white">
         <SiteHeader />
         {children}

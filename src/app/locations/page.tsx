@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { buildPublicMetadata } from "@/lib/publicSeo";
-import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { LocationsDirectory, type LocationRow } from "./LocationsDirectory";
 
 export const dynamic = "force-dynamic";
@@ -16,38 +15,39 @@ export const metadata: Metadata = buildPublicMetadata({
 
 export default async function LocationsPage() {
   const prisma = getPrismaOrNull();
-  if (!prisma) {
-    return <PublicDataUnavailable title="Venue directory unavailable" />;
-  }
-
   let rows: LocationRow[] = [];
+  let queryFailed = false;
+
   try {
-    const venues = await prisma.venue.findMany({
-      where: { city: { not: null } },
-      select: { city: true, region: true, id: true },
-    });
+    if (prisma) {
+      const venues = await prisma.venue.findMany({
+        where: { city: { not: null } },
+        select: { city: true, region: true, id: true },
+      });
 
-    const grouped = new Map<string, { city: string; region: string | null; count: number }>();
-    for (const v of venues) {
-      const city = (v.city ?? "").trim();
-      if (!city) continue;
-      const key = `${city.toLowerCase()}|${(v.region ?? "").toLowerCase()}`;
-      const cur = grouped.get(key);
-      if (cur) cur.count += 1;
-      else grouped.set(key, { city, region: v.region, count: 1 });
+      const grouped = new Map<string, { city: string; region: string | null; count: number }>();
+      for (const v of venues) {
+        const city = (v.city ?? "").trim();
+        if (!city) continue;
+        const key = `${city.toLowerCase()}|${(v.region ?? "").toLowerCase()}`;
+        const cur = grouped.get(key);
+        if (cur) cur.count += 1;
+        else grouped.set(key, { city, region: v.region, count: 1 });
+      }
+
+      const locations = Array.from(grouped.values()).sort((a, b) => a.city.localeCompare(b.city));
+
+      rows = locations.map((l) => ({
+        key: `${l.city}|${l.region ?? ""}`,
+        city: l.city,
+        region: l.region,
+        count: l.count,
+        slug: slugify(l.city),
+      }));
     }
-
-    const locations = Array.from(grouped.values()).sort((a, b) => a.city.localeCompare(b.city));
-
-    rows = locations.map((l) => ({
-      key: `${l.city}|${l.region ?? ""}`,
-      city: l.city,
-      region: l.region,
-      count: l.count,
-      slug: slugify(l.city),
-    }));
-  } catch {
-    return <PublicDataUnavailable title="Venue directory unavailable" />;
+  } catch (err) {
+    console.error("DB query failed", err);
+    queryFailed = true;
   }
 
   return (
@@ -58,6 +58,12 @@ export default async function LocationsPage() {
           Venues on MicStage with a listed city. Search below, then open a city to see public performer activity and
           shareable pages.
         </p>
+
+        {queryFailed ? (
+          <div className="mt-6 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white/85">
+            We couldn’t load the venue directory. Try again in a moment.
+          </div>
+        ) : null}
 
         <LocationsDirectory rows={rows} />
       </main>

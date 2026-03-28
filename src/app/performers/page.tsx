@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { asStringArrayJson } from "@/lib/musicianProfile";
 import { buildPublicMetadata } from "@/lib/publicSeo";
-import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +13,24 @@ export const metadata: Metadata = buildPublicMetadata({
   path: "/performers",
 });
 
+type MusicianCard = {
+  id: string;
+  stageName: string;
+  bio: string | null;
+  imageUrl: string | null;
+  homeCity: string | null;
+  homeRegion: string | null;
+  secondaryCity: string | null;
+  secondaryRegion: string | null;
+  openToHire: boolean;
+  travelRadiusMiles: number | null;
+  secondaryRadiusMiles: number | null;
+  specializations: unknown;
+  instruments: unknown;
+  hireRateDescription: string | null;
+  setLengthMinutes: number | null;
+};
+
 export default async function PerformersPage({
   searchParams,
 }: {
@@ -23,40 +40,50 @@ export default async function PerformersPage({
   const query = q?.trim() ?? "";
 
   const prisma = getPrismaOrNull();
-  if (!prisma) {
-    return <PublicDataUnavailable title="Performer directory unavailable" />;
-  }
+  let musicians: MusicianCard[] = [];
+  let queryFailed = false;
 
   try {
-    // Scan a bounded set then filter (stage name contains).
-    const base = await prisma.musicianUser.findMany({
-      select: {
-        id: true,
-        stageName: true,
-        bio: true,
-        imageUrl: true,
-        homeCity: true,
-        homeRegion: true,
-        secondaryCity: true,
-        secondaryRegion: true,
-        openToHire: true,
-        travelRadiusMiles: true,
-        secondaryRadiusMiles: true,
-        specializations: true,
-        instruments: true,
-        hireRateDescription: true,
-        setLengthMinutes: true,
-      },
-      orderBy: { stageName: "asc" },
-      take: query ? 400 : 80,
-    });
+    if (prisma) {
+      const base = await prisma.musicianUser.findMany({
+        select: {
+          id: true,
+          stageName: true,
+          bio: true,
+          imageUrl: true,
+          homeCity: true,
+          homeRegion: true,
+          secondaryCity: true,
+          secondaryRegion: true,
+          openToHire: true,
+          travelRadiusMiles: true,
+          secondaryRadiusMiles: true,
+          specializations: true,
+          instruments: true,
+          hireRateDescription: true,
+          setLengthMinutes: true,
+        },
+        orderBy: { stageName: "asc" },
+        take: query ? 400 : 80,
+      });
 
-    const qLower = query.toLowerCase();
-    const musicians = query
-      ? base.filter((m) => m.stageName.toLowerCase().includes(qLower)).slice(0, 80)
-      : base;
+      const qLower = query.toLowerCase();
+      musicians = query
+        ? base.filter((m) => m.stageName.toLowerCase().includes(qLower)).slice(0, 80)
+        : base;
+    }
+  } catch (err) {
+    console.error("DB query failed", err);
+    queryFailed = true;
+  }
 
-    return (
+  const emptyMessage = queryFailed
+    ? "We couldn’t load the performer directory. Try again in a moment."
+    : query
+      ? "No performers match that search yet."
+      : "No performers yet. Artists can join MicStage to appear here.";
+
+  return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-3xl px-6 py-14">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -100,9 +127,7 @@ export default async function PerformersPage({
 
         <div className="mt-8 grid gap-4">
           {musicians.length === 0 ? (
-            <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
-              No performers match that search yet.
-            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">{emptyMessage}</div>
           ) : (
             musicians.map((m) => {
               const specs = asStringArrayJson(m.specializations);
@@ -114,10 +139,7 @@ export default async function PerformersPage({
                 (m.openToHire ? "Open to hire — contact via socials / website on full profile (coming soon)." : null);
 
               return (
-                <article
-                  key={m.id}
-                  className="rounded-xl border border-white/10 bg-white/5 p-5"
-                >
+                <article key={m.id} className="rounded-xl border border-white/10 bg-white/5 p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-semibold text-white">{m.stageName}</h2>
@@ -191,8 +213,5 @@ export default async function PerformersPage({
         </p>
       </main>
     </div>
-    );
-  } catch {
-    return <PublicDataUnavailable title="Performer directory unavailable" />;
-  }
+  );
 }

@@ -82,7 +82,12 @@ if (production) {
   }
   ok("EMAIL_FROM is set");
 
-  const db = process.env.DATABASE_URL || "";
+  const db =
+    process.env.DATABASE_URL?.trim() ||
+    process.env.POSTGRES_URL?.trim() ||
+    process.env.POSTGRES_PRISMA_URL?.trim() ||
+    process.env.PRISMA_DATABASE_URL?.trim() ||
+    "";
   if (db.startsWith("file:")) {
     warn(
       "DATABASE_URL is SQLite. For real traffic use Postgres; schema is still sqlite-only until you migrate (see docs).",

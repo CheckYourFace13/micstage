@@ -13,8 +13,10 @@ export function PublicDataUnavailable({
         <h1 className="om-heading text-3xl tracking-wide text-white">{title}</h1>
         <p className="mt-4 text-sm text-white/70">{description}</p>
         <p className="mt-2 text-xs text-white/50">
-          If you’re the site owner, confirm <code className="rounded bg-white/10 px-1">DATABASE_URL</code> is set for
-          production.
+          If you’re the site owner, set a Postgres URL in production env:{" "}
+          <code className="rounded bg-white/10 px-1">DATABASE_URL</code> (or{" "}
+          <code className="rounded bg-white/10 px-1">POSTGRES_URL</code> /{" "}
+          <code className="rounded bg-white/10 px-1">POSTGRES_PRISMA_URL</code>).
         </p>
         <div className="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
           <Link

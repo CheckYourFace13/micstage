@@ -1,7 +1,8 @@
 import { config as loadEnv } from "dotenv";
 import { defineConfig } from "prisma/config";
+import { resolveDatabaseUrl } from "./src/lib/databaseUrl";
 
-// Ensure Prisma CLI sees the same DATABASE_URL the app uses locally.
+// Ensure Prisma CLI sees the same DB URL the app uses locally.
 loadEnv({ path: ".env" });
 loadEnv({ path: ".env.local", override: true });
 
@@ -11,6 +12,6 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: resolveDatabaseUrl() ?? undefined,
   },
 });

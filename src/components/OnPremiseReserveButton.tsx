@@ -53,11 +53,19 @@ export default function OnPremiseReserveButton({ formId, label, className }: Pro
         setErrorMessage(null);
         form.requestSubmit();
       },
-      () => {
+      (err) => {
         setStatus("error");
-        setErrorMessage("Location permission is required to reserve this slot.");
+        if (err.code === err.PERMISSION_DENIED) {
+          setErrorMessage("Location access was blocked. Allow location for this site in your browser settings, then try again.");
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setErrorMessage("Could not read your position. Try again outdoors or with Wi‑Fi/cell enabled.");
+        } else if (err.code === err.TIMEOUT) {
+          setErrorMessage("Location request timed out. Move closer to a window or try again.");
+        } else {
+          setErrorMessage("Could not verify your location for this reservation.");
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60_000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60_000 }
     );
   }
 

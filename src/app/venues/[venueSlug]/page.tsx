@@ -12,6 +12,9 @@ import { getSession } from "@/lib/session";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 import { equipmentProvidedList, performanceFormatLabel } from "@/lib/venueDisplay";
 import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
+import { VenueBookingFlash } from "@/components/VenueBookingFlash";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { safeExternalHref } from "@/lib/externalUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -55,10 +58,10 @@ export async function generateMetadata(props: { params: Promise<{ venueSlug: str
 
 export default async function VenuePublicPage(props: {
   params: Promise<{ venueSlug: string }>;
-  searchParams: Promise<{ bookError?: string; reserve?: string }>;
+  searchParams: Promise<{ bookError?: string; reserve?: string; booked?: string; cancelled?: string }>;
 }) {
   const { venueSlug } = await props.params;
-  const { bookError, reserve } = await props.searchParams;
+  const { bookError, reserve, booked, cancelled } = await props.searchParams;
   const session = await getSession();
   const now = new Date();
 
@@ -109,14 +112,22 @@ export default async function VenuePublicPage(props: {
     session?.kind === "venue" ? await venueIdsForVenueSession(session) : [];
   const isStaffForThisVenue = venueStaffVenueIds.includes(venue.id);
   const gear = equipmentProvidedList(venue);
-  const socialLinks = [
-    ["Facebook", venue.facebookUrl],
-    ["Instagram", venue.instagramUrl],
-    ["X/Twitter", venue.twitterUrl],
-    ["TikTok", venue.tiktokUrl],
-    ["YouTube", venue.youtubeUrl],
-    ["SoundCloud", venue.soundcloudUrl],
-  ].filter(([, url]) => Boolean(url)) as [string, string][];
+  const websiteHref = safeExternalHref(venue.websiteUrl);
+  const socialLinks = (
+    [
+      ["Facebook", venue.facebookUrl],
+      ["Instagram", venue.instagramUrl],
+      ["X/Twitter", venue.twitterUrl],
+      ["TikTok", venue.tiktokUrl],
+      ["YouTube", venue.youtubeUrl],
+      ["SoundCloud", venue.soundcloudUrl],
+    ] as const
+  )
+    .map(([label, url]) => {
+      const href = safeExternalHref(url);
+      return href ? ([label, href] as [string, string]) : null;
+    })
+    .filter(Boolean) as [string, string][];
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -149,6 +160,8 @@ export default async function VenuePublicPage(props: {
         </div>
 
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
+        <VenueBookingFlash initialBooked={booked === "1"} initialCancelled={cancelled === "1"} />
 
         {bookError ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
@@ -210,6 +223,19 @@ export default async function VenuePublicPage(props: {
           ) : (
             <div className="text-white/50">Equipment details not listed yet — check with the venue.</div>
           )}
+          {websiteHref ? (
+            <div>
+              <div className="text-white/60">Website</div>
+              <a
+                href={websiteHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block text-sm text-[rgb(var(--om-neon))] underline hover:brightness-110"
+              >
+                Visit venue site
+              </a>
+            </div>
+          ) : null}
           {socialLinks.length > 0 ? (
             <div>
               <div className="text-white/60">Social media</div>
@@ -219,7 +245,7 @@ export default async function VenuePublicPage(props: {
                     key={label}
                     href={url}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="rounded-md border border-white/15 bg-black/30 px-2 py-1 text-xs text-white/90 hover:bg-black/40"
                   >
                     {label}
@@ -341,9 +367,11 @@ export default async function VenuePublicPage(props: {
                                   <form action={cancelBooking}>
                                     <input type="hidden" name="venueSlug" value={venue.slug} />
                                     <input type="hidden" name="bookingId" value={activeBooking.id} />
-                                    <button className="h-9 rounded-md border border-white/15 bg-white/5 px-3 text-sm text-white hover:bg-white/10">
-                                      Cancel
-                                    </button>
+                                    <FormSubmitButton
+                                      label="Cancel booking"
+                                      pendingLabel="Cancelling…"
+                                      className="h-9 rounded-md border border-white/15 bg-white/5 px-3 text-sm text-white hover:bg-white/10 disabled:opacity-60"
+                                    />
                                   </form>
                                 ) : canBook ? (
                                   isMusician ? (
@@ -371,14 +399,15 @@ export default async function VenuePublicPage(props: {
                                           />
                                         </>
                                       ) : (
-                                        <button
-                                          type="submit"
-                                          className={`h-9 rounded-md px-3 text-sm font-semibold text-black hover:brightness-110 ${
+                                        <FormSubmitButton
+                                          label={
+                                            isReservedCandidate ? "Complete reservation" : "Reserve this slot"
+                                          }
+                                          pendingLabel="Reserving…"
+                                          className={`h-9 rounded-md px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-60 ${
                                             isReservedCandidate ? "bg-emerald-400" : "bg-[rgb(var(--om-neon))]"
                                           }`}
-                                        >
-                                          {isReservedCandidate ? "Complete reservation" : "Reserve this slot"}
-                                        </button>
+                                        />
                                       )}
                                     </form>
                                   ) : (

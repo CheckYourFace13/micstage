@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { createEventTemplate, generateDateSchedule, houseBookSlot, inviteManager } from "./actions";
@@ -14,10 +15,14 @@ export default async function VenuePortalPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    profile?: string;
     profileError?: string;
     scheduleError?: string;
     scheduleSuccess?: string;
     planError?: string;
+    planSuccess?: string;
+    houseBook?: string;
+    invite?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -83,6 +88,11 @@ export default async function VenuePortalPage({
           </div>
         </header>
 
+        {q.profile === "saved" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            Venue profile saved. Public pages update after a short refresh.
+          </div>
+        ) : null}
         {q.profileError === "duplicateWeekday" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             You already have a recurring schedule for that weekday. Use{" "}
@@ -116,6 +126,31 @@ export default async function VenuePortalPage({
             Schedule saved and future slots updated. Booked slots were not changed.
           </div>
         ) : null}
+        {q.scheduleSuccess === "template" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            Recurring open mic template created. Generate dates or use your weekly schedule to fill bookable slots.
+          </div>
+        ) : null}
+        {q.scheduleSuccess === "date" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            Slots for that date are up to date.
+          </div>
+        ) : null}
+        {q.houseBook === "1" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            Walk-up / house booking saved for that slot.
+          </div>
+        ) : null}
+        {q.invite === "sent" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            Manager invited. Share the temporary password securely; they should log in and change it.
+          </div>
+        ) : null}
+        {q.planSuccess === "1" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            Plan upgraded to PRO (development only until payments are live).
+          </div>
+        ) : null}
         {q.profileError === "format" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             Invalid performance format. Please try again.
@@ -145,11 +180,21 @@ export default async function VenuePortalPage({
         {venues.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-8">
             <div className="text-sm text-white/70">
-              No venues found for this account yet. Register a venue first at{" "}
-              <Link className="underline" href="/register/venue">
-                /register/venue
-              </Link>
-              .
+              <p>
+                No venues are linked to this login yet. If you haven&apos;t created a room on MicStage, start at{" "}
+                <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
+                  venue registration
+                </Link>
+                .
+              </p>
+              <p className="mt-3 text-white/60">
+                If you already completed registration but still see this, your session may be out of sync or data may
+                need a fix —{" "}
+                <Link className="underline hover:text-white" href="/contact">
+                  contact support
+                </Link>
+                .
+              </p>
             </div>
           </div>
         ) : (
@@ -389,9 +434,11 @@ export default async function VenuePortalPage({
                         </p>
                       </fieldset>
 
-                    <button className="mt-2 h-11 rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110">
-                      Save available times
-                    </button>
+                    <FormSubmitButton
+                      label="Save available times"
+                      pendingLabel="Saving…"
+                      className="mt-2 h-11 rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+                    />
                   </form>
                 </div>
 
@@ -431,9 +478,11 @@ export default async function VenuePortalPage({
                                 className="h-10 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white"
                               />
                             </label>
-                            <button className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110">
-                              Generate slots
-                            </button>
+                            <FormSubmitButton
+                              label="Generate slots"
+                              pendingLabel="Generating…"
+                              className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+                            />
                           </form>
 
                           {t.instances.length ? (
@@ -469,9 +518,11 @@ export default async function VenuePortalPage({
                                                   placeholder="Performer name"
                                                   className="h-9 w-40 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white placeholder:text-white/40"
                                                 />
-                                                <button className="h-9 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110">
-                                                  House book
-                                                </button>
+                                                <FormSubmitButton
+                                                  label="House book"
+                                                  pendingLabel="Booking…"
+                                                  className="h-9 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+                                                />
                                               </form>
                                             )}
                                           </div>
@@ -518,9 +569,11 @@ export default async function VenuePortalPage({
                           placeholder="Temp password"
                         />
                       </label>
-                      <button className="h-11 rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10 md:col-span-3">
-                        Add manager
-                      </button>
+                      <FormSubmitButton
+                        label="Add manager"
+                        pendingLabel="Saving…"
+                        className="h-11 rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60 md:col-span-3"
+                      />
                     </form>
                   </div>
                 ) : null}

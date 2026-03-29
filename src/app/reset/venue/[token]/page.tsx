@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { finalizeVenuePasswordReset } from "../actions";
 import { verifyResetToken } from "@/lib/passwordReset";
 import { privateNoIndexMetadata } from "@/lib/privateSeo";
@@ -39,12 +40,11 @@ export default async function VenueResetTokenPage(props: { params: Promise<{ tok
                 placeholder="New password"
               />
             </label>
-            <button
-              type="submit"
-              className="mt-2 inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-            >
-              Save new password
-            </button>
+            <FormSubmitButton
+              label="Save new password"
+              pendingLabel="Saving…"
+              className="mt-2 inline-flex h-11 min-w-[180px] items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+            />
           </form>
         )}
       </main>

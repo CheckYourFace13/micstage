@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Weekday } from "@/generated/prisma/client";
 import { ALL_WEEKDAYS, computeWeeklySchedulePreview } from "@/lib/weeklySchedule";
 import { weekdayToLabel } from "@/lib/time";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { saveWeeklyScheduleAndGenerateSlots } from "./actions";
 
 function timeToMinutesHHMM(value: string): number | null {
@@ -285,12 +286,11 @@ export function WeeklyScheduleForm({
         )}
       </div>
 
-      <button
-        type="submit"
-        className="h-12 rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-      >
-        Save schedule &amp; generate slots
-      </button>
+      <FormSubmitButton
+        label="Save schedule & generate slots"
+        pendingLabel="Saving & generating…"
+        className="h-12 rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+      />
       <p className="text-xs text-white/50">
         Saves one recurring template per selected weekday (updates the latest template for that day if it already
         exists), then fills your booking window. Run again anytime to add missing slots or align open slots with new

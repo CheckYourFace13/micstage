@@ -201,6 +201,7 @@ export async function createEventTemplate(formData: FormData) {
   });
 
   revalidatePath("/venue");
+  redirect("/venue?scheduleSuccess=template");
 }
 
 /**
@@ -427,6 +428,7 @@ export async function updateVenueProfile(formData: FormData) {
   revalidatePath("/venue");
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+  redirect("/venue?profile=saved");
 }
 
 export async function discoverVenueSocials(formData: FormData) {
@@ -517,6 +519,7 @@ export async function generateDateSchedule(formData: FormData) {
 
   revalidatePath("/venue");
   revalidatePath(`/venues/${template.venue.slug}`);
+  redirect("/venue?scheduleSuccess=date");
 }
 
 export async function inviteManager(formData: FormData) {
@@ -545,6 +548,7 @@ export async function inviteManager(formData: FormData) {
   });
 
   revalidatePath("/venue");
+  redirect("/venue?invite=sent");
 }
 
 export async function houseBookSlot(formData: FormData) {
@@ -616,6 +620,7 @@ export async function houseBookSlot(formData: FormData) {
   revalidatePath("/venue");
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+  redirect("/venue?houseBook=1");
 }
 
 export async function upgradeVenuePlan(formData: FormData) {
@@ -639,5 +644,6 @@ export async function upgradeVenuePlan(formData: FormData) {
   revalidatePath("/venue");
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+  redirect("/venue?planSuccess=1");
 }
 

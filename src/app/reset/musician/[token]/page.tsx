@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { finalizeMusicianPasswordReset } from "../actions";
 import { verifyResetToken } from "@/lib/passwordReset";
 import { privateNoIndexMetadata } from "@/lib/privateSeo";
@@ -39,12 +40,11 @@ export default async function MusicianResetTokenPage(props: { params: Promise<{ 
                 placeholder="New password"
               />
             </label>
-            <button
-              type="submit"
-              className="mt-2 inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
-            >
-              Save new password
-            </button>
+            <FormSubmitButton
+              label="Save new password"
+              pendingLabel="Saving…"
+              className="mt-2 inline-flex h-11 min-w-[180px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+            />
           </form>
         )}
       </main>

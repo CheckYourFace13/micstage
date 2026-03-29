@@ -22,13 +22,6 @@ function optString(formData: FormData, key: string): string | undefined {
   return t ? t : undefined;
 }
 
-function reqFloat(formData: FormData, key: string): number {
-  const v = reqString(formData, key);
-  const n = Number.parseFloat(v);
-  if (!Number.isFinite(n)) throw new Error(`${key} must be a number`);
-  return n;
-}
-
 export async function registerVenue(formData: FormData) {
   const email = reqString(formData, "email").toLowerCase();
   const password = reqString(formData, "password");
@@ -41,16 +34,22 @@ export async function registerVenue(formData: FormData) {
   });
   if (!rl.allowed) redirect("/register/venue?error=rate");
 
-  const venueName = reqString(formData, "venueName");
-  const googlePlaceId = reqString(formData, "googlePlaceId");
-  const formattedAddress = reqString(formData, "formattedAddress");
+  const venueName = optString(formData, "venueName");
+  const googlePlaceId = optString(formData, "googlePlaceId");
+  const formattedAddress = optString(formData, "formattedAddress");
   const city = optString(formData, "city");
   const region = optString(formData, "region");
   const country = optString(formData, "country");
-  const lat = reqFloat(formData, "lat");
-  const lng = reqFloat(formData, "lng");
-  if (!googlePlaceId) throw new Error("Pick your venue from Google suggestions");
-  if (!venueName) throw new Error("Venue name must come from Google selection");
+  const latRaw = formData.get("lat");
+  const lngRaw = formData.get("lng");
+  const lat =
+    typeof latRaw === "string" && latRaw.trim() ? Number.parseFloat(latRaw.trim()) : Number.NaN;
+  const lng =
+    typeof lngRaw === "string" && lngRaw.trim() ? Number.parseFloat(lngRaw.trim()) : Number.NaN;
+
+  if (!googlePlaceId || !venueName || !formattedAddress || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    redirect("/register/venue?error=place");
+  }
 
   const timeZone = tzLookup(lat, lng);
 

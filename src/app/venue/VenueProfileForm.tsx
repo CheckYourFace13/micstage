@@ -1,3 +1,4 @@
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { discoverVenueSocials, upgradeVenuePlan, updateVenueProfile } from "./actions";
 import type { Venue } from "../../generated/prisma/client";
 
@@ -225,9 +226,11 @@ export function VenueProfileForm({ venue }: Props) {
       {venue.subscriptionTier === "FREE" ? (
         <form action={upgradeVenuePlan} className="mt-4 flex flex-wrap items-center gap-3">
           <input type="hidden" name="venueId" value={venue.id} />
-          <button className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black hover:brightness-110">
-            Upgrade to PRO (unlock longer booking windows)
-          </button>
+          <FormSubmitButton
+            label="Upgrade to PRO (unlock longer booking windows)"
+            pendingLabel="Upgrading…"
+            className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+          />
           <span className="text-xs text-white/50">Payments integration is TODO; this is dev-safe.</span>
         </form>
       ) : (

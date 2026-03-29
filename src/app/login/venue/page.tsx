@@ -5,6 +5,7 @@ export const metadata = {
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { safeAfterAuthPath } from "@/lib/safeRedirect";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { loginVenue } from "./serverActions";
 
 export default async function VenueLoginPage(props: {
@@ -72,12 +73,11 @@ export default async function VenueLoginPage(props: {
             />
           </label>
 
-          <button
-            type="submit"
-            className="mt-2 inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-          >
-            Log in
-          </button>
+          <FormSubmitButton
+            label="Log in"
+            pendingLabel="Signing in…"
+            className="mt-2 inline-flex h-11 min-w-[120px] items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+          />
 
           <div className="text-xs text-white/60">
             Forgot password?{" "}

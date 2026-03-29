@@ -4,6 +4,7 @@ export const metadata = {
 
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { registerMusician } from "./actions";
 
 export default async function MusicianRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
@@ -66,12 +67,11 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
             />
           </label>
 
-          <button
-            type="submit"
-            className="mt-2 inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
-          >
-            Create artist account
-          </button>
+          <FormSubmitButton
+            label="Create artist account"
+            pendingLabel="Creating account…"
+            className="mt-2 inline-flex h-11 min-w-[200px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+          />
           <p className="text-xs text-white/50">After signup, you’ll be able to book slots and track your upcoming sets.</p>
         </form>
       </main>

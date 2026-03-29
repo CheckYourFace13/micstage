@@ -1,3 +1,4 @@
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { requestMusicianPasswordReset } from "./actions";
 
 export const metadata = {
@@ -50,12 +51,11 @@ export default async function ResetMusicianPasswordPage(props: {
             />
           </label>
 
-          <button
-            type="submit"
-            className="mt-2 inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
-          >
-            Send reset link
-          </button>
+          <FormSubmitButton
+            label="Send reset link"
+            pendingLabel="Sending…"
+            className="mt-2 inline-flex h-11 min-w-[160px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+          />
 
           <p className="text-xs text-white/50">In development without email provider setup, reset links are logged to server console.</p>
         </form>

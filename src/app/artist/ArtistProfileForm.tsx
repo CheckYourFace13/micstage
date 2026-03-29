@@ -1,3 +1,4 @@
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { updateMusicianProfile } from "./actions";
 type MusicianUser = any;
 
@@ -347,12 +348,11 @@ export function ArtistProfileForm({ musician, allVenues, venuesForInterest }: Pr
           </div>
         </div>
 
-        <button
-          type="submit"
-          className="h-11 rounded-md border border-white/15 bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-        >
-          Save profile
-        </button>
+        <FormSubmitButton
+          label="Save profile"
+          pendingLabel="Saving…"
+          className="h-11 rounded-md border border-white/15 bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+        />
 
         <p className="text-xs text-white/45">
           Signed in as <span className="font-mono">{musician.email}</span>

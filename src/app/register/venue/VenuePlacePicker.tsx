@@ -43,6 +43,12 @@ export function VenuePlacePicker(props: {
   }, [apiKey]);
 
   useEffect(() => {
+    if (!apiKey?.trim()) {
+      setError("Google Maps API key is not configured (NEXT_PUBLIC_GOOGLE_MAPS_API_KEY). Venue search will not work until it is set.");
+    }
+  }, [apiKey]);
+
+  useEffect(() => {
     if (!ready) return;
     if (!inputRef.current) return;
     if (!window.google?.maps?.places) {
@@ -93,12 +99,14 @@ export function VenuePlacePicker(props: {
 
   return (
     <div className="grid gap-2">
-      <Script
-        src={scriptSrc}
-        strategy="afterInteractive"
-        onLoad={() => setReady(true)}
-        onError={() => setError("Failed to load Google Maps script. Check your API key and network.")}
-      />
+      {apiKey?.trim() ? (
+        <Script
+          src={scriptSrc}
+          strategy="afterInteractive"
+          onLoad={() => setReady(true)}
+          onError={() => setError("Failed to load Google Maps script. Check your API key and network.")}
+        />
+      ) : null}
 
       <label className="grid gap-1 text-sm">
         <span className="text-white/80">{label}</span>

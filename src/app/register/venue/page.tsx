@@ -5,6 +5,7 @@ export const metadata = {
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { registerVenue } from "./actions";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { VenuePlaceFields } from "./venuePlaceFields";
 
 export default async function VenueRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
@@ -13,6 +14,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
   if (session?.kind === "venue") redirect("/venue");
 
   const showRate = error === "rate";
+  const showPlace = error === "place";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -27,6 +29,13 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
         </p>
 
         <form action={registerVenue} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+          {showPlace ? (
+            <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white">
+              Choose your venue from the Google suggestions dropdown before creating your account. If the map search
+              does not load, confirm <span className="font-mono text-white/90">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</span> is
+              set for this environment.
+            </div>
+          ) : null}
           {showRate ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Too many signup attempts. Please try again later.
@@ -55,12 +64,11 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
             />
           </label>
 
-          <button
-            type="submit"
-            className="mt-2 inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-          >
-            Create venue account
-          </button>
+          <FormSubmitButton
+            label="Create venue account"
+            pendingLabel="Creating account…"
+            className="mt-2 inline-flex h-11 min-w-[200px] items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+          />
           <p className="text-xs text-white/50">
             This saves your venue using Google’s Place ID + coordinates, so maps and your public MicStage marketing pages
             reference the correct location (SEO-friendly URLs and listings).

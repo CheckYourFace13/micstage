@@ -98,12 +98,16 @@ function parsePerformanceFormat(v: string): VenuePerformanceFormat {
   redirect("/venue?profileError=format");
 }
 
-function timeToMinutes(time: string, field: string): number {
-  const m = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!m) throw new Error(`${field} must be HH:MM`);
+/** Start/end times on schedule forms; redirects instead of throwing into the error overlay. */
+function scheduleTimeMinutesFromForm(formData: FormData, field: string): number {
+  const raw = formData.get(field);
+  if (typeof raw !== "string" || !raw.trim()) redirect("/venue?scheduleError=invalidTime");
+  const t = raw.trim();
+  const m = /^(\d{2}):(\d{2})$/.exec(t);
+  if (!m) redirect("/venue?scheduleError=invalidTime");
   const hh = Number.parseInt(m[1], 10);
   const mm = Number.parseInt(m[2], 10);
-  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) throw new Error(`${field} is invalid`);
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) redirect("/venue?scheduleError=invalidTime");
   return hh * 60 + mm;
 }
 
@@ -112,13 +116,13 @@ export async function createEventTemplate(formData: FormData) {
   const venueId = reqString(formData, "venueId");
 
   const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(venueId)) throw new Error("Not allowed");
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
 
   const title = reqString(formData, "title");
   const weekday = reqString(formData, "weekday") as Weekday;
-  const startTimeMin = timeToMinutes(reqString(formData, "startTime"), "startTime");
-  const endTimeMin = timeToMinutes(reqString(formData, "endTime"), "endTime");
-  if (endTimeMin <= startTimeMin) throw new Error("End time must be after start time");
+  const startTimeMin = scheduleTimeMinutesFromForm(formData, "startTime");
+  const endTimeMin = scheduleTimeMinutesFromForm(formData, "endTime");
+  if (endTimeMin <= startTimeMin) redirect("/venue?scheduleError=invalidTime");
 
   const slotMinutes = reqInt(formData, "slotMinutes");
   const breakMinutes = reqInt(formData, "breakMinutes");
@@ -214,7 +218,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
   const session = await requireVenueSession();
   const venueId = reqString(formData, "venueId");
   const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(venueId)) throw new Error("Not allowed");
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
 
   const weekdays = parseWeekdaysFromForm(formData);
   if (weekdays.length === 0) {
@@ -222,9 +226,9 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
   }
 
   const title = reqString(formData, "title");
-  const startTimeMin = timeToMinutes(reqString(formData, "startTime"), "startTime");
-  const endTimeMin = timeToMinutes(reqString(formData, "endTime"), "endTime");
-  if (endTimeMin <= startTimeMin) throw new Error("End time must be after start time");
+  const startTimeMin = scheduleTimeMinutesFromForm(formData, "startTime");
+  const endTimeMin = scheduleTimeMinutesFromForm(formData, "endTime");
+  if (endTimeMin <= startTimeMin) redirect("/venue?scheduleError=invalidTime");
 
   const slotMinutes = reqInt(formData, "slotMinutes");
   const breakMinutes = reqInt(formData, "breakMinutes");
@@ -246,7 +250,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
       subscriptionTier: true,
     },
   });
-  if (!venue) throw new Error("Venue not found");
+  if (!venue) redirect("/venue?venueError=venueMissing");
 
   const timeZone = optString(formData, "timeZone") ?? venue.timeZone ?? "America/Chicago";
   const maxHorizonDays = venue.subscriptionTier === "FREE" ? 60 : 90;
@@ -326,7 +330,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
       timeZone: true,
     },
   });
-  if (!venueForRules) throw new Error("Venue not found");
+  if (!venueForRules) redirect("/venue?venueError=venueMissing");
 
   const allVenueTemplates = await prisma.eventTemplate.findMany({
     where: { venueId },
@@ -382,7 +386,7 @@ export async function updateVenueProfile(formData: FormData) {
   const session = await requireVenueSession();
   const venueId = reqString(formData, "venueId");
   const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(venueId)) throw new Error("Not allowed");
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
 
   const about = optString(formData, "about") ?? null;
   const logoUrl = normalizeUrl(optString(formData, "logoUrl"));
@@ -435,22 +439,22 @@ export async function discoverVenueSocials(formData: FormData) {
   const session = await requireVenueSession();
   const venueId = reqString(formData, "venueId");
   const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(venueId)) throw new Error("Not allowed");
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
 
   const venue = await requirePrisma().venue.findUnique({
     where: { id: venueId },
     select: { websiteUrl: true, slug: true },
   });
   const website = venue?.websiteUrl;
-  if (!website) redirect("/venue?profileError=missingWebsite");
+  if (!website) redirect("/venue?socialsError=needWebsite");
 
   let html = "";
   try {
     const res = await fetch(website, { redirect: "follow", cache: "no-store" });
-    if (!res.ok) redirect("/venue?profileError=socialFetchFailed");
+    if (!res.ok) redirect("/venue?socialsError=fetchFailed");
     html = await res.text();
   } catch {
-    redirect("/venue?profileError=socialFetchFailed");
+    redirect("/venue?socialsError=fetchFailed");
   }
 
   const links = Array.from(html.matchAll(/https?:\/\/[^\s"'<>]+/gi)).map((m) => m[0]);
@@ -475,7 +479,7 @@ export async function discoverVenueSocials(formData: FormData) {
 
   revalidatePath("/venue");
   if (venue?.slug) revalidatePath(`/venues/${venue.slug}`);
-  redirect("/venue?profileError=socialFound");
+  redirect("/venue?venueNotice=socialsDiscovered");
 }
 
 export async function generateDateSchedule(formData: FormData) {
@@ -487,10 +491,10 @@ export async function generateDateSchedule(formData: FormData) {
     where: { id: templateId },
     include: { venue: true },
   });
-  if (!template) throw new Error("Template not found");
+  if (!template) redirect("/venue?scheduleError=templateMissing");
 
   const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(template.venueId)) throw new Error("Not allowed");
+  if (!allowed.includes(template.venueId)) redirect("/venue?venueError=forbidden");
 
   if (!isDateInSeriesRange(template.venue, date)) {
     redirect("/venue?scheduleError=outsideSeries");
@@ -524,14 +528,14 @@ export async function generateDateSchedule(formData: FormData) {
 
 export async function inviteManager(formData: FormData) {
   const session = await requireVenueSession();
-  if (!session.venueOwnerId) throw new Error("Only admins can invite managers (for now)");
+  if (!session.venueOwnerId) redirect("/venue?inviteError=ownerOnly");
 
   const venueId = reqString(formData, "venueId");
   const managerEmail = reqString(formData, "managerEmail").toLowerCase();
   const tempPassword = reqString(formData, "tempPassword");
 
   const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(venueId)) throw new Error("Not allowed");
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
 
   const passwordHash = await bcrypt.hash(tempPassword, 12);
 
@@ -558,64 +562,76 @@ export async function houseBookSlot(formData: FormData) {
   const performerName = reqString(formData, "performerName");
 
   const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(venueId)) throw new Error("Not allowed");
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
 
-  await requirePrisma().$transaction(async (tx) => {
-    const slot = await tx.slot.findUnique({
-      where: { id: slotId },
-      include: {
-        booking: true,
-        instance: { include: { template: { include: { venue: true } } } },
-      },
-    });
-    if (!slot) throw new Error("Slot not found");
-    if (slot.instance.template.venueId !== venueId) throw new Error("Venue mismatch");
-
-    const instanceVenue = slot.instance.template.venue;
-    const instanceBlock = bookingBlockReason(instanceVenue, slot.instance.date);
-    if (instanceBlock) throw new Error(instanceBlock);
-
-    if (slot.instance.isCancelled) throw new Error("This date’s schedule was cancelled.");
-
-    const slotStartUtc = slotStartInstant(
-      slot.instance.date,
-      slot.startMin,
-      slot.instance.template.timeZone,
-    );
-    if (slotStartUtc.getTime() <= Date.now()) throw new Error("This slot has already started.");
-
-    if (slot.booking && !slot.booking.cancelledAt) {
-      throw new Error("Slot already booked");
-    }
-
-    if (slot.booking && slot.booking.cancelledAt) {
-      await tx.booking.update({
-        where: { id: slot.booking.id },
-        data: {
-          musicianId: null,
-          performerName,
-          performerEmail: null,
-          notes: null,
-          cancelledAt: null,
-        },
-      });
-    } else {
-      await tx.booking.create({
-        data: {
-          slotId: slot.id,
-          musicianId: null,
-          performerName,
-          performerEmail: null,
-          notes: null,
-        },
-      });
-    }
-
-    await tx.slot.update({
-      where: { id: slot.id },
-      data: { status: "RESERVED" },
-    });
+  const slotPreview = await requirePrisma().slot.findUnique({
+    where: { id: slotId },
+    include: {
+      booking: true,
+      instance: { include: { template: { include: { venue: true } } } },
+    },
   });
+  if (!slotPreview) redirect("/venue?houseBookError=missing");
+  if (slotPreview.instance.template.venueId !== venueId) redirect("/venue?venueError=forbidden");
+
+  const instanceVenue = slotPreview.instance.template.venue;
+  const instanceBlock = bookingBlockReason(instanceVenue, slotPreview.instance.date);
+  if (instanceBlock) redirect("/venue?houseBookError=blocked");
+
+  if (slotPreview.instance.isCancelled) redirect("/venue?houseBookError=cancelled");
+
+  const slotStartUtc = slotStartInstant(
+    slotPreview.instance.date,
+    slotPreview.startMin,
+    slotPreview.instance.template.timeZone,
+  );
+  if (slotStartUtc.getTime() <= Date.now()) redirect("/venue?houseBookError=past");
+
+  if (slotPreview.booking && !slotPreview.booking.cancelledAt) redirect("/venue?houseBookError=taken");
+
+  try {
+    await requirePrisma().$transaction(async (tx) => {
+      const slot = await tx.slot.findUnique({
+        where: { id: slotId },
+        include: { booking: true },
+      });
+      if (!slot) throw new Error("HOUSE_BOOK_MISSING");
+      if (slot.booking && !slot.booking.cancelledAt) throw new Error("HOUSE_BOOK_TAKEN");
+
+      if (slot.booking && slot.booking.cancelledAt) {
+        await tx.booking.update({
+          where: { id: slot.booking.id },
+          data: {
+            musicianId: null,
+            performerName,
+            performerEmail: null,
+            notes: null,
+            cancelledAt: null,
+          },
+        });
+      } else {
+        await tx.booking.create({
+          data: {
+            slotId: slot.id,
+            musicianId: null,
+            performerName,
+            performerEmail: null,
+            notes: null,
+          },
+        });
+      }
+
+      await tx.slot.update({
+        where: { id: slot.id },
+        data: { status: "RESERVED" },
+      });
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "HOUSE_BOOK_MISSING") redirect("/venue?houseBookError=missing");
+    if (msg === "HOUSE_BOOK_TAKEN") redirect("/venue?houseBookError=taken");
+    throw e;
+  }
 
   revalidatePath("/venue");
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
@@ -627,8 +643,8 @@ export async function upgradeVenuePlan(formData: FormData) {
   const session = await requireVenueSession();
   const venueId = reqString(formData, "venueId");
   const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(venueId)) throw new Error("Not allowed");
-  if (!session.venueOwnerId) throw new Error("Only venue owners can change plan (for now)");
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
+  if (!session.venueOwnerId) redirect("/venue?planError=ownerOnly");
 
   // Placeholder: real payment integration (Stripe/etc.) is not wired yet.
   // To avoid accidental production “free upgrades”, only allow manual upgrades in dev.

@@ -1,5 +1,5 @@
 /**
- * Normalize user- or DB-stored URLs for safe use in public <a href>.
+ * Normalize user- or DB-stored URLs for safe use in public <a href> or <img src>.
  * Returns null when empty or clearly unusable (e.g. javascript:).
  */
 export function safeExternalHref(raw: string | null | undefined): string | null {

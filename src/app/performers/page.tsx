@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { asStringArrayJson } from "@/lib/musicianProfile";
+import { safeExternalHref } from "@/lib/externalUrl";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
@@ -130,6 +131,7 @@ export default async function PerformersPage({
             <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">{emptyMessage}</div>
           ) : (
             musicians.map((m) => {
+              const imageSrc = safeExternalHref(m.imageUrl);
               const specs = asStringArrayJson(m.specializations);
               const insts = asStringArrayJson(m.instruments);
               const homeLoc = [m.homeCity, m.homeRegion].filter(Boolean).join(", ");
@@ -149,10 +151,10 @@ export default async function PerformersPage({
                         </span>
                       ) : null}
                     </div>
-                    {m.imageUrl ? (
+                    {imageSrc ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={m.imageUrl}
+                        src={imageSrc}
                         alt=""
                         className="h-14 w-14 rounded-lg border border-white/10 object-cover"
                       />

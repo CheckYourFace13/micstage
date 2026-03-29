@@ -23,6 +23,11 @@ export default async function VenuePortalPage({
     planSuccess?: string;
     houseBook?: string;
     invite?: string;
+    venueError?: string;
+    venueNotice?: string;
+    socialsError?: string;
+    inviteError?: string;
+    houseBookError?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -121,6 +126,16 @@ export default async function VenuePortalPage({
             Choose at least one weekday for your weekly schedule.
           </div>
         ) : null}
+        {q.scheduleError === "invalidTime" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            Use valid start/end times (HH:MM, 24h) with end after start.
+          </div>
+        ) : null}
+        {q.scheduleError === "templateMissing" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            That schedule template is no longer available. Refresh the page and try again.
+          </div>
+        ) : null}
         {q.scheduleSuccess === "weekly" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
             Schedule saved and future slots updated. Booked slots were not changed.
@@ -156,19 +171,64 @@ export default async function VenuePortalPage({
             Invalid performance format. Please try again.
           </div>
         ) : null}
-        {q.profileError === "missingWebsite" ? (
+        {q.socialsError === "needWebsite" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
-            Add a website URL first, then use auto-find socials.
+            Add a website URL on your venue profile and save, then run auto-find again.
           </div>
         ) : null}
-        {q.profileError === "socialFetchFailed" ? (
+        {q.socialsError === "fetchFailed" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             Could not fetch your website for social discovery. You can still enter social links manually.
           </div>
         ) : null}
-        {q.profileError === "socialFound" ? (
+        {q.venueNotice === "socialsDiscovered" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Social links were discovered. Review and save to confirm.
+            Social links were discovered from your website. Review fields and save your profile to confirm.
+          </div>
+        ) : null}
+        {q.venueError === "forbidden" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            You don&apos;t have access to that action for this venue. Refresh if your login changed.
+          </div>
+        ) : null}
+        {q.venueError === "venueMissing" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            Venue data could not be loaded. Refresh and try again.
+          </div>
+        ) : null}
+        {q.inviteError === "ownerOnly" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            Only the venue owner can invite managers right now.
+          </div>
+        ) : null}
+        {q.planError === "ownerOnly" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            Only the venue owner can change the subscription plan.
+          </div>
+        ) : null}
+        {q.houseBookError === "missing" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            That slot no longer exists. Refresh the dashboard.
+          </div>
+        ) : null}
+        {q.houseBookError === "taken" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            Someone else booked that slot first. Refresh to see the latest schedule.
+          </div>
+        ) : null}
+        {q.houseBookError === "past" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            That slot has already started — pick a future time.
+          </div>
+        ) : null}
+        {q.houseBookError === "cancelled" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            That date was cancelled — house booking isn&apos;t available.
+          </div>
+        ) : null}
+        {q.houseBookError === "blocked" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            House booking isn&apos;t allowed for that slot under your current schedule rules or date range.
           </div>
         ) : null}
         {q.planError === "paymentsDisabled" ? (

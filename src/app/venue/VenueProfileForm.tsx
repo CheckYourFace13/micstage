@@ -134,15 +134,9 @@ export function VenueProfileForm({ venue }: Props) {
               />
             </label>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              formAction={discoverVenueSocials}
-              className="h-10 rounded-md border border-white/15 bg-white/5 px-4 text-xs font-semibold text-white hover:bg-white/10"
-            >
-              Auto-find socials from website
-            </button>
-            <span className="text-xs text-white/50">We try to find links from your website; you verify/edit before saving.</span>
-          </div>
+          <p className="text-xs text-white/50">
+            Save your profile after editing. Use auto-find below to pull social links from your saved website URL.
+          </p>
         </div>
 
         <fieldset className="grid gap-3">
@@ -215,12 +209,26 @@ export function VenueProfileForm({ venue }: Props) {
           </div>
         </fieldset>
 
-        <button
-          type="submit"
-          className="h-11 rounded-md border border-white/15 bg-white/10 px-5 text-sm font-semibold text-white hover:bg-white/15"
-        >
-          Save venue profile
-        </button>
+        <FormSubmitButton
+          label="Save venue profile"
+          pendingLabel="Saving profile…"
+          className="h-11 rounded-md border border-white/15 bg-white/10 px-5 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-60"
+        />
+      </form>
+
+      <form action={discoverVenueSocials} className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-white/15 bg-black/15 px-4 py-3">
+        <input type="hidden" name="venueId" value={venue.id} />
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-medium text-white/70">Auto-find socials from website</div>
+          <p className="mt-1 text-xs text-white/45">
+            Reads the website URL already saved for this venue. Save the profile first if you just changed the URL.
+          </p>
+        </div>
+        <FormSubmitButton
+          label="Run auto-find"
+          pendingLabel="Searching website…"
+          className="h-10 shrink-0 rounded-md border border-white/15 bg-white/5 px-4 text-xs font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+        />
       </form>
 
       {venue.subscriptionTier === "FREE" ? (

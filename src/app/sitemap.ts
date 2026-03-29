@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { slugify } from "@/lib/slug";
+import { getValidLocationSlugs } from "@/lib/locationSlugValidation";
 import { siteOrigin } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
@@ -45,22 +45,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.75,
     }));
 
-    const withCity = await prisma.venue.findMany({
-      where: { city: { not: null } },
-      select: { city: true },
-    });
-    const citySlugs = new Set<string>();
-    for (const v of withCity) {
-      const c = v.city?.trim();
-      if (c) citySlugs.add(slugify(c));
-    }
-
-    const locationEntries: MetadataRoute.Sitemap = [...citySlugs].map((slug) => ({
-      url: `${base}/locations/${slug}/performers`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.65,
-    }));
+    const validLocationSlugs = await getValidLocationSlugs();
+    const locationEntries: MetadataRoute.Sitemap =
+      validLocationSlugs == null
+        ? []
+        : [...validLocationSlugs].map((slug) => ({
+            url: `${base}/locations/${slug}/performers`,
+            lastModified: now,
+            changeFrequency: "weekly",
+            priority: 0.65,
+          }));
 
     return [...staticEntries, ...venueEntries, ...locationEntries];
   } catch {

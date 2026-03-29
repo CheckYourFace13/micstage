@@ -107,6 +107,7 @@ export default async function VenuePublicPage(props: {
   const isMusician = session?.kind === "musician";
   const venueStaffVenueIds =
     session?.kind === "venue" ? await venueIdsForVenueSession(session) : [];
+  const isStaffForThisVenue = venueStaffVenueIds.includes(venue.id);
   const gear = equipmentProvidedList(venue);
   const socialLinks = [
     ["Facebook", venue.facebookUrl],
@@ -126,7 +127,12 @@ export default async function VenuePublicPage(props: {
             <h1 className="mt-2 text-3xl font-semibold">{venue.name}</h1>
             <div className="mt-2 text-sm text-white/70">{venue.formattedAddress}</div>
           </div>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {session?.kind === "venue" && isStaffForThisVenue ? (
+              <Link className="text-white/70 hover:text-white" href="/venue">
+                Venue portal
+              </Link>
+            ) : null}
             {isMusician ? (
               <Link className="text-white/70 hover:text-white" href="/artist">
                 Artist portal

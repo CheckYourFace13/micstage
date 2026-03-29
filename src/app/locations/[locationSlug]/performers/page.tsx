@@ -2,26 +2,23 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { Prisma } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { assertKnownLocationSlugOrNotFound } from "@/lib/locationSlugValidation";
+import {
+  assertKnownLocationSlugOrNotFound,
+  locationDirectorySlug,
+  resolveLocationPlaceTitle,
+} from "@/lib/locationSlugValidation";
+import { slugify } from "@/lib/slug";
 import { minutesToTimeLabel } from "@/lib/time";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
 
-function titleCaseSlug(slug: string): string {
-  return slug
-    .split("-")
-    .filter(Boolean)
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(" ");
-}
-
 export async function generateMetadata(props: { params: Promise<{ locationSlug: string }> }): Promise<Metadata> {
   const { locationSlug } = await props.params;
-  const city = titleCaseSlug(locationSlug);
+  const place = await resolveLocationPlaceTitle(locationSlug);
   return buildPublicMetadata({
-    title: `${city} open mic performers`,
-    description: `See who’s playing upcoming open mics in ${city}. Public, shareable performer list on MicStage.`,
+    title: `${place} open mic performers`,
+    description: `See who’s playing upcoming open mics in ${place}. Public, shareable performer list on MicStage.`,
     path: `/locations/${locationSlug}/performers`,
   });
 }
@@ -29,7 +26,7 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
 export default async function LocationPerformersPage(props: { params: Promise<{ locationSlug: string }> }) {
   const { locationSlug } = await props.params;
   await assertKnownLocationSlugOrNotFound(locationSlug);
-  const cityGuess = titleCaseSlug(locationSlug);
+  const placeTitle = await resolveLocationPlaceTitle(locationSlug);
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -72,9 +69,13 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
         include: bookingInclude,
       });
 
-      bookings = allCityBookings.filter(
-        (b) => (b.slot.instance.template.venue.city ?? "").toLowerCase() === cityGuess.toLowerCase(),
-      );
+      bookings = allCityBookings.filter((b) => {
+        const v = b.slot.instance.template.venue;
+        const c = (v.city ?? "").trim();
+        if (!c) return false;
+        if (locationDirectorySlug(c, v.region) === locationSlug) return true;
+        return slugify(c) === locationSlug;
+      });
     }
   } catch (err) {
     console.error("DB query failed", err);
@@ -82,7 +83,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
   }
 
   const shareUrl = absoluteUrl(`/locations/${locationSlug}/performers`);
-  const shareText = `Who's playing upcoming open mics in ${cityGuess}?`;
+  const shareText = `Who's playing upcoming open mics in ${placeTitle}?`;
   const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
   const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
@@ -97,7 +98,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Public performer list</div>
-            <h1 className="om-heading mt-2 text-4xl tracking-wide">{cityGuess} performers</h1>
+            <h1 className="om-heading mt-2 text-4xl tracking-wide">{placeTitle} performers</h1>
             <p className="mt-2 text-sm text-white/70">Upcoming open mic performers anyone can view or share.</p>
           </div>
           <Link className="text-sm text-white/70 hover:text-white" href="/locations">

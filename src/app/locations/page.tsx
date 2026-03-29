@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { slugify } from "@/lib/slug";
+import { locationDirectorySlug } from "@/lib/locationSlugValidation";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { LocationsDirectory, type LocationRow } from "./LocationsDirectory";
 
@@ -42,7 +42,7 @@ export default async function LocationsPage() {
         city: l.city,
         region: l.region,
         count: l.count,
-        slug: slugify(l.city),
+        slug: locationDirectorySlug(l.city, l.region),
       }));
     }
   } catch (err) {

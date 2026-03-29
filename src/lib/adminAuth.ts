@@ -1,10 +1,34 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_COOKIE_NAME, ADMIN_EMAIL_COOKIE_NAME, ADMIN_PATH_PREFIX } from "@/lib/adminEdge";
+import {
+  ADMIN_COOKIE_NAME,
+  ADMIN_EMAIL_COOKIE_NAME,
+  ADMIN_PATH_PREFIX,
+  ADMIN_SESSION_COOKIE_PATH,
+} from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
 
 const MESSAGE = "micstage:admin-session:v2";
+
+function adminCookieBase() {
+  const secure = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true as const,
+    secure,
+    sameSite: "lax" as const,
+  };
+}
+
+/** Drop stale cookies from older MicStage builds (different names/paths). */
+function clearLegacyAdminCookies(jar: Awaited<ReturnType<typeof cookies>>) {
+  const b = adminCookieBase();
+  const expire = { ...b, maxAge: 0 };
+  jar.set("micstage_admin", "", { ...expire, path: "/" });
+  jar.set("micstage_admin", "", { ...expire, path: ADMIN_PATH_PREFIX });
+  jar.set("micstage_admin_sess", "", { ...expire, path: ADMIN_PATH_PREFIX });
+  jar.set("micstage_admin_email", "", { ...expire, path: ADMIN_PATH_PREFIX });
+}
 
 function derivedHmacKeyUtf8(secret: string): Buffer {
   return crypto.createHash("sha256").update(secret, "utf8").digest();
@@ -32,7 +56,7 @@ export async function assertAdminSession(): Promise<void> {
   }
 }
 
-/** True when admin cookie matches current env secret (for global header UI). */
+/** True when admin cookie matches current env secret (footer link swap). */
 export async function isAdminSessionCookieValid(): Promise<boolean> {
   const secret = getAdminSecretOrNull();
   if (!secret) return false;
@@ -50,27 +74,24 @@ export async function getOptionalAdminEmailFromLoginForm(): Promise<string | und
 export async function setAdminSessionCookie(secret: string, emailForAudit?: string | null) {
   const token = adminSessionNodeToken(secret);
   const jar = await cookies();
+  const b = adminCookieBase();
+  clearLegacyAdminCookies(jar);
+
   jar.set(ADMIN_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: ADMIN_PATH_PREFIX,
+    ...b,
+    path: ADMIN_SESSION_COOKIE_PATH,
     maxAge: 60 * 60 * 24 * 7,
   });
   if (emailForAudit?.trim()) {
     jar.set(ADMIN_EMAIL_COOKIE_NAME, emailForAudit.trim().toLowerCase(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: ADMIN_PATH_PREFIX,
+      ...b,
+      path: ADMIN_SESSION_COOKIE_PATH,
       maxAge: 60 * 60 * 24 * 7,
     });
   } else {
     jar.set(ADMIN_EMAIL_COOKIE_NAME, "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: ADMIN_PATH_PREFIX,
+      ...b,
+      path: ADMIN_SESSION_COOKIE_PATH,
       maxAge: 0,
     });
   }

@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { isAdminSessionCookieValid } from "@/lib/adminAuth";
 
-function roleBadge(text: string, tone: "admin" | "venue" | "artist") {
+function roleBadge(text: string, tone: "venue" | "artist") {
   const cls =
-    tone === "admin"
-      ? "border-amber-400/35 bg-amber-500/15 text-amber-100"
-      : tone === "venue"
-        ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
-        : "border-emerald-400/35 bg-emerald-500/15 text-emerald-100";
+    tone === "venue"
+      ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
+      : "border-emerald-400/35 bg-emerald-500/15 text-emerald-100";
   return (
     <span
       className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:text-[11px] ${cls}`}
@@ -18,10 +15,9 @@ function roleBadge(text: string, tone: "admin" | "venue" | "artist") {
   );
 }
 
-/** Sticky MicStage branding + primary discovery links (every page). */
+/** Sticky MicStage branding + primary discovery links (every page). Admin entry is in the footer only. */
 export async function SiteHeader() {
-  const [session, adminOk] = await Promise.all([getSession(), isAdminSessionCookieValid()]);
-
+  const session = await getSession();
   const venueSession = session?.kind === "venue";
   const artistSession = session?.kind === "musician";
 
@@ -36,23 +32,14 @@ export async function SiteHeader() {
         </Link>
         <div className="flex w-full flex-col items-end gap-2 sm:w-auto">
           <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
-            {adminOk ? roleBadge("Admin", "admin") : null}
             {venueSession ? roleBadge("Venue", "venue") : null}
             {!venueSession && artistSession ? roleBadge("Artist", "artist") : null}
-            {adminOk ? (
-              <Link
-                className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
-                href="/internal/admin/logout"
-              >
-                Sign out admin
-              </Link>
-            ) : null}
             {venueSession || artistSession ? (
               <Link
                 className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
                 href="/logout"
               >
-                Sign out account
+                Sign out
               </Link>
             ) : null}
           </div>
@@ -78,21 +65,6 @@ export async function SiteHeader() {
             >
               Contact
             </Link>
-            {adminOk ? (
-              <Link
-                className="rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 hover:bg-amber-500/20 sm:px-3"
-                href="/internal/admin"
-              >
-                Admin
-              </Link>
-            ) : (
-              <Link
-                className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
-                href="/internal/admin/login"
-              >
-                Admin login
-              </Link>
-            )}
             <Link
               className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
               href="/login/musician"

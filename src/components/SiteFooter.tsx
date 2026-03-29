@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { legalContactEmail } from "@/lib/legalContact";
+import { isAdminSessionCookieValid } from "@/lib/adminAuth";
 
-export function SiteFooter() {
-  const email = legalContactEmail();
+export async function SiteFooter() {
+  const adminOk = await isAdminSessionCookieValid();
 
   return (
     <footer className="border-t border-white/10 bg-black">
@@ -17,13 +17,18 @@ export function SiteFooter() {
           <Link className="hover:text-white" href="/terms">
             Terms of Service
           </Link>
+          {adminOk ? (
+            <Link className="hover:text-white" href="/internal/admin">
+              Admin
+            </Link>
+          ) : (
+            <Link className="hover:text-white" href="/internal/admin/login">
+              Admin login
+            </Link>
+          )}
         </nav>
         <div className="text-xs text-white/45">
           <span>© {new Date().getFullYear()} MicStage</span>
-          <span className="mx-2 text-white/25">·</span>
-          <a className="underline hover:text-white/80" href={`mailto:${email}`}>
-            {email}
-          </a>
         </div>
       </div>
     </footer>

@@ -20,6 +20,15 @@ export async function adminSessionToken(secret: string): Promise<string> {
     .join("");
 }
 
-export const ADMIN_COOKIE_NAME = "micstage_admin";
+/** New name + root path avoids duplicate legacy cookies (same name, different paths) confusing parsers. */
+export const ADMIN_COOKIE_NAME = "micstage_admin_sess";
+
 export const ADMIN_EMAIL_COOKIE_NAME = "micstage_admin_email";
+
 export const ADMIN_PATH_PREFIX = "/internal/admin";
+
+/**
+ * Root path so the session cookie is sent on every request to this origin (fixes nested /internal/admin/*).
+ * Scoped paths like /internal/admin can fail with some proxies, cached responses, or duplicate cookie pairs.
+ */
+export const ADMIN_SESSION_COOKIE_PATH = "/";

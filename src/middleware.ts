@@ -9,6 +9,7 @@ import {
   ADMIN_COOKIE_NAME,
   ADMIN_EMAIL_COOKIE_NAME,
   ADMIN_PATH_PREFIX,
+  ADMIN_SESSION_COOKIE_PATH,
   adminSessionToken,
 } from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
@@ -101,7 +102,7 @@ async function runMiddleware(request: NextRequest) {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
-          path: ADMIN_PATH_PREFIX,
+          path: ADMIN_SESSION_COOKIE_PATH,
           maxAge: 60 * 60 * 24 * 7,
         });
         if (emailParam?.trim()) {
@@ -109,7 +110,7 @@ async function runMiddleware(request: NextRequest) {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
-            path: ADMIN_PATH_PREFIX,
+            path: ADMIN_SESSION_COOKIE_PATH,
             maxAge: 60 * 60 * 24 * 7,
           });
         }

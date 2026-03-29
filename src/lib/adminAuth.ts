@@ -4,10 +4,14 @@ import { redirect } from "next/navigation";
 import { ADMIN_COOKIE_NAME, ADMIN_EMAIL_COOKIE_NAME, ADMIN_PATH_PREFIX } from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
 
-const MESSAGE = "micstage:admin-session:v1";
+const MESSAGE = "micstage:admin-session:v2";
+
+function derivedHmacKeyUtf8(secret: string): Buffer {
+  return crypto.createHash("sha256").update(secret, "utf8").digest();
+}
 
 export function adminSessionNodeToken(secret: string): string {
-  return crypto.createHmac("sha256", secret).update(MESSAGE).digest("hex");
+  return crypto.createHmac("sha256", derivedHmacKeyUtf8(secret)).update(MESSAGE, "utf8").digest("hex");
 }
 
 export function getAdminSecretOrNull(): string | null {
@@ -28,9 +32,18 @@ export async function assertAdminSession(): Promise<void> {
   }
 }
 
+/** True when admin cookie matches current env secret (for global header UI). */
+export async function isAdminSessionCookieValid(): Promise<boolean> {
+  const secret = getAdminSecretOrNull();
+  if (!secret) return false;
+  const jar = await cookies();
+  const tok = jar.get(ADMIN_COOKIE_NAME)?.value;
+  return Boolean(tok && tok === adminSessionNodeToken(secret));
+}
+
 export async function getOptionalAdminEmailFromLoginForm(): Promise<string | undefined> {
   const jar = await cookies();
-  return jar.get("micstage_admin_email")?.value || undefined;
+  return jar.get(ADMIN_EMAIL_COOKIE_NAME)?.value || undefined;
 }
 
 /** Set alongside admin cookie when allowlist is used (read-only hint for UI). */

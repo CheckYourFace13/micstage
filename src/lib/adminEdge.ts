@@ -1,13 +1,15 @@
 /**
  * Edge-safe HMAC session token for internal admin cookie (must match Node in adminAuth.ts).
+ * Uses SHA-256(secret) as the HMAC key so long secrets match Node's createHmac behavior.
  */
-const MESSAGE = "micstage:admin-session:v1";
+const MESSAGE = "micstage:admin-session:v2";
 
 export async function adminSessionToken(secret: string): Promise<string> {
   const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.digest("SHA-256", enc.encode(secret));
   const key = await crypto.subtle.importKey(
     "raw",
-    enc.encode(secret),
+    keyMaterial,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

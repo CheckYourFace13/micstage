@@ -74,9 +74,12 @@ async function runMiddleware(request: NextRequest) {
     }
 
     const loginPath = `${ADMIN_PATH_PREFIX}/login`;
+    const logoutPath = `${ADMIN_PATH_PREFIX}/logout`;
     const isLogin = pathname === loginPath || pathname.startsWith(`${loginPath}/`);
+    const isLogoutRoute = pathname === logoutPath || pathname.startsWith(`${logoutPath}/`);
+    const skipAdminCookieCheck = isLogin || isLogoutRoute;
 
-    if (!isLogin) {
+    if (!skipAdminCookieCheck) {
       const expectedToken = await adminSessionTokenOrNull(adminSecret);
       if (!expectedToken) {
         return new NextResponse("MicStage: admin session validation unavailable (crypto).", {

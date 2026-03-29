@@ -145,6 +145,11 @@ export default async function ArtistPortalPage({
             Profile saved.
           </div>
         ) : null}
+        {q.profileError === "invalidForm" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            That save request was incomplete or out of date. Refresh the page and try again.
+          </div>
+        ) : null}
         {q.profileError === "years" ? (
           <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
             Years playing must be between 0 and 80.

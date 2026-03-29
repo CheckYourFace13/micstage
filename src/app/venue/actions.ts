@@ -19,9 +19,10 @@ import {
 } from "@/lib/venueBookingRules";
 import { BookingRestrictionMode, VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
 
+/** Missing/tampered fields → friendly portal message instead of generic error UI. */
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
-  if (typeof v !== "string" || !v.trim()) throw new Error(`${key} is required`);
+  if (typeof v !== "string" || !v.trim()) redirect("/venue?venueError=invalidForm");
   return v.trim();
 }
 
@@ -35,7 +36,7 @@ function optString(formData: FormData, key: string): string | undefined {
 function reqInt(formData: FormData, key: string): number {
   const v = reqString(formData, key);
   const n = Number.parseInt(v, 10);
-  if (!Number.isFinite(n)) throw new Error(`${key} must be a number`);
+  if (!Number.isFinite(n)) redirect("/venue?venueError=invalidForm");
   return n;
 }
 
@@ -52,7 +53,7 @@ function optInt(formData: FormData, key: string): number | undefined {
 function reqDate(formData: FormData, key: string): Date {
   const iso = reqString(formData, key); // YYYY-MM-DD
   const d = new Date(`${iso}T00:00:00.000Z`);
-  if (Number.isNaN(d.getTime())) throw new Error("Invalid date");
+  if (Number.isNaN(d.getTime())) redirect("/venue?venueError=invalidForm");
   return d;
 }
 
@@ -129,7 +130,7 @@ export async function createEventTemplate(formData: FormData) {
   const seriesStartDate = reqDate(formData, "seriesStartDate");
   const seriesEndDate = reqDate(formData, "seriesEndDate");
   if (seriesEndDate.getTime() < seriesStartDate.getTime()) {
-    redirect("/venue?profileError=badRange");
+    redirect("/venue?scheduleError=badRange");
   }
 
   const venue = await requirePrisma().venue.findUnique({
@@ -150,10 +151,10 @@ export async function createEventTemplate(formData: FormData) {
   const horizonEndUtc = new Date(todayUtc.getTime() + maxHorizonDays * 24 * 60 * 60 * 1000);
 
   if (seriesStartDate.getTime() < todayUtc.getTime() || seriesStartDate.getTime() > horizonEndUtc.getTime()) {
-    redirect("/venue?profileError=badRange");
+    redirect("/venue?scheduleError=badRange");
   }
   if (seriesEndDate.getTime() < todayUtc.getTime() || seriesEndDate.getTime() > horizonEndUtc.getTime()) {
-    redirect("/venue?profileError=badRange");
+    redirect("/venue?scheduleError=badRange");
   }
 
   const bookingOpensDaysAhead = Math.max(
@@ -175,7 +176,7 @@ export async function createEventTemplate(formData: FormData) {
     select: { id: true },
   });
   if (existingSameDay) {
-    redirect("/venue?profileError=duplicateWeekday");
+    redirect("/venue?scheduleError=duplicateWeekday");
   }
 
   await prisma.eventTemplate.create({
@@ -235,7 +236,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
   const seriesStartDate = reqDate(formData, "seriesStartDate");
   const seriesEndDate = reqDate(formData, "seriesEndDate");
   if (seriesEndDate.getTime() < seriesStartDate.getTime()) {
-    redirect("/venue?profileError=badRange");
+    redirect("/venue?scheduleError=badRange");
   }
 
   const prisma = requirePrisma();
@@ -260,10 +261,10 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
   const horizonEndUtc = new Date(todayUtc.getTime() + maxHorizonDays * 24 * 60 * 60 * 1000);
 
   if (seriesStartDate.getTime() < todayUtc.getTime() || seriesStartDate.getTime() > horizonEndUtc.getTime()) {
-    redirect("/venue?profileError=badRange");
+    redirect("/venue?scheduleError=badRange");
   }
   if (seriesEndDate.getTime() < todayUtc.getTime() || seriesEndDate.getTime() > horizonEndUtc.getTime()) {
-    redirect("/venue?profileError=badRange");
+    redirect("/venue?scheduleError=badRange");
   }
 
   const bookingOpensDaysAhead = Math.max(

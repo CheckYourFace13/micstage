@@ -98,16 +98,16 @@ export default async function VenuePortalPage({
             Venue profile saved. Public pages update after a short refresh.
           </div>
         ) : null}
-        {q.profileError === "duplicateWeekday" ? (
+        {q.profileError === "duplicateWeekday" || q.scheduleError === "duplicateWeekday" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             You already have a recurring schedule for that weekday. Use{" "}
             <span className="font-semibold text-white">Set weekly schedule</span> to change it — MicStage keeps one template per
             weekday per venue.
           </div>
         ) : null}
-        {q.profileError === "badRange" ? (
+        {q.profileError === "badRange" || q.scheduleError === "badRange" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
-            End date must be on or after start date.
+            End date must be on or after start date, and your booking window must fit your plan limits.
           </div>
         ) : null}
         {q.profileError === "badWindow" ? (
@@ -171,19 +171,25 @@ export default async function VenuePortalPage({
             Invalid performance format. Please try again.
           </div>
         ) : null}
-        {q.socialsError === "needWebsite" ? (
+        {q.socialsError === "needWebsite" || q.profileError === "missingWebsite" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             Add a website URL on your venue profile and save, then run auto-find again.
           </div>
         ) : null}
-        {q.socialsError === "fetchFailed" ? (
+        {q.socialsError === "fetchFailed" || q.profileError === "socialFetchFailed" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             Could not fetch your website for social discovery. You can still enter social links manually.
           </div>
         ) : null}
-        {q.venueNotice === "socialsDiscovered" ? (
+        {q.venueNotice === "socialsDiscovered" || q.profileError === "socialFound" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
             Social links were discovered from your website. Review fields and save your profile to confirm.
+          </div>
+        ) : null}
+        {q.venueError === "invalidForm" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            That request was incomplete or out of date. Refresh the page and try again — if it keeps happening, use your
+            browser&apos;s back button to re-open the form.
           </div>
         ) : null}
         {q.venueError === "forbidden" ? (

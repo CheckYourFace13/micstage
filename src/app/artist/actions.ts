@@ -17,7 +17,7 @@ export async function lookupMicStageVenueByGooglePlaceId(googlePlaceId: string) 
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
-  if (typeof v !== "string" || !v.trim()) throw new Error(`${key} is required`);
+  if (typeof v !== "string" || !v.trim()) redirect("/artist?profileError=invalidForm");
   return v.trim();
 }
 

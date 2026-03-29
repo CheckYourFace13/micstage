@@ -17,22 +17,47 @@ export async function sendEmail(input: {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "RESEND_API_KEY is missing in production. Set it and EMAIL_FROM (verified domain) so password resets can send.",
-      );
+      const msg =
+        "RESEND_API_KEY is missing in production. Set it and EMAIL_FROM (verified domain) so password resets can send.";
+      console.error("[mailer]", msg, { toDomain: input.to.split("@")[1] ?? "?" });
+      throw new Error(msg);
     }
-    // Dev fallback so flow still works without provider setup.
-    console.log("EMAIL_FALLBACK", { ...input, appUrl: appUrl() });
+    console.log("[mailer] EMAIL_FALLBACK (no RESEND_API_KEY)", {
+      to: input.to,
+      subject: input.subject,
+      appUrl: appUrl(),
+    });
     return;
   }
 
-  const resend = new Resend(apiKey);
-  await resend.emails.send({
-    from: fromEmail(),
-    to: input.to,
-    subject: input.subject,
-    html: input.html,
-    text: input.text,
-  });
-}
+  const fromAddr = fromEmail();
+  if (!fromAddr || fromAddr.includes("onboarding@resend.dev")) {
+    console.warn(
+      "[mailer] EMAIL_FROM not set or still resend.dev default; production sends often fail domain verification.",
+      { from: fromAddr },
+    );
+  }
 
+  const resend = new Resend(apiKey);
+  try {
+    const { error } = await resend.emails.send({
+      from: fromAddr,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    });
+    if (error) {
+      console.error("[mailer] Resend API rejected send", {
+        message: error.message,
+        name: error.name,
+        toDomain: input.to.split("@")[1] ?? "?",
+      });
+      throw new Error(`Resend: ${error.message}`);
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[mailer] send failed", { message, toDomain: input.to.split("@")[1] ?? "?" });
+    throw e;
+  }
+}

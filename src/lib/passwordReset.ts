@@ -13,21 +13,27 @@ function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-export async function createPasswordReset(input: {
+async function accountExistsForReset(accountType: PasswordResetAccountType, email: string): Promise<boolean> {
+  const prisma = requirePrisma();
+  if (accountType === "VENUE") {
+    const owner = await prisma.venueOwner.findUnique({ where: { email } });
+    if (owner) return true;
+    const manager = await prisma.venueManager.findUnique({ where: { email } });
+    return !!manager;
+  }
+  const user = await prisma.musicianUser.findUnique({ where: { email } });
+  return !!user;
+}
+
+/** Creates DB row; returns raw token for URL. */
+async function issuePasswordResetToken(input: {
   accountType: PasswordResetAccountType;
   email: string;
-}): Promise<{ sent: boolean }> {
+}): Promise<{ rawToken: string; path: string } | null> {
   const prisma = requirePrisma();
   const email = input.email.trim().toLowerCase();
-
-  const exists =
-    input.accountType === "VENUE"
-      ? (await prisma.venueOwner.findUnique({ where: { email } })) ||
-        (await prisma.venueManager.findUnique({ where: { email } }))
-      : await prisma.musicianUser.findUnique({ where: { email } });
-
-  // Do not reveal whether account exists.
-  if (!exists) return { sent: true };
+  const exists = await accountExistsForReset(input.accountType, email);
+  if (!exists) return null;
 
   const rawToken = crypto.randomBytes(32).toString("hex");
   const tokenHash = hashToken(rawToken);
@@ -44,8 +50,18 @@ export async function createPasswordReset(input: {
 
   const path =
     input.accountType === "VENUE" ? `/reset/venue/${rawToken}` : `/reset/musician/${rawToken}`;
-  const link = `${appUrl()}${path}`;
+  return { rawToken, path };
+}
 
+export async function createPasswordReset(input: {
+  accountType: PasswordResetAccountType;
+  email: string;
+}): Promise<{ sent: boolean }> {
+  const email = input.email.trim().toLowerCase();
+  const issued = await issuePasswordResetToken({ accountType: input.accountType, email });
+  if (!issued) return { sent: true };
+
+  const link = `${appUrl()}${issued.path}`;
   await sendEmail({
     to: email,
     subject: "Reset your MicStage password",
@@ -54,6 +70,45 @@ export async function createPasswordReset(input: {
   });
 
   return { sent: true };
+}
+
+/** Internal admin: returns full URL or error (surfaces missing account). */
+export async function createPasswordResetLinkForAdmin(input: {
+  accountType: PasswordResetAccountType;
+  email: string;
+}): Promise<{ ok: true; link: string } | { ok: false; error: string }> {
+  const email = input.email.trim().toLowerCase();
+  const issued = await issuePasswordResetToken({ accountType: input.accountType, email });
+  if (!issued) {
+    return { ok: false, error: "No account found for that email and type (venue vs artist)." };
+  }
+  return { ok: true, link: `${appUrl()}${issued.path}` };
+}
+
+/** Internal admin: sends reset email and surfaces transport errors. */
+export async function sendPasswordResetEmailForAdmin(input: {
+  accountType: PasswordResetAccountType;
+  email: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const email = input.email.trim().toLowerCase();
+  const issued = await issuePasswordResetToken({ accountType: input.accountType, email });
+  if (!issued) {
+    return { ok: false, error: "No account found for that email and type (venue vs artist)." };
+  }
+  const link = `${appUrl()}${issued.path}`;
+  try {
+    await sendEmail({
+      to: email,
+      subject: "Reset your MicStage password",
+      html: `<p>You requested a password reset.</p><p><a href="${link}">Reset password</a></p><p>This link expires in ${TOKEN_TTL_MINUTES} minutes.</p>`,
+      text: `You requested a password reset.\n\nOpen this link: ${link}\n\nThis link expires in ${TOKEN_TTL_MINUTES} minutes.`,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Email send failed.";
+    console.error("[passwordReset] admin send failed", { message });
+    return { ok: false, error: message };
+  }
+  return { ok: true };
 }
 
 export async function verifyResetToken(input: {
@@ -118,4 +173,3 @@ export async function consumeResetToken(input: {
   if (!changed) return { ok: false as const };
   return { ok: true as const };
 }
-

@@ -5,8 +5,8 @@ export const metadata = {
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { safeAfterAuthPath } from "@/lib/safeRedirect";
-import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { loginVenue } from "./serverActions";
+import { VenueLoginForm } from "./VenueLoginForm";
 
 export default async function VenueLoginPage(props: {
   searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
@@ -31,8 +31,24 @@ export default async function VenueLoginPage(props: {
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Venue login</h1>
         <p className="mt-2 text-sm text-white/70">Log in to manage your venue schedule and invite managers.</p>
 
-        <form action={loginVenue} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <input type="hidden" name="next" value={next ?? ""} />
+        <VenueLoginForm
+          action={loginVenue}
+          next={next ?? ""}
+          footer={
+            <div className="text-xs text-white/60">
+              Forgot password?{" "}
+              <a className="underline hover:text-white" href="/reset/venue">
+                Reset it
+              </a>
+              .<br />
+              New venue?{" "}
+              <a className="underline hover:text-white" href="/register/venue">
+                Create an account
+              </a>
+              .
+            </div>
+          }
+        >
           {showResetSuccess ? (
             <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
               Password updated successfully. You can log in now.
@@ -72,26 +88,7 @@ export default async function VenueLoginPage(props: {
               required
             />
           </label>
-
-          <FormSubmitButton
-            label="Log in"
-            pendingLabel="Signing in…"
-            className="mt-2 inline-flex h-11 min-w-[120px] items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
-          />
-
-          <div className="text-xs text-white/60">
-            Forgot password?{" "}
-            <a className="underline hover:text-white" href="/reset/venue">
-              Reset it
-            </a>
-            .<br />
-            New venue?{" "}
-            <a className="underline hover:text-white" href="/register/venue">
-              Create an account
-            </a>
-            .
-          </div>
-        </form>
+        </VenueLoginForm>
       </main>
     </div>
   );

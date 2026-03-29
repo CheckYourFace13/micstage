@@ -1,18 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { legalContactEmail } from "@/lib/legalContact";
 import { buildPublicMetadata } from "@/lib/publicSeo";
+import { ContactForm } from "./ContactForm";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Contact & support",
   description:
-    "Get help with your MicStage account, the platform, or bookings. Find when to contact MicStage vs your venue.",
+    "Get help with your MicStage account, the platform, or bookings. Send a message to our team or contact the venue for room-specific questions.",
   path: "/contact",
 });
 
 export default function ContactPage() {
-  const email = legalContactEmail();
-
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto max-w-2xl px-6 py-14 pb-24">
@@ -23,17 +21,14 @@ export default function ContactPage() {
           room is usually the best first stop.
         </p>
 
-        <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-sm font-semibold text-white">Email us</h2>
+        <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6 sm:p-8">
+          <h2 className="text-sm font-semibold text-white">Send us a message</h2>
           <p className="mt-2 text-sm text-white/70">
-            Send a clear subject line and, if relevant, your account email and a link to the page you’re on.
+            Tell us how we can help. We’ll reply to the email address you provide.
           </p>
-          <a
-            className="mt-4 inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-            href={`mailto:${email}?subject=MicStage%20support`}
-          >
-            {email}
-          </a>
+          <div className="mt-6">
+            <ContactForm />
+          </div>
         </div>
 
         <div className="mt-12 space-y-8 text-sm leading-relaxed text-white/80">
@@ -60,11 +55,11 @@ export default function ContactPage() {
             <p className="mt-4 text-white/65">
               Find public venue pages from{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/locations">
-                locations
+                Find Venues
               </Link>{" "}
               or{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
-                performers
+                Find Artists
               </Link>
               — each venue page may list website or social links when provided.
             </p>

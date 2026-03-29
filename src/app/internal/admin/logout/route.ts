@@ -7,8 +7,8 @@ import {
 } from "@/lib/adminEdge";
 
 export async function GET(request: Request) {
-  const u = new URL("/internal/admin/login", request.url);
-  const res = NextResponse.redirect(u);
+  const home = new URL("/", request.url);
+  const res = NextResponse.redirect(home);
   const secure = process.env.NODE_ENV === "production";
   const base = { httpOnly: true, secure, sameSite: "lax" as const, maxAge: 0 };
 

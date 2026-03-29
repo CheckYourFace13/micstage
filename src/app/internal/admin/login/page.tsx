@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { privateNoIndexMetadata } from "@/lib/privateSeo";
-import { ADMIN_COOKIE_NAME, ADMIN_PATH_PREFIX } from "@/lib/adminEdge";
+import { ADMIN_COOKIE_NAME } from "@/lib/adminEdge";
 import { adminSessionNodeToken, getAdminSecretOrNull } from "@/lib/adminAuth";
 import { parseAdminEmailAllowlist } from "@/lib/adminAuthShared";
 import { adminLoginAction } from "./actions";
@@ -97,8 +97,8 @@ export default async function AdminLoginPage(props: {
           </form>
 
           <p className="mt-6 text-xs text-zinc-500">
-            Cookie path is limited to <code className="rounded bg-zinc-800 px-1">{ADMIN_PATH_PREFIX}</code>. You can also use{" "}
-            <code className="rounded bg-zinc-800 px-1">?key=…&amp;email=…</code> once to set the session cookie.
+            Session cookie uses path <code className="rounded bg-zinc-800 px-1">/</code>. You can also use{" "}
+            <code className="rounded bg-zinc-800 px-1">?key=…&amp;email=…</code> on an admin URL once to set the session cookie.
           </p>
         </main>
       </div>

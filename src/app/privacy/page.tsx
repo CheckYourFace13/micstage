@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LegalDocument } from "@/components/LegalDocument";
-import { legalContactEmail } from "@/lib/legalContact";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 const updated = "March 18, 2026";
@@ -13,8 +13,6 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default function PrivacyPage() {
-  const contact = legalContactEmail();
-
   return (
     <LegalDocument title="Privacy Policy" updated={updated}>
       <p>
@@ -94,8 +92,11 @@ export default function PrivacyPage() {
 
       <h2>Contact</h2>
       <p>
-        Questions about this policy:{" "}
-        <a href={`mailto:${contact}`}>{contact}</a>.
+        Questions about this policy: use the{" "}
+        <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/contact">
+          contact form
+        </Link>
+        .
       </p>
     </LegalDocument>
   );

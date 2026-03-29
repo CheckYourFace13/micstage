@@ -29,13 +29,13 @@ export function PublicDataUnavailable({
             href="/performers"
             className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Performers
+            Find Artists
           </Link>
           <Link
             href="/locations"
             className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Locations
+            Find Venues
           </Link>
         </div>
       </main>

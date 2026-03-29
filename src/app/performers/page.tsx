@@ -79,17 +79,17 @@ export default async function PerformersPage({
   }
 
   const emptyMessage = queryFailed
-    ? "We couldn’t load the performer directory. Try again in a moment."
+    ? "We couldn’t load the artist directory. Try again in a moment."
     : query
-      ? "No performers match that search yet."
-      : "No performers yet. Artists can join MicStage to appear here.";
+      ? "No artists match that search yet."
+      : "No artists listed yet. Join MicStage to appear here.";
 
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-3xl px-6 py-14">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="text-xs font-medium uppercase tracking-widest text-white/60">Performers</div>
+            <div className="text-xs font-medium uppercase tracking-widest text-white/60">Artists</div>
             <h1 className="om-heading mt-2 text-4xl tracking-wide">Search by stage name</h1>
             <p className="mt-2 max-w-xl text-sm text-white/65">
               MicStage lists <span className="text-white/85">stage / performer names only</span>. First and last names
@@ -97,7 +97,7 @@ export default async function PerformersPage({
             </p>
           </div>
           <Link href="/locations" className="text-sm text-white/70 hover:text-white">
-            Open mic venues
+            Find Venues
           </Link>
         </div>
 

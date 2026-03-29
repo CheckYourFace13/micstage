@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LegalDocument } from "@/components/LegalDocument";
-import { legalContactEmail } from "@/lib/legalContact";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 const updated = "March 18, 2026";
@@ -13,8 +13,6 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default function TermsPage() {
-  const contact = legalContactEmail();
-
   return (
     <LegalDocument title="Terms of Service" updated={updated}>
       <p>
@@ -108,8 +106,11 @@ export default function TermsPage() {
 
       <h2>Contact</h2>
       <p>
-        For questions about these Terms:{" "}
-        <a href={`mailto:${contact}`}>{contact}</a>.
+        For questions about these Terms, use the{" "}
+        <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/contact">
+          contact form
+        </Link>
+        .
       </p>
     </LegalDocument>
   );

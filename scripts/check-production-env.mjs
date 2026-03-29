@@ -82,6 +82,18 @@ if (production) {
   }
   ok("EMAIL_FROM is set");
 
+  const contactInbox =
+    process.env.MICSTAGE_CONTACT_INBOX?.trim() ||
+    process.env.CONTACT_INBOX?.trim() ||
+    process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() ||
+    "";
+  if (!contactInbox) {
+    fail(
+      "Set MICSTAGE_CONTACT_INBOX (or CONTACT_INBOX / NEXT_PUBLIC_CONTACT_EMAIL) so the /contact form can deliver messages.",
+    );
+  }
+  ok("Contact inbox (MICSTAGE_CONTACT_INBOX or equivalent) is set");
+
   const db =
     process.env.DATABASE_URL?.trim() ||
     process.env.POSTGRES_URL?.trim() ||

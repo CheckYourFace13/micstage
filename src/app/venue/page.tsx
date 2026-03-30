@@ -73,7 +73,7 @@ export default async function VenuePortalPage({
                 className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
                 href="/performers"
               >
-                Search performers
+                Search artists
               </Link>
               <Link
                 className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
@@ -581,7 +581,7 @@ export default async function VenuePortalPage({
                                                 <input
                                                   name="performerName"
                                                   required
-                                                  placeholder="Performer name"
+                                                  placeholder="Artist / stage name"
                                                   className="h-9 w-40 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white placeholder:text-white/40"
                                                 />
                                                 <FormSubmitButton

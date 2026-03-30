@@ -42,7 +42,7 @@ export function ArtistProfileForm({ musician, allVenues, venuesForInterest }: Pr
   return (
     <div className="mt-10 rounded-2xl border border-white/10 bg-black/30 p-6">
       <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-        Your performer profile
+        Your artist profile
       </div>
       <h2 className="om-heading mt-2 text-2xl tracking-wide text-white">Profile & discovery</h2>
       <p className="mt-2 text-sm text-white/60">
@@ -64,7 +64,7 @@ export function ArtistProfileForm({ musician, allVenues, venuesForInterest }: Pr
           </li>
         </ul>
         <p className="text-xs text-white/50">
-          Performer search uses <span className="text-white/70">stage name only</span>, not your legal name.
+          Artist search uses <span className="text-white/70">stage name only</span>, not your legal name.
         </p>
       </div>
 

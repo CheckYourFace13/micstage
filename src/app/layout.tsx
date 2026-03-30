@@ -23,7 +23,7 @@ const body = Inter({
 const origin = siteOrigin();
 const siteTagline = "Artists to music to marketing";
 const defaultDescription =
-  "MicStage connects open mic venues and artists—bookable slots, performer discovery, and public venue pages built for local SEO and sharing.";
+  "MicStage connects open mic venues and artists—bookable slots, artist discovery, and public venue pages built for local SEO and sharing.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(origin),

@@ -1,7 +1,14 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import {
+  ADMIN_COOKIE_NAME,
+  ADMIN_EMAIL_COOKIE_NAME,
+  ADMIN_PATH_PREFIX,
+  ADMIN_SESSION_COOKIE_PATH,
+} from "@/lib/adminEdge";
+import { OM_SESSION_COOKIE_NAME } from "@/lib/authCookieNames";
 
-const COOKIE_NAME = "om_session";
+const COOKIE_NAME = OM_SESSION_COOKIE_NAME;
 
 type VenueSession = {
   kind: "venue";
@@ -37,6 +44,19 @@ function secretKey() {
   return new TextEncoder().encode(getAuthSecret());
 }
 
+function clearAdminSessionCookiesInJar(
+  jar: Awaited<ReturnType<typeof cookies>>,
+  secure: boolean,
+) {
+  const b = { httpOnly: true as const, secure, sameSite: "lax" as const, maxAge: 0 };
+  jar.set(ADMIN_COOKIE_NAME, "", { ...b, path: ADMIN_SESSION_COOKIE_PATH });
+  jar.set(ADMIN_EMAIL_COOKIE_NAME, "", { ...b, path: ADMIN_SESSION_COOKIE_PATH });
+  jar.set("micstage_admin", "", { ...b, path: "/" });
+  jar.set("micstage_admin", "", { ...b, path: ADMIN_PATH_PREFIX });
+  jar.set("micstage_admin_sess", "", { ...b, path: ADMIN_PATH_PREFIX });
+  jar.set("micstage_admin_email", "", { ...b, path: ADMIN_PATH_PREFIX });
+}
+
 export async function setSession(session: Session) {
   const token = await new SignJWT(session)
     .setProtectedHeader({ alg: "HS256" })
@@ -45,6 +65,7 @@ export async function setSession(session: Session) {
     .sign(secretKey());
 
   const jar = await cookies();
+  clearAdminSessionCookiesInJar(jar, process.env.NODE_ENV === "production");
   jar.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",

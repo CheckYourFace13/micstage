@@ -23,10 +23,10 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Artist registration</h1>
         <p className="mt-2 text-sm text-white/70">
-          Create your performer account with <span className="text-white/90">email + password</span> (private). You’ll set
-          a <span className="text-white/90">stage / performer name</span> that is{" "}
+          Create your artist account with <span className="text-white/90">email + password</span> (private). You’ll set
+          a <span className="text-white/90">stage name</span> that is{" "}
           <span className="text-emerald-200/90">public</span> — that’s what venues and fans see and how you show up in
-          performer search.
+          artist search.
         </p>
 
         <form action={registerMusician} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
@@ -36,7 +36,7 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
             </div>
           ) : null}
           <label className="grid gap-1 text-sm">
-            <span className="text-white/80">Stage / performer name</span>
+            <span className="text-white/80">Stage name</span>
             <input
               name="stageName"
               className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"

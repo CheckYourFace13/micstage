@@ -17,8 +17,8 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
   const { locationSlug } = await props.params;
   const place = await resolveLocationPlaceTitle(locationSlug);
   return buildPublicMetadata({
-    title: `${place} open mic performers`,
-    description: `See who’s playing upcoming open mics in ${place}. Public, shareable performer list on MicStage.`,
+    title: `${place} open mic artists`,
+    description: `See who’s playing upcoming open mics in ${place}. Public, shareable artist list on MicStage.`,
     path: `/locations/${locationSlug}/performers`,
   });
 }
@@ -90,16 +90,16 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
 
   const emptyMessage = queryFailed
     ? "We couldn’t load upcoming bookings for this area. Try again in a moment."
-    : "No upcoming performers found yet in this location.";
+    : "No upcoming artists found yet in this location.";
 
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-5xl px-6 py-12">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-medium uppercase tracking-widest text-white/60">Public performer list</div>
-            <h1 className="om-heading mt-2 text-4xl tracking-wide">{placeTitle} performers</h1>
-            <p className="mt-2 text-sm text-white/70">Upcoming open mic performers anyone can view or share.</p>
+            <div className="text-xs font-medium uppercase tracking-widest text-white/60">Public artist list</div>
+            <h1 className="om-heading mt-2 text-4xl tracking-wide">{placeTitle} artists</h1>
+            <p className="mt-2 text-sm text-white/70">Upcoming open mic artists anyone can view or share.</p>
           </div>
           <Link className="text-sm text-white/70 hover:text-white" href="/locations">
             All locations

@@ -8,7 +8,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Find open mic performers by stage name",
+  title: "Find open mic artists by stage name",
   description:
     "Search MicStage artists by public stage name. Discover open mic regulars and hire-ready acts—legal names stay private.",
   path: "/performers",
@@ -92,7 +92,7 @@ export default async function PerformersPage({
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Artists</div>
             <h1 className="om-heading mt-2 text-4xl tracking-wide">Search by stage name</h1>
             <p className="mt-2 max-w-xl text-sm text-white/65">
-              MicStage lists <span className="text-white/85">stage / performer names only</span>. First and last names
+              MicStage lists <span className="text-white/85">stage names only</span>. First and last names
               from artist accounts are private and never appear here.
             </p>
           </div>
@@ -122,7 +122,7 @@ export default async function PerformersPage({
 
         {!query ? (
           <p className="mt-6 text-sm text-white/50">
-            Enter part of a performer’s stage name, or leave blank to browse (up to 80 listings, A–Z).
+            Enter part of an artist’s stage name, or leave blank to browse (up to 80 listings, A–Z).
           </p>
         ) : null}
 

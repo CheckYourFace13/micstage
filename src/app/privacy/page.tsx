@@ -29,8 +29,8 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Booking and scheduling data.</strong> We store information needed to run the service: open mic
-          schedules, slot reservations, performer names or labels you submit for a booking, optional notes, and related
-          timestamps. Some performer or venue information may appear on public pages you or the venue make available.
+          schedules, slot reservations, artist names or labels you submit for a booking, optional notes, and related
+          timestamps. Some artist or venue information may appear on public pages you or the venue make available.
         </li>
         <li>
           <strong>Technical data.</strong> Like most sites, our servers and partners may receive standard technical

@@ -120,7 +120,7 @@ export default async function ArtistPortalPage({
                 className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
                 href="/performers"
               >
-                Search performers
+                Search artists
               </Link>
               <Link
                 className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"

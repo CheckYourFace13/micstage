@@ -36,7 +36,7 @@ export async function generateMetadata(props: { params: Promise<{ venueSlug: str
       return buildPublicMetadata({
         title: "Venue not found",
         description:
-          "This MicStage venue page could not be found. Browse open mic venues and performers from the home page.",
+          "This MicStage venue page could not be found. Browse open mic venues and artists from the home page.",
         path,
       });
     }

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
-      "MicStage helps open mic venues and artists get found: structured schedules, bookable slots, performer search, and shareable public pages for local discovery.",
+      "MicStage helps open mic venues and artists get found: structured schedules, bookable slots, artist search, and shareable public pages for local discovery.",
     path: "/",
   }),
   /** Avoid root layout `title.template` appending "| MicStage" twice. */
@@ -94,7 +94,7 @@ export default function Home() {
               <p className="mt-4 text-xs text-white/50">
                 Artists:{" "}
                 <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
-                  browse performers
+                  browse artists
                 </Link>{" "}
                 or{" "}
                 <Link className="underline hover:text-white" href="/register/musician">

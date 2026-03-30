@@ -33,7 +33,7 @@ export default async function MusicianLoginPage(props: {
           Sign in with your <span className="text-white/90">email and password</span>. Your{" "}
           <span className="text-emerald-200/90">stage name</span> is what others see on MicStage and in{" "}
           <a className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
-            performer search
+            artist search
           </a>{" "}
           — not your legal name.
         </p>

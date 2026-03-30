@@ -8,6 +8,7 @@ import {
   ADMIN_SESSION_COOKIE_PATH,
 } from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
+import { clearSession } from "@/lib/session";
 
 const MESSAGE = "micstage:admin-session:v2";
 
@@ -72,6 +73,7 @@ export async function getOptionalAdminEmailFromLoginForm(): Promise<string | und
 
 /** Set alongside admin cookie when allowlist is used (read-only hint for UI). */
 export async function setAdminSessionCookie(secret: string, emailForAudit?: string | null) {
+  await clearSession();
   const token = adminSessionNodeToken(secret);
   const jar = await cookies();
   const b = adminCookieBase();

@@ -18,14 +18,21 @@ function roleBadge(text: string, tone: "venue" | "artist" | "admin") {
   );
 }
 
-/**
- * Admin (`micstage_admin_sess`), venue, and artist (`om_session`) are independent:
- * badges and sign-out links only reflect the matching cookie/session.
- */
+type HeaderAuth = "admin" | "venue" | "artist" | "public";
+
+function resolveHeaderAuth(
+  adminOk: boolean,
+  session: Awaited<ReturnType<typeof getSession>>,
+): HeaderAuth {
+  if (adminOk) return "admin";
+  if (session?.kind === "venue") return "venue";
+  if (session?.kind === "musician") return "artist";
+  return "public";
+}
+
 export async function SiteHeader() {
   const [session, adminOk] = await Promise.all([getSession(), isAdminSessionCookieValid()]);
-  const venueSession = session?.kind === "venue";
-  const artistSession = session?.kind === "musician";
+  const auth = resolveHeaderAuth(adminOk, session);
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/15 bg-black/85 backdrop-blur-md">
@@ -39,24 +46,44 @@ export async function SiteHeader() {
 
         <div className="flex w-full flex-col gap-2 lg:w-auto lg:items-end">
           <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
-            {adminOk ? roleBadge("Admin", "admin") : null}
-            {venueSession ? roleBadge("Venue", "venue") : null}
-            {artistSession ? roleBadge("Artist", "artist") : null}
-            {adminOk ? (
-              <Link
-                className="rounded-md px-2 py-1 text-[11px] font-medium text-amber-100/90 hover:bg-amber-500/15 hover:text-amber-50 sm:text-xs"
-                href="/internal/admin/logout"
-              >
-                Sign out admin
-              </Link>
+            {auth === "admin" ? (
+              <>
+                {roleBadge("Admin", "admin")}
+                <Link
+                  className="rounded-md px-2 py-1 text-[11px] font-medium text-amber-100/90 hover:bg-amber-500/15 hover:text-amber-50 sm:text-xs"
+                  href="/internal/admin"
+                >
+                  Admin
+                </Link>
+                <Link
+                  className="rounded-md px-2 py-1 text-[11px] font-medium text-amber-100/90 hover:bg-amber-500/15 hover:text-amber-50 sm:text-xs"
+                  href="/internal/admin/logout"
+                >
+                  Sign out admin
+                </Link>
+              </>
             ) : null}
-            {venueSession || artistSession ? (
-              <Link
-                className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
-                href="/logout"
-              >
-                Sign out
-              </Link>
+            {auth === "venue" ? (
+              <>
+                {roleBadge("Venue", "venue")}
+                <Link
+                  className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
+                  href="/logout"
+                >
+                  Sign out
+                </Link>
+              </>
+            ) : null}
+            {auth === "artist" ? (
+              <>
+                {roleBadge("Artist", "artist")}
+                <Link
+                  className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
+                  href="/logout"
+                >
+                  Sign out
+                </Link>
+              </>
             ) : null}
           </div>
 
@@ -78,23 +105,25 @@ export async function SiteHeader() {
                 Find Venues
               </Link>
             </nav>
-            <nav
-              className="flex flex-wrap items-center justify-end gap-x-1 gap-y-2 border-t border-white/10 pt-2 text-xs font-medium sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 sm:text-sm"
-              aria-label="Account"
-            >
-              <Link
-                className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
-                href="/login/musician"
+            {auth === "public" ? (
+              <nav
+                className="flex flex-wrap items-center justify-end gap-x-1 gap-y-2 border-t border-white/10 pt-2 text-xs font-medium sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 sm:text-sm"
+                aria-label="Account"
               >
-                Artist login
-              </Link>
-              <Link
-                className="rounded-md border border-white/20 bg-white/5 px-2 py-1.5 text-white hover:bg-white/10 sm:px-3"
-                href="/login/venue"
-              >
-                Venue login
-              </Link>
-            </nav>
+                <Link
+                  className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
+                  href="/login/musician"
+                >
+                  Artist login
+                </Link>
+                <Link
+                  className="rounded-md border border-white/20 bg-white/5 px-2 py-1.5 text-white hover:bg-white/10 sm:px-3"
+                  href="/login/venue"
+                >
+                  Venue login
+                </Link>
+              </nav>
+            ) : null}
           </div>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Marketing & SEO for open mic venues and artists",
   description:
-    "How MicStage combines artist discovery, venue pages, and crawl-friendly URLs so your open mic attracts more performers, fans, and search traffic.",
+    "How MicStage combines artist discovery, venue pages, and crawl-friendly URLs so your open mic attracts more artists, fans, and search traffic.",
   path: "/why/marketing-and-seo",
 });
 
@@ -25,7 +25,7 @@ export default function WhyMarketingAndSeoPage() {
         <section className="mt-8 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">What gets indexed and shared</h2>
           <ul className="grid gap-3 text-sm text-white/75">
-            <li>Public venue pages and city/location performer pages.</li>
+            <li>Public venue pages and city/location artist pages.</li>
             <li>Structured route paths for location-based discovery (city slugs and venue slugs).</li>
             <li>Sitemap and robots support for cleaner crawling and launch readiness.</li>
           </ul>

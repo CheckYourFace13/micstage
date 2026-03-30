@@ -47,7 +47,7 @@ export function LocationsDirectory({ rows }: { rows: LocationRow[] }) {
             </Link>{" "}
             ·{" "}
             <Link className="underline hover:text-white" href="/performers">
-              Browse performers
+              Browse artists
             </Link>
           </p>
         </div>
@@ -68,7 +68,7 @@ export function LocationsDirectory({ rows }: { rows: LocationRow[] }) {
                 {l.region ? `, ${l.region}` : ""}
               </div>
               <div className="mt-1 text-xs text-white/60">
-                {l.count} registered venue{l.count === 1 ? "" : "s"} · public performer activity
+                {l.count} registered venue{l.count === 1 ? "" : "s"} · public artist activity
               </div>
             </Link>
           ))}

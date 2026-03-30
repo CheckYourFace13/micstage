@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { OM_SESSION_COOKIE_NAME } from "@/lib/authCookieNames";
 import {
   ADMIN_COOKIE_NAME,
   ADMIN_EMAIL_COOKIE_NAME,
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
   res.cookies.set("micstage_admin", "", { ...base, path: "/" });
   res.cookies.set("micstage_admin", "", { ...base, path: ADMIN_PATH_PREFIX });
   res.cookies.set("micstage_admin_sess", "", { ...base, path: ADMIN_PATH_PREFIX });
+  res.cookies.set("micstage_admin_email", "", { ...base, path: ADMIN_PATH_PREFIX });
+  res.cookies.set(OM_SESSION_COOKIE_NAME, "", { ...base, path: "/" });
 
   return res;
 }

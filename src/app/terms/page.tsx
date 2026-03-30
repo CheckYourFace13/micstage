@@ -63,7 +63,7 @@ export default function TermsPage() {
 
       <h2>Public information</h2>
       <p>
-        Features may display information publicly (for example, venue pages, performer discovery, or city-level
+        Features may display information publicly (for example, venue pages, artist discovery, or city-level
         listings). You choose what to publish within the product’s options; assume public-facing fields may be visible
         on the web or in search engines.
       </p>

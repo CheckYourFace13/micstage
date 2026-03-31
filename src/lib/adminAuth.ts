@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { redirect } from "next/navigation";
 import {
   ADMIN_COOKIE_NAME,
@@ -21,14 +22,43 @@ function adminCookieBase() {
   };
 }
 
+/** Current + legacy admin cookie names/paths to expire on logout (host-only; same as login set). */
+const ADMIN_LOGOUT_COOKIE_TARGETS: readonly { name: string; path: string }[] = [
+  { name: ADMIN_COOKIE_NAME, path: ADMIN_SESSION_COOKIE_PATH },
+  { name: ADMIN_EMAIL_COOKIE_NAME, path: ADMIN_SESSION_COOKIE_PATH },
+  { name: "micstage_admin", path: "/" },
+  { name: "micstage_admin", path: ADMIN_PATH_PREFIX },
+  { name: "micstage_admin_sess", path: ADMIN_PATH_PREFIX },
+  { name: "micstage_admin_email", path: ADMIN_PATH_PREFIX },
+];
+
 /** Drop stale cookies from older MicStage builds (different names/paths). */
 function clearLegacyAdminCookies(jar: Awaited<ReturnType<typeof cookies>>) {
   const b = adminCookieBase();
   const expire = { ...b, maxAge: 0 };
-  jar.set("micstage_admin", "", { ...expire, path: "/" });
-  jar.set("micstage_admin", "", { ...expire, path: ADMIN_PATH_PREFIX });
-  jar.set("micstage_admin_sess", "", { ...expire, path: ADMIN_PATH_PREFIX });
-  jar.set("micstage_admin_email", "", { ...expire, path: ADMIN_PATH_PREFIX });
+  for (const t of ADMIN_LOGOUT_COOKIE_TARGETS) {
+    if (t.name === ADMIN_COOKIE_NAME || t.name === ADMIN_EMAIL_COOKIE_NAME) continue;
+    jar.set(t.name, "", { ...expire, path: t.path });
+  }
+}
+
+/** Clear admin session cookies on the current request (server actions / RSC cookie jar). */
+export async function clearAdminSessionCookies(): Promise<void> {
+  const jar = await cookies();
+  const b = adminCookieBase();
+  const expire = { ...b, maxAge: 0 };
+  for (const t of ADMIN_LOGOUT_COOKIE_TARGETS) {
+    jar.set(t.name, "", { ...expire, path: t.path });
+  }
+}
+
+/** Same expiry as `clearAdminSessionCookies`, for Route Handlers (`NextResponse`). */
+export function applyAdminLogoutCookiesToResponse(res: NextResponse): void {
+  const secure = process.env.NODE_ENV === "production";
+  const base = { httpOnly: true as const, secure, sameSite: "lax" as const, maxAge: 0 };
+  for (const t of ADMIN_LOGOUT_COOKIE_TARGETS) {
+    res.cookies.set(t.name, "", { ...base, path: t.path });
+  }
 }
 
 function derivedHmacKeyUtf8(secret: string): Buffer {

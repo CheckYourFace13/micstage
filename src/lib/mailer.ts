@@ -8,11 +8,17 @@ function fromEmail() {
   return process.env.EMAIL_FROM || "MicStage <onboarding@resend.dev>";
 }
 
+function replyToEmail() {
+  const v = process.env.EMAIL_REPLY_TO?.trim();
+  return v || undefined;
+}
+
 export async function sendEmail(input: {
   to: string;
   subject: string;
   html: string;
   text: string;
+  replyTo?: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -40,12 +46,14 @@ export async function sendEmail(input: {
 
   const resend = new Resend(apiKey);
   try {
+    const replyTo = input.replyTo || replyToEmail();
     const { error } = await resend.emails.send({
       from: fromAddr,
       to: input.to,
       subject: input.subject,
       html: input.html,
       text: input.text,
+      replyTo,
     });
     if (error) {
       console.error("[mailer] Resend API rejected send", {

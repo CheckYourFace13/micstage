@@ -13,6 +13,32 @@ function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function passwordResetEmailContent(link: string) {
+  const subject = "MicStage password reset";
+  const html = [
+    "<p>Hi,</p>",
+    "<p>We received a request to reset your MicStage password.</p>",
+    `<p><a href="${link}">Reset your password</a></p>`,
+    `<p>This link expires in ${TOKEN_TTL_MINUTES} minutes.</p>`,
+    "<p>If you did not request this, you can ignore this email.</p>",
+    "<p>MicStage</p>",
+  ].join("");
+  const text = [
+    "Hi,",
+    "",
+    "We received a request to reset your MicStage password.",
+    "",
+    `Reset your password: ${link}`,
+    "",
+    `This link expires in ${TOKEN_TTL_MINUTES} minutes.`,
+    "",
+    "If you did not request this, you can ignore this email.",
+    "",
+    "MicStage",
+  ].join("\n");
+  return { subject, html, text };
+}
+
 async function accountExistsForReset(accountType: PasswordResetAccountType, email: string): Promise<boolean> {
   const prisma = requirePrisma();
   if (accountType === "VENUE") {
@@ -62,11 +88,12 @@ export async function createPasswordReset(input: {
   if (!issued) return { sent: true };
 
   const link = `${appUrl()}${issued.path}`;
+  const content = passwordResetEmailContent(link);
   await sendEmail({
     to: email,
-    subject: "Reset your MicStage password",
-    html: `<p>You requested a password reset.</p><p><a href="${link}">Reset password</a></p><p>This link expires in ${TOKEN_TTL_MINUTES} minutes.</p>`,
-    text: `You requested a password reset.\n\nOpen this link: ${link}\n\nThis link expires in ${TOKEN_TTL_MINUTES} minutes.`,
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
   });
 
   return { sent: true };
@@ -96,12 +123,13 @@ export async function sendPasswordResetEmailForAdmin(input: {
     return { ok: false, error: "No account found for that email and type (venue vs artist)." };
   }
   const link = `${appUrl()}${issued.path}`;
+  const content = passwordResetEmailContent(link);
   try {
     await sendEmail({
       to: email,
-      subject: "Reset your MicStage password",
-      html: `<p>You requested a password reset.</p><p><a href="${link}">Reset password</a></p><p>This link expires in ${TOKEN_TTL_MINUTES} minutes.</p>`,
-      text: `You requested a password reset.\n\nOpen this link: ${link}\n\nThis link expires in ${TOKEN_TTL_MINUTES} minutes.`,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Email send failed.";

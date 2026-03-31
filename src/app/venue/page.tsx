@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { createEventTemplate, generateDateSchedule, houseBookSlot, inviteManager } from "./actions";
@@ -87,9 +88,10 @@ export default async function VenuePortalPage({
             <Link className="text-sm text-white/70 hover:text-white" href="/">
               Home
             </Link>
-            <Link className="text-sm text-white/70 hover:text-white" href="/logout">
-              Logout
-            </Link>
+            <LogoutVenueArtistButton
+              label="Logout"
+              className="text-sm text-white/70 hover:text-white"
+            />
           </div>
         </header>
 

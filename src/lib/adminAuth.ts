@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import {
   ADMIN_COOKIE_NAME,
   ADMIN_EMAIL_COOKIE_NAME,
-  ADMIN_PATH_PREFIX,
+  ADMIN_LOGOUT_COOKIE_TARGETS,
   ADMIN_SESSION_COOKIE_PATH,
 } from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
@@ -21,16 +21,6 @@ function adminCookieBase() {
     sameSite: "lax" as const,
   };
 }
-
-/** Current + legacy admin cookie names/paths to expire on logout (host-only; same as login set). */
-const ADMIN_LOGOUT_COOKIE_TARGETS: readonly { name: string; path: string }[] = [
-  { name: ADMIN_COOKIE_NAME, path: ADMIN_SESSION_COOKIE_PATH },
-  { name: ADMIN_EMAIL_COOKIE_NAME, path: ADMIN_SESSION_COOKIE_PATH },
-  { name: "micstage_admin", path: "/" },
-  { name: "micstage_admin", path: ADMIN_PATH_PREFIX },
-  { name: "micstage_admin_sess", path: ADMIN_PATH_PREFIX },
-  { name: "micstage_admin_email", path: ADMIN_PATH_PREFIX },
-];
 
 /** Drop stale cookies from older MicStage builds (different names/paths). */
 function clearLegacyAdminCookies(jar: Awaited<ReturnType<typeof cookies>>) {

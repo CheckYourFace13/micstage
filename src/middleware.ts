@@ -13,8 +13,6 @@ import {
   adminSessionToken,
 } from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
-import { OM_SESSION_COOKIE_NAME } from "@/lib/authCookieNames";
-
 async function adminSessionTokenOrNull(secret: string): Promise<string | null> {
   try {
     if (typeof crypto === "undefined" || !crypto.subtle) {
@@ -160,30 +158,9 @@ async function runMiddleware(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-micstage-pathname", `${pathname}${search}`);
-  const res = NextResponse.next({
+  return NextResponse.next({
     request: { headers: requestHeaders },
   });
-
-  const adminSecret = process.env.MICSTAGE_ADMIN_SECRET?.trim();
-  if (adminSecret) {
-    const expectedToken = await adminSessionTokenOrNull(adminSecret);
-    if (
-      expectedToken &&
-      request.cookies.get(ADMIN_COOKIE_NAME)?.value === expectedToken &&
-      request.cookies.get(OM_SESSION_COOKIE_NAME)?.value
-    ) {
-      const secure = process.env.NODE_ENV === "production";
-      res.cookies.set(OM_SESSION_COOKIE_NAME, "", {
-        httpOnly: true,
-        secure,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 0,
-      });
-    }
-  }
-
-  return res;
 }
 
 export const config = {

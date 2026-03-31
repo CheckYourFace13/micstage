@@ -32,3 +32,13 @@ export const ADMIN_PATH_PREFIX = "/internal/admin";
  * Scoped paths like /internal/admin can fail with some proxies, cached responses, or duplicate cookie pairs.
  */
 export const ADMIN_SESSION_COOKIE_PATH = "/";
+
+/** Names/paths to expire on admin logout (current + legacy); keep in sync with session clearing on venue/artist login. */
+export const ADMIN_LOGOUT_COOKIE_TARGETS: readonly { name: string; path: string }[] = [
+  { name: ADMIN_COOKIE_NAME, path: ADMIN_SESSION_COOKIE_PATH },
+  { name: ADMIN_EMAIL_COOKIE_NAME, path: ADMIN_SESSION_COOKIE_PATH },
+  { name: "micstage_admin", path: "/" },
+  { name: "micstage_admin", path: ADMIN_PATH_PREFIX },
+  { name: "micstage_admin_sess", path: ADMIN_PATH_PREFIX },
+  { name: "micstage_admin_email", path: ADMIN_PATH_PREFIX },
+] as const;

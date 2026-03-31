@@ -1,7 +1,8 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { requirePrisma } from "@/lib/prisma";
+import { isNextRedirectError } from "@/lib/nextRedirect";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
@@ -27,14 +28,27 @@ export async function registerMusician(formData: FormData) {
   if (!rl.allowed) redirect("/register/musician?error=rate");
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const existing = await requirePrisma().musicianUser.findUnique({ where: { email } });
-  if (existing) redirect("/login/musician");
 
-  const musician = await requirePrisma().musicianUser.create({
-    data: { email, passwordHash, stageName },
-  });
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    console.error("[registerMusician] database not configured");
+    redirect("/register/musician?error=unavailable");
+  }
 
-  await setSession({ kind: "musician", musicianId: musician.id, email: musician.email });
-  redirect(`/artist?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_MUSICIAN}`);
+  try {
+    const existing = await prisma.musicianUser.findUnique({ where: { email } });
+    if (existing) redirect("/login/musician");
+
+    const musician = await prisma.musicianUser.create({
+      data: { email, passwordHash, stageName },
+    });
+
+    await setSession({ kind: "musician", musicianId: musician.id, email: musician.email });
+    redirect(`/artist?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_MUSICIAN}`);
+  } catch (e) {
+    if (isNextRedirectError(e)) throw e;
+    console.error("[registerMusician]", e);
+    redirect("/register/musician?error=unavailable");
+  }
 }
 

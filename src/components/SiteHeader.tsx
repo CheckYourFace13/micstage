@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { adminLogoutAction } from "@/app/internal/admin/logoutAction";
-import { isAdminSessionCookieValid } from "@/lib/adminAuth";
-import { getSession } from "@/lib/session";
+import { getAuthUiState } from "@/lib/authUiState";
+import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 
 function roleBadge(text: string, tone: "venue" | "artist" | "admin") {
   const cls =
@@ -36,21 +36,8 @@ function roleBadgeLink(text: string, tone: "venue" | "artist" | "admin", href: s
   );
 }
 
-type HeaderAuth = "admin" | "venue" | "artist" | "public";
-
-function resolveHeaderAuth(
-  adminOk: boolean,
-  session: Awaited<ReturnType<typeof getSession>>,
-): HeaderAuth {
-  if (adminOk) return "admin";
-  if (session?.kind === "venue") return "venue";
-  if (session?.kind === "musician") return "artist";
-  return "public";
-}
-
 export async function SiteHeader() {
-  const [session, adminOk] = await Promise.all([getSession(), isAdminSessionCookieValid()]);
-  const auth = resolveHeaderAuth(adminOk, session);
+  const { role: auth } = await getAuthUiState();
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/15 bg-black/85 backdrop-blur-md">
@@ -80,23 +67,19 @@ export async function SiteHeader() {
             {auth === "venue" ? (
               <>
                 {roleBadge("Venue", "venue")}
-                <Link
+                <LogoutVenueArtistButton
+                  label="Sign out"
                   className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
-                  href="/logout"
-                >
-                  Sign out
-                </Link>
+                />
               </>
             ) : null}
             {auth === "artist" ? (
               <>
                 {roleBadge("Artist", "artist")}
-                <Link
+                <LogoutVenueArtistButton
+                  label="Sign out"
                   className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
-                  href="/logout"
-                >
-                  Sign out
-                </Link>
+                />
               </>
             ) : null}
           </div>

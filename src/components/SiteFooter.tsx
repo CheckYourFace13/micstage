@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { isAdminSessionCookieValid } from "@/lib/adminAuth";
+import { getAuthUiState } from "@/lib/authUiState";
 
 export async function SiteFooter() {
-  const adminOk = await isAdminSessionCookieValid();
+  const { role } = await getAuthUiState();
+  const adminOk = role === "admin";
 
   return (
     <footer className="border-t border-white/10 bg-black">

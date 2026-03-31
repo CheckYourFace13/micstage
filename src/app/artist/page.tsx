@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireMusicianSession } from "@/lib/authz";
 import { minutesToTimeLabel } from "@/lib/time";
@@ -134,9 +135,10 @@ export default async function ArtistPortalPage({
             <Link className="text-white/70 hover:text-white" href="/">
               Home
             </Link>
-            <Link className="text-white/70 hover:text-white" href="/logout">
-              Logout
-            </Link>
+            <LogoutVenueArtistButton
+              label="Logout"
+              className="text-white/70 hover:text-white"
+            />
           </div>
         </header>
 

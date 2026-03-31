@@ -19,6 +19,7 @@ export default async function VenueLoginPage(props: {
 
   const showInvalid = error === "invalid";
   const showRate = error === "rate";
+  const showUnavailable = error === "unavailable";
   const showResetSuccess = reset === "success";
 
   return (
@@ -66,6 +67,11 @@ export default async function VenueLoginPage(props: {
           {showRate ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Too many attempts. Please wait and try again.
+            </div>
+          ) : null}
+          {showUnavailable ? (
+            <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+              Sign-in is temporarily unavailable. Check your connection and try again. If this keeps happening, contact support.
             </div>
           ) : null}
           <label className="grid gap-1 text-sm">

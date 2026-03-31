@@ -2,7 +2,8 @@
 
 import bcrypt from "bcryptjs";
 import tzLookup from "tz-lookup";
-import { requirePrisma } from "@/lib/prisma";
+import { isNextRedirectError } from "@/lib/nextRedirect";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
@@ -55,42 +56,54 @@ export async function registerVenue(formData: FormData) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const baseSlug = slugify(venueName) || "venue";
-  let slug = baseSlug;
-  for (let i = 0; i < 25; i++) {
-    const exists = await requirePrisma().venue.findUnique({ where: { slug } });
-    if (!exists) break;
-    slug = `${baseSlug}-${i + 2}`;
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    console.error("[registerVenue] database not configured");
+    redirect("/register/venue?error=unavailable");
   }
 
-  await requirePrisma().$transaction(async (tx) => {
-    const existing = await tx.venueOwner.findUnique({ where: { email } });
-    if (existing) {
-      const ok = await bcrypt.compare(password, existing.passwordHash);
-      if (!ok) redirect("/login/venue?error=invalid");
+  try {
+    const baseSlug = slugify(venueName) || "venue";
+    let slug = baseSlug;
+    for (let i = 0; i < 25; i++) {
+      const exists = await prisma.venue.findUnique({ where: { slug } });
+      if (!exists) break;
+      slug = `${baseSlug}-${i + 2}`;
     }
-    const owner = existing ?? (await tx.venueOwner.create({ data: { email, passwordHash } }));
 
-    // If the owner already existed, we leave their passwordHash as-is (login flow comes next).
-    await tx.venue.create({
-      data: {
-        ownerId: owner.id,
-        name: venueName,
-        slug,
-        googlePlaceId,
-        formattedAddress,
-        city,
-        region,
-        country,
-        lat,
-        lng,
-        timeZone,
-      },
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.venueOwner.findUnique({ where: { email } });
+      if (existing) {
+        const ok = await bcrypt.compare(password, existing.passwordHash);
+        if (!ok) redirect("/login/venue?error=invalid");
+      }
+      const owner = existing ?? (await tx.venueOwner.create({ data: { email, passwordHash } }));
+
+      // If the owner already existed, we leave their passwordHash as-is (login flow comes next).
+      await tx.venue.create({
+        data: {
+          ownerId: owner.id,
+          name: venueName,
+          slug,
+          googlePlaceId,
+          formattedAddress,
+          city,
+          region,
+          country,
+          lat,
+          lng,
+          timeZone,
+        },
+      });
+
+      await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
     });
 
-    await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
-  });
-
-  redirect(`/venue?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_VENUE}`);
+    redirect(`/venue?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_VENUE}`);
+  } catch (e) {
+    if (isNextRedirectError(e)) throw e;
+    console.error("[registerVenue]", e);
+    redirect("/register/venue?error=unavailable");
+  }
 }
 

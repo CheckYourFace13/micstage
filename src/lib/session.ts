@@ -1,11 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import {
-  ADMIN_COOKIE_NAME,
-  ADMIN_EMAIL_COOKIE_NAME,
-  ADMIN_PATH_PREFIX,
-  ADMIN_SESSION_COOKIE_PATH,
-} from "@/lib/adminEdge";
+import { ADMIN_LOGOUT_COOKIE_TARGETS } from "@/lib/adminEdge";
 import { OM_SESSION_COOKIE_NAME } from "@/lib/authCookieNames";
 
 const COOKIE_NAME = OM_SESSION_COOKIE_NAME;
@@ -49,12 +44,9 @@ function clearAdminSessionCookiesInJar(
   secure: boolean,
 ) {
   const b = { httpOnly: true as const, secure, sameSite: "lax" as const, maxAge: 0 };
-  jar.set(ADMIN_COOKIE_NAME, "", { ...b, path: ADMIN_SESSION_COOKIE_PATH });
-  jar.set(ADMIN_EMAIL_COOKIE_NAME, "", { ...b, path: ADMIN_SESSION_COOKIE_PATH });
-  jar.set("micstage_admin", "", { ...b, path: "/" });
-  jar.set("micstage_admin", "", { ...b, path: ADMIN_PATH_PREFIX });
-  jar.set("micstage_admin_sess", "", { ...b, path: ADMIN_PATH_PREFIX });
-  jar.set("micstage_admin_email", "", { ...b, path: ADMIN_PATH_PREFIX });
+  for (const t of ADMIN_LOGOUT_COOKIE_TARGETS) {
+    jar.set(t.name, "", { ...b, path: t.path });
+  }
 }
 
 export async function setSession(session: Session) {

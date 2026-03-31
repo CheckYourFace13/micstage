@@ -13,6 +13,7 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
   if (session?.kind === "musician") redirect("/artist");
 
   const showRate = error === "rate";
+  const showUnavailable = error === "unavailable";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -33,6 +34,11 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
           {showRate ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Too many signup attempts. Please try again later.
+            </div>
+          ) : null}
+          {showUnavailable ? (
+            <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+              Registration could not complete. Check your connection and try again. If this keeps happening, contact support.
             </div>
           ) : null}
           <label className="grid gap-1 text-sm">

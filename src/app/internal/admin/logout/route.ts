@@ -8,8 +8,6 @@ import {
 } from "@/lib/adminEdge";
 import { absoluteUrl } from "@/lib/publicSeo";
 
-export const dynamic = "force-dynamic";
-
 function hostFromUrlMaybe(raw: string | undefined): string | null {
   if (!raw) return null;
   const t = raw.trim();
@@ -57,7 +55,6 @@ function candidateCookieDomains(request: Request): string[] {
 
 export async function GET(request: Request) {
   const res = NextResponse.redirect(absoluteUrl("/"));
-  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
   const secure = process.env.NODE_ENV === "production";
   const base = { httpOnly: true, secure, sameSite: "lax" as const, maxAge: 0 };
   const paths = ["/", ADMIN_PATH_PREFIX, ADMIN_SESSION_COOKIE_PATH];

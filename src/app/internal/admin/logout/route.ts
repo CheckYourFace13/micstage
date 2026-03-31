@@ -7,21 +7,36 @@ import {
 } from "@/lib/adminEdge";
 import { absoluteUrl, siteOrigin } from "@/lib/publicSeo";
 
-function adminCookieDomains(): string[] {
+function adminCookieDomains(request: Request): string[] {
+  const out = new Set<string>();
+  const addHost = (host: string | null) => {
+    if (!host) return;
+    const normalized = host.toLowerCase();
+    if (!normalized || normalized === "localhost" || normalized.startsWith("127.") || normalized.endsWith(".local")) {
+      return;
+    }
+    out.add(normalized);
+    if (normalized.startsWith("www.")) {
+      out.add(normalized.slice(4));
+    } else {
+      out.add(`www.${normalized}`);
+    }
+  };
+
   try {
-    const host = new URL(siteOrigin()).hostname.toLowerCase();
-    if (!host || host === "localhost" || host.startsWith("127.") || host.endsWith(".local")) return [];
-    return host.startsWith("www.") ? [host, host.slice(4)] : [host, `www.${host}`];
+    addHost(new URL(siteOrigin()).hostname.toLowerCase());
   } catch {
-    return [];
+    // ignore and still use request host fallback below
   }
+  addHost(new URL(request.url).hostname.toLowerCase());
+  return Array.from(out);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const res = NextResponse.redirect(absoluteUrl("/"));
   const secure = process.env.NODE_ENV === "production";
   const base = { httpOnly: true, secure, sameSite: "lax" as const, maxAge: 0 };
-  const domains = adminCookieDomains();
+  const domains = adminCookieDomains(request);
   const clearCookie = (name: string, path: string) => {
     res.cookies.set(name, "", { ...base, path });
     for (const domain of domains) {

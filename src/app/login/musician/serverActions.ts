@@ -1,9 +1,8 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { isNextRedirectError } from "@/lib/nextRedirect";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { safeAfterAuthPath } from "@/lib/safeRedirect";
 import { setSession } from "@/lib/session";
@@ -54,7 +53,8 @@ export async function loginMusician(formData: FormData) {
     await setSession({ kind: "musician", musicianId: user.id, email: user.email });
     redirect(safeAfterAuthPath(nextField, "/artist"));
   } catch (e) {
-    if (isNextRedirectError(e)) throw e;
+    // Let Next.js handle redirect/notFound/dynamic-control-flow; do not treat as login failure.
+    unstable_rethrow(e);
     console.error("[loginMusician]", e);
     redirect(musicianLoginQuery("unavailable", nextField));
   }

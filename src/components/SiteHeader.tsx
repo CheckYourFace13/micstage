@@ -18,6 +18,23 @@ function roleBadge(text: string, tone: "venue" | "artist" | "admin") {
   );
 }
 
+function roleBadgeLink(text: string, tone: "venue" | "artist" | "admin", href: string) {
+  const cls =
+    tone === "venue"
+      ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
+      : tone === "artist"
+        ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-100"
+        : "border-amber-400/40 bg-amber-500/15 text-amber-100";
+  return (
+    <Link
+      href={href}
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide hover:brightness-110 sm:text-[11px] ${cls}`}
+    >
+      {text}
+    </Link>
+  );
+}
+
 type HeaderAuth = "admin" | "venue" | "artist" | "public";
 
 function resolveHeaderAuth(
@@ -48,13 +65,7 @@ export async function SiteHeader() {
           <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
             {auth === "admin" ? (
               <>
-                {roleBadge("Admin", "admin")}
-                <Link
-                  className="rounded-md px-2 py-1 text-[11px] font-medium text-amber-100/90 hover:bg-amber-500/15 hover:text-amber-50 sm:text-xs"
-                  href="/internal/admin"
-                >
-                  Admin
-                </Link>
+                {roleBadgeLink("ADMIN", "admin", "/internal/admin")}
                 <Link
                   className="rounded-md px-2 py-1 text-[11px] font-medium text-amber-100/90 hover:bg-amber-500/15 hover:text-amber-50 sm:text-xs"
                   href="/internal/admin/logout"

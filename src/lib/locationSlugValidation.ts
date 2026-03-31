@@ -73,6 +73,58 @@ export const getValidLocationSlugs = cache(async (): Promise<Set<string> | null>
   }
 });
 
+/**
+ * Canonical public location slugs keyed by each accepted incoming alias.
+ * Canonical always prefers `city-region` when region exists for that venue pair.
+ */
+export const getLocationAliasToCanonicalMap = cache(async (): Promise<Map<string, string> | null> => {
+  const prisma = getPrismaOrNull();
+  if (!prisma) return null;
+  try {
+    const venues = await prisma.venue.findMany({
+      where: { city: { not: null } },
+      select: { city: true, region: true },
+    });
+
+    const map = new Map<string, string>();
+    const cityKeyToRegionSet = new Map<string, Set<string>>();
+    for (const v of venues) {
+      const city = (v.city ?? "").trim();
+      if (!city) continue;
+      const cityKey = city.toLowerCase();
+      const region = (v.region ?? "").trim();
+      if (!cityKeyToRegionSet.has(cityKey)) cityKeyToRegionSet.set(cityKey, new Set());
+      cityKeyToRegionSet.get(cityKey)!.add(region.toLowerCase());
+    }
+
+    for (const v of venues) {
+      const city = (v.city ?? "").trim();
+      if (!city) continue;
+      const region = (v.region ?? "").trim();
+      const canonical = locationDirectorySlug(city, region || null);
+      if (!canonical) continue;
+      map.set(canonical, canonical);
+
+      const bare = slugify(city);
+      if (!bare) continue;
+      const regionSet = cityKeyToRegionSet.get(city.toLowerCase()) ?? new Set<string>();
+      if (regionSet.size <= 1) {
+        map.set(bare, canonical);
+      }
+    }
+
+    return map;
+  } catch {
+    return null;
+  }
+});
+
+export async function canonicalLocationSlugOrNull(locationSlug: string): Promise<string | null> {
+  const map = await getLocationAliasToCanonicalMap();
+  if (!map) return null;
+  return map.get(locationSlug) ?? null;
+}
+
 /** Human label for a location slug (for headings / metadata). */
 export function locationSlugToFallbackTitle(slug: string): string {
   return slug

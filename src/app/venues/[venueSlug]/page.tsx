@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { isValidPublicSlug } from "@/lib/locationSlugValidation";
-import { buildPublicMetadata } from "@/lib/publicSeo";
+import { isValidPublicSlug, locationDirectorySlug } from "@/lib/locationSlugValidation";
+import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { bookSlot, cancelBooking } from "./actions";
@@ -15,6 +15,7 @@ import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 import { VenueBookingFlash } from "@/components/VenueBookingFlash";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { safeExternalHref } from "@/lib/externalUrl";
+import { relatedLocationsForVenue } from "@/lib/relatedLocations";
 
 export const dynamic = "force-dynamic";
 
@@ -100,11 +101,22 @@ export default async function VenuePublicPage(props: {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: venue.name,
+    url: absoluteUrl(`/venues/${venue.slug}`),
     address: venue.formattedAddress,
+    sameAs: [venue.websiteUrl, venue.facebookUrl, venue.instagramUrl, venue.twitterUrl]
+      .filter((v): v is string => Boolean(v)),
     geo:
       venue.lat != null && venue.lng != null
         ? { "@type": "GeoCoordinates", latitude: venue.lat, longitude: venue.lng }
         : undefined,
+  };
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Venues", item: absoluteUrl("/venues") },
+      { "@type": "ListItem", position: 2, name: venue.name, item: absoluteUrl(`/venues/${venue.slug}`) },
+    ],
   };
 
   const isMusician = session?.kind === "musician";
@@ -128,6 +140,17 @@ export default async function VenuePublicPage(props: {
       return href ? ([label, href] as [string, string]) : null;
     })
     .filter(Boolean) as [string, string][];
+  const nearbyLocations = await relatedLocationsForVenue(venue, 5);
+  const templateCount = venue.eventTemplates.length;
+  const upcomingInstances = venue.eventTemplates.flatMap((t) =>
+    t.instances.filter((i) => !i.isCancelled && i.date >= now),
+  );
+  const upcomingSlots = upcomingInstances.flatMap((i) => i.slots);
+  const openSlotCount = upcomingSlots.filter((s) => s.status === "AVAILABLE" && !s.booking).length;
+  const bookedSlotCount = upcomingSlots.filter((s) => Boolean(s.booking && !s.booking.cancelledAt)).length;
+  const nextUpcomingDate = upcomingInstances
+    .map((i) => i.date)
+    .sort((a, b) => a.getTime() - b.getTime())[0];
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -137,6 +160,15 @@ export default async function VenuePublicPage(props: {
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Venue</div>
             <h1 className="mt-2 text-3xl font-semibold">{venue.name}</h1>
             <div className="mt-2 text-sm text-white/70">{venue.formattedAddress}</div>
+            {venue.city ? (
+              <Link
+                className="mt-2 inline-block text-xs text-white/60 underline hover:text-white"
+                href={`/locations/${locationDirectorySlug(venue.city, venue.region)}/performers`}
+              >
+                Explore artists in {venue.city}
+                {venue.region ? `, ${venue.region}` : ""}
+              </Link>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {session?.kind === "venue" && isStaffForThisVenue ? (
@@ -160,6 +192,7 @@ export default async function VenuePublicPage(props: {
         </div>
 
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
         <VenueBookingFlash initialBooked={booked === "1"} initialCancelled={cancelled === "1"} />
 
@@ -179,6 +212,22 @@ export default async function VenuePublicPage(props: {
             {venue.about}
           </div>
         ) : null}
+
+        <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
+          <h2 className="text-xl font-semibold">Open mic summary</h2>
+          <p className="mt-2 text-sm text-white/75">
+            {venue.name} runs {templateCount} public open mic {templateCount === 1 ? "schedule" : "schedules"}
+            {venue.city ? ` in ${venue.city}${venue.region ? `, ${venue.region}` : ""}` : ""}.{" "}
+            {nextUpcomingDate
+              ? `Next public date: ${nextUpcomingDate.toISOString().slice(0, 10)}.`
+              : "New dates will appear as the venue publishes schedules."}{" "}
+            Currently showing {openSlotCount} open slots and {bookedSlotCount} booked spots across upcoming schedule instances.
+          </p>
+          <div className="mt-3 text-sm text-white/70">
+            Performer sign-up: use the booking controls in each schedule block below. Audience members can browse dates
+            and performers to plan visits.
+          </div>
+        </section>
 
         {(venue.logoUrl || venue.imagePrimaryUrl || venue.imageSecondaryUrl) && (
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -266,6 +315,26 @@ export default async function VenuePublicPage(props: {
             Bookings open up to <span className="font-mono text-white/80">{venue.bookingOpensDaysAhead}</span> days in advance.
           </div>
         </div>
+
+        {nearbyLocations.length > 0 ? (
+          <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
+            <h2 className="text-xl font-semibold">Related nearby locations</h2>
+            <p className="mt-2 text-sm text-white/70">
+              Discover performer activity in related markets to compare open mic availability and audience reach.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {nearbyLocations.map((l) => (
+                <Link
+                  key={l.slug}
+                  href={`/locations/${l.slug}/performers`}
+                  className="rounded-md border border-white/15 bg-black/25 px-3 py-1.5 text-sm hover:bg-black/40"
+                >
+                  {l.label} ({l.venueCount})
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {venue.eventTemplates.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
@@ -442,6 +511,59 @@ export default async function VenuePublicPage(props: {
             ))}
           </div>
         )}
+
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
+          <h2 className="text-xl font-semibold">FAQ</h2>
+          <div className="mt-3 grid gap-3 text-sm text-white/80">
+            <div>
+              <h3 className="font-semibold text-white">How do artists reserve a slot here?</h3>
+              <p className="mt-1">
+                Open slots in the schedule list show a reservation action. Artists can sign in and complete booking directly
+                from this public page.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-white">What schedule details are public?</h3>
+              <p className="mt-1">
+                Public templates include weekday/time, slot length, upcoming dates, slot status, and booked performer names.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-white">Can fans use this page?</h3>
+              <p className="mt-1">
+                Yes. Fans can view upcoming open mic dates and performers, then follow venue links for additional details.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
+          <h2 className="text-xl font-semibold">Open mic planning guides</h2>
+          <p className="mt-2 text-sm text-white/70">
+            Looking for practical strategy on improving turnout and repeat participation? These evergreen guides are built
+            for venues and performers.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/resources/how-to-run-a-successful-open-mic-night"
+              className="rounded-md border border-white/15 bg-black/25 px-3 py-1.5 text-sm hover:bg-black/40"
+            >
+              How to run a successful open mic night
+            </Link>
+            <Link
+              href="/resources/why-open-mic-nights-work-for-venues"
+              className="rounded-md border border-white/15 bg-black/25 px-3 py-1.5 text-sm hover:bg-black/40"
+            >
+              Why open mic nights work for venues
+            </Link>
+            <Link
+              href="/resources"
+              className="rounded-md border border-white/15 bg-black/25 px-3 py-1.5 text-sm hover:bg-black/40"
+            >
+              All resources
+            </Link>
+          </div>
+        </section>
       </main>
     </div>
   );

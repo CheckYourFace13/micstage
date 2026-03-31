@@ -1,18 +1,23 @@
 import type { MetadataRoute } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { getValidLocationSlugs } from "@/lib/locationSlugValidation";
+import { locationDirectorySlug } from "@/lib/locationSlugValidation";
 import { siteOrigin } from "@/lib/publicSeo";
+import { getAllResourceArticles } from "@/lib/resourcesContent";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteOrigin();
-  const now = new Date();
+  const staticLastModified = process.env.VERCEL_GIT_COMMIT_DATE
+    ? new Date(process.env.VERCEL_GIT_COMMIT_DATE)
+    : new Date();
 
   const staticPaths = [
     "",
     "/performers",
     "/locations",
+    "/venues",
+    "/resources",
     "/why/venue-controlled-structure",
     "/why/no-double-booking",
     "/why/marketing-and-seo",
@@ -23,19 +28,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticEntries: MetadataRoute.Sitemap = staticPaths.map((path) => ({
     url: `${base}${path || "/"}`,
-    lastModified: now,
+    lastModified: staticLastModified,
     changeFrequency: "weekly",
     priority: path === "" ? 1 : 0.85,
   }));
 
   const prisma = getPrismaOrNull();
+  const resourceEntries: MetadataRoute.Sitemap = getAllResourceArticles().map((a) => ({
+    url: `${base}/resources/${a.slug}`,
+    lastModified: new Date(a.updatedAt),
+    changeFrequency: "monthly",
+    priority: 0.72,
+  }));
   if (!prisma) {
-    return staticEntries;
+    return [...staticEntries, ...resourceEntries];
   }
 
   try {
     const venues = await prisma.venue.findMany({
-      select: { slug: true, updatedAt: true },
+      select: { slug: true, updatedAt: true, city: true, region: true },
     });
 
     const venueEntries: MetadataRoute.Sitemap = venues.map((v) => ({
@@ -45,19 +56,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.75,
     }));
 
-    const validLocationSlugs = await getValidLocationSlugs();
-    const locationEntries: MetadataRoute.Sitemap =
-      validLocationSlugs == null
-        ? []
-        : [...validLocationSlugs].map((slug) => ({
-            url: `${base}/locations/${slug}/performers`,
-            lastModified: now,
-            changeFrequency: "weekly",
-            priority: 0.65,
-          }));
+    const locationUpdatedAt = new Map<string, Date>();
+    for (const v of venues) {
+      const city = (v.city ?? "").trim();
+      if (!city) continue;
+      const slug = locationDirectorySlug(city, v.region);
+      if (!slug) continue;
+      const prev = locationUpdatedAt.get(slug);
+      if (!prev || v.updatedAt > prev) {
+        locationUpdatedAt.set(slug, v.updatedAt);
+      }
+    }
+    const locationEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()].map(([slug, updatedAt]) => ({
+      url: `${base}/locations/${slug}/performers`,
+      lastModified: updatedAt,
+      changeFrequency: "weekly",
+      priority: 0.65,
+    }));
 
-    return [...staticEntries, ...venueEntries, ...locationEntries];
+    return [...staticEntries, ...resourceEntries, ...venueEntries, ...locationEntries];
   } catch {
-    return staticEntries;
+    return [...staticEntries, ...resourceEntries];
   }
 }

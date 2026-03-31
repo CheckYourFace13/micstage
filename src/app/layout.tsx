@@ -56,10 +56,30 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const orgJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "MicStage",
+    url: absoluteUrl("/"),
+    logo: absoluteUrl("/favicon.png"),
+  };
+  const siteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "MicStage",
+    url: absoluteUrl("/"),
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${absoluteUrl("/locations")}?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
   return (
     <html lang="en" className={`${heading.variable} ${body.variable} h-full antialiased`}>
       <head>
         <link rel="icon" href="/favicon.png" type="image/png" />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
       </head>
       <body className="min-h-full bg-black font-[var(--font-body)] text-white">
         <SiteHeader />

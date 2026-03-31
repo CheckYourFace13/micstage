@@ -27,12 +27,6 @@ export function AdminNav() {
             </Link>
           ))}
         </nav>
-        <Link
-          href="/internal/admin/logout"
-          className="ml-auto rounded px-2 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          Sign out
-        </Link>
       </div>
       <p className="border-t border-zinc-800 px-3 py-1 text-[10px] text-zinc-500">
         Internal only — path <code className="text-zinc-400">{ADMIN_PATH_PREFIX}</code>

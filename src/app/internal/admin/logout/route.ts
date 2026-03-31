@@ -5,10 +5,10 @@ import {
   ADMIN_PATH_PREFIX,
   ADMIN_SESSION_COOKIE_PATH,
 } from "@/lib/adminEdge";
+import { absoluteUrl } from "@/lib/publicSeo";
 
-export async function GET(request: Request) {
-  const home = new URL("/", request.url);
-  const res = NextResponse.redirect(home);
+export async function GET() {
+  const res = NextResponse.redirect(absoluteUrl("/"));
   const secure = process.env.NODE_ENV === "production";
   const base = { httpOnly: true, secure, sameSite: "lax" as const, maxAge: 0 };
   // Current cookies set by admin login/session flow.

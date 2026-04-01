@@ -1,5 +1,8 @@
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { updateMusicianProfile } from "./actions";
+
+// Prisma payload is wide; fields are validated at save time.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- server-only prop from artist portal query
 type MusicianUser = any;
 
 import {
@@ -23,18 +26,21 @@ type Props = {
     }[];
     interestedVenues: { venueId: string }[];
   };
-  allVenues: VenuePick[];
   venuesForInterest: VenueInterestRow[];
 };
 
-export function ArtistProfileForm({ musician, allVenues, venuesForInterest }: Props) {
+export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
   const specs = asStringArrayJson(musician.specializations);
   const insts = asStringArrayJson(musician.instruments);
-  const interestIds = musician.interestedVenues.map((i: any) => i.venueId);
-  const pastVenueChips = musician.pastVenues.map((p: any) => ({
-    city: p.venue.city,
-    region: p.venue.region,
-  }));
+  const interestIds = (musician.interestedVenues ?? []).map((i: { venueId: string }) => i.venueId);
+  const pastVenueChips = (musician.pastVenues ?? [])
+    .filter((p: { venue?: { id: string; name: string } | null }) => p.venue?.id && p.venue?.name)
+    .map((p: { venue: { id: string; name: string; city: string | null; region: string | null } }) => ({
+      id: p.venue.id,
+      name: p.venue.name,
+      city: p.venue.city,
+      region: p.venue.region,
+    }));
 
   const displayName =
     [musician.firstName, musician.lastName].filter(Boolean).join(" ").trim() || musician.stageName;

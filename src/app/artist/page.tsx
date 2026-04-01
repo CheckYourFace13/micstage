@@ -9,6 +9,9 @@ export const metadata = {
   title: "Artist portal | MicStage",
 };
 
+/** Session + bookings depend on request cookies; avoid any static/prerender mismatch after login. */
+export const dynamic = "force-dynamic";
+
 export default async function ArtistPortalPage({
   searchParams,
 }: {

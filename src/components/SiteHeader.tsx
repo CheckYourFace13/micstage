@@ -3,33 +3,12 @@ import { adminLogoutAction } from "@/app/internal/admin/logoutAction";
 import { getAuthUiState } from "@/lib/authUiState";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 
-function roleBadge(text: string, tone: "venue" | "artist" | "admin") {
-  const cls =
-    tone === "venue"
-      ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
-      : tone === "artist"
-        ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-100"
-        : "border-amber-400/40 bg-amber-500/15 text-amber-100";
-  return (
-    <span
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:text-[11px] ${cls}`}
-    >
-      {text}
-    </span>
-  );
-}
-
-function roleBadgeLink(text: string, tone: "venue" | "artist" | "admin", href: string) {
-  const cls =
-    tone === "venue"
-      ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
-      : tone === "artist"
-        ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-100"
-        : "border-amber-400/40 bg-amber-500/15 text-amber-100";
+function roleBadgeLink(text: string, tone: "admin", href: string) {
+  const cls = "border-amber-400/40 bg-amber-500/15 text-amber-100";
   return (
     <Link
       href={href}
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide hover:brightness-110 sm:text-[11px] ${cls}`}
+      className={`inline-flex max-w-[min(100%,18rem)] items-center truncate rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide hover:brightness-110 sm:max-w-xs sm:text-[11px] ${cls}`}
     >
       {text}
     </Link>
@@ -37,7 +16,7 @@ function roleBadgeLink(text: string, tone: "venue" | "artist" | "admin", href: s
 }
 
 export async function SiteHeader() {
-  const { role: auth } = await getAuthUiState();
+  const { role: auth, signedInLine, signedInHref } = await getAuthUiState();
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/15 bg-black/85 backdrop-blur-md">
@@ -50,7 +29,7 @@ export async function SiteHeader() {
         </Link>
 
         <div className="flex w-full flex-col gap-2 lg:w-auto lg:items-end">
-          <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
             {auth === "admin" ? (
               <>
                 {roleBadgeLink("ADMIN", "admin", "/internal/admin")}
@@ -64,21 +43,31 @@ export async function SiteHeader() {
                 </form>
               </>
             ) : null}
-            {auth === "venue" ? (
+            {auth === "venue" && signedInLine && signedInHref ? (
               <>
-                {roleBadge("Venue", "venue")}
+                <Link
+                  href={signedInHref}
+                  className="max-w-[min(100%,20rem)] truncate text-right text-[12px] font-medium leading-snug text-sky-100/95 underline decoration-sky-400/40 decoration-1 underline-offset-2 hover:decoration-sky-300/70 sm:max-w-md sm:text-sm"
+                >
+                  {signedInLine}
+                </Link>
                 <LogoutVenueArtistButton
                   label="Sign out"
-                  className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
+                  className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
                 />
               </>
             ) : null}
-            {auth === "artist" ? (
+            {auth === "artist" && signedInLine && signedInHref ? (
               <>
-                {roleBadge("Artist", "artist")}
+                <Link
+                  href={signedInHref}
+                  className="max-w-[min(100%,20rem)] truncate text-right text-[12px] font-medium leading-snug text-emerald-100/95 underline decoration-emerald-400/40 decoration-1 underline-offset-2 hover:decoration-emerald-300/70 sm:max-w-md sm:text-sm"
+                >
+                  {signedInLine}
+                </Link>
                 <LogoutVenueArtistButton
                   label="Sign out"
-                  className="rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
+                  className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
                 />
               </>
             ) : null}

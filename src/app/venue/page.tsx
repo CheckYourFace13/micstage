@@ -12,6 +12,8 @@ export const metadata = {
   title: "Venue portal | MicStage",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function VenuePortalPage({
   searchParams,
 }: {

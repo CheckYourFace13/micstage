@@ -13,49 +13,68 @@ function musicianLoginQuery(code: string, nextField: string): string {
   return `/login/musician?${q.toString()}`;
 }
 
+/**
+ * Avoid wrapping `redirect()` in a broad try/catch — Next uses thrown redirect errors for navigation;
+ * catching and re-handling them can break the client transition and surface the root error boundary.
+ */
 export async function loginMusician(formData: FormData) {
   const nextEntry = formData.get("next");
   const nextField = (typeof nextEntry === "string" ? nextEntry : "").trim();
 
-  try {
-    const emailRaw = formData.get("email");
-    const passwordRaw = formData.get("password");
-    if (
-      typeof emailRaw !== "string" ||
-      !emailRaw.trim() ||
-      typeof passwordRaw !== "string" ||
-      !passwordRaw.trim()
-    ) {
-      redirect(musicianLoginQuery("invalid", nextField));
-    }
-    const email = emailRaw.trim().toLowerCase();
-    const password = passwordRaw;
+  const emailRaw = formData.get("email");
+  const passwordRaw = formData.get("password");
+  if (
+    typeof emailRaw !== "string" ||
+    !emailRaw.trim() ||
+    typeof passwordRaw !== "string" ||
+    !passwordRaw.trim()
+  ) {
+    redirect(musicianLoginQuery("invalid", nextField));
+  }
+  const email = emailRaw.trim().toLowerCase();
+  const password = passwordRaw;
 
-    const rl = await consumeRateLimit({
-      scope: "login:musician",
-      identifier: email,
-      limit: 10,
-      windowSec: 60 * 15,
-    });
-    if (!rl.allowed) redirect(musicianLoginQuery("rate", nextField));
+  const rl = await consumeRateLimit({
+    scope: "login:musician",
+    identifier: email,
+    limit: 10,
+    windowSec: 60 * 15,
+  });
+  if (!rl.allowed) redirect(musicianLoginQuery("rate", nextField));
 
-    const prisma = getPrismaOrNull();
-    if (!prisma) {
-      console.error("[loginMusician] database not configured");
-      redirect(musicianLoginQuery("unavailable", nextField));
-    }
-
-    const user = await prisma.musicianUser.findUnique({ where: { email } });
-    if (!user) redirect(musicianLoginQuery("invalid", nextField));
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) redirect(musicianLoginQuery("invalid", nextField));
-
-    await setSession({ kind: "musician", musicianId: user.id, email: user.email });
-    redirect(safeAfterAuthPath(nextField, "/artist"));
-  } catch (e) {
-    // Let Next.js handle redirect/notFound/dynamic-control-flow; do not treat as login failure.
-    unstable_rethrow(e);
-    console.error("[loginMusician]", e);
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    console.error("[loginMusician] database not configured");
     redirect(musicianLoginQuery("unavailable", nextField));
   }
+
+  let user;
+  try {
+    user = await prisma.musicianUser.findUnique({ where: { email } });
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("[loginMusician] findUnique", e);
+    redirect(musicianLoginQuery("unavailable", nextField));
+  }
+  if (!user) redirect(musicianLoginQuery("invalid", nextField));
+
+  let passwordOk: boolean;
+  try {
+    passwordOk = await bcrypt.compare(password, user.passwordHash);
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("[loginMusician] bcrypt", e);
+    redirect(musicianLoginQuery("unavailable", nextField));
+  }
+  if (!passwordOk) redirect(musicianLoginQuery("invalid", nextField));
+
+  try {
+    await setSession({ kind: "musician", musicianId: user.id, email: user.email });
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("[loginMusician] setSession", e);
+    redirect(musicianLoginQuery("unavailable", nextField));
+  }
+
+  redirect(safeAfterAuthPath(nextField, "/artist"));
 }

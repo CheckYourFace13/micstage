@@ -1,9 +1,8 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { isNextRedirectError } from "@/lib/nextRedirect";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { safeAfterAuthPath } from "@/lib/safeRedirect";
 import { setSession } from "@/lib/session";
@@ -18,50 +17,92 @@ export async function loginVenue(formData: FormData) {
   const nextEntry = formData.get("next");
   const nextField = (typeof nextEntry === "string" ? nextEntry : "").trim();
 
-  try {
-    const emailRaw = formData.get("email");
-    const passwordRaw = formData.get("password");
-    if (
-      typeof emailRaw !== "string" ||
-      !emailRaw.trim() ||
-      typeof passwordRaw !== "string" ||
-      !passwordRaw.trim()
-    ) {
-      redirect(venueLoginQuery("invalid", nextField));
-    }
-    const email = emailRaw.trim().toLowerCase();
-    const password = passwordRaw;
-
-    const rl = await consumeRateLimit({
-      scope: "login:venue",
-      identifier: email,
-      limit: 10,
-      windowSec: 60 * 15,
-    });
-    if (!rl.allowed) redirect(venueLoginQuery("rate", nextField));
-
-    const prisma = getPrismaOrNull();
-    if (!prisma) {
-      console.error("[loginVenue] database not configured");
-      redirect(venueLoginQuery("unavailable", nextField));
-    }
-
-    const owner = await prisma.venueOwner.findUnique({ where: { email } });
-    if (owner && (await bcrypt.compare(password, owner.passwordHash))) {
-      await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
-      redirect(safeAfterAuthPath(nextField, "/venue"));
-    }
-
-    const manager = await prisma.venueManager.findUnique({ where: { email } });
-    if (manager && (await bcrypt.compare(password, manager.passwordHash))) {
-      await setSession({ kind: "venue", venueManagerId: manager.id, email: manager.email });
-      redirect(safeAfterAuthPath(nextField, "/venue"));
-    }
-
+  const emailRaw = formData.get("email");
+  const passwordRaw = formData.get("password");
+  if (
+    typeof emailRaw !== "string" ||
+    !emailRaw.trim() ||
+    typeof passwordRaw !== "string" ||
+    !passwordRaw.trim()
+  ) {
     redirect(venueLoginQuery("invalid", nextField));
-  } catch (e) {
-    if (isNextRedirectError(e)) throw e;
-    console.error("[loginVenue]", e);
+  }
+  const email = emailRaw.trim().toLowerCase();
+  const password = passwordRaw;
+
+  const rl = await consumeRateLimit({
+    scope: "login:venue",
+    identifier: email,
+    limit: 10,
+    windowSec: 60 * 15,
+  });
+  if (!rl.allowed) redirect(venueLoginQuery("rate", nextField));
+
+  const prisma = getPrismaOrNull();
+  if (!prisma) {
+    console.error("[loginVenue] database not configured");
     redirect(venueLoginQuery("unavailable", nextField));
   }
+
+  let owner;
+  try {
+    owner = await prisma.venueOwner.findUnique({ where: { email } });
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("[loginVenue] venueOwner findUnique", e);
+    redirect(venueLoginQuery("unavailable", nextField));
+  }
+
+  if (owner) {
+    let ownerOk: boolean;
+    try {
+      ownerOk = await bcrypt.compare(password, owner.passwordHash);
+    } catch (e) {
+      unstable_rethrow(e);
+      console.error("[loginVenue] bcrypt owner", e);
+      redirect(venueLoginQuery("unavailable", nextField));
+    }
+    if (ownerOk) {
+      try {
+        await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
+      } catch (e) {
+        unstable_rethrow(e);
+        console.error("[loginVenue] setSession owner", e);
+        redirect(venueLoginQuery("unavailable", nextField));
+      }
+      redirect(safeAfterAuthPath(nextField, "/venue"));
+    }
+  }
+
+  let manager;
+  try {
+    manager = await prisma.venueManager.findUnique({ where: { email } });
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("[loginVenue] venueManager findUnique", e);
+    redirect(venueLoginQuery("unavailable", nextField));
+  }
+
+  if (manager) {
+    let managerOk: boolean;
+    try {
+      managerOk = await bcrypt.compare(password, manager.passwordHash);
+    } catch (e) {
+      unstable_rethrow(e);
+      console.error("[loginVenue] bcrypt manager", e);
+      redirect(venueLoginQuery("unavailable", nextField));
+    }
+    if (managerOk) {
+      try {
+        await setSession({ kind: "venue", venueManagerId: manager.id, email: manager.email });
+      } catch (e) {
+        unstable_rethrow(e);
+        console.error("[loginVenue] setSession manager", e);
+        redirect(venueLoginQuery("unavailable", nextField));
+      }
+      redirect(safeAfterAuthPath(nextField, "/venue"));
+    }
+  }
+
+  redirect(venueLoginQuery("invalid", nextField));
 }

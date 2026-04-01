@@ -1,12 +1,12 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requirePrisma } from "@/lib/prisma";
-import { safeLoginNextPath } from "@/lib/safeRedirect";
+import { ARTIST_DASHBOARD_HREF, safeLoginNextPath } from "@/lib/safeRedirect";
 import { getSession, type Session } from "@/lib/session";
 
 async function loginRedirectPath(
   loginBase: "/login/venue" | "/login/musician",
-  fallback: "/venue" | "/artist",
+  fallback: "/venue" | typeof ARTIST_DASHBOARD_HREF,
 ) {
   const h = await headers();
   const fromHeader = h.get("x-micstage-pathname");
@@ -22,7 +22,7 @@ export async function requireVenueSession() {
 
 export async function requireMusicianSession() {
   const s = await getSession();
-  if (!s || s.kind !== "musician") redirect(await loginRedirectPath("/login/musician", "/artist"));
+  if (!s || s.kind !== "musician") redirect(await loginRedirectPath("/login/musician", ARTIST_DASHBOARD_HREF));
   return s;
 }
 

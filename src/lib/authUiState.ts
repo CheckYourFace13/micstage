@@ -1,5 +1,6 @@
 import { isAdminSessionCookieValid } from "@/lib/adminAuth";
 import { getPrismaOrNull } from "@/lib/prisma";
+import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession, type Session } from "@/lib/session";
 
 export type AuthUiRole = "admin" | "venue" | "artist" | "public";
@@ -28,7 +29,7 @@ async function resolveArtistLine(session: Extract<Session, { kind: "musician" }>
     const name = emailLocalPart(session.email) || "Artist";
     return {
       signedInLine: `You're on stage, ${name}`,
-      signedInHref: "/artist",
+      signedInHref: ARTIST_DASHBOARD_HREF,
     };
   }
   try {
@@ -44,13 +45,13 @@ async function resolveArtistLine(session: Extract<Session, { kind: "musician" }>
       "Artist";
     return {
       signedInLine: `You're on stage, ${name}`,
-      signedInHref: "/artist",
+      signedInHref: ARTIST_DASHBOARD_HREF,
     };
   } catch {
     const name = emailLocalPart(session.email) || "Artist";
     return {
       signedInLine: `You're on stage, ${name}`,
-      signedInHref: "/artist",
+      signedInHref: ARTIST_DASHBOARD_HREF,
     };
   }
 }

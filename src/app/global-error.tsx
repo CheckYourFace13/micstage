@@ -3,6 +3,7 @@
 import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useCallback, useEffect } from "react";
+import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 
 function pathnamePrefix(): string {
   if (typeof window === "undefined") return "";
@@ -11,14 +12,14 @@ function pathnamePrefix(): string {
 
 function tryAgainHref(): string {
   const p = pathnamePrefix();
-  if (p === "/artist" || p.startsWith("/artist/")) return "/artist";
+  if (p === ARTIST_DASHBOARD_HREF || p.startsWith(`${ARTIST_DASHBOARD_HREF}/`)) return ARTIST_DASHBOARD_HREF;
   if (p === "/venue" || p.startsWith("/venue/")) return "/venue";
   return "";
 }
 
 function signInAgainHref(): string {
   const p = pathnamePrefix();
-  if (p === "/artist" || p.startsWith("/artist/")) return "/login/musician";
+  if (p === ARTIST_DASHBOARD_HREF || p.startsWith(`${ARTIST_DASHBOARD_HREF}/`)) return "/login/musician";
   if (p === "/venue" || p.startsWith("/venue/")) return "/login/venue";
   return "/login/musician";
 }

@@ -3,6 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireMusicianSession } from "@/lib/authz";
+import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { minutesToTimeLabel } from "@/lib/time";
 import { ArtistProfileForm } from "./ArtistProfileForm";
 
@@ -139,7 +140,7 @@ export default async function ArtistPortalPage({
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-              href="/artist"
+              href={ARTIST_DASHBOARD_HREF}
             >
               Retry dashboard
             </Link>

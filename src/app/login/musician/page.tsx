@@ -4,7 +4,7 @@ export const metadata = {
 
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { safeAfterAuthPath } from "@/lib/safeRedirect";
+import { safeAfterMusicianLoginPath } from "@/lib/safeRedirect";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { loginMusician } from "./serverActions";
 
@@ -14,7 +14,7 @@ export default async function MusicianLoginPage(props: {
   const { error, next, reset } = await props.searchParams;
   const session = await getSession();
   if (session?.kind === "musician") {
-    redirect(safeAfterAuthPath(next, "/artist"));
+    redirect(safeAfterMusicianLoginPath(next));
   }
 
   const showInvalid = error === "invalid";

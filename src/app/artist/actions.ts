@@ -6,6 +6,7 @@ import { Prisma } from "../../generated/prisma/client";
 import { requirePrisma } from "@/lib/prisma";
 import { requireMusicianSession } from "@/lib/authz";
 import { MUSICIAN_INSTRUMENTS, MUSICIAN_SPECIALIZATIONS } from "@/lib/musicianProfile";
+import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 
 export async function lookupMicStageVenueByGooglePlaceId(googlePlaceId: string) {
   if (!googlePlaceId?.trim()) return null;
@@ -17,7 +18,7 @@ export async function lookupMicStageVenueByGooglePlaceId(googlePlaceId: string) 
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
-  if (typeof v !== "string" || !v.trim()) redirect("/artist?profileError=invalidForm");
+  if (typeof v !== "string" || !v.trim()) redirect(`${ARTIST_DASHBOARD_HREF}?profileError=invalidForm`);
   return v.trim();
 }
 
@@ -99,7 +100,7 @@ export async function updateMusicianProfile(formData: FormData) {
   const homeRegion = optString(formData, "homeRegion");
   const travelRadiusMiles = optInt(formData, "travelRadiusMiles");
   if (travelRadiusMiles != null && (travelRadiusMiles < 1 || travelRadiusMiles > 500)) {
-    redirect("/artist?profileError=radius");
+    redirect(`${ARTIST_DASHBOARD_HREF}?profileError=radius`);
   }
 
   const secondaryGooglePlaceId = optString(formData, "secondaryGooglePlaceId");
@@ -119,17 +120,17 @@ export async function updateMusicianProfile(formData: FormData) {
       secondaryLng != null,
   );
   if (hasSecondaryHint && (secondaryRadiusMiles == null || secondaryRadiusMiles < 1 || secondaryRadiusMiles > 500)) {
-    redirect("/artist?profileError=secondaryRadius");
+    redirect(`${ARTIST_DASHBOARD_HREF}?profileError=secondaryRadius`);
   }
 
   const yearsPlaying = optInt(formData, "yearsPlaying");
   if (yearsPlaying != null && (yearsPlaying < 0 || yearsPlaying > 80)) {
-    redirect("/artist?profileError=years");
+    redirect(`${ARTIST_DASHBOARD_HREF}?profileError=years`);
   }
 
   const setLengthMinutes = optInt(formData, "setLengthMinutes");
   if (setLengthMinutes != null && (setLengthMinutes < 5 || setLengthMinutes > 240)) {
-    redirect("/artist?profileError=setLength");
+    redirect(`${ARTIST_DASHBOARD_HREF}?profileError=setLength`);
   }
 
   const openToHire = formData.get("openToHire") === "on";
@@ -148,7 +149,7 @@ export async function updateMusicianProfile(formData: FormData) {
   if (allPicked.length) {
     const count = await requirePrisma().venue.count({ where: { id: { in: allPicked } } });
     if (count !== allPicked.length) {
-      redirect("/artist?profileError=venues");
+      redirect(`${ARTIST_DASHBOARD_HREF}?profileError=venues`);
     }
   }
   await requirePrisma().$transaction(async (tx) => {
@@ -218,6 +219,6 @@ export async function updateMusicianProfile(formData: FormData) {
     }
   });
 
-  revalidatePath("/artist");
-  redirect("/artist?profile=saved");
+  revalidatePath(ARTIST_DASHBOARD_HREF);
+  redirect(`${ARTIST_DASHBOARD_HREF}?profile=saved`);
 }

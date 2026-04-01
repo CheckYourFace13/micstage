@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requirePrisma } from "@/lib/prisma";
 import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
+import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 
 function reqString(formData: FormData, key: string): string {
@@ -141,7 +142,7 @@ export async function bookSlot(formData: FormData) {
   });
 
   revalidatePath(`/venues/${venueSlug}`);
-  revalidatePath("/artist");
+  revalidatePath(ARTIST_DASHBOARD_HREF);
   redirect(`/venues/${venueSlug}?booked=1`);
 }
 
@@ -206,7 +207,7 @@ export async function cancelBooking(formData: FormData) {
   });
 
   revalidatePath(`/venues/${venueSlug}`);
-  revalidatePath("/artist");
+  revalidatePath(ARTIST_DASHBOARD_HREF);
   redirect(`/venues/${venueSlug}?cancelled=1`);
 }
 

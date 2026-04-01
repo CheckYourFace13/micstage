@@ -3,6 +3,7 @@ export const metadata = {
 };
 
 import { redirect } from "next/navigation";
+import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { registerMusician } from "./actions";
@@ -10,7 +11,7 @@ import { registerMusician } from "./actions";
 export default async function MusicianRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await props.searchParams;
   const session = await getSession();
-  if (session?.kind === "musician") redirect("/artist");
+  if (session?.kind === "musician") redirect(ARTIST_DASHBOARD_HREF);
 
   const showRate = error === "rate";
   const showUnavailable = error === "unavailable";

@@ -7,6 +7,7 @@ import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { JOINED_MUSICIAN, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
+import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -44,7 +45,7 @@ export async function registerMusician(formData: FormData) {
     });
 
     await setSession({ kind: "musician", musicianId: musician.id, email: musician.email });
-    redirect(`/artist?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_MUSICIAN}`);
+    redirect(`${ARTIST_DASHBOARD_HREF}?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_MUSICIAN}`);
   } catch (e) {
     if (isNextRedirectError(e)) throw e;
     console.error("[registerMusician]", e);

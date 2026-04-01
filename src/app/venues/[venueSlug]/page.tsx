@@ -16,6 +16,7 @@ import { VenueBookingFlash } from "@/components/VenueBookingFlash";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { safeExternalHref } from "@/lib/externalUrl";
 import { relatedLocationsForVenue } from "@/lib/relatedLocations";
+import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 
 export const dynamic = "force-dynamic";
 
@@ -177,7 +178,7 @@ export default async function VenuePublicPage(props: {
               </Link>
             ) : null}
             {isMusician ? (
-              <Link className="text-white/70 hover:text-white" href="/artist">
+              <Link className="text-white/70 hover:text-white" href={ARTIST_DASHBOARD_HREF}>
                 Artist portal
               </Link>
             ) : (

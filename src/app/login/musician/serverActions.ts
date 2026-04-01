@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { consumeRateLimit } from "@/lib/rateLimit";
-import { safeAfterAuthPath } from "@/lib/safeRedirect";
+import { safeAfterMusicianLoginPath } from "@/lib/safeRedirect";
 import { setSession } from "@/lib/session";
 
 function musicianLoginQuery(code: string, nextField: string): string {
@@ -76,5 +76,5 @@ export async function loginMusician(formData: FormData) {
     redirect(musicianLoginQuery("unavailable", nextField));
   }
 
-  redirect(safeAfterAuthPath(nextField, "/artist"));
+  redirect(safeAfterMusicianLoginPath(nextField));
 }

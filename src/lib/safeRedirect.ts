@@ -1,3 +1,6 @@
+/** Canonical artist dashboard & profile setup (`ArtistProfileForm` on this route). */
+export const ARTIST_DASHBOARD_HREF = "/artist" as const;
+
 /**
  * Sanitize `next` / return URLs after auth to same-origin paths only.
  * Prevents open redirects (e.g. //evil.com) and post-login loops via /login, /register, etc.
@@ -23,6 +26,17 @@ export function safeAfterAuthPath(next: string | null | undefined, fallback: str
   if (isAuthPortalPath(pathOnly)) return fallback;
 
   return raw;
+}
+
+/**
+ * After musician login (or “already signed in” on the login page): always land on the artist dashboard
+ * unless `next` is a safe deep link back to a venue (e.g. finish booking after sign-in).
+ */
+export function safeAfterMusicianLoginPath(next: string | null | undefined): string {
+  const resolved = safeAfterAuthPath(next, ARTIST_DASHBOARD_HREF);
+  const pathOnly = (resolved.split("?")[0] || "").trim();
+  if (pathOnly.startsWith("/venues/")) return resolved;
+  return ARTIST_DASHBOARD_HREF;
 }
 
 /**

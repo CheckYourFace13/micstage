@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { Prisma } from "@/generated/prisma/client";
+import type { MusicianUser } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireMusicianSession } from "@/lib/authz";
@@ -7,32 +8,28 @@ import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { minutesToTimeLabel } from "@/lib/time";
 import { ArtistProfileForm } from "./ArtistProfileForm";
 
-const artistPortalInclude = {
-  pastVenues: {
+const bookingPortalInclude = {
+  slot: {
     include: {
-      venue: { select: { id: true, name: true, city: true, region: true } },
-    },
-  },
-  interestedVenues: true,
-  bookings: {
-    where: { cancelledAt: null },
-    orderBy: { createdAt: "desc" as const },
-    take: 25,
-    include: {
-      slot: {
+      instance: {
         include: {
-          instance: {
-            include: {
-              template: { include: { venue: true } },
-            },
-          },
+          template: { include: { venue: true } },
         },
       },
     },
   },
-} satisfies Prisma.MusicianUserInclude;
+} satisfies Prisma.BookingInclude;
 
-type MusicianPortalUser = Prisma.MusicianUserGetPayload<{ include: typeof artistPortalInclude }>;
+type PortalBooking = Prisma.BookingGetPayload<{ include: typeof bookingPortalInclude }>;
+type PortalPastVenue = Prisma.MusicianPastVenueGetPayload<{
+  include: { venue: { select: { id: true; name: true; city: true; region: true } } };
+}>;
+
+type MusicianPortalUser = MusicianUser & {
+  pastVenues: PortalPastVenue[];
+  interestedVenues: { venueId: string }[];
+  bookings: PortalBooking[];
+};
 
 export const metadata = {
   title: "Artist portal | MicStage",
@@ -67,16 +64,82 @@ type ArtistPortalLoad =
   | { status: "not_found" }
   | { status: "error" };
 
-async function loadArtistPortalData(musicianId: string): Promise<ArtistPortalLoad> {
-  try {
-    const prisma = requirePrisma();
-    const loaded = await prisma.musicianUser.findUnique({
-      where: { id: musicianId },
-      include: artistPortalInclude,
-    });
-    if (!loaded) return { status: "not_found" };
+function logArtistPortalFailure(phase: string, e: unknown) {
+  if (e instanceof Prisma.PrismaClientKnownRequestError) {
+    console.error(`[artist portal] ${phase}`, e.code, e.meta ?? {}, e.message);
+  } else if (e instanceof Prisma.PrismaClientValidationError) {
+    console.error(`[artist portal] ${phase} (validation)`, e.message);
+  } else {
+    console.error(`[artist portal] ${phase}`, e);
+  }
+}
 
-    const allVenues = await prisma.venue.findMany({
+async function loadArtistPortalData(musicianId: string): Promise<ArtistPortalLoad> {
+  let prisma: ReturnType<typeof requirePrisma>;
+  try {
+    prisma = requirePrisma();
+  } catch (e) {
+    logArtistPortalFailure("requirePrisma", e);
+    return { status: "error" };
+  }
+
+  let base: MusicianUser | null = null;
+  try {
+    base = await prisma.musicianUser.findUnique({ where: { id: musicianId } });
+  } catch (e) {
+    logArtistPortalFailure("musicianUser.findUnique (scalars)", e);
+    return { status: "error" };
+  }
+  if (!base) return { status: "not_found" };
+
+  let pastVenues: PortalPastVenue[] = [];
+  try {
+    pastVenues = await prisma.musicianPastVenue.findMany({
+      where: { musicianId: base.id },
+      include: {
+        venue: { select: { id: true, name: true, city: true, region: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  } catch (e) {
+    logArtistPortalFailure("musicianPastVenue.findMany", e);
+  }
+
+  type InterestRow = Prisma.MusicianVenueInterestGetPayload<{
+    include: { venue: { select: { slug: true; name: true; city: true; region: true } } };
+  }>;
+  let interestRows: InterestRow[] = [];
+  try {
+    interestRows = await prisma.musicianVenueInterest.findMany({
+      where: { musicianId: base.id },
+      include: { venue: { select: { slug: true, name: true, city: true, region: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (e) {
+    logArtistPortalFailure("musicianVenueInterest.findMany", e);
+  }
+
+  const interestedVenues = interestRows.map((r) => ({ venueId: r.venueId }));
+  const tracked: TrackedRow[] = interestRows.slice(0, 24).map((r) => ({
+    id: r.id,
+    venue: r.venue,
+  }));
+
+  let bookings: PortalBooking[] = [];
+  try {
+    bookings = await prisma.booking.findMany({
+      where: { musicianId: base.id, cancelledAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 25,
+      include: bookingPortalInclude,
+    });
+  } catch (e) {
+    logArtistPortalFailure("booking.findMany (upcoming)", e);
+  }
+
+  let allVenues: VenuePickRow[] = [];
+  try {
+    allVenues = await prisma.venue.findMany({
       where: {
         eventTemplates: { some: { isPublic: true } },
       },
@@ -84,19 +147,18 @@ async function loadArtistPortalData(musicianId: string): Promise<ArtistPortalLoa
       orderBy: [{ city: "asc" }, { name: "asc" }],
       take: 500,
     });
-
-    const tracked = await prisma.musicianVenueInterest.findMany({
-      where: { musicianId: loaded.id },
-      include: { venue: { select: { slug: true, name: true, city: true, region: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 24,
-    });
-
-    return { status: "ok", musician: loaded, allVenues, tracked };
   } catch (e) {
-    console.error("[artist portal] load failed", e);
-    return { status: "error" };
+    logArtistPortalFailure("venue.findMany (interest picker)", e);
   }
+
+  const musician: MusicianPortalUser = {
+    ...base,
+    pastVenues,
+    interestedVenues,
+    bookings,
+  };
+
+  return { status: "ok", musician, allVenues, tracked };
 }
 
 export default async function ArtistPortalPage({
@@ -304,7 +366,7 @@ export default async function ArtistPortalPage({
             }
             return (
               <div className="mt-4 grid gap-3">
-                {bookingRows.map((b) => {
+                {bookingRows.map((b: PortalBooking) => {
                   const v = b.slot!.instance!.template!.venue!;
                   const date = b.slot!.instance!.date.toISOString().slice(0, 10);
                   const tpl = b.slot!.instance!.template!;

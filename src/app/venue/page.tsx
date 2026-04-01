@@ -1,12 +1,107 @@
 import Link from "next/link";
+import type { Venue } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
+import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { createEventTemplate, generateDateSchedule, houseBookSlot, inviteManager } from "./actions";
 import { minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
 import { VenueProfileForm } from "./VenueProfileForm";
 import { WeeklyScheduleForm } from "./WeeklyScheduleForm";
+
+type VenueScheduleTemplateInclude = {
+  instances: {
+    where: { date: { gte: Date } };
+    orderBy: { date: "asc" };
+    take: number;
+    include: { slots: { orderBy: { startMin: "asc" }; include: { booking: true } } };
+  };
+};
+
+function venueScheduleTemplateIncludeAtRequest(): VenueScheduleTemplateInclude {
+  return {
+    instances: {
+      where: { date: { gte: new Date() } },
+      orderBy: { date: "asc" },
+      take: 2,
+      include: { slots: { orderBy: { startMin: "asc" }, include: { booking: true } } },
+    },
+  };
+}
+
+type PortalEventTemplate = Prisma.EventTemplateGetPayload<{ include: VenueScheduleTemplateInclude }>;
+export type VenuePortalRow = Venue & { eventTemplates: PortalEventTemplate[] };
+
+function logVenuePortalFailure(phase: string, e: unknown) {
+  if (e instanceof Prisma.PrismaClientKnownRequestError) {
+    console.error(`[venue portal] ${phase}`, e.code, e.meta ?? {}, e.message);
+  } else if (e instanceof Prisma.PrismaClientValidationError) {
+    console.error(`[venue portal] ${phase} (validation)`, e.message);
+  } else {
+    console.error(`[venue portal] ${phase}`, e);
+  }
+}
+
+async function loadVenuePortalRows(session: Awaited<ReturnType<typeof requireVenueSession>>): Promise<{
+  venues: VenuePortalRow[];
+  loadError: "none" | "requirePrisma" | "venueList";
+}> {
+  let prisma: ReturnType<typeof requirePrisma>;
+  try {
+    prisma = requirePrisma();
+  } catch (e) {
+    logVenuePortalFailure("requirePrisma", e);
+    return { venues: [], loadError: "requirePrisma" };
+  }
+
+  let venueIds: string[] = [];
+  try {
+    venueIds = await venueIdsForSession(session);
+  } catch (e) {
+    logVenuePortalFailure("venueIdsForSession", e);
+    venueIds = [];
+  }
+
+  let venuesBase: Venue[] = [];
+  if (venueIds.length > 0) {
+    try {
+      venuesBase = await prisma.venue.findMany({
+        where: { id: { in: venueIds } },
+        orderBy: { createdAt: "desc" },
+      });
+    } catch (e) {
+      logVenuePortalFailure("venue.findMany (scalars)", e);
+      return { venues: [], loadError: "venueList" };
+    }
+  }
+
+  const templatesByVenueId: Record<string, PortalEventTemplate[]> = {};
+  if (venueIds.length > 0) {
+    try {
+      const tpls = await prisma.eventTemplate.findMany({
+        where: { venueId: { in: venueIds } },
+        orderBy: [{ weekday: "asc" }, { startTimeMin: "asc" }],
+        include: venueScheduleTemplateIncludeAtRequest(),
+      });
+      for (const t of tpls) {
+        const list = templatesByVenueId[t.venueId] ?? [];
+        list.push(t);
+        templatesByVenueId[t.venueId] = list;
+      }
+    } catch (e) {
+      logVenuePortalFailure("eventTemplate.findMany (instances/slots/bookings)", e);
+    }
+  }
+
+  const venues: VenuePortalRow[] = venuesBase.map((v) => ({
+    ...v,
+    eventTemplates: templatesByVenueId[v.id] ?? [],
+  }));
+
+  return { venues, loadError: "none" };
+}
 
 export const metadata = {
   title: "Venue portal | MicStage",
@@ -35,26 +130,38 @@ export default async function VenuePortalPage({
 }) {
   const q = await searchParams;
   const session = await requireVenueSession();
-  const venueIds = await venueIdsForSession(session);
-  const prisma = requirePrisma();
+  const { venues, loadError } = await loadVenuePortalRows(session);
 
-  const venues = await prisma.venue.findMany({
-    where: { id: { in: venueIds } },
-    orderBy: { createdAt: "desc" },
-    include: {
-      eventTemplates: {
-        orderBy: [{ weekday: "asc" }, { startTimeMin: "asc" }],
-        include: {
-          instances: {
-            where: { date: { gte: new Date() } },
-            orderBy: { date: "asc" },
-            take: 2,
-            include: { slots: { orderBy: { startMin: "asc" }, include: { booking: true } } },
-          },
-        },
-      },
-    },
-  });
+  if (loadError === "requirePrisma" || loadError === "venueList") {
+    return (
+      <div className="min-h-dvh bg-black text-white">
+        <main className="mx-auto w-full max-w-3xl px-6 py-16">
+          <h1 className="om-heading text-2xl tracking-wide text-white">Venue dashboard</h1>
+          <p className="mt-3 text-sm text-white/75">
+            We couldn&apos;t load your dashboard right now (connection or server issue). Your account is still signed in.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
+              href={VENUE_DASHBOARD_HREF}
+            >
+              Retry dashboard
+            </Link>
+            <Link
+              className="inline-flex h-11 items-center justify-center rounded-md border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
+              href="/"
+            >
+              Home
+            </Link>
+            <LogoutVenueArtistButton
+              label="Logout"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
+            />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const todayIso = toIsoDateOnly(new Date());
   const horizonDaysFor = (tier: "FREE" | "PRO") => (tier === "FREE" ? 60 : 90);

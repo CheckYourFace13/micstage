@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { adminLogoutAction } from "@/app/internal/admin/logoutAction";
+import { ADMIN_LOGOUT_PATH } from "@/lib/adminEdge";
 import { getAuthUiState } from "@/lib/authUiState";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 
@@ -33,7 +33,7 @@ export async function SiteHeader() {
             {auth === "admin" ? (
               <>
                 {roleBadgeLink("ADMIN", "admin", "/internal/admin")}
-                <form action={adminLogoutAction} className="inline">
+                <form action={ADMIN_LOGOUT_PATH} method="get" className="inline">
                   <button
                     type="submit"
                     className="rounded-md px-2 py-1 text-[11px] font-medium text-amber-100/90 hover:bg-amber-500/15 hover:text-amber-50 sm:text-xs"

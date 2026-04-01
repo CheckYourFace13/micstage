@@ -27,6 +27,15 @@ export const ADMIN_EMAIL_COOKIE_NAME = "micstage_admin_email";
 
 export const ADMIN_PATH_PREFIX = "/internal/admin";
 
+/** Canonical admin logout URL (GET clears cookies and redirects home). */
+export const ADMIN_LOGOUT_PATH = `${ADMIN_PATH_PREFIX}/logout` as const;
+
+/** Opt-in: `MICSTAGE_ADMIN_LOGOUT_DEBUG=1` logs logout + middleware cookie visibility (no secrets). */
+export function logAdminLogoutDebug(phase: string, detail?: Record<string, unknown>): void {
+  if (process.env.MICSTAGE_ADMIN_LOGOUT_DEBUG !== "1") return;
+  console.info(`[micstage:admin-logout] ${phase}`, detail ?? {});
+}
+
 /**
  * Root path so the session cookie is sent on every request to this origin (fixes nested /internal/admin/*).
  * Scoped paths like /internal/admin can fail with some proxies, cached responses, or duplicate cookie pairs.

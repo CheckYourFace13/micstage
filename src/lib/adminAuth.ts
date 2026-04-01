@@ -32,17 +32,7 @@ function clearLegacyAdminCookies(jar: Awaited<ReturnType<typeof cookies>>) {
   }
 }
 
-/** Clear admin session cookies on the current request (server actions / RSC cookie jar). */
-export async function clearAdminSessionCookies(): Promise<void> {
-  const jar = await cookies();
-  const b = adminCookieBase();
-  const expire = { ...b, maxAge: 0 };
-  for (const t of ADMIN_LOGOUT_COOKIE_TARGETS) {
-    jar.set(t.name, "", { ...expire, path: t.path });
-  }
-}
-
-/** Same expiry as `clearAdminSessionCookies`, for Route Handlers (`NextResponse`). */
+/** Expire all admin session cookies on a `NextResponse` (use from Route Handlers only; see `ADMIN_LOGOUT_PATH`). */
 export function applyAdminLogoutCookiesToResponse(res: NextResponse): void {
   const secure = process.env.NODE_ENV === "production";
   const base = { httpOnly: true as const, secure, sameSite: "lax" as const, maxAge: 0 };

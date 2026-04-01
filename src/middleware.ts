@@ -8,9 +8,11 @@ import {
 import {
   ADMIN_COOKIE_NAME,
   ADMIN_EMAIL_COOKIE_NAME,
+  ADMIN_LOGOUT_PATH,
   ADMIN_PATH_PREFIX,
   ADMIN_SESSION_COOKIE_PATH,
   adminSessionToken,
+  logAdminLogoutDebug,
 } from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
 async function adminSessionTokenOrNull(secret: string): Promise<string | null> {
@@ -59,6 +61,19 @@ export async function middleware(request: NextRequest) {
 async function runMiddleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
+  if (
+    process.env.MICSTAGE_ADMIN_LOGOUT_DEBUG === "1" &&
+    pathname === "/" &&
+    request.method === "GET"
+  ) {
+    const ref = request.headers.get("referer") ?? "";
+    if (ref.includes(ADMIN_LOGOUT_PATH)) {
+      logAdminLogoutDebug("middleware:post-logout-home", {
+        hadAdminCookie: Boolean(request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+      });
+    }
+  }
+
   if (pathname.startsWith(ADMIN_PATH_PREFIX)) {
     const rawAdmin = process.env.MICSTAGE_ADMIN_SECRET;
     const adminSecret = rawAdmin?.trim();
@@ -74,10 +89,17 @@ async function runMiddleware(request: NextRequest) {
     }
 
     const loginPath = `${ADMIN_PATH_PREFIX}/login`;
-    const logoutPath = `${ADMIN_PATH_PREFIX}/logout`;
     const isLogin = pathname === loginPath || pathname.startsWith(`${loginPath}/`);
-    const isLogoutRoute = pathname === logoutPath || pathname.startsWith(`${logoutPath}/`);
+    const isLogoutRoute = pathname === ADMIN_LOGOUT_PATH || pathname.startsWith(`${ADMIN_LOGOUT_PATH}/`);
     const skipAdminCookieCheck = isLogin || isLogoutRoute;
+
+    if (isLogoutRoute) {
+      logAdminLogoutDebug("middleware", {
+        pathname,
+        hadAdminCookie: Boolean(request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+        hadAdminEmailCookie: Boolean(request.cookies.get(ADMIN_EMAIL_COOKIE_NAME)?.value),
+      });
+    }
 
     if (!skipAdminCookieCheck) {
       const expectedToken = await adminSessionTokenOrNull(adminSecret);

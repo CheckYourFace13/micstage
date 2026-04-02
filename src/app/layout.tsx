@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { Bebas_Neue, Inter } from "next/font/google";
@@ -51,11 +52,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const embed = (await headers()).get("x-micstage-embed") === "1";
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -82,9 +84,9 @@ export default function RootLayout({
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
       </head>
       <body className="min-h-full bg-black font-[var(--font-body)] text-white">
-        <SiteHeader />
+        {!embed ? <SiteHeader /> : null}
         {children}
-        <SiteFooter />
+        {!embed ? <SiteFooter /> : null}
         {!isAnalyticsDisabled() ? <Analytics /> : null}
         {!isAnalyticsDisabled() ? (
           <Suspense fallback={null}>

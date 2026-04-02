@@ -180,6 +180,13 @@ async function runMiddleware(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-micstage-pathname", `${pathname}${search}`);
+  // Minimal chrome for iframe embeds (canonical lineup URL + ?embed=1).
+  if (
+    /^\/venues\/[^/]+\/lineup\/[^/]+$/.test(pathname) &&
+    request.nextUrl.searchParams.get("embed") === "1"
+  ) {
+    requestHeaders.set("x-micstage-embed", "1");
+  }
   return NextResponse.next({
     request: { headers: requestHeaders },
   });

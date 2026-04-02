@@ -6,6 +6,7 @@ import { requirePrisma } from "@/lib/prisma";
 import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
+import { appendQueryToPath, safePublicVenueReturnPath } from "@/lib/publicVenueReturnPath";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
 
@@ -34,6 +35,7 @@ function optNumber(formData: FormData, key: string): number | null {
 
 export async function bookSlot(formData: FormData) {
   const venueSlug = reqString(formData, "venueSlug");
+  const returnBase = safePublicVenueReturnPath(venueSlug, optString(formData, "returnPath"));
   const slotId = reqString(formData, "slotId");
   const notes = optString(formData, "notes");
 
@@ -51,11 +53,13 @@ export async function bookSlot(formData: FormData) {
   if (slotPreview.instance.template.venue.slug !== venueSlug) throw new Error("Venue mismatch");
   const venue = slotPreview.instance.template.venue;
   if (slotPreview.instance.isCancelled) {
-    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("This date’s schedule was cancelled.")}`);
+    redirect(
+      appendQueryToPath(returnBase, { bookError: "This date’s schedule was cancelled." }),
+    );
   }
   const instanceBlock = bookingBlockReason(venue, slotPreview.instance.date);
   if (instanceBlock) {
-    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(instanceBlock)}`);
+    redirect(appendQueryToPath(returnBase, { bookError: instanceBlock }));
   }
 
   const previewTz = slotPreview.instance.template.timeZone;
@@ -75,7 +79,7 @@ export async function bookSlot(formData: FormData) {
     { restrictionTimeZone: previewTz },
   );
   if (templateRestrictionBlock) {
-    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(templateRestrictionBlock)}`);
+    redirect(appendQueryToPath(returnBase, { bookError: templateRestrictionBlock }));
   }
 
   await requirePrisma().$transaction(async (tx) => {
@@ -86,7 +90,9 @@ export async function bookSlot(formData: FormData) {
     if (!slot) throw new Error("Slot not found");
     if (slot.instance.template.venue.slug !== venueSlug) throw new Error("Venue mismatch");
     if (slot.instance.isCancelled) {
-      redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("This date’s schedule was cancelled.")}`);
+      redirect(
+        appendQueryToPath(returnBase, { bookError: "This date’s schedule was cancelled." }),
+      );
     }
     if (slot.status !== "AVAILABLE") throw new Error("Slot is not available");
     if (slot.booking && !slot.booking.cancelledAt) throw new Error("Slot already booked");
@@ -96,7 +102,7 @@ export async function bookSlot(formData: FormData) {
     const txTz = slot.instance.template.timeZone;
     const txSlotStartUtc = slotStartInstant(slot.instance.date, slot.startMin, txTz);
     const txInstanceBlock = bookingBlockReason(txVenue, slot.instance.date);
-    if (txInstanceBlock) redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(txInstanceBlock)}`);
+    if (txInstanceBlock) redirect(appendQueryToPath(returnBase, { bookError: txInstanceBlock }));
     const effTx = effectiveSlotRestriction(slot, slot.instance.template);
     const txRestrictionBlock = slotRestrictionBlockReason(
       {
@@ -111,7 +117,7 @@ export async function bookSlot(formData: FormData) {
       clientLocation,
       { restrictionTimeZone: txTz },
     );
-    if (txRestrictionBlock) redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(txRestrictionBlock)}`);
+    if (txRestrictionBlock) redirect(appendQueryToPath(returnBase, { bookError: txRestrictionBlock }));
 
     let performerName = optString(formData, "performerName") ?? "";
     let performerEmail = optString(formData, "performerEmail") ?? null;
@@ -144,18 +150,22 @@ export async function bookSlot(formData: FormData) {
     });
   });
 
+  const lineupYmd = slotPreview.instance.date.toISOString().slice(0, 10);
   revalidatePath(`/venues/${venueSlug}`);
+  revalidatePath(`/venues/${venueSlug}/lineup`);
+  revalidatePath(`/venues/${venueSlug}/lineup/${lineupYmd}`);
   revalidatePath(ARTIST_DASHBOARD_HREF);
-  redirect(`/venues/${venueSlug}?booked=1`);
+  redirect(appendQueryToPath(returnBase, { booked: "1" }));
 }
 
 export async function cancelBooking(formData: FormData) {
   const venueSlug = reqString(formData, "venueSlug");
+  const returnBase = safePublicVenueReturnPath(venueSlug, optString(formData, "returnPath"));
   const bookingId = reqString(formData, "bookingId");
 
   const session = await getSession();
   if (!session) {
-    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Sign in to cancel a booking.")}`);
+    redirect(appendQueryToPath(returnBase, { bookError: "Sign in to cancel a booking." }));
   }
 
   const bookingVenueId = await requirePrisma().booking
@@ -166,7 +176,7 @@ export async function cancelBooking(formData: FormData) {
     .then((b) => b?.slot.instance.template.venueId);
 
   if (!bookingVenueId) {
-    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Booking not found.")}`);
+    redirect(appendQueryToPath(returnBase, { bookError: "Booking not found." }));
   }
 
   const allowedVenueIds = await venueIdsForVenueSession(session);
@@ -177,18 +187,25 @@ export async function cancelBooking(formData: FormData) {
       select: { musicianId: true, slot: { select: { instance: { select: { template: { select: { venue: { select: { slug: true } } } } } } } } },
     });
     if (!full || full.slot.instance.template.venue.slug !== venueSlug) {
-      redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Booking not found.")}`);
+      redirect(appendQueryToPath(returnBase, { bookError: "Booking not found." }));
     }
     if (!full.musicianId || full.musicianId !== session.musicianId) {
-      redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("You can only cancel your own bookings.")}`);
+      redirect(appendQueryToPath(returnBase, { bookError: "You can only cancel your own bookings." }));
     }
   } else if (session.kind === "venue") {
     if (!allowedVenueIds.includes(bookingVenueId)) {
-      redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Not allowed to cancel this booking.")}`);
+      redirect(appendQueryToPath(returnBase, { bookError: "Not allowed to cancel this booking." }));
     }
   } else {
-    redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent("Sign in to cancel a booking.")}`);
+    redirect(appendQueryToPath(returnBase, { bookError: "Sign in to cancel a booking." }));
   }
+
+  const lineupYmd = await requirePrisma().booking
+    .findUnique({
+      where: { id: bookingId },
+      select: { slot: { select: { instance: { select: { date: true } } } } },
+    })
+    .then((b) => b?.slot.instance.date.toISOString().slice(0, 10));
 
   await requirePrisma().$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
@@ -210,7 +227,9 @@ export async function cancelBooking(formData: FormData) {
   });
 
   revalidatePath(`/venues/${venueSlug}`);
+  revalidatePath(`/venues/${venueSlug}/lineup`);
+  if (lineupYmd) revalidatePath(`/venues/${venueSlug}/lineup/${lineupYmd}`);
   revalidatePath(ARTIST_DASHBOARD_HREF);
-  redirect(`/venues/${venueSlug}?cancelled=1`);
+  redirect(appendQueryToPath(returnBase, { cancelled: "1" }));
 }
 

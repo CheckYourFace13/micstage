@@ -78,3 +78,34 @@ export function buildPublicMetadata(opts: {
     },
   };
 }
+
+/** Lineup-first public pages: strong title + context for social crawlers. */
+export function buildLineupPageMetadata(opts: {
+  venueName: string;
+  venueSlug: string;
+  ymd: string;
+  place: string;
+}): Metadata {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(opts.ymd);
+  let dateSentence = opts.ymd;
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    dateSentence = new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(dt);
+  }
+  const path = `/venues/${opts.venueSlug}/lineup/${opts.ymd}`;
+  const title = `${opts.venueName} open mic lineup — ${opts.ymd}`;
+  const description = `Open mic lineup for ${opts.venueName}${opts.place ? ` in ${opts.place}` : ""} on ${dateSentence}. Set times, who’s booked, and open slots — MicStage.`;
+  return {
+    ...buildPublicMetadata({ title, description, path }),
+    title: { absolute: `${title} | MicStage` },
+  };
+}

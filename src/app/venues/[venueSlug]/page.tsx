@@ -5,16 +5,19 @@ import { getPrismaOrNull } from "@/lib/prisma";
 import { isValidPublicSlug, locationDirectorySlug } from "@/lib/locationSlugValidation";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
-import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
-import { bookSlot, cancelBooking } from "./actions";
+import { lineupNavLabelFromYmd } from "@/lib/time";
 import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
-import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
-import { equipmentProvidedList, performanceFormatLabel } from "@/lib/venueDisplay";
-import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
-import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
+import { equipmentProvidedList } from "@/lib/venueDisplay";
 import { VenueBookingFlash } from "@/components/VenueBookingFlash";
-import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { VenueLineupBoard } from "@/components/venue/VenueLineupBoard";
+import { loadPublicVenueForLineup } from "@/lib/venuePublicLineupData";
+import {
+  lineupsForStorageYmd,
+  pickPrimaryLineup,
+  storageYmdUtc,
+  upcomingLineupDateYmds,
+} from "@/lib/venuePublicLineup";
 import { safeExternalHref } from "@/lib/externalUrl";
 import { relatedLocationsForVenue } from "@/lib/relatedLocations";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
@@ -77,27 +80,22 @@ export default async function VenuePublicPage(props: {
 
   let venue;
   try {
-    venue = await prisma.venue.findUnique({
-      where: { slug: venueSlug },
-      include: {
-        eventTemplates: {
-          where: { isPublic: true },
-          orderBy: [{ weekday: "asc" }, { startTimeMin: "asc" }],
-          include: {
-            instances: {
-              orderBy: { date: "desc" },
-              take: 8,
-              include: { slots: { orderBy: { startMin: "asc" }, include: { booking: true } } },
-            },
-          },
-        },
-      },
-    });
+    venue = await loadPublicVenueForLineup(venueSlug);
   } catch {
     return <PublicDataUnavailable title="Venue page unavailable" />;
   }
 
   if (!venue) notFound();
+
+  const primary = pickPrimaryLineup(venue.eventTemplates, venue.timeZone, now);
+  const lineupDates = upcomingLineupDateYmds(venue.eventTemplates, venue.timeZone, now, 28);
+  const heroYmd = primary
+    ? storageYmdUtc(primary.instance.date)
+    : lineupDates[0] ?? null;
+  const heroLineups = heroYmd ? lineupsForStorageYmd(venue.eventTemplates, heroYmd) : [];
+  const venueHomeReturnPath = reserve
+    ? `/venues/${venue.slug}?reserve=${encodeURIComponent(reserve)}`
+    : `/venues/${venue.slug}`;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -205,7 +203,7 @@ export default async function VenuePublicPage(props: {
         ) : null}
         {isMusician && reserve ? (
           <div className="mt-4 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Continue your reservation by clicking <span className="font-semibold">Complete reservation</span> on the selected slot.
+            Continue your reservation by tapping <span className="font-semibold">Reserve</span> on the selected slot below.
           </div>
         ) : null}
 
@@ -228,8 +226,11 @@ export default async function VenuePublicPage(props: {
             with the venue&apos;s calendar).
           </p>
           <div className="mt-3 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/70">
-            <span className="font-medium text-white/85">Performers:</span> book open times in the schedule sections
-            below—MicStage confirms instantly when you&apos;re signed in.{" "}
+            <span className="font-medium text-white/85">Performers:</span> book open slots in the lineup below (or on the{" "}
+            <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href={`/venues/${venue.slug}/lineup`}>
+              shareable lineup page
+            </Link>
+            ). MicStage confirms instantly when you&apos;re signed in.{" "}
             <span className="text-white/55">Fans can browse who&apos;s on without an account.</span>
           </div>
         </section>
@@ -350,190 +351,88 @@ export default async function VenuePublicPage(props: {
             </p>
           </div>
         ) : (
-          <>
-            <section className="mt-8 rounded-2xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.06)] p-5">
-              <h2 className="text-xl font-semibold text-white">Book a performance slot</h2>
-              <p className="mt-2 text-sm text-white/70">
-                Times below are set by the venue. <span className="text-white/85">Open</span> rows can be reserved when you
-                sign in as an artist—booking is free and tied to the live schedule you see here (no separate off-platform
-                list).
-              </p>
-            </section>
-            <div className="mt-6 grid gap-6">
-            {venue.eventTemplates.map((t) => (
-              <section key={t.id} className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-semibold">{t.title}</h2>
-                    <div className="mt-1 text-sm text-white/70">
-                      {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–{minutesToTimeLabel(t.endTimeMin)} ·{" "}
-                      {t.slotMinutes}m slots
-                      {t.breakMinutes ? ` + ${t.breakMinutes}m breaks` : ""}
-                    </div>
-                    <div className="mt-1 text-sm text-white/65">
-                      <span className="text-white/50">Performance format:</span>{" "}
-                      <span className="font-medium text-white/90">{performanceFormatLabel(t.performanceFormat)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {t.instances.length === 0 ? (
-                  <div className="mt-4 text-sm text-white/60">No date schedules generated yet.</div>
-                ) : (
-                  <div className="mt-5 grid gap-5">
-                    {t.instances.map((inst) => {
-                      const instanceBookBlock = bookingBlockReason(venue, inst.date);
-                      const instanceCancelled = inst.isCancelled;
-                      return (
-                      <div key={inst.id} className="rounded-xl border border-white/10 bg-black/30 p-5">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <div className="font-semibold">Schedule for {inst.date.toISOString().slice(0, 10)}</div>
-                          <div className="text-xs text-white/50">{inst.slots.length} slots</div>
-                        </div>
-                        {instanceCancelled ? (
-                          <div className="mt-2 text-xs text-amber-200/90">This date was cancelled — booking is closed.</div>
-                        ) : null}
-                        {instanceBookBlock ? (
-                          <div className="mt-2 text-xs text-amber-200/90">{instanceBookBlock}</div>
-                        ) : null}
-
-                        <div className="mt-3 grid gap-2">
-                          {inst.slots.map((s) => {
-                            const activeBooking = s.booking && !s.booking.cancelledAt ? s.booking : null;
-                            const isReservedCandidate = reserve === s.id;
-                            const slotStartUtc = slotStartInstant(inst.date, s.startMin, t.timeZone);
-                            const eff = effectiveSlotRestriction(s, t);
-                            const slotBlockReason = slotRestrictionBlockReason(
-                              {
-                                bookingRestrictionMode: eff.bookingRestrictionMode,
-                                restrictionHoursBefore: eff.restrictionHoursBefore,
-                                onPremiseMaxDistanceMeters: eff.onPremiseMaxDistanceMeters,
-                                lat: venue.lat,
-                                lng: venue.lng,
-                              },
-                              slotStartUtc,
-                              now,
-                              undefined,
-                              {
-                                onPremiseMissingLocationShouldBlock: false,
-                                restrictionTimeZone: t.timeZone,
-                              },
-                            );
-
-                            const slotUsable = s.status === "AVAILABLE";
-                            const canBook =
-                              !instanceCancelled &&
-                              slotUsable &&
-                              !activeBooking &&
-                              !instanceBookBlock &&
-                              slotBlockReason == null;
-
-                            const canCancelBooking =
-                              !!activeBooking &&
-                              !!session &&
-                              ((session.kind === "musician" &&
-                                !!activeBooking.musicianId &&
-                                activeBooking.musicianId === session.musicianId) ||
-                                (session.kind === "venue" && venueStaffVenueIds.includes(venue.id)));
-                            return (
-                              <div
-                                key={s.id}
-                                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2"
-                              >
-                                <div className="text-sm">
-                                  <span className="font-semibold">
-                                    {minutesToTimeLabel(s.startMin)}–{minutesToTimeLabel(s.endMin)}
-                                  </span>
-                                  <span className="ml-2 text-white/70">
-                                    {activeBooking
-                                      ? `Booked: ${activeBooking.performerName}`
-                                      : !slotUsable
-                                        ? s.status === "CANCELLED"
-                                          ? "Cancelled slot"
-                                          : "Unavailable"
-                                        : "Open slot"}
-                                  </span>
-                                </div>
-
-                                {activeBooking && canCancelBooking ? (
-                                  <form action={cancelBooking}>
-                                    <input type="hidden" name="venueSlug" value={venue.slug} />
-                                    <input type="hidden" name="bookingId" value={activeBooking.id} />
-                                    <FormSubmitButton
-                                      label="Cancel booking"
-                                      pendingLabel="Cancelling…"
-                                      className="h-9 rounded-md border border-white/15 bg-white/5 px-3 text-sm text-white hover:bg-white/10 disabled:opacity-60"
-                                    />
-                                  </form>
-                                ) : canBook ? (
-                                  isMusician ? (
-                                    <form
-                                      id={`reserve-form-${s.id}`}
-                                      action={bookSlot}
-                                      className="flex flex-wrap items-center gap-2"
-                                    >
-                                      <input type="hidden" name="venueSlug" value={venue.slug} />
-                                      <input type="hidden" name="slotId" value={s.id} />
-                                      {eff.bookingRestrictionMode === "ON_PREMISE" ? (
-                                        <>
-                                          <input type="hidden" name="clientLat" value="" />
-                                          <input type="hidden" name="clientLng" value="" />
-                                          <OnPremiseReserveButton
-                                            formId={`reserve-form-${s.id}`}
-                                            label={
-                                              isReservedCandidate
-                                                ? "Complete reservation"
-                                                : "Reserve near you"
-                                              }
-                                            className={`h-9 rounded-md px-3 text-sm font-semibold text-black hover:brightness-110 ${
-                                              isReservedCandidate ? "bg-emerald-400" : "bg-[rgb(var(--om-neon))]"
-                                            } disabled:opacity-60`}
-                                          />
-                                        </>
-                                      ) : (
-                                        <FormSubmitButton
-                                          label={
-                                            isReservedCandidate ? "Complete reservation" : "Reserve this slot"
-                                          }
-                                          pendingLabel="Reserving…"
-                                          className={`h-9 rounded-md px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-60 ${
-                                            isReservedCandidate ? "bg-emerald-400" : "bg-[rgb(var(--om-neon))]"
-                                          }`}
-                                        />
-                                      )}
-                                    </form>
-                                  ) : (
-                                    <Link
-                                      href={`/login/musician?next=${encodeURIComponent(`/venues/${venue.slug}?reserve=${s.id}`)}`}
-                                      className="h-9 rounded-md border border-[rgba(var(--om-neon),0.55)] bg-[rgba(var(--om-neon),0.12)] px-3 py-2 text-xs font-semibold text-white hover:bg-[rgba(var(--om-neon),0.18)]"
-                                    >
-                                      Click here to reserve
-                                    </Link>
-                                  )
-                                ) : activeBooking ? null : (
-                                  <span className="text-xs text-white/45">
-                                    {instanceCancelled
-                                      ? "Booking closed."
-                                      : !slotUsable
-                                        ? s.status === "CANCELLED"
-                                          ? "This slot was cancelled."
-                                          : "This slot is not available."
-                                        : slotBlockReason ?? "Booking closed for this date."}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                    })}
-                  </div>
-                )}
-              </section>
-            ))}
+          <section className="mt-8 rounded-2xl border border-[rgba(var(--om-neon),0.4)] bg-[rgba(var(--om-neon),0.07)] p-5 sm:p-7">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold leading-tight text-white sm:text-3xl">Open mic lineup</h2>
+                <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/75">
+                  Large type for the room: set times, performer names, and open slots.{" "}
+                  <span className="text-white/90">Artists</span> can reserve when signed in; fans read the board as-is.
+                </p>
+                {heroYmd ? (
+                  <p className="mt-2 text-sm text-white/60">
+                    Share this night:{" "}
+                    <Link
+                      className="font-medium text-[rgb(var(--om-neon))] underline hover:brightness-110"
+                      href={`/venues/${venue.slug}/lineup/${heroYmd}`}
+                    >
+                      {lineupNavLabelFromYmd(heroYmd)} lineup page
+                    </Link>{" "}
+                    (best for Facebook and your website).
+                  </p>
+                ) : null}
+              </div>
+              {heroYmd ? (
+                <Link
+                  className="shrink-0 rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-white/15"
+                  href={`/venues/${venue.slug}/lineup/${heroYmd}`}
+                >
+                  Open full lineup view
+                </Link>
+              ) : null}
             </div>
-          </>
+
+            {heroYmd ? (
+              <>
+                {lineupDates.length > 1 ? (
+                  <nav className="mt-8" aria-label="Upcoming open mic dates">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-white/50">Other nights</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {lineupDates.map((ymd) => (
+                        <Link
+                          key={ymd}
+                          href={`/venues/${venue.slug}/lineup/${ymd}`}
+                          className={`rounded-full border px-4 py-2.5 text-sm font-medium ${
+                            ymd === heroYmd
+                              ? "border-[rgb(var(--om-neon))] bg-[rgb(var(--om-neon))]/15 text-white"
+                              : "border-white/15 bg-black/30 text-white/85 hover:border-white/25 hover:bg-black/45"
+                          }`}
+                        >
+                          {lineupNavLabelFromYmd(ymd)}
+                        </Link>
+                      ))}
+                    </div>
+                  </nav>
+                ) : null}
+
+                <div className="mt-8">
+                  <VenueLineupBoard
+                    venue={venue}
+                    lineups={heroLineups}
+                    ymd={heroYmd}
+                    now={now}
+                    session={session}
+                    venueStaffVenueIds={venueStaffVenueIds}
+                    isMusician={isMusician}
+                    returnPath={venueHomeReturnPath}
+                    reserve={reserve}
+                    heroBadge={
+                      primary && heroYmd && storageYmdUtc(primary.instance.date) === heroYmd ? primary.badge : null
+                    }
+                    showShareStrip
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="mt-6 rounded-xl border border-dashed border-white/20 bg-black/25 p-6 text-sm text-white/70">
+                <p className="font-medium text-white/85">No upcoming dates in this window</p>
+                <p className="mt-2 text-white/65">
+                  The venue has public schedules but no future nights published yet. Check back soon or visit their links
+                  above.
+                </p>
+              </div>
+            )}
+          </section>
         )}
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -542,15 +441,16 @@ export default async function VenuePublicPage(props: {
             <div>
               <h3 className="font-semibold text-white">How do artists reserve a slot here?</h3>
               <p className="mt-1">
-                Find an <span className="text-white/90">Open slot</span> in the schedules above, sign in (or create a free
-                artist account), and complete the reservation—your spot is confirmed against the same calendar everyone sees
-                on this page.
+                Find an <span className="text-white/90">Open</span> row in the lineup, sign in (or create a free artist
+                account), and complete the reservation—your spot is confirmed against the same board everyone sees here and
+                on the shareable lineup link.
               </p>
             </div>
             <div>
               <h3 className="font-semibold text-white">What schedule details are public?</h3>
               <p className="mt-1">
-                Public templates include weekday/time, slot length, upcoming dates, slot status, and booked performer names.
+                Each night shows set times, slot status, booked performer names, and open slots. Venues can embed the lineup
+                or share the date-specific URL.
               </p>
             </div>
             <div>

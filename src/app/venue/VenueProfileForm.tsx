@@ -2,22 +2,36 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { discoverVenueSocials, upgradeVenuePlan, updateVenueProfile } from "./actions";
 import type { Venue } from "../../generated/prisma/client";
 
-type Props = { venue: Venue };
+type Props = { venue: Venue; emphasis?: "primary" | "secondary" };
 
-export function VenueProfileForm({ venue }: Props) {
+export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
+  const secondary = emphasis === "secondary";
   return (
-    <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-6">
-      <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-        Venue profile
-      </div>
-      <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">About your venue & what you provide</h3>
-      <p className="mt-2 text-sm text-white/60">
-        This is what artists see on your public page—stronger profiles build trust before they book. Use direct image URLs
-        (one per line). You can save now and refine anytime.{" "}
-        <span className="text-white/45">
-          Performance format (acoustic-only, full band, etc.) is set per schedule block in{" "}
-          <span className="text-white/60">Set weekly schedule</span> or when adding a recurring night.
-        </span>
+    <div className={secondary ? "mt-0 rounded-xl border border-white/10 bg-black/25 p-5" : "mt-6 rounded-2xl border border-white/10 bg-black/30 p-6"}>
+      {!secondary ? (
+        <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
+          Venue profile
+        </div>
+      ) : null}
+      <h3
+        className={
+          secondary
+            ? "om-heading mt-0 text-lg font-semibold tracking-wide text-white"
+            : "om-heading mt-2 text-2xl tracking-wide text-white"
+        }
+      >
+        {secondary ? "Venue info & images" : "About your venue & what you provide"}
+      </h3>
+      <p className={secondary ? "mt-2 text-xs text-white/55" : "mt-2 text-sm text-white/60"}>
+        {secondary
+          ? "Public-facing details artists see alongside your lineup. Format per night is set under schedule blocks below."
+          : "This is what artists see on your public page—stronger profiles build trust before they book. Use direct image URLs (one per line). You can save now and refine anytime."}{" "}
+        {!secondary ? (
+          <span className="text-white/45">
+            Performance format (acoustic-only, full band, etc.) is set per schedule block in{" "}
+            <span className="text-white/60">Set weekly schedule</span> or when adding a recurring night.
+          </span>
+        ) : null}
       </p>
 
       <form action={updateVenueProfile} className="mt-6 grid gap-5">

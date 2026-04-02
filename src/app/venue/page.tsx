@@ -6,18 +6,22 @@ import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
-import {
-  createEventTemplate,
-  generateDateSchedule,
-  houseBookSlot,
-  inviteManager,
-  updateSlotBookingRules,
-} from "./actions";
+import { generateDateSchedule, houseBookSlot, inviteManager, updateSlotBookingRules } from "./actions";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { slotHasBookingRuleOverride } from "@/lib/slotBookingEffective";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
-import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
-import { minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
+import { absoluteUrl } from "@/lib/publicSeo";
+import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
+import {
+  lineupsForStorageYmd,
+  pickPrimaryLineup,
+  storageYmdUtc,
+  upcomingLineupDateYmds,
+} from "@/lib/venuePublicLineup";
+import type { LineupTemplate } from "@/lib/venuePublicLineupData";
+import { loadLineupTemplatesByVenueIds, venueIsOperational } from "@/lib/venueDashboardOperational";
+import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
+import { VenueAddRecurringNightFormFields } from "./VenueAddRecurringNightForm";
 import { VenueProfileForm } from "./VenueProfileForm";
 import { WeeklyScheduleForm } from "./WeeklyScheduleForm";
 
@@ -174,6 +178,17 @@ export default async function VenuePortalPage({
     );
   }
 
+  const operationalVenueIds = venues.filter(venueIsOperational).map((v) => v.id);
+  let lineupByVenueId: Record<string, LineupTemplate[]> = {};
+  try {
+    if (operationalVenueIds.length > 0) {
+      lineupByVenueId = await loadLineupTemplatesByVenueIds(operationalVenueIds);
+    }
+  } catch (e) {
+    logVenuePortalFailure("loadLineupTemplatesByVenueIds", e);
+  }
+  const anyVenueOperational = operationalVenueIds.length > 0;
+
   const todayIso = toIsoDateOnly(new Date());
   const horizonDaysFor = (tier: "FREE" | "PRO") => (tier === "FREE" ? 60 : 90);
   const plusDaysIso = (days: number) => toIsoDateOnly(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
@@ -186,8 +201,17 @@ export default async function VenuePortalPage({
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Venue portal</div>
             <h1 className="om-heading mt-2 text-4xl tracking-wide">Venue dashboard</h1>
             <p className="mt-2 text-sm text-white/70">
-              <span className="text-white/85">Start here:</span> save your weekly schedule (below), then generate dates—your
-              public venue page updates as you go. Signed in as <span className="font-mono">{session.email}</span>
+              {anyVenueOperational ? (
+                <>
+                  <span className="text-white/85">Control center:</span> share your lineup, watch tonight&apos;s board, and
+                  manage slots below. Signed in as <span className="font-mono">{session.email}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-white/85">Finish setup:</span> save your venue profile and weekly schedule — your public
+                  page updates as you go. Signed in as <span className="font-mono">{session.email}</span>
+                </>
+              )}
             </p>
             <div className="mt-3 flex flex-wrap gap-2 text-sm">
               <Link
@@ -217,9 +241,17 @@ export default async function VenuePortalPage({
 
         {q.profile === "saved" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            <span className="font-semibold text-emerald-100/95">Profile saved.</span> Your public venue page shows this
-            info—refresh the page if you don&apos;t see changes yet. Next: set or update your weekly schedule so artists can
-            book.
+            <span className="font-semibold text-emerald-100/95">Profile saved.</span>{" "}
+            {anyVenueOperational ? (
+              <>
+                Your public venue and lineup pages pick this up — refresh if you don&apos;t see changes yet.
+              </>
+            ) : (
+              <>
+                Your public venue page shows this info—refresh if needed. Next: set or update your weekly schedule so artists can
+                book.
+              </>
+            )}
           </div>
         ) : null}
         {q.profileError === "duplicateWeekday" || q.scheduleError === "duplicateWeekday" ? (
@@ -399,11 +431,37 @@ export default async function VenuePortalPage({
           </div>
         ) : (
           <div className="mt-10 grid gap-8">
-            {venues.map((v) => (
+            {venues.map((v) => {
+              const operational = venueIsOperational(v);
+              const lineupTemplates = lineupByVenueId[v.id] ?? [];
+              const nowDash = new Date();
+              const primary = operational ? pickPrimaryLineup(lineupTemplates, v.timeZone, nowDash) : null;
+              const upcomingYmds = operational
+                ? upcomingLineupDateYmds(lineupTemplates, v.timeZone, nowDash, 21)
+                : [];
+              const heroYmd = primary
+                ? storageYmdUtc(primary.instance.date)
+                : upcomingYmds[0] ?? null;
+              const heroLineups = heroYmd ? lineupsForStorageYmd(lineupTemplates, heroYmd) : [];
+              const lineupPath = heroYmd ? `/venues/${v.slug}/lineup/${heroYmd}` : null;
+              const hDays = horizonDaysFor(v.subscriptionTier);
+              const lineupBadge =
+                operational && primary && heroYmd && storageYmdUtc(primary.instance.date) === heroYmd
+                  ? primary.badge
+                  : null;
+
+              return (
               <section key={v.id} className="rounded-2xl border border-white/10 bg-white/5 p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <div className="text-xs font-medium uppercase tracking-widest text-white/60">Venue</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-xs font-medium uppercase tracking-widest text-white/60">Venue</div>
+                      {operational ? (
+                        <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-200/90">
+                          Live ops
+                        </span>
+                      ) : null}
+                    </div>
                     <h2 className="mt-2 text-2xl font-semibold">{v.name}</h2>
                     <div className="mt-1 text-sm text-white/70">{v.formattedAddress}</div>
                     <div className="mt-2 text-xs text-white/60">
@@ -412,23 +470,149 @@ export default async function VenuePortalPage({
                         /venues/{v.slug}
                       </Link>
                     </div>
+                    {operational ? (
+                      <a
+                        href={`#venue-profile-${v.id}`}
+                        className="mt-3 inline-flex text-sm font-medium text-[rgb(var(--om-neon))] underline hover:brightness-110"
+                      >
+                        Edit venue info
+                      </a>
+                    ) : null}
                   </div>
                 </div>
 
-                <VenueProfileForm venue={v} />
+                {operational ? (
+                  <div className="mt-8 rounded-2xl border border-[rgba(var(--om-neon),0.55)] bg-gradient-to-b from-[rgba(var(--om-neon),0.12)] to-black/35 p-6 sm:p-7">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <h3 className="om-heading text-2xl font-bold tracking-wide text-white">Lineup & sharing</h3>
+                        <p className="mt-2 max-w-xl text-sm text-white/70">
+                          What audiences and artists see next. Share the date link everywhere you promote the room.
+                        </p>
+                      </div>
+                      {lineupBadge ? (
+                        <span className="shrink-0 rounded-full border border-[rgba(var(--om-neon),0.5)] bg-black/40 px-3 py-1 text-xs font-bold uppercase tracking-wide text-[rgb(var(--om-neon))]">
+                          {lineupBadge === "live" ? "Live now" : lineupBadge === "tonight" ? "Tonight" : "Upcoming"}
+                        </span>
+                      ) : null}
+                    </div>
 
-                {/* Primary: weekly schedule + bulk slot generation */}
-                <div className="mt-6 rounded-2xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.06)] p-6 shadow-[0_0_0_1px_rgba(255,45,149,0.12)]">
+                    {lineupPath ? (
+                      <>
+                        <div className="mt-6">
+                          <VenueDashboardShareBar
+                            lineupUrl={absoluteUrl(lineupPath)}
+                            embedUrl={absoluteUrl(`${lineupPath}?embed=1`)}
+                            publicVenueUrl={absoluteUrl(`/venues/${v.slug}`)}
+                            jsonUrl={absoluteUrl(`/api/public/venues/${v.slug}/lineup?date=${heroYmd}`)}
+                          />
+                        </div>
+                        {upcomingYmds.length > 1 ? (
+                          <div className="mt-6">
+                            <div className="text-xs font-semibold uppercase tracking-wider text-white/50">Upcoming dates</div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {upcomingYmds.map((ymd) => (
+                                <Link
+                                  key={ymd}
+                                  href={`/venues/${v.slug}/lineup/${ymd}`}
+                                  className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                                    ymd === heroYmd
+                                      ? "border-[rgb(var(--om-neon))] bg-[rgb(var(--om-neon))]/15 text-white"
+                                      : "border-white/15 bg-black/30 text-white/80 hover:border-white/25"
+                                  }`}
+                                >
+                                  {lineupNavLabelFromYmd(ymd)}
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        <div className="mt-6 rounded-xl border border-white/10 bg-black/35 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wider text-white/55">Preview</div>
+                          {heroLineups.length === 0 ? (
+                            <p className="mt-2 text-sm text-white/55">
+                              No published slots for this date yet — generate slots under your blocks below.
+                            </p>
+                          ) : (
+                            <div className="mt-3 space-y-4">
+                              {heroLineups.map(({ template: t, instance: inst }) => (
+                                <div key={inst.id}>
+                                  <div className="text-sm font-semibold text-white">{t.title}</div>
+                                  <ul className="mt-2 divide-y divide-white/10 rounded-lg border border-white/10">
+                                    {inst.slots.slice(0, 12).map((s) => {
+                                      const bk = s.booking && !s.booking.cancelledAt ? s.booking : null;
+                                      const open = s.status === "AVAILABLE" && !bk;
+                                      return (
+                                        <li
+                                          key={s.id}
+                                          className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2.5 text-sm"
+                                        >
+                                          <span className="font-bold tabular-nums text-white">
+                                            {minutesToTimeLabel(s.startMin)}–{minutesToTimeLabel(s.endMin)}
+                                          </span>
+                                          <span className="text-right text-white/85">
+                                            {bk ? (
+                                              bk.performerName
+                                            ) : open ? (
+                                              <span className="font-semibold text-[rgb(var(--om-neon))]">Open</span>
+                                            ) : (
+                                              "—"
+                                            )}
+                                          </span>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                  {inst.slots.length > 12 ? (
+                                    <Link href={lineupPath} className="mt-2 inline-block text-xs text-white/50 underline">
+                                      Full lineup →
+                                    </Link>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-6 text-sm text-white/65">
+                        No upcoming nights in the booking window yet. Save your schedule blocks and generate dates — share links
+                        will show up here.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {!operational ? <VenueProfileForm venue={v} /> : null}
+
+                <div
+                  className={
+                    operational
+                      ? "mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-6"
+                      : "mt-6 rounded-2xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.06)] p-6 shadow-[0_0_0_1px_rgba(255,45,149,0.12)]"
+                  }
+                >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-                        Schedule
+                        {operational ? "Schedule blocks" : "Schedule"}
                       </div>
-                      <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">Set weekly schedule</h3>
+                      <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">
+                        {operational ? "Manage recurring nights" : "Set weekly schedule"}
+                      </h3>
                       <p className="mt-2 max-w-2xl text-sm text-white/70">
-                        <span className="font-medium text-white/85">Recommended first step:</span> choose your nights, hours,
-                        slot length, and booking window. MicStage creates templates and fills open slots automatically—you can
-                        re-run this anytime; confirmed bookings stay put.
+                        {operational ? (
+                          <>
+                            Update which nights you run, hours, slot length, and booking window. Re-run anytime — confirmed
+                            bookings stay put.
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-medium text-white/85">Recommended first step:</span> choose your nights, hours,
+                            slot length, and booking window. MicStage creates templates and fills open slots automatically—you can
+                            re-run this anytime; confirmed bookings stay put.
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -436,12 +620,10 @@ export default async function VenuePortalPage({
                     venueId={v.id}
                     venueTimeZone={v.timeZone}
                     todayIso={todayIso}
-                    horizonDays={horizonDaysFor(v.subscriptionTier)}
+                    horizonDays={hDays}
                     defaultSeriesStart={v.seriesStartDate ? toIsoDateOnly(v.seriesStartDate) : todayIso}
                     defaultSeriesEnd={
-                      v.seriesEndDate
-                        ? toIsoDateOnly(v.seriesEndDate)
-                        : plusDaysIso(horizonDaysFor(v.subscriptionTier))
+                      v.seriesEndDate ? toIsoDateOnly(v.seriesEndDate) : plusDaysIso(hDays)
                     }
                     defaultTitle={v.eventTemplates[0]?.title ?? "Open mic"}
                     defaultPerformanceFormat={v.eventTemplates[0]?.performanceFormat ?? v.performanceFormat}
@@ -451,218 +633,60 @@ export default async function VenuePortalPage({
                   />
                 </div>
 
-                {/* Optional: second recurring night on the same weekday or different rules */}
-                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-                        Optional
-                      </div>
-                      <h3 className="om-heading mt-2 text-xl tracking-wide text-white">Add a recurring night (single weekday)</h3>
-                      <p className="mt-2 max-w-2xl text-sm text-white/70">
-                        Only if you don’t use the weekly form yet — you can add <span className="text-white/90">one</span> template
-                        per weekday. If that weekday already exists, use{" "}
-                        <span className="font-medium text-white/90">Set weekly schedule</span> instead.
-                      </p>
-                    </div>
-                  </div>
-
-                  <form action={createEventTemplate} className="mt-6 grid gap-3">
-                      <input type="hidden" name="venueId" value={v.id} />
-                      <label className="grid gap-1 text-sm">
-                        <span className="text-white/80">Open mic night name (public)</span>
-                        <input
-                          name="title"
-                          required
-                          className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-                          placeholder="Monday Songwriter Night"
-                        />
-                      </label>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="grid gap-1 text-sm">
-                          <span className="text-white/80">
-                            Booking window start (today onward)
-                          </span>
-                          <input
-                            name="seriesStartDate"
-                            type="date"
-                            min={todayIso}
-                            max={plusDaysIso(horizonDaysFor(v.subscriptionTier))}
-                            defaultValue={todayIso}
-                            required
-                            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-                          />
-                        </label>
-                        <label className="grid gap-1 text-sm">
-                          <span className="text-white/80">
-                            Booking window end (max {horizonDaysFor(v.subscriptionTier)} days out)
-                          </span>
-                          <input
-                            name="seriesEndDate"
-                            type="date"
-                            min={todayIso}
-                            max={plusDaysIso(horizonDaysFor(v.subscriptionTier))}
-                            defaultValue={plusDaysIso(horizonDaysFor(v.subscriptionTier))}
-                            required
-                            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-                          />
-                        </label>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="grid gap-1 text-sm">
-                          <span className="text-white/80">Weekday</span>
-                          <select name="weekday" className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white">
-                            <option value="MON">Monday</option>
-                            <option value="TUE">Tuesday</option>
-                            <option value="WED">Wednesday</option>
-                            <option value="THU">Thursday</option>
-                            <option value="FRI">Friday</option>
-                            <option value="SAT">Saturday</option>
-                            <option value="SUN">Sunday</option>
-                          </select>
-                        </label>
-                        <label className="grid gap-1 text-sm">
-                          <span className="text-white/80">Time zone (auto from venue location)</span>
-                          <input
-                            name="timeZone"
-                            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-                            defaultValue={v.timeZone}
-                          />
-                        </label>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="grid gap-1 text-sm">
-                          <span className="text-white/80">Start time</span>
-                          <input
-                            name="startTime"
-                            type="time"
-                            required
-                            defaultValue="17:00"
-                            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 font-mono text-white"
-                          />
-                        </label>
-                        <label className="grid gap-1 text-sm">
-                          <span className="text-white/80">End time</span>
-                          <input
-                            name="endTime"
-                            type="time"
-                            required
-                            defaultValue="21:00"
-                            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 font-mono text-white"
-                          />
-                        </label>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="grid gap-1 text-sm">
-                          <span className="text-white/80">Slot minutes</span>
-                          <input
-                            name="slotMinutes"
-                            type="number"
-                            min={1}
-                            defaultValue={25}
-                            required
-                            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-                          />
-                        </label>
-                        <label className="grid gap-1 text-sm">
-                          <span className="text-white/80">Break minutes</span>
-                          <input
-                            name="breakMinutes"
-                            type="number"
-                            min={0}
-                            defaultValue={5}
-                            required
-                            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-                          />
-                        </label>
-                      </div>
-
-                      <label className="grid gap-1 text-sm">
-                        <span className="text-white/80">Performance format (this night, public)</span>
-                        <select
-                          name="performanceFormat"
-                          defaultValue={v.performanceFormat}
-                          className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-                        >
-                          {VENUE_PERFORMANCE_FORMAT_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <fieldset className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4 sm:col-span-2">
-                        <legend className="text-sm font-semibold text-white">Booking release rules (for this time block)</legend>
-
-                        <div className="grid gap-2">
-                          {BOOKING_RESTRICTION_OPTIONS.map((o) => (
-                            <label key={o.value} className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
-                              <input
-                                type="radio"
-                                name="bookingRestrictionMode"
-                                value={o.value}
-                                defaultChecked={v.bookingRestrictionMode === o.value}
-                                className="h-4 w-4 accent-[rgb(var(--om-neon))]"
-                              />
-                              {o.label}
-                            </label>
-                          ))}
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="grid gap-1 text-sm">
-                            <span className="text-white/80">X hours before start</span>
-                            <input
-                              name="restrictionHoursBefore"
-                              type="number"
-                              min={0}
-                              max={48}
-                              defaultValue={v.restrictionHoursBefore ?? 6}
-                              required
-                              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-                            />
-                          </label>
-                          <label className="grid gap-1 text-sm">
-                            <span className="text-white/80">On-premise radius (meters)</span>
-                            <input
-                              name="onPremiseMaxDistanceMeters"
-                              type="number"
-                              min={50}
-                              max={10000}
-                              defaultValue={v.onPremiseMaxDistanceMeters ?? 1000}
-                              required
-                              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-                            />
-                          </label>
-                        </div>
-
-                        <p className="text-xs text-white/50">
-                          These rules apply to every generated slot inside this template (each template is a “time block”).
-                        </p>
-                      </fieldset>
-
-                    <FormSubmitButton
-                      label="Save available times"
-                      pendingLabel="Saving…"
-                      className="mt-2 h-11 rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+                {operational ? (
+                  <details className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5 open:bg-white/[0.05]">
+                    <summary className="cursor-pointer list-none text-lg font-semibold text-white marker:content-none [&::-webkit-details-marker]:hidden">
+                      <span className="underline decoration-white/25 underline-offset-4 hover:decoration-white/50">
+                        Add another recurring night (one weekday)
+                      </span>
+                      <span className="mt-1 block text-sm font-normal text-white/55">
+                        One template per weekday. If it already exists, use Manage recurring nights above.
+                      </span>
+                    </summary>
+                    <VenueAddRecurringNightFormFields
+                      venue={v}
+                      todayIso={todayIso}
+                      horizonDays={hDays}
+                      plusDaysIso={plusDaysIso}
+                      formClassName="mt-4 grid gap-3"
                     />
-                  </form>
-                </div>
+                  </details>
+                ) : (
+                  <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
+                          Optional
+                        </div>
+                        <h3 className="om-heading mt-2 text-xl tracking-wide text-white">Add a recurring night (single weekday)</h3>
+                        <p className="mt-2 max-w-2xl text-sm text-white/70">
+                          Only if you don’t use the weekly form yet — you can add <span className="text-white/90">one</span>{" "}
+                          template per weekday. If that weekday already exists, use{" "}
+                          <span className="font-medium text-white/90">Set weekly schedule</span> instead.
+                        </p>
+                      </div>
+                    </div>
+                    <VenueAddRecurringNightFormFields
+                      venue={v}
+                      todayIso={todayIso}
+                      horizonDays={hDays}
+                      plusDaysIso={plusDaysIso}
+                    />
+                  </div>
+                )}
 
-                {/* One-off: single date */}
+                {/* Per block: generate dates + house tools */}
                 <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-5">
                   <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-                    One-off
+                    {operational ? "Blocks" : "One-off"}
                   </div>
-                  <div className="mt-2 text-lg font-semibold text-white">Generate slots for one date</div>
+                  <div className="mt-2 text-lg font-semibold text-white">
+                    {operational ? "Each schedule block" : "Generate slots for one date"}
+                  </div>
                   <p className="mt-1 text-sm text-white/60">
-                    Use this for a single calendar day without re-running the full window (same safe rules — booked slots are not
-                    overwritten).
+                    {operational
+                      ? "Pick a block, generate or refresh slots for a single date, and handle walk-ups. Booked slots are never overwritten."
+                      : "Use this for a single calendar day without re-running the full window (same safe rules — booked slots are not overwritten)."}
                   </p>
                   {v.eventTemplates.length === 0 ? (
                     <div className="mt-4 text-sm text-white/60">Set a weekly schedule first — no templates yet.</div>
@@ -829,6 +853,23 @@ export default async function VenuePortalPage({
                   )}
                 </div>
 
+                {operational ? (
+                  <details
+                    id={`venue-profile-${v.id}`}
+                    className="group mt-8 scroll-mt-28 rounded-2xl border border-white/10 bg-black/25 p-5 open:border-white/15 open:bg-black/35"
+                  >
+                    <summary className="cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="text-lg font-semibold text-white underline decoration-white/20 underline-offset-4 group-open:decoration-[rgb(var(--om-neon))]/50">
+                          Edit venue info
+                        </span>
+                        <span className="text-sm text-white/50">Profile, images, gear, socials, plan</span>
+                      </div>
+                    </summary>
+                    <VenueProfileForm venue={v} emphasis="secondary" />
+                  </details>
+                ) : null}
+
                 {session.venueOwnerId ? (
                   <div className="mt-6 grid gap-4 rounded-xl border border-white/10 bg-black/30 p-5">
                     <div>
@@ -867,7 +908,8 @@ export default async function VenuePortalPage({
                   </div>
                 ) : null}
               </section>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

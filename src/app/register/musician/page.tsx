@@ -5,6 +5,7 @@ export const metadata = {
 import { redirect } from "next/navigation";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
+import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { registerMusician } from "./actions";
 
@@ -30,6 +31,7 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
           <span className="text-emerald-200/90">public</span> — that’s what venues and fans see and how you show up in
           artist search.
         </p>
+        <BetaNote className="mt-3" />
 
         <form action={registerMusician} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
           {showRate ? (

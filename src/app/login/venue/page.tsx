@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { safeAfterAuthPath } from "@/lib/safeRedirect";
 import { loginVenue } from "./serverActions";
+import { BetaNote } from "@/components/BetaNote";
 import { VenueLoginForm } from "./VenueLoginForm";
 
 export default async function VenueLoginPage(props: {
@@ -31,6 +32,7 @@ export default async function VenueLoginPage(props: {
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Venue login</h1>
         <p className="mt-2 text-sm text-white/70">Log in to manage your venue schedule and invite managers.</p>
+        <BetaNote className="mt-3" />
 
         <VenueLoginForm
           action={loginVenue}

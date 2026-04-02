@@ -5,6 +5,7 @@ export const metadata = {
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { safeAfterMusicianLoginPath } from "@/lib/safeRedirect";
+import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { loginMusician } from "./serverActions";
 
@@ -38,6 +39,7 @@ export default async function MusicianLoginPage(props: {
           </a>{" "}
           — not your legal name.
         </p>
+        <BetaNote className="mt-3" />
 
         <form action={loginMusician} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
           <input type="hidden" name="next" value={next ?? ""} />

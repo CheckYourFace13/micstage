@@ -5,6 +5,7 @@ export const metadata = {
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { registerVenue } from "./actions";
+import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { VenuePlaceFields } from "./venuePlaceFields";
 
@@ -28,6 +29,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
         <p className="mt-2 text-sm text-white/70">
           Create your venue account. Next step will be creating your open mic schedule and publishing your page.
         </p>
+        <BetaNote className="mt-3" />
 
         <form action={registerVenue} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
           {showPlace ? (

@@ -21,9 +21,20 @@ export async function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/15 bg-black/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-        <Link href="/" className="group flex min-w-0 items-baseline gap-2 sm:gap-3 lg:flex-1">
-          <span className="om-heading shrink-0 text-xl tracking-wide text-white sm:text-2xl">MicStage</span>
-          <span className="truncate text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 sm:text-[11px]">
+        <Link
+          href="/"
+          className="group flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:gap-x-3 lg:flex-1"
+        >
+          <span className="flex shrink-0 items-center gap-2">
+            <span className="om-heading text-xl tracking-wide text-white sm:text-2xl">MicStage</span>
+            <span
+              className="rounded border border-[rgba(var(--om-neon),0.4)] bg-[rgba(var(--om-neon),0.1)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--om-neon))] sm:text-[10px]"
+              title="MicStage is in beta"
+            >
+              BETA
+            </span>
+          </span>
+          <span className="min-w-0 truncate text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 sm:text-[11px]">
             Artists to Music to Marketing
           </span>
         </Link>

@@ -37,10 +37,11 @@ async function resolveArtistLine(session: Extract<Session, { kind: "musician" }>
       where: { id: session.musicianId },
       select: { stageName: true, firstName: true, lastName: true, email: true },
     });
+    const stage = m?.stageName?.trim() ?? "";
     const legal = [m?.firstName, m?.lastName].filter(Boolean).join(" ").trim();
     const name =
+      stage ||
       legal ||
-      m?.stageName?.trim() ||
       emailLocalPart(m?.email ?? session.email) ||
       "Artist";
     return {

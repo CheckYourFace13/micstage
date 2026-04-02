@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 
-/** Production default; override with APP_URL / NEXT_PUBLIC_APP_URL in env. */
-export function siteOrigin(): string {
-  let raw = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://micstage.com").trim();
-  raw = raw.replace(/\/+$/, "");
-  if (!/^https?:\/\//i.test(raw)) {
-    raw = `https://${raw}`;
+function normalizeSiteOrigin(raw: string): string {
+  let r = raw.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(r)) {
+    r = `https://${r}`;
   }
-  const hostMatch = /^https?:\/\/([^/:?#]+)/i.exec(raw);
+  const hostMatch = /^https?:\/\/([^/:?#]+)/i.exec(r);
   const host = (hostMatch?.[1] ?? "").toLowerCase();
   const isLocal =
     host === "localhost" ||
@@ -15,14 +13,35 @@ export function siteOrigin(): string {
     host.endsWith(".local") ||
     host.includes("localhost");
   // Prefer HTTPS for any non-local host so metadataBase / canonicals never use accidental http:// in production.
-  if (!isLocal && raw.startsWith("http://")) {
-    raw = `https://${raw.slice("http://".length)}`;
+  if (!isLocal && r.startsWith("http://")) {
+    r = `https://${r.slice("http://".length)}`;
   }
-  return raw;
+  return r;
+}
+
+/** Production default; override with APP_URL / NEXT_PUBLIC_APP_URL in env (metadata / OG). */
+export function siteOrigin(): string {
+  return normalizeSiteOrigin(process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://micstage.com");
+}
+
+/**
+ * Canonical public base URL for server-issued redirects (e.g. admin logout).
+ * Prefer `APP_URL`, then `NEXT_PUBLIC_APP_URL`, then `https://micstage.com` — do not use `request.url` origin.
+ */
+export function siteOriginForServerRedirect(): string {
+  return normalizeSiteOrigin(process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://micstage.com");
 }
 
 export function absoluteUrl(path: string): string {
   const base = siteOrigin();
+  if (!path || path === "/") return `${base}/`;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+}
+
+/** Absolute URL using `siteOriginForServerRedirect` (not `request.url`). */
+export function absoluteServerRedirectUrl(path: string): string {
+  const base = siteOriginForServerRedirect();
   if (!path || path === "/") return `${base}/`;
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;

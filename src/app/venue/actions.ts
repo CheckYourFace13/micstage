@@ -17,7 +17,9 @@ import {
   isWithinBookingWindow,
   slotStartInstant,
 } from "@/lib/venueBookingRules";
-import { BookingRestrictionMode, VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
+import { BookingRestrictionMode, Weekday } from "@/generated/prisma/client";
+import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
+import { parseVenuePerformanceFormat } from "@/lib/venuePerformanceFormat";
 
 /** Missing/tampered fields → friendly portal message instead of generic error UI. */
 function reqString(formData: FormData, key: string): string {
@@ -86,18 +88,7 @@ function firstMatchingLink(links: string[], patterns: RegExp[]): string | null {
   return null;
 }
 
-const FORMATS: VenuePerformanceFormat[] = [
-  "OPEN_VARIETY",
-  "ACOUSTIC_ONLY",
-  "GUITAR_VOCAL_ONLY",
-  "FULL_BANDS_ALLOWED",
-  "COMEDY_SPOKEN_WORD",
-];
-
-function parsePerformanceFormat(v: string): VenuePerformanceFormat {
-  if (FORMATS.includes(v as VenuePerformanceFormat)) return v as VenuePerformanceFormat;
-  redirect("/venue?profileError=format");
-}
+const ALLOWED_BOOKING_MODES = new Set<string>(BOOKING_RESTRICTION_OPTIONS.map((o) => o.value));
 
 /** Start/end times on schedule forms; redirects instead of throwing into the error overlay. */
 function scheduleTimeMinutesFromForm(formData: FormData, field: string): number {
@@ -141,6 +132,7 @@ export async function createEventTemplate(formData: FormData) {
       restrictionHoursBefore: true,
       onPremiseMaxDistanceMeters: true,
       subscriptionTier: true,
+      performanceFormat: true,
     },
   });
   const timeZone = optString(formData, "timeZone") ?? venue?.timeZone ?? "America/Chicago";
@@ -163,12 +155,16 @@ export async function createEventTemplate(formData: FormData) {
   );
 
   const bookingRestrictionModeStr = optString(formData, "bookingRestrictionMode") ?? venue?.bookingRestrictionMode ?? "NONE";
-  const allowedModes: BookingRestrictionMode[] = ["NONE", "ATTENDEE_DAY_OF", "HOURS_BEFORE", "ON_PREMISE"];
-  if (!allowedModes.includes(bookingRestrictionModeStr as BookingRestrictionMode)) redirect("/venue?profileError=format");
+  if (!ALLOWED_BOOKING_MODES.has(bookingRestrictionModeStr)) redirect("/venue?profileError=format");
   const bookingRestrictionMode = bookingRestrictionModeStr as BookingRestrictionMode;
 
   const restrictionHoursBefore = optInt(formData, "restrictionHoursBefore") ?? venue?.restrictionHoursBefore ?? 6;
   const onPremiseMaxDistanceMeters = optInt(formData, "onPremiseMaxDistanceMeters") ?? venue?.onPremiseMaxDistanceMeters ?? 1000;
+
+  const performanceFormat = parseVenuePerformanceFormat(
+    optString(formData, "performanceFormat"),
+    venue?.performanceFormat ?? "OPEN_VARIETY",
+  );
 
   const prisma = requirePrisma();
   const existingSameDay = await prisma.eventTemplate.findFirst({
@@ -190,6 +186,7 @@ export async function createEventTemplate(formData: FormData) {
       breakMinutes,
       timeZone,
       isPublic: true,
+      performanceFormat,
       bookingRestrictionMode,
       restrictionHoursBefore,
       onPremiseMaxDistanceMeters,
@@ -249,6 +246,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
       restrictionHoursBefore: true,
       onPremiseMaxDistanceMeters: true,
       subscriptionTier: true,
+      performanceFormat: true,
     },
   });
   if (!venue) redirect("/venue?venueError=venueMissing");
@@ -274,13 +272,17 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
 
   const bookingRestrictionModeStr =
     optString(formData, "bookingRestrictionMode") ?? venue.bookingRestrictionMode ?? "NONE";
-  const allowedModes: BookingRestrictionMode[] = ["NONE", "ATTENDEE_DAY_OF", "HOURS_BEFORE", "ON_PREMISE"];
-  if (!allowedModes.includes(bookingRestrictionModeStr as BookingRestrictionMode)) redirect("/venue?profileError=format");
+  if (!ALLOWED_BOOKING_MODES.has(bookingRestrictionModeStr)) redirect("/venue?profileError=format");
   const bookingRestrictionMode = bookingRestrictionModeStr as BookingRestrictionMode;
 
   const restrictionHoursBefore = optInt(formData, "restrictionHoursBefore") ?? venue.restrictionHoursBefore ?? 6;
   const onPremiseMaxDistanceMeters =
     optInt(formData, "onPremiseMaxDistanceMeters") ?? venue.onPremiseMaxDistanceMeters ?? 1000;
+
+  const performanceFormat = parseVenuePerformanceFormat(
+    optString(formData, "performanceFormat"),
+    venue.performanceFormat,
+  );
 
   const templatePayload = {
     title,
@@ -290,6 +292,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
     breakMinutes,
     timeZone,
     isPublic: true,
+    performanceFormat,
     bookingRestrictionMode,
     restrictionHoursBefore,
     onPremiseMaxDistanceMeters,
@@ -400,7 +403,6 @@ export async function updateVenueProfile(formData: FormData) {
   const tiktokUrl = normalizeUrl(optString(formData, "tiktokUrl"));
   const youtubeUrl = normalizeUrl(optString(formData, "youtubeUrl"));
   const soundcloudUrl = normalizeUrl(optString(formData, "soundcloudUrl"));
-  const performanceFormat = parsePerformanceFormat(reqString(formData, "performanceFormat"));
 
   await requirePrisma().venue.update({
     where: { id: venueId },
@@ -416,7 +418,6 @@ export async function updateVenueProfile(formData: FormData) {
       tiktokUrl,
       youtubeUrl,
       soundcloudUrl,
-      performanceFormat,
       providesPA: checkboxOn(formData, "providesPA"),
       providesSpeakersMics: checkboxOn(formData, "providesSpeakersMics"),
       providesMonitors: checkboxOn(formData, "providesMonitors"),
@@ -662,5 +663,53 @@ export async function upgradeVenuePlan(formData: FormData) {
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
   redirect("/venue?planSuccess=1");
+}
+
+/**
+ * Per-slot booking rule override. `slotBookingRule=inherit` clears overrides (template defaults apply).
+ */
+export async function updateSlotBookingRules(formData: FormData) {
+  const session = await requireVenueSession();
+  const venueId = reqString(formData, "venueId");
+  const slotId = reqString(formData, "slotId");
+  const ruleRaw = optString(formData, "slotBookingRule") ?? "inherit";
+
+  const allowed = await venueIdsForSession(session);
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
+
+  const slot = await requirePrisma().slot.findUnique({
+    where: { id: slotId },
+    include: { instance: { include: { template: true } } },
+  });
+  if (!slot || slot.instance.template.venueId !== venueId) redirect("/venue?venueError=forbidden");
+
+  if (ruleRaw === "inherit") {
+    await requirePrisma().slot.update({
+      where: { id: slotId },
+      data: {
+        bookingRestrictionModeOverride: null,
+        restrictionHoursBeforeOverride: null,
+        onPremiseMaxDistanceMetersOverride: null,
+      },
+    });
+  } else {
+    if (!ALLOWED_BOOKING_MODES.has(ruleRaw)) redirect("/venue?venueError=invalidForm");
+    const tpl = slot.instance.template;
+    const hours = optInt(formData, "restrictionHoursBefore") ?? tpl.restrictionHoursBefore;
+    const meters = optInt(formData, "onPremiseMaxDistanceMeters") ?? tpl.onPremiseMaxDistanceMeters;
+    await requirePrisma().slot.update({
+      where: { id: slotId },
+      data: {
+        bookingRestrictionModeOverride: ruleRaw as BookingRestrictionMode,
+        restrictionHoursBeforeOverride: hours,
+        onPremiseMaxDistanceMetersOverride: meters,
+      },
+    });
+  }
+
+  revalidatePath("/venue");
+  const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+  if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+  redirect("/venue?slotRule=saved");
 }
 

@@ -4,14 +4,6 @@ import type { Venue } from "../../generated/prisma/client";
 
 type Props = { venue: Venue };
 
-const formatOptions: { value: Venue["performanceFormat"]; label: string }[] = [
-  { value: "OPEN_VARIETY", label: "Open variety (mixed acts)" },
-  { value: "ACOUSTIC_ONLY", label: "Acoustic only" },
-  { value: "GUITAR_VOCAL_ONLY", label: "Guitar & vocals only" },
-  { value: "FULL_BANDS_ALLOWED", label: "Full bands allowed" },
-  { value: "COMEDY_SPOKEN_WORD", label: "Comedy / spoken word" },
-];
-
 export function VenueProfileForm({ venue }: Props) {
   return (
     <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-6">
@@ -21,7 +13,11 @@ export function VenueProfileForm({ venue }: Props) {
       <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">About your venue & what you provide</h3>
       <p className="mt-2 text-sm text-white/60">
         This is what artists see on your public page—stronger profiles build trust before they book. Use direct image URLs
-        (one per line). You can save now and refine anytime.
+        (one per line). You can save now and refine anytime.{" "}
+        <span className="text-white/45">
+          Performance format (acoustic-only, full band, etc.) is set per schedule block in{" "}
+          <span className="text-white/60">Set weekly schedule</span> or when adding a recurring night.
+        </span>
       </p>
 
       <form action={updateVenueProfile} className="mt-6 grid gap-5">
@@ -139,24 +135,6 @@ export function VenueProfileForm({ venue }: Props) {
             Save your profile after editing. Use auto-find below to pull social links from your saved website URL.
           </p>
         </div>
-
-        <fieldset className="grid gap-3">
-          <legend className="text-sm font-semibold text-white">Performance format (pick one)</legend>
-          <div className="grid gap-2">
-            {formatOptions.map((o) => (
-              <label key={o.value} className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
-                <input
-                  type="radio"
-                  name="performanceFormat"
-                  value={o.value}
-                  defaultChecked={venue.performanceFormat === o.value}
-                  className="h-4 w-4 accent-[rgb(var(--om-neon))]"
-                />
-                {o.label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
 
         <fieldset className="grid gap-3">
           <legend className="text-sm font-semibold text-white">What you provide for artists</legend>

@@ -11,6 +11,7 @@ import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 import { equipmentProvidedList, performanceFormatLabel } from "@/lib/venueDisplay";
+import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
 import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 import { VenueBookingFlash } from "@/components/VenueBookingFlash";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
@@ -260,10 +261,10 @@ export default async function VenuePublicPage(props: {
         )}
 
         <div className="mt-6 grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-white/80">
-          <div>
-            <span className="text-white/60">Performance format: </span>
-            <span className="font-medium text-white">{performanceFormatLabel(venue.performanceFormat)}</span>
-          </div>
+          <p className="text-xs text-white/55">
+            Performance format is set per schedule block below (each open mic night can differ). Venue-wide details here
+            still apply to every visit.
+          </p>
           {gear.length > 0 ? (
             <div>
               <div className="text-white/60">Provided for artists</div>
@@ -369,6 +370,10 @@ export default async function VenuePublicPage(props: {
                       {t.slotMinutes}m slots
                       {t.breakMinutes ? ` + ${t.breakMinutes}m breaks` : ""}
                     </div>
+                    <div className="mt-1 text-sm text-white/65">
+                      <span className="text-white/50">Performance format:</span>{" "}
+                      <span className="font-medium text-white/90">{performanceFormatLabel(t.performanceFormat)}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -397,11 +402,12 @@ export default async function VenuePublicPage(props: {
                             const activeBooking = s.booking && !s.booking.cancelledAt ? s.booking : null;
                             const isReservedCandidate = reserve === s.id;
                             const slotStartUtc = slotStartInstant(inst.date, s.startMin, t.timeZone);
+                            const eff = effectiveSlotRestriction(s, t);
                             const slotBlockReason = slotRestrictionBlockReason(
                               {
-                                bookingRestrictionMode: t.bookingRestrictionMode,
-                                restrictionHoursBefore: t.restrictionHoursBefore,
-                                onPremiseMaxDistanceMeters: t.onPremiseMaxDistanceMeters,
+                                bookingRestrictionMode: eff.bookingRestrictionMode,
+                                restrictionHoursBefore: eff.restrictionHoursBefore,
+                                onPremiseMaxDistanceMeters: eff.onPremiseMaxDistanceMeters,
                                 lat: venue.lat,
                                 lng: venue.lng,
                               },
@@ -468,7 +474,7 @@ export default async function VenuePublicPage(props: {
                                     >
                                       <input type="hidden" name="venueSlug" value={venue.slug} />
                                       <input type="hidden" name="slotId" value={s.id} />
-                                      {t.bookingRestrictionMode === "ON_PREMISE" ? (
+                                      {eff.bookingRestrictionMode === "ON_PREMISE" ? (
                                         <>
                                           <input type="hidden" name="clientLat" value="" />
                                           <input type="hidden" name="clientLng" value="" />

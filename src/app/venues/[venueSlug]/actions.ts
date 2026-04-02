@@ -7,6 +7,7 @@ import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
+import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -59,11 +60,12 @@ export async function bookSlot(formData: FormData) {
 
   const previewTz = slotPreview.instance.template.timeZone;
   const slotStartUtc = slotStartInstant(slotPreview.instance.date, slotPreview.startMin, previewTz);
+  const effPreview = effectiveSlotRestriction(slotPreview, slotPreview.instance.template);
   const templateRestrictionBlock = slotRestrictionBlockReason(
     {
-      bookingRestrictionMode: slotPreview.instance.template.bookingRestrictionMode,
-      restrictionHoursBefore: slotPreview.instance.template.restrictionHoursBefore,
-      onPremiseMaxDistanceMeters: slotPreview.instance.template.onPremiseMaxDistanceMeters,
+      bookingRestrictionMode: effPreview.bookingRestrictionMode,
+      restrictionHoursBefore: effPreview.restrictionHoursBefore,
+      onPremiseMaxDistanceMeters: effPreview.onPremiseMaxDistanceMeters,
       lat: venue.lat,
       lng: venue.lng,
     },
@@ -95,11 +97,12 @@ export async function bookSlot(formData: FormData) {
     const txSlotStartUtc = slotStartInstant(slot.instance.date, slot.startMin, txTz);
     const txInstanceBlock = bookingBlockReason(txVenue, slot.instance.date);
     if (txInstanceBlock) redirect(`/venues/${venueSlug}?bookError=${encodeURIComponent(txInstanceBlock)}`);
+    const effTx = effectiveSlotRestriction(slot, slot.instance.template);
     const txRestrictionBlock = slotRestrictionBlockReason(
       {
-        bookingRestrictionMode: slot.instance.template.bookingRestrictionMode,
-        restrictionHoursBefore: slot.instance.template.restrictionHoursBefore,
-        onPremiseMaxDistanceMeters: slot.instance.template.onPremiseMaxDistanceMeters,
+        bookingRestrictionMode: effTx.bookingRestrictionMode,
+        restrictionHoursBefore: effTx.restrictionHoursBefore,
+        onPremiseMaxDistanceMeters: effTx.onPremiseMaxDistanceMeters,
         lat: txVenue.lat,
         lng: txVenue.lng,
       },

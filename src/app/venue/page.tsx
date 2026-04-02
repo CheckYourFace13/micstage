@@ -6,7 +6,17 @@ import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
-import { createEventTemplate, generateDateSchedule, houseBookSlot, inviteManager } from "./actions";
+import {
+  createEventTemplate,
+  generateDateSchedule,
+  houseBookSlot,
+  inviteManager,
+  updateSlotBookingRules,
+} from "./actions";
+import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
+import { slotHasBookingRuleOverride } from "@/lib/slotBookingEffective";
+import { performanceFormatLabel } from "@/lib/venueDisplay";
+import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
 import { minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
 import { VenueProfileForm } from "./VenueProfileForm";
 import { WeeklyScheduleForm } from "./WeeklyScheduleForm";
@@ -126,6 +136,7 @@ export default async function VenuePortalPage({
     socialsError?: string;
     inviteError?: string;
     houseBookError?: string;
+    slotRule?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -359,6 +370,12 @@ export default async function VenuePortalPage({
             Plan upgrades are currently disabled in production until payments are connected.
           </div>
         ) : null}
+        {q.slotRule === "saved" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            <span className="font-semibold text-emerald-100/95">Slot booking rule updated.</span> Public booking uses this
+            rule for that slot unless you reset it to the schedule default.
+          </div>
+        ) : null}
 
         {venues.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-8">
@@ -427,6 +444,7 @@ export default async function VenuePortalPage({
                         : plusDaysIso(horizonDaysFor(v.subscriptionTier))
                     }
                     defaultTitle={v.eventTemplates[0]?.title ?? "Open mic"}
+                    defaultPerformanceFormat={v.eventTemplates[0]?.performanceFormat ?? v.performanceFormat}
                     bookingRestrictionMode={v.bookingRestrictionMode}
                     restrictionHoursBefore={v.restrictionHoursBefore ?? 6}
                     onPremiseMaxDistanceMeters={v.onPremiseMaxDistanceMeters ?? 1000}
@@ -563,16 +581,26 @@ export default async function VenuePortalPage({
                         </label>
                       </div>
 
+                      <label className="grid gap-1 text-sm">
+                        <span className="text-white/80">Performance format (this night, public)</span>
+                        <select
+                          name="performanceFormat"
+                          defaultValue={v.performanceFormat}
+                          className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
+                        >
+                          {VENUE_PERFORMANCE_FORMAT_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
                       <fieldset className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4 sm:col-span-2">
                         <legend className="text-sm font-semibold text-white">Booking release rules (for this time block)</legend>
 
                         <div className="grid gap-2">
-                          {[
-                            { value: "NONE", label: "Book anytime within the booking window" },
-                            { value: "ATTENDEE_DAY_OF", label: "Reserved for attendees (unlock on the day)" },
-                            { value: "HOURS_BEFORE", label: "Unlock up to X hours before start" },
-                            { value: "ON_PREMISE", label: "On-premise only (location required) + X hours before start" },
-                          ].map((o) => (
+                          {BOOKING_RESTRICTION_OPTIONS.map((o) => (
                             <label key={o.value} className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
                               <input
                                 type="radio"
@@ -643,7 +671,13 @@ export default async function VenuePortalPage({
                       {v.eventTemplates.map((t) => (
                         <div key={t.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
                           <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <div className="font-semibold">{t.title}</div>
+                            <div>
+                              <div className="font-semibold">{t.title}</div>
+                              <div className="mt-0.5 text-xs text-white/55">
+                                Format:{" "}
+                                <span className="text-white/80">{performanceFormatLabel(t.performanceFormat)}</span>
+                              </div>
+                            </div>
                             <div className="text-xs text-white/60">
                               {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–{minutesToTimeLabel(t.endTimeMin)} ·{" "}
                               {t.slotMinutes}m + {t.breakMinutes}m
@@ -679,36 +713,107 @@ export default async function VenuePortalPage({
                                     <div className="mt-2 grid gap-2">
                                       {inst.slots.map((s) => {
                                         const activeBooking = s.booking && !s.booking.cancelledAt ? s.booking : null;
+                                        const overridden = slotHasBookingRuleOverride(s);
                                         return (
                                           <div
                                             key={s.id}
-                                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2"
+                                            className="rounded-lg border border-white/10 bg-black/20 px-3 py-3"
                                           >
-                                            <div className="text-sm">
-                                              <span className="font-semibold">
-                                                {minutesToTimeLabel(s.startMin)}–{minutesToTimeLabel(s.endMin)}
-                                              </span>
-                                              <span className="ml-2 text-white/70">
-                                                {activeBooking ? `Booked: ${activeBooking.performerName}` : "Open slot"}
-                                              </span>
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                              <div className="text-sm">
+                                                <span className="font-semibold">
+                                                  {minutesToTimeLabel(s.startMin)}–{minutesToTimeLabel(s.endMin)}
+                                                </span>
+                                                <span className="ml-2 text-white/70">
+                                                  {activeBooking ? `Booked: ${activeBooking.performerName}` : "Open slot"}
+                                                </span>
+                                              </div>
+                                              {activeBooking ? null : (
+                                                <form action={houseBookSlot} className="flex flex-wrap items-center gap-2">
+                                                  <input type="hidden" name="venueId" value={v.id} />
+                                                  <input type="hidden" name="slotId" value={s.id} />
+                                                  <input
+                                                    name="performerName"
+                                                    required
+                                                    placeholder="Artist / stage name"
+                                                    className="h-9 w-40 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white placeholder:text-white/40"
+                                                  />
+                                                  <FormSubmitButton
+                                                    label="House book"
+                                                    pendingLabel="Booking…"
+                                                    className="h-9 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+                                                  />
+                                                </form>
+                                              )}
                                             </div>
-                                            {activeBooking ? null : (
-                                              <form action={houseBookSlot} className="flex items-center gap-2">
+                                            <div className="mt-2 border-t border-white/10 pt-2">
+                                              <div className="text-[11px] text-white/45">
+                                                {overridden ? (
+                                                  <span>
+                                                    <span className="font-medium text-amber-200/90">Custom booking rule</span> on
+                                                    this slot (public booking follows this, not the template default).
+                                                  </span>
+                                                ) : (
+                                                  <span>
+                                                    Using <span className="text-white/65">schedule block default</span> for
+                                                    booking release.
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <form action={updateSlotBookingRules} className="mt-2 grid gap-2 sm:grid-cols-2">
                                                 <input type="hidden" name="venueId" value={v.id} />
                                                 <input type="hidden" name="slotId" value={s.id} />
-                                                <input
-                                                  name="performerName"
-                                                  required
-                                                  placeholder="Artist / stage name"
-                                                  className="h-9 w-40 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white placeholder:text-white/40"
-                                                />
+                                                <label className="grid gap-1 text-xs sm:col-span-2">
+                                                  <span className="text-white/55">Booking release for this slot</span>
+                                                  <select
+                                                    name="slotBookingRule"
+                                                    defaultValue={
+                                                      s.bookingRestrictionModeOverride ?? "inherit"
+                                                    }
+                                                    className="h-9 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white"
+                                                  >
+                                                    <option value="inherit">Same as schedule block (default)</option>
+                                                    {BOOKING_RESTRICTION_OPTIONS.map((o) => (
+                                                      <option key={o.value} value={o.value}>
+                                                        {o.label}
+                                                      </option>
+                                                    ))}
+                                                  </select>
+                                                </label>
+                                                <label className="grid gap-1 text-xs">
+                                                  <span className="text-white/55">Hours before start (X)</span>
+                                                  <input
+                                                    name="restrictionHoursBefore"
+                                                    type="number"
+                                                    min={0}
+                                                    max={48}
+                                                    defaultValue={
+                                                      s.restrictionHoursBeforeOverride ?? t.restrictionHoursBefore
+                                                    }
+                                                    className="h-9 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white"
+                                                  />
+                                                </label>
+                                                <label className="grid gap-1 text-xs">
+                                                  <span className="text-white/55">On-premise radius (m)</span>
+                                                  <input
+                                                    name="onPremiseMaxDistanceMeters"
+                                                    type="number"
+                                                    min={50}
+                                                    max={10000}
+                                                    defaultValue={
+                                                      s.onPremiseMaxDistanceMetersOverride ??
+                                                      t.onPremiseMaxDistanceMeters
+                                                    }
+                                                    className="h-9 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white"
+                                                  />
+                                                </label>
                                                 <FormSubmitButton
-                                                  label="House book"
-                                                  pendingLabel="Booking…"
-                                                  className="h-9 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+                                                  label="Apply slot rule"
+                                                  pendingLabel="Saving…"
+                                                  className="h-9 rounded-md border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/15 disabled:opacity-60 sm:col-span-2"
                                                 />
                                               </form>
-                                            )}
+                                            </div>
                                           </div>
                                         );
                                       })}

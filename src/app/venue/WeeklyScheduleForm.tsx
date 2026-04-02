@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Weekday } from "@/generated/prisma/client";
+import type { VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
+import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
+import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
 import { ALL_WEEKDAYS, computeWeeklySchedulePreview } from "@/lib/weeklySchedule";
 import { weekdayToLabel } from "@/lib/time";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
@@ -27,6 +29,7 @@ type Props = {
   bookingRestrictionMode: string;
   restrictionHoursBefore: number;
   onPremiseMaxDistanceMeters: number;
+  defaultPerformanceFormat: VenuePerformanceFormat;
 };
 
 export function WeeklyScheduleForm({
@@ -40,6 +43,7 @@ export function WeeklyScheduleForm({
   bookingRestrictionMode,
   restrictionHoursBefore,
   onPremiseMaxDistanceMeters,
+  defaultPerformanceFormat,
 }: Props) {
   const plusDaysIso = (days: number) => {
     const d = new Date(`${todayIso}T12:00:00.000Z`);
@@ -192,6 +196,25 @@ export function WeeklyScheduleForm({
         </label>
       </div>
 
+      <fieldset className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4">
+        <legend className="text-sm font-semibold text-white">Performance format (this schedule)</legend>
+        <p className="text-xs text-white/55">Applies to every night you select below. You can use different formats for other weekdays by saving another combination.</p>
+        <label className="grid gap-1 text-sm">
+          <span className="text-white/80">What kinds of acts for this block?</span>
+          <select
+            name="performanceFormat"
+            defaultValue={defaultPerformanceFormat}
+            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
+          >
+            {VENUE_PERFORMANCE_FORMAT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </fieldset>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
           <span className="text-white/80">Performance slot (minutes)</span>
@@ -222,12 +245,7 @@ export function WeeklyScheduleForm({
       <fieldset className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
         <legend className="text-sm font-semibold text-white">Booking release rules</legend>
         <div className="grid gap-2">
-          {[
-            { value: "NONE", label: "Book anytime within the booking window" },
-            { value: "ATTENDEE_DAY_OF", label: "Reserved for attendees (unlock on the day)" },
-            { value: "HOURS_BEFORE", label: "Unlock up to X hours before start" },
-            { value: "ON_PREMISE", label: "On-premise only + X hours before start" },
-          ].map((o) => (
+          {BOOKING_RESTRICTION_OPTIONS.map((o) => (
             <label key={o.value} className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
               <input
                 type="radio"

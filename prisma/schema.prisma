@@ -123,6 +123,7 @@ model Venue {
   // For ON_PREMISE: max allowed distance from venue (meters) for booking.
   onPremiseMaxDistanceMeters Int @default(1000)
 
+  /// Legacy default when creating templates; each `EventTemplate` stores its own format for public display.
   performanceFormat VenuePerformanceFormat @default(OPEN_VARIETY)
 
   // What the venue provides for musicians (filterable later)
@@ -280,6 +281,9 @@ model EventTemplate {
 
   isPublic Boolean @default(true)
 
+  /// Acts / setups allowed for this schedule block (public + search).
+  performanceFormat VenuePerformanceFormat @default(OPEN_VARIETY)
+
   // Booking release rules for this specific time block.
   bookingRestrictionMode BookingRestrictionMode @default(NONE)
   restrictionHoursBefore Int @default(6)
@@ -323,6 +327,11 @@ model Slot {
   endMin   Int
 
   status SlotStatus @default(AVAILABLE)
+
+  /// When set, public booking + restrictions use these instead of the template defaults.
+  bookingRestrictionModeOverride BookingRestrictionMode?
+  restrictionHoursBeforeOverride Int?
+  onPremiseMaxDistanceMetersOverride Int?
 
   booking Booking?
 

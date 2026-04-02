@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { assertAdminSession } from "@/lib/adminAuth";
 import { requirePrisma } from "@/lib/prisma";
 import { adminUpdateEventTemplate } from "@/app/internal/admin/actions";
+import { performanceFormatLabel } from "@/lib/venueDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,8 @@ export default async function AdminTemplateDetailPage(props: {
       ) : null}
 
       <section className="mt-6 rounded border border-zinc-700 bg-zinc-900 p-4 text-xs text-zinc-400">
-        <p>Instances generated: {t._count.instances}</p>
+        <p>Performance format: {performanceFormatLabel(t.performanceFormat)}</p>
+        <p className="mt-2">Instances generated: {t._count.instances}</p>
         <p className="mt-2">
           Times and slot grid are not editable here (booking safety). Adjust title, description, and public visibility only.
         </p>

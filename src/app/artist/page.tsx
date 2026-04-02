@@ -264,7 +264,21 @@ export default async function ArtistPortalPage({
               You log in with <span className="text-white/75">email</span> (private). Fans and venues find you by{" "}
               <span className="text-white/75">stage name</span> only.
             </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            <div className="mt-4 max-w-2xl rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/70">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Suggested next steps</div>
+              <ol className="mt-2 list-decimal space-y-1.5 pl-5 marker:text-white/40">
+                <li>
+                  Complete your profile below—especially <span className="text-white/85">stage name</span> and where you
+                  play.
+                </li>
+                <li>Track venues you like, or browse open mics by location.</li>
+                <li>
+                  Book a slot from any venue&apos;s public page while signed in—your upcoming gigs appear in{" "}
+                  <span className="text-white/85">Your upcoming bookings</span> below.
+                </li>
+              </ol>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 text-sm">
               <Link
                 className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
                 href="/performers"
@@ -292,7 +306,8 @@ export default async function ArtistPortalPage({
 
         {q.profile === "saved" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Profile saved.
+            <span className="font-semibold text-emerald-100/95">Profile saved.</span> Public search and venue discovery use
+            your stage-facing details—give it a moment to update everywhere.
           </div>
         ) : null}
         {q.profileError === "invalidForm" ? (
@@ -350,17 +365,23 @@ export default async function ArtistPortalPage({
         <ArtistProfileForm musician={musician} venuesForInterest={venuesForInterest} />
 
         <section className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="text-sm font-semibold">Your upcoming bookings</div>
+          <div className="text-sm font-semibold text-white">Your upcoming bookings</div>
+          <p className="mt-1 text-xs text-white/50">
+            Confirmed reservations from venue pages show here—same live schedule the venue publishes.
+          </p>
           {(() => {
             const bookingRows = (musician.bookings ?? []).filter(isRenderableBooking);
             if (bookingRows.length === 0) {
               return (
-                <div className="mt-3 text-sm text-white/60">
-                  No bookings yet. Use your tracked venues or browse{" "}
-                  <Link className="underline" href="/locations">
-                    locations
-                  </Link>{" "}
-                  to find an open mic and book a slot.
+                <div className="mt-4 rounded-lg border border-dashed border-white/15 bg-black/20 px-4 py-5 text-sm text-white/65">
+                  <p className="font-medium text-white/80">No upcoming gigs yet</p>
+                  <p className="mt-2">
+                    Open a venue&apos;s public page, pick an open time, and reserve while signed in. Start from{" "}
+                    <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/locations">
+                      locations
+                    </Link>{" "}
+                    or venues you&apos;re tracking above.
+                  </p>
                 </div>
               );
             }

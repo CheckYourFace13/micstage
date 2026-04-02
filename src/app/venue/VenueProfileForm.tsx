@@ -20,14 +20,15 @@ export function VenueProfileForm({ venue }: Props) {
       </div>
       <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">About your venue & what you provide</h3>
       <p className="mt-2 text-sm text-white/60">
-        Artists will use this to filter and search venues later. Image URLs should be direct links (one per line).
+        This is what artists see on your public page—stronger profiles build trust before they book. Use direct image URLs
+        (one per line). You can save now and refine anytime.
       </p>
 
       <form action={updateVenueProfile} className="mt-6 grid gap-5">
         <input type="hidden" name="venueId" value={venue.id} />
 
         <label className="grid gap-1 text-sm">
-          <span className="text-white/80">About the venue</span>
+          <span className="text-white/80">About the venue (public)</span>
           <textarea
             name="about"
             rows={4}

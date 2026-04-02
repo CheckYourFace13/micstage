@@ -52,8 +52,8 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
       </div>
       <h2 className="om-heading mt-2 text-2xl tracking-wide text-white">Profile & discovery</h2>
       <p className="mt-2 text-sm text-white/60">
-        Control what appears on MicStage. Venues use this for discovery; your login email is never shown on public
-        pages.
+        Control what appears on MicStage. Venues use this to find and evaluate you; your login email stays private. You
+        can save a partial profile and come back—everything below is yours to refine over time.
       </p>
 
       <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4 text-sm">

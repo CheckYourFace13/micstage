@@ -215,18 +215,21 @@ export default async function VenuePublicPage(props: {
         ) : null}
 
         <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <h2 className="text-xl font-semibold">Open mic summary</h2>
+          <h2 className="text-xl font-semibold text-white">Availability at a glance</h2>
           <p className="mt-2 text-sm text-white/75">
-            {venue.name} runs {templateCount} public open mic {templateCount === 1 ? "schedule" : "schedules"}
+            {venue.name} lists {templateCount} public open mic {templateCount === 1 ? "schedule" : "schedules"}
             {venue.city ? ` in ${venue.city}${venue.region ? `, ${venue.region}` : ""}` : ""}.{" "}
             {nextUpcomingDate
-              ? `Next public date: ${nextUpcomingDate.toISOString().slice(0, 10)}.`
-              : "New dates will appear as the venue publishes schedules."}{" "}
-            Currently showing {openSlotCount} open slots and {bookedSlotCount} booked spots across upcoming schedule instances.
+              ? `Next listed date: ${nextUpcomingDate.toISOString().slice(0, 10)}.`
+              : "New dates appear here as the venue publishes them."}{" "}
+            Right now: <span className="text-white/90">{openSlotCount} open</span> and{" "}
+            <span className="text-white/90">{bookedSlotCount} booked</span> slots across upcoming nights (counts update live
+            with the venue&apos;s calendar).
           </p>
-          <div className="mt-3 text-sm text-white/70">
-            Performer sign-up: use the booking controls in each schedule block below. Audience members can browse dates
-            and performers to plan visits.
+          <div className="mt-3 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/70">
+            <span className="font-medium text-white/85">Performers:</span> book open times in the schedule sections
+            below—MicStage confirms instantly when you&apos;re signed in.{" "}
+            <span className="text-white/55">Fans can browse who&apos;s on without an account.</span>
           </div>
         </section>
 
@@ -338,11 +341,24 @@ export default async function VenuePublicPage(props: {
         ) : null}
 
         {venue.eventTemplates.length === 0 ? (
-          <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
-            No public schedules yet.
+          <div className="mt-8 rounded-2xl border border-dashed border-white/20 bg-white/[0.03] p-6 text-sm text-white/70">
+            <p className="font-semibold text-white/85">No public bookable schedule yet</p>
+            <p className="mt-2 text-white/65">
+              This venue hasn&apos;t published open mic dates on MicStage. Check their website or social links above, or
+              visit again soon.
+            </p>
           </div>
         ) : (
-          <div className="mt-8 grid gap-6">
+          <>
+            <section className="mt-8 rounded-2xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.06)] p-5">
+              <h2 className="text-xl font-semibold text-white">Book a performance slot</h2>
+              <p className="mt-2 text-sm text-white/70">
+                Times below are set by the venue. <span className="text-white/85">Open</span> rows can be reserved when you
+                sign in as an artist—booking is free and tied to the live schedule you see here (no separate off-platform
+                list).
+              </p>
+            </section>
+            <div className="mt-6 grid gap-6">
             {venue.eventTemplates.map((t) => (
               <section key={t.id} className="rounded-2xl border border-white/10 bg-white/5 p-6">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -510,7 +526,8 @@ export default async function VenuePublicPage(props: {
                 )}
               </section>
             ))}
-          </div>
+            </div>
+          </>
         )}
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -519,8 +536,9 @@ export default async function VenuePublicPage(props: {
             <div>
               <h3 className="font-semibold text-white">How do artists reserve a slot here?</h3>
               <p className="mt-1">
-                Open slots in the schedule list show a reservation action. Artists can sign in and complete booking directly
-                from this public page.
+                Find an <span className="text-white/90">Open slot</span> in the schedules above, sign in (or create a free
+                artist account), and complete the reservation—your spot is confirmed against the same calendar everyone sees
+                on this page.
               </p>
             </div>
             <div>

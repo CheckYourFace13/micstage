@@ -175,8 +175,8 @@ export default async function VenuePortalPage({
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Venue portal</div>
             <h1 className="om-heading mt-2 text-4xl tracking-wide">Venue dashboard</h1>
             <p className="mt-2 text-sm text-white/70">
-              Set when you’re open, then generate bookable slots. Signed in as{" "}
-              <span className="font-mono">{session.email}</span>
+              <span className="text-white/85">Start here:</span> save your weekly schedule (below), then generate dates—your
+              public venue page updates as you go. Signed in as <span className="font-mono">{session.email}</span>
             </p>
             <div className="mt-3 flex flex-wrap gap-2 text-sm">
               <Link
@@ -206,7 +206,9 @@ export default async function VenuePortalPage({
 
         {q.profile === "saved" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Venue profile saved. Public pages update after a short refresh.
+            <span className="font-semibold text-emerald-100/95">Profile saved.</span> Your public venue page shows this
+            info—refresh the page if you don&apos;t see changes yet. Next: set or update your weekly schedule so artists can
+            book.
           </div>
         ) : null}
         {q.profileError === "duplicateWeekday" || q.scheduleError === "duplicateWeekday" ? (
@@ -249,17 +251,21 @@ export default async function VenuePortalPage({
         ) : null}
         {q.scheduleSuccess === "weekly" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Schedule saved and future slots updated. Booked slots were not changed.
+            <span className="font-semibold text-emerald-100/95">Schedule saved.</span> Future open slots are updated;
+            existing bookings were left as-is. Artists can now see live times on your public page.
           </div>
         ) : null}
         {q.scheduleSuccess === "template" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Recurring open mic template created. Generate dates or use your weekly schedule to fill bookable slots.
+            <span className="font-semibold text-emerald-100/95">Recurring night added.</span> Generate dates for this
+            template, or use <span className="font-medium text-white">Set weekly schedule</span> to manage everything in one
+            place.
           </div>
         ) : null}
         {q.scheduleSuccess === "date" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Slots for that date are up to date.
+            <span className="font-semibold text-emerald-100/95">Slots refreshed</span> for that date—bookings already held
+            were not changed.
           </div>
         ) : null}
         {q.houseBook === "1" ? (
@@ -403,8 +409,9 @@ export default async function VenuePortalPage({
                       </div>
                       <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">Set weekly schedule</h3>
                       <p className="mt-2 max-w-2xl text-sm text-white/70">
-                        Pick which nights you run, your hours, and slot length. We create recurring templates and fill your booking
-                        window automatically. Re-run anytime to refresh open slots — existing bookings stay safe.
+                        <span className="font-medium text-white/85">Recommended first step:</span> choose your nights, hours,
+                        slot length, and booking window. MicStage creates templates and fills open slots automatically—you can
+                        re-run this anytime; confirmed bookings stay put.
                       </p>
                     </div>
                   </div>
@@ -445,7 +452,7 @@ export default async function VenuePortalPage({
                   <form action={createEventTemplate} className="mt-6 grid gap-3">
                       <input type="hidden" name="venueId" value={v.id} />
                       <label className="grid gap-1 text-sm">
-                        <span className="text-white/80">Open mic night name</span>
+                        <span className="text-white/80">Open mic night name (public)</span>
                         <input
                           name="title"
                           required

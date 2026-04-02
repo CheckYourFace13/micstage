@@ -29,13 +29,23 @@ export default function Home() {
       <main className="relative mx-auto w-full max-w-6xl px-6 py-12 sm:py-16">
         <header className="grid gap-10 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
-              <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--om-neon))]" />
-              Built for local scenes
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
+                <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--om-neon))]" />
+                Built for local scenes
+              </div>
+              <div className="inline-flex items-center rounded-full border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-3 py-1 text-xs font-medium text-white/85">
+                Free to use · Simple to launch
+              </div>
             </div>
             <h1 className="om-heading mt-4 text-5xl leading-[0.9] tracking-wide sm:text-6xl">
               Put your open mic on the map.
             </h1>
+            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-white/80">
+              MicStage is <span className="text-white">free to use</span> with the full toolkit—structured schedules,
+              bookable slots, artist search, and SEO-ready public pages. Most venues get a first publish going in a few
+              guided steps, not weeks of setup.
+            </p>
             <p className="mt-4 max-w-2xl text-base leading-7 text-white/75">
               We help you <span className="text-white/90">market venues and artists</span>: structured open mic schedules,
               bookable slots, and public pages tuned for discovery. Built-in SEO gives you clean titles, shareable URLs, and
@@ -84,7 +94,7 @@ export default function Home() {
                     <div>
                       <div className="font-semibold">For Venues: Create Your Open Mic</div>
                       <div className="mt-1 text-sm text-white/70">
-                        Define slots once. We generate marketing-ready public pages (SEO-friendly) for your room.
+                        Set your weekly pattern once—MicStage builds the full public schedule and bookable slots for your room.
                       </div>
                     </div>
                     <div className="text-white/60 group-hover:text-white">→</div>

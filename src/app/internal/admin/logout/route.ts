@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { applyAdminLogoutCookiesToResponse } from "@/lib/adminAuth";
-import { logAdminLogoutDebug } from "@/lib/adminEdge";
+import { ADMIN_LOGOUT_COOKIE_TARGETS, logAdminLogoutDebug } from "@/lib/adminEdge";
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 
 /**
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   }
 
   logAdminLogoutDebug("route:redirect", {
-    setCookieNames: res.cookies.getAll().map((c) => c.name),
+    clearedSetCookies: ADMIN_LOGOUT_COOKIE_TARGETS.map((t) => `${t.name} Path=${t.path}`),
   });
 
   return res;

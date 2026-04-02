@@ -42,12 +42,17 @@ export function logAdminLogoutDebug(phase: string, detail?: Record<string, unkno
  */
 export const ADMIN_SESSION_COOKIE_PATH = "/";
 
-/** Names/paths to expire on admin logout (current + legacy); keep in sync with session clearing on venue/artist login. */
+/**
+ * Each (name, path) must become its own `Set-Cookie` line. `NextResponse.cookies.set()` uses a Map keyed by **name only**,
+ * so looping `.set()` drops earlier paths — always expire both `/` and `/internal/admin` for every admin cookie name.
+ * Keep in sync with `clearAdminSessionCookiesInJar` in session.ts.
+ */
 export const ADMIN_LOGOUT_COOKIE_TARGETS: readonly { name: string; path: string }[] = [
+  // Order: longer path before `/` so `cookies().set()` (Map keyed by name) leaves a `Path=/` expire as the final op per name.
+  { name: ADMIN_COOKIE_NAME, path: ADMIN_PATH_PREFIX },
   { name: ADMIN_COOKIE_NAME, path: ADMIN_SESSION_COOKIE_PATH },
+  { name: ADMIN_EMAIL_COOKIE_NAME, path: ADMIN_PATH_PREFIX },
   { name: ADMIN_EMAIL_COOKIE_NAME, path: ADMIN_SESSION_COOKIE_PATH },
-  { name: "micstage_admin", path: "/" },
   { name: "micstage_admin", path: ADMIN_PATH_PREFIX },
-  { name: "micstage_admin_sess", path: ADMIN_PATH_PREFIX },
-  { name: "micstage_admin_email", path: ADMIN_PATH_PREFIX },
+  { name: "micstage_admin", path: ADMIN_SESSION_COOKIE_PATH },
 ] as const;

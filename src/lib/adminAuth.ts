@@ -32,12 +32,18 @@ function clearLegacyAdminCookies(jar: Awaited<ReturnType<typeof cookies>>) {
   }
 }
 
+/** Serialize one expired cookie; must not use `res.cookies.set` in a loop for same name + different paths (see adminEdge). */
+function adminLogoutSetCookieHeader(name: string, path: string, secure: boolean): string {
+  const parts = [`${name}=`, `Path=${path}`, "Max-Age=0", "HttpOnly", "SameSite=Lax"];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
 /** Expire all admin session cookies on a `NextResponse` (use from Route Handlers only; see `ADMIN_LOGOUT_PATH`). */
 export function applyAdminLogoutCookiesToResponse(res: NextResponse): void {
   const secure = process.env.NODE_ENV === "production";
-  const base = { httpOnly: true as const, secure, sameSite: "lax" as const, maxAge: 0 };
   for (const t of ADMIN_LOGOUT_COOKIE_TARGETS) {
-    res.cookies.set(t.name, "", { ...base, path: t.path });
+    res.headers.append("Set-Cookie", adminLogoutSetCookieHeader(t.name, t.path, secure));
   }
 }
 

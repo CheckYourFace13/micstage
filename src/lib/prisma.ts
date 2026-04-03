@@ -1,5 +1,6 @@
 import { PrismaClient } from "../generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { logDbDebug } from "./dbDebugLog";
 import { resolveDatabaseUrl } from "./databaseUrl";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
@@ -14,7 +15,7 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 export function getPrismaOrNull(): PrismaClient | null {
   const dbUrl = resolveDatabaseUrl();
   if (!dbUrl) {
-    console.log("NO DATABASE URL FOUND");
+    logDbDebug("NO DATABASE URL FOUND");
     return null;
   }
   if (!globalForPrisma.prisma) {

@@ -3,6 +3,7 @@
 import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useCallback, useEffect } from "react";
+import { isLikelyStaleServerActionError } from "@/lib/staleActionError";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 
 function pathnamePrefix(): string {
@@ -50,17 +51,35 @@ export default function GlobalError({
 
   const portalRetry = tryAgainHref();
   const signInHref = signInAgainHref();
+  const staleAction = isLikelyStaleServerActionError(error.message);
 
   return (
     <html lang="en">
       <body className="min-h-dvh bg-black font-sans text-white antialiased">
         <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6 text-center">
           <p className="text-xs font-medium uppercase tracking-widest text-white/50">MicStage</p>
-          <h1 className="mt-3 text-2xl font-semibold text-white">Something went wrong</h1>
+          <h1 className="mt-3 text-2xl font-semibold text-white">
+            {staleAction ? "Page out of sync after deploy" : "Something went wrong"}
+          </h1>
           <p className="mt-2 text-sm text-white/65">
-            This error was reported automatically. Use the actions below to get back on track.
+            {staleAction ? (
+              <>
+                Your tab may be using an older MicStage build than the server.{" "}
+                <span className="text-white/80">Refresh this page</span> (or use a hard reload) so forms and server actions
+                line up again.
+              </>
+            ) : (
+              <>This error was reported automatically. Use the actions below to get back on track.</>
+            )}
           </p>
           <div className="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="h-11 rounded-md bg-pink-500 px-5 text-sm font-semibold text-black hover:brightness-110"
+            >
+              Refresh page
+            </button>
             <button
               type="button"
               onClick={onTryAgain}
@@ -81,7 +100,11 @@ export default function GlobalError({
               Home
             </Link>
           </div>
-          {!portalRetry ? (
+          {staleAction ? (
+            <p className="mt-4 text-xs text-white/45">
+              Hard reload: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac). Then retry your last action.
+            </p>
+          ) : !portalRetry ? (
             <p className="mt-4 text-xs text-white/45">
               “Try again” retries this page. If the problem continues, go home or sign in again.
             </p>

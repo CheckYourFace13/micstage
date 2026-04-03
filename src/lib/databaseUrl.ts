@@ -1,3 +1,5 @@
+import { logDbDebug } from "./dbDebugLog";
+
 /**
  * Postgres connection string for Prisma (runtime + CLI).
  * Hosts may expose POSTGRES_URL / POSTGRES_PRISMA_URL while docs say DATABASE_URL.
@@ -16,6 +18,6 @@ export function resolveDatabaseUrl(): string | null {
       break;
     }
   }
-  console.log("DB URL FOUND:", !!url);
+  logDbDebug("DB URL FOUND:", !!url);
   return url;
 }

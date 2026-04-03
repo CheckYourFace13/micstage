@@ -10,7 +10,12 @@ import { generateDateSchedule, inviteManager } from "./actions";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { absoluteUrl } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
-import { pickPrimaryLineup, storageYmdUtc, upcomingLineupDateYmds } from "@/lib/venuePublicLineup";
+import {
+  isValidLineupYmd,
+  pickPrimaryLineup,
+  storageYmdUtc,
+  upcomingLineupDateYmds,
+} from "@/lib/venuePublicLineup";
 import type { LineupTemplate } from "@/lib/venuePublicLineupData";
 import { loadLineupTemplatesByVenueIds, venueIsOperational } from "@/lib/venueDashboardOperational";
 import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
@@ -117,6 +122,20 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
+/** Preserve flash/query params when switching `lineupDay` from the dashboard. */
+function venueDashboardChipHref(
+  preserved: Record<string, string | undefined>,
+  ymd: string,
+): string {
+  const p = new URLSearchParams();
+  for (const [key, val] of Object.entries(preserved)) {
+    if (val == null || val === "" || key === "lineupDay") continue;
+    p.set(key, val);
+  }
+  p.set("lineupDay", ymd);
+  return `/venue?${p.toString()}`;
+}
+
 export default async function VenuePortalPage({
   searchParams,
 }: {
@@ -137,9 +156,13 @@ export default async function VenuePortalPage({
     slotLine?: string;
     slotDeleteError?: string;
     slotDeleted?: string;
+    lineupDay?: string;
   }>;
 }) {
   const q = await searchParams;
+  const preservedQuery: Record<string, string | undefined> = Object.fromEntries(
+    Object.entries(q).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  );
   const session = await requireVenueSession();
   const { venues, loadError } = await loadVenuePortalRows(session);
 
@@ -448,12 +471,31 @@ export default async function VenuePortalPage({
               const heroYmd = primary
                 ? storageYmdUtc(primary.instance.date)
                 : upcomingYmds[0] ?? null;
-              const lineupPath = heroYmd ? `/venues/${v.slug}/lineup/${heroYmd}` : null;
+              const managedYmds = new Set(
+                v.eventTemplates.flatMap((t) => t.instances.map((i) => storageYmdUtc(i.date))),
+              );
+              const rawLineupDay = typeof q.lineupDay === "string" ? q.lineupDay.trim() : "";
+              const selectedYmd =
+                rawLineupDay &&
+                isValidLineupYmd(rawLineupDay) &&
+                (upcomingYmds.includes(rawLineupDay) || managedYmds.has(rawLineupDay))
+                  ? rawLineupDay
+                  : heroYmd;
+              const lineupPath = selectedYmd ? `/venues/${v.slug}/lineup/${selectedYmd}` : null;
               const hDays = horizonDaysFor(v.subscriptionTier);
               const lineupBadge =
-                operational && primary && heroYmd && storageYmdUtc(primary.instance.date) === heroYmd
+                operational && primary && selectedYmd && storageYmdUtc(primary.instance.date) === selectedYmd
                   ? primary.badge
                   : null;
+              const templatesForSelectedDay =
+                selectedYmd == null
+                  ? []
+                  : v.eventTemplates
+                      .map((t) => ({
+                        template: t,
+                        instances: t.instances.filter((i) => storageYmdUtc(i.date) === selectedYmd),
+                      }))
+                      .filter((row) => row.instances.length > 0);
 
               return (
               <section key={v.id} className="rounded-2xl border border-white/10 bg-white/5 p-6">
@@ -502,45 +544,64 @@ export default async function VenuePortalPage({
                       ) : null}
                     </div>
 
-                    {lineupPath ? (
+                    {upcomingYmds.length > 0 ? (
+                      <div className="mt-6">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-white/50">Upcoming nights</div>
+                        <div
+                          className="mt-2 flex flex-wrap gap-2"
+                          role="tablist"
+                          aria-label="Select which night to manage"
+                        >
+                          {upcomingYmds.map((ymd) => {
+                            const isSelected = ymd === selectedYmd;
+                            return (
+                              <Link
+                                key={ymd}
+                                href={venueDashboardChipHref(preservedQuery, ymd)}
+                                scroll={false}
+                                role="tab"
+                                aria-selected={isSelected}
+                                className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                                  isSelected
+                                    ? "border-[rgb(var(--om-neon))] bg-[rgb(var(--om-neon))]/22 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(var(--om-neon),0.4)]"
+                                    : "border-white/15 bg-black/30 font-medium text-white/80 hover:border-white/25 hover:bg-black/40"
+                                }`}
+                              >
+                                {lineupNavLabelFromYmd(ymd)}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {selectedYmd && lineupPath ? (
                       <>
-                        <div className="mt-6">
+                        <div className="mt-6 border-l-2 border-[rgb(var(--om-neon))]/60 pl-4">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--om-neon))]/90">
+                            Selected night
+                          </div>
+                          <div className="mt-1 text-lg font-semibold tracking-tight text-white">
+                            {lineupNavLabelFromYmd(selectedYmd)}
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
                           <VenueDashboardShareBar
                             lineupUrl={absoluteUrl(lineupPath)}
                             embedUrl={absoluteUrl(`${lineupPath}?embed=1`)}
                             publicVenueUrl={absoluteUrl(`/venues/${v.slug}`)}
-                            jsonUrl={absoluteUrl(`/api/public/venues/${v.slug}/lineup?date=${heroYmd}`)}
+                            jsonUrl={absoluteUrl(`/api/public/venues/${v.slug}/lineup?date=${selectedYmd}`)}
                           />
                         </div>
-                        {upcomingYmds.length > 0 ? (
-                          <div className="mt-6">
-                            <div className="text-xs font-semibold uppercase tracking-wider text-white/50">Upcoming dates</div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {upcomingYmds.map((ymd) => (
-                                <Link
-                                  key={ymd}
-                                  href={`/venues/${v.slug}/lineup/${ymd}`}
-                                  className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                                    ymd === heroYmd
-                                      ? "border-[rgb(var(--om-neon))] bg-[rgb(var(--om-neon))]/15 text-white"
-                                      : "border-white/15 bg-black/30 text-white/80 hover:border-white/25"
-                                  }`}
-                                >
-                                  {lineupNavLabelFromYmd(ymd)}
-                                </Link>
-                              ))}
-                            </div>
-                            <p className="mt-3 text-xs text-white/45">
-                              Open <span className="text-white/65">Open public lineup</span> to preview the guest view, or jump
-                              a date from the list.
-                            </p>
-                          </div>
-                        ) : null}
+                        <p className="mt-3 text-xs text-white/45">
+                          Links and API target this night only. Switch nights with the chips above.
+                        </p>
                       </>
                     ) : (
                       <p className="mt-6 text-sm text-white/65">
-                        No upcoming nights in the booking window yet. Save your schedule blocks and generate dates — share links
-                        will show up here.
+                        No upcoming nights in the booking window yet. Save your schedule blocks and generate dates — night chips
+                        and share links will show up here.
                       </p>
                     )}
 
@@ -550,40 +611,47 @@ export default async function VenuePortalPage({
                         One row per slot: start time, who appears on the public lineup (when not booked by a MicStage artist),
                         booking type, Save. Delete removes an empty or house-held slot — not slots with an active artist booking.
                       </p>
-                      {v.eventTemplates.some((t) => t.instances.length > 0) ? (
+                      {!selectedYmd ? (
+                        <p className="mt-4 text-sm text-white/55">
+                          No night selected — generate dates first, then pick a night from the chips above.
+                        </p>
+                      ) : templatesForSelectedDay.length > 0 ? (
                         <div className="mt-4 grid gap-6">
-                          {v.eventTemplates.map((t) =>
-                            t.instances.length ? (
-                              <div key={t.id} className="rounded-xl border border-white/10 bg-black/30 p-3 sm:p-4">
-                                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
-                                  <div className="font-semibold text-white">{t.title}</div>
-                                  <div className="text-xs text-white/55">
-                                    {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–
-                                    {minutesToTimeLabel(t.endTimeMin)}
-                                  </div>
-                                </div>
-                                <div className="mt-3 grid gap-5">
-                                  {t.instances.map((inst) => (
-                                    <div key={inst.id}>
-                                      <div className="text-xs font-medium uppercase tracking-wide text-white/45">
-                                        {inst.date.toISOString().slice(0, 10)}
-                                      </div>
-                                      <div className="mt-1 rounded-lg border border-white/10 bg-black/25 px-2 sm:px-3">
-                                        {inst.slots.map((s) => (
-                                          <VenueSlotManagementRow key={s.id} venueId={v.id} slot={s} template={t} />
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ))}
+                          {templatesForSelectedDay.map(({ template: t, instances }) => (
+                            <div key={t.id} className="rounded-xl border border-white/10 bg-black/30 p-3 sm:p-4">
+                              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
+                                <div className="font-semibold text-white">{t.title}</div>
+                                <div className="text-xs text-white/55">
+                                  {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–
+                                  {minutesToTimeLabel(t.endTimeMin)}
                                 </div>
                               </div>
-                            ) : null,
-                          )}
+                              <div className="mt-3 grid gap-5">
+                                {instances.map((inst) => (
+                                  <div key={inst.id}>
+                                    <div className="mt-1 rounded-lg border border-white/10 bg-black/25 px-2 sm:px-3">
+                                      {inst.slots.map((s) => (
+                                        <VenueSlotManagementRow
+                                          key={s.id}
+                                          venueId={v.id}
+                                          slot={s}
+                                          template={t}
+                                          lineupDay={selectedYmd}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <p className="mt-4 text-sm text-white/55">
-                          No generated nights in view yet — use <span className="text-white/75">Each schedule block</span> below
-                          to pick a date and <span className="text-white/75">Generate slots</span>.
+                          No slots for{" "}
+                          <span className="text-white/80">{lineupNavLabelFromYmd(selectedYmd)}</span> yet — use{" "}
+                          <span className="text-white/75">Each schedule block</span> below, pick this date, and{" "}
+                          <span className="text-white/75">Generate slots</span>.
                         </p>
                       )}
                     </div>

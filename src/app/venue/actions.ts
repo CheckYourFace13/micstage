@@ -17,6 +17,7 @@ import {
   isWithinBookingWindow,
   slotStartInstant,
 } from "@/lib/venueBookingRules";
+import { isValidLineupYmd, storageYmdUtc } from "@/lib/venuePublicLineup";
 import { BookingRestrictionMode, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { isLineupRuleTier, prismaOverridesForLineupRuleTier } from "@/lib/lineupRuleTiers";
@@ -35,6 +36,13 @@ function optString(formData: FormData, key: string): string | undefined {
   if (typeof v !== "string") return undefined;
   const t = v.trim();
   return t ? t : undefined;
+}
+
+/** Keep venue dashboard on the same lineup day after slot actions (optional `lineupDay` on form). */
+function redirectVenueWithOptionalLineupDay(query: string, formData: FormData): never {
+  const day = optString(formData, "lineupDay");
+  const suffix = day && isValidLineupYmd(day) ? `&lineupDay=${encodeURIComponent(day)}` : "";
+  redirect(`/venue?${query}${suffix}`);
 }
 
 function reqInt(formData: FormData, key: string): number {
@@ -527,7 +535,8 @@ export async function generateDateSchedule(formData: FormData) {
 
   revalidatePath("/venue");
   revalidatePath(`/venues/${template.venue.slug}`);
-  redirect("/venue?scheduleSuccess=date");
+  const ymd = storageYmdUtc(date);
+  redirect(`/venue?scheduleSuccess=date&lineupDay=${encodeURIComponent(ymd)}`);
 }
 
 export async function inviteManager(formData: FormData) {
@@ -740,7 +749,7 @@ export async function updateVenueSlotLine(formData: FormData) {
   const duration = slot.endMin - slot.startMin;
   const newEndMin = newStartMin + duration;
   if (newStartMin < tpl.startTimeMin || newEndMin > tpl.endTimeMin) {
-    redirect("/venue?venueError=invalidForm");
+    redirectVenueWithOptionalLineupDay("venueError=invalidForm", formData);
   }
 
   const overrides = prismaOverridesForLineupRuleTier(tierRaw, tpl);
@@ -783,7 +792,7 @@ export async function updateVenueSlotLine(formData: FormData) {
   revalidatePath("/venue");
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
-  redirect("/venue?slotLine=saved");
+  redirectVenueWithOptionalLineupDay("slotLine=saved", formData);
 }
 
 export async function deleteVenueSlot(formData: FormData) {
@@ -801,13 +810,13 @@ export async function deleteVenueSlot(formData: FormData) {
   if (!slot || slot.instance.template.venueId !== venueId) redirect("/venue?venueError=forbidden");
 
   const active = slot.booking && !slot.booking.cancelledAt ? slot.booking : null;
-  if (active?.musicianId) redirect("/venue?slotDeleteError=musicianBooked");
+  if (active?.musicianId) redirectVenueWithOptionalLineupDay("slotDeleteError=musicianBooked", formData);
 
   await requirePrisma().slot.delete({ where: { id: slotId } });
 
   revalidatePath("/venue");
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
-  redirect("/venue?slotDeleted=1");
+  redirectVenueWithOptionalLineupDay("slotDeleted=1", formData);
 }
 

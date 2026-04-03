@@ -9,6 +9,8 @@ type Props = {
   venueId: string;
   slot: Slot & { booking: Booking | null };
   template: EventTemplate;
+  /** Preserves dashboard day tab after save/delete (`YYYY-MM-DD`). */
+  lineupDay?: string;
 };
 
 function defaultArtistInputValue(slot: Slot, booking: Booking | null): string {
@@ -17,7 +19,7 @@ function defaultArtistInputValue(slot: Slot, booking: Booking | null): string {
   return slot.manualLineupLabel ?? "";
 }
 
-export function VenueSlotManagementRow({ venueId, slot, template }: Props) {
+export function VenueSlotManagementRow({ venueId, slot, template, lineupDay }: Props) {
   const lockedMusician = slotHasMusicianBooking(slot.booking);
   const defaultTier = lineupRuleTierFromSlot(slot, template);
   const displayName = publicSlotArtistLabel(slot, slot.booking);
@@ -27,6 +29,7 @@ export function VenueSlotManagementRow({ venueId, slot, template }: Props) {
       <form action={updateVenueSlotLine} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <input type="hidden" name="venueId" value={venueId} />
         <input type="hidden" name="slotId" value={slot.id} />
+        {lineupDay ? <input type="hidden" name="lineupDay" value={lineupDay} /> : null}
         <label className="flex shrink-0 flex-col gap-0.5">
           <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">Time</span>
           <input
@@ -80,6 +83,7 @@ export function VenueSlotManagementRow({ venueId, slot, template }: Props) {
       <form action={deleteVenueSlot} className="flex items-end">
         <input type="hidden" name="venueId" value={venueId} />
         <input type="hidden" name="slotId" value={slot.id} />
+        {lineupDay ? <input type="hidden" name="lineupDay" value={lineupDay} /> : null}
         <FormSubmitButton
           label="Delete"
           pendingLabel="…"

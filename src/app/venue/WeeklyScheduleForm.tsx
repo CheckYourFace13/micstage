@@ -31,6 +31,8 @@ type Props = {
   restrictionHoursBefore: number;
   onPremiseMaxDistanceMeters: number;
   defaultPerformanceFormat: VenuePerformanceFormat;
+  /** Override default `mt-6 grid gap-4` on the root form when embedded in another card. */
+  formClassName?: string;
 };
 
 export function WeeklyScheduleForm({
@@ -45,6 +47,7 @@ export function WeeklyScheduleForm({
   restrictionHoursBefore,
   onPremiseMaxDistanceMeters,
   defaultPerformanceFormat,
+  formClassName = "mt-6 grid gap-4",
 }: Props) {
   const plusDaysIso = (days: number) => {
     const d = new Date(`${todayIso}T12:00:00.000Z`);
@@ -90,7 +93,7 @@ export function WeeklyScheduleForm({
   }, [seriesStart, seriesEnd, weekdays, timeZone, startTime, endTime, slotMinutes, breakMinutes]);
 
   return (
-    <form action={saveWeeklyScheduleAndGenerateSlots} className="mt-6 grid gap-4">
+    <form action={saveWeeklyScheduleAndGenerateSlots} className={formClassName}>
       <input type="hidden" name="venueId" value={venueId} />
 
       <label className="grid gap-1 text-sm">

@@ -29,7 +29,7 @@ export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
         {!secondary ? (
           <span className="text-white/45">
             Performance format (acoustic-only, full band, etc.) is set per schedule block in{" "}
-            <span className="text-white/60">Set weekly schedule</span> or when adding a recurring night.
+            <span className="text-white/60">Weekly schedule</span> or when adding a recurring night.
           </span>
         ) : null}
       </p>

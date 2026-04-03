@@ -274,7 +274,7 @@ export default async function VenuePortalPage({
         {q.profileError === "duplicateWeekday" || q.scheduleError === "duplicateWeekday" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             You already have a recurring schedule for that weekday. Use{" "}
-            <span className="font-semibold text-white">Set weekly schedule</span> to change it — MicStage keeps one template per
+            <span className="font-semibold text-white">Weekly schedule</span> to change it — MicStage keeps one template per
             weekday per venue.
           </div>
         ) : null}
@@ -318,7 +318,7 @@ export default async function VenuePortalPage({
         {q.scheduleSuccess === "template" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
             <span className="font-semibold text-emerald-100/95">Recurring night added.</span> Generate dates for this
-            template, or use <span className="font-medium text-white">Set weekly schedule</span> to manage everything in one
+            template, or use <span className="font-medium text-white">Weekly schedule</span> to manage everything in one
             place.
           </div>
         ) : null}
@@ -685,49 +685,114 @@ export default async function VenuePortalPage({
                 <div
                   className={
                     operational
-                      ? "mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-6"
+                      ? "mt-8 rounded-xl border border-white/10 bg-black/30 p-5 sm:p-6"
                       : "mt-6 rounded-2xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.06)] p-6 shadow-[0_0_0_1px_rgba(255,45,149,0.12)]"
                   }
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-                        {operational ? "Schedule blocks" : "Schedule"}
-                      </div>
-                      <h3 className="om-heading mt-2 text-2xl tracking-wide text-white">
-                        {operational ? "Manage recurring nights" : "Set weekly schedule"}
-                      </h3>
-                      <p className="mt-2 max-w-2xl text-sm text-white/70">
-                        {operational ? (
-                          <>
-                            Update which nights you run, hours, slot length, and booking window. Re-run anytime — confirmed
-                            bookings stay put.
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-medium text-white/85">Recommended first step:</span> choose your nights, hours,
-                            slot length, and booking window. MicStage creates templates and fills open slots automatically—you can
-                            re-run this anytime; confirmed bookings stay put.
-                          </>
-                        )}
-                      </p>
-                    </div>
+                  <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
+                    {operational ? "Blocks" : "Schedule"}
                   </div>
-                  <WeeklyScheduleForm
-                    venueId={v.id}
-                    venueTimeZone={v.timeZone}
-                    todayIso={todayIso}
-                    horizonDays={hDays}
-                    defaultSeriesStart={v.seriesStartDate ? toIsoDateOnly(v.seriesStartDate) : todayIso}
-                    defaultSeriesEnd={
-                      v.seriesEndDate ? toIsoDateOnly(v.seriesEndDate) : plusDaysIso(hDays)
-                    }
-                    defaultTitle={v.eventTemplates[0]?.title ?? "Open mic"}
-                    defaultPerformanceFormat={v.eventTemplates[0]?.performanceFormat ?? v.performanceFormat}
-                    bookingRestrictionMode={v.bookingRestrictionMode}
-                    restrictionHoursBefore={v.restrictionHoursBefore ?? 6}
-                    onPremiseMaxDistanceMeters={v.onPremiseMaxDistanceMeters ?? 1000}
-                  />
+                  <h3 className="om-heading mt-2 text-xl font-bold tracking-wide text-white sm:text-2xl">
+                    {operational ? "Each schedule block" : "Set up your schedule & generate slots"}
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-sm text-white/65">
+                    {operational ? (
+                      <>
+                        Set or update your weekly nights, hours, and booking window, then generate slots per block. New nights
+                        show up in <span className="text-white/80">Lineup & sharing</span> above. Booked slots are never
+                        overwritten.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-white/85">Start here:</span> save your weekly nights and window, then
+                        generate dates for each block. MicStage creates templates and fills open slots — re-run anytime; confirmed
+                        bookings stay put.
+                      </>
+                    )}
+                  </p>
+
+                  <div className="mt-6 border-t border-white/10 pt-6">
+                    <h4 className="text-base font-semibold text-white">Weekly schedule</h4>
+                    <p className="mt-1 max-w-2xl text-sm text-white/55">
+                      Choose which nights run, slot length, and booking release rules. Saves one template per selected weekday and
+                      fills slots across your booking window.
+                    </p>
+                    <WeeklyScheduleForm
+                      venueId={v.id}
+                      venueTimeZone={v.timeZone}
+                      todayIso={todayIso}
+                      horizonDays={hDays}
+                      defaultSeriesStart={v.seriesStartDate ? toIsoDateOnly(v.seriesStartDate) : todayIso}
+                      defaultSeriesEnd={
+                        v.seriesEndDate ? toIsoDateOnly(v.seriesEndDate) : plusDaysIso(hDays)
+                      }
+                      defaultTitle={v.eventTemplates[0]?.title ?? "Open mic"}
+                      defaultPerformanceFormat={v.eventTemplates[0]?.performanceFormat ?? v.performanceFormat}
+                      bookingRestrictionMode={v.bookingRestrictionMode}
+                      restrictionHoursBefore={v.restrictionHoursBefore ?? 6}
+                      onPremiseMaxDistanceMeters={v.onPremiseMaxDistanceMeters ?? 1000}
+                      formClassName="mt-4 grid gap-4"
+                    />
+                  </div>
+
+                  <div className="mt-8 border-t border-white/10 pt-6">
+                    <div className="text-sm font-semibold text-white/90">
+                      {operational ? "Generate slots by date" : "Generate slots for one date"}
+                    </div>
+                    <p className="mt-1 text-xs text-white/50">
+                      {operational
+                        ? "Pick a block and calendar day to materialize or refresh that night’s grid."
+                        : "Pick a block once templates exist."}
+                    </p>
+                    {v.eventTemplates.length === 0 ? (
+                      <p className="mt-4 text-sm text-white/55">
+                        No templates yet — use <span className="text-white/75">Weekly schedule</span> above first.
+                      </p>
+                    ) : (
+                      <div className="mt-4 grid gap-3">
+                        {v.eventTemplates.map((t) => (
+                          <div key={t.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                              <div>
+                                <div className="font-semibold">{t.title}</div>
+                                <div className="mt-0.5 text-xs text-white/55">
+                                  Format:{" "}
+                                  <span className="text-white/80">{performanceFormatLabel(t.performanceFormat)}</span>
+                                </div>
+                              </div>
+                              <div className="text-xs text-white/60">
+                                {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–
+                                {minutesToTimeLabel(t.endTimeMin)} · {t.slotMinutes}m + {t.breakMinutes}m
+                              </div>
+                            </div>
+                            <form action={generateDateSchedule} className="mt-3 flex flex-wrap items-end gap-2">
+                              <input type="hidden" name="templateId" value={t.id} />
+                              <label className="grid gap-1 text-xs">
+                                <span className="text-white/60">Date</span>
+                                <input
+                                  name="date"
+                                  type="date"
+                                  defaultValue={todayIso}
+                                  min={v.seriesStartDate ? toIsoDateOnly(v.seriesStartDate) : todayIso}
+                                  max={
+                                    v.seriesEndDate
+                                      ? toIsoDateOnly(v.seriesEndDate)
+                                      : plusDaysIso(horizonDaysFor(v.subscriptionTier))
+                                  }
+                                  className="h-10 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white"
+                                />
+                              </label>
+                              <FormSubmitButton
+                                label="Generate slots"
+                                pendingLabel="Generating…"
+                                className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
+                              />
+                            </form>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {operational ? (
@@ -737,7 +802,8 @@ export default async function VenuePortalPage({
                         Add another recurring night (one weekday)
                       </span>
                       <span className="mt-1 block text-sm font-normal text-white/55">
-                        One template per weekday. If it already exists, use Manage recurring nights above.
+                        One template per weekday. If it already exists, update it with <span className="text-white/70">Weekly schedule</span>{" "}
+                        above.
                       </span>
                     </summary>
                     <VenueAddRecurringNightFormFields
@@ -759,7 +825,7 @@ export default async function VenuePortalPage({
                         <p className="mt-2 max-w-2xl text-sm text-white/70">
                           Only if you don’t use the weekly form yet — you can add <span className="text-white/90">one</span>{" "}
                           template per weekday. If that weekday already exists, use{" "}
-                          <span className="font-medium text-white/90">Set weekly schedule</span> instead.
+                          <span className="font-medium text-white/90">Weekly schedule</span> instead.
                         </p>
                       </div>
                     </div>
@@ -771,63 +837,6 @@ export default async function VenuePortalPage({
                     />
                   </div>
                 )}
-
-                {/* Per block: generate dates + house tools */}
-                <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-5">
-                  <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-                    {operational ? "Blocks" : "One-off"}
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-white">
-                    {operational ? "Each schedule block" : "Generate slots for one date"}
-                  </div>
-                  <p className="mt-1 text-sm text-white/60">
-                    {operational
-                      ? "Pick a block and date, then generate or refresh slots. New nights show up in Lineup & sharing above for editing. Booked slots are never overwritten."
-                      : "Use this for a single calendar day without re-running the full window (same safe rules — booked slots are not overwritten)."}
-                  </p>
-                  {v.eventTemplates.length === 0 ? (
-                    <div className="mt-4 text-sm text-white/60">Set a weekly schedule first — no templates yet.</div>
-                  ) : (
-                    <div className="mt-4 grid gap-3">
-                      {v.eventTemplates.map((t) => (
-                        <div key={t.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
-                          <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <div>
-                              <div className="font-semibold">{t.title}</div>
-                              <div className="mt-0.5 text-xs text-white/55">
-                                Format:{" "}
-                                <span className="text-white/80">{performanceFormatLabel(t.performanceFormat)}</span>
-                              </div>
-                            </div>
-                            <div className="text-xs text-white/60">
-                              {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–{minutesToTimeLabel(t.endTimeMin)} ·{" "}
-                              {t.slotMinutes}m + {t.breakMinutes}m
-                            </div>
-                          </div>
-                          <form action={generateDateSchedule} className="mt-3 flex flex-wrap items-end gap-2">
-                            <input type="hidden" name="templateId" value={t.id} />
-                            <label className="grid gap-1 text-xs">
-                              <span className="text-white/60">Date</span>
-                              <input
-                                name="date"
-                                type="date"
-                                defaultValue={todayIso}
-                                min={v.seriesStartDate ? toIsoDateOnly(v.seriesStartDate) : todayIso}
-                                max={v.seriesEndDate ? toIsoDateOnly(v.seriesEndDate) : plusDaysIso(horizonDaysFor(v.subscriptionTier))}
-                                className="h-10 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white"
-                              />
-                            </label>
-                            <FormSubmitButton
-                              label="Generate slots"
-                              pendingLabel="Generating…"
-                              className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
-                            />
-                          </form>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
                 {operational ? (
                   <details

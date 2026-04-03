@@ -7,16 +7,10 @@ import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { generateDateSchedule, inviteManager } from "./actions";
-import { publicSlotArtistLabel } from "@/lib/slotDisplay";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { absoluteUrl } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
-import {
-  lineupsForStorageYmd,
-  pickPrimaryLineup,
-  storageYmdUtc,
-  upcomingLineupDateYmds,
-} from "@/lib/venuePublicLineup";
+import { pickPrimaryLineup, storageYmdUtc, upcomingLineupDateYmds } from "@/lib/venuePublicLineup";
 import type { LineupTemplate } from "@/lib/venuePublicLineupData";
 import { loadLineupTemplatesByVenueIds, venueIsOperational } from "@/lib/venueDashboardOperational";
 import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
@@ -454,7 +448,6 @@ export default async function VenuePortalPage({
               const heroYmd = primary
                 ? storageYmdUtc(primary.instance.date)
                 : upcomingYmds[0] ?? null;
-              const heroLineups = heroYmd ? lineupsForStorageYmd(lineupTemplates, heroYmd) : [];
               const lineupPath = heroYmd ? `/venues/${v.slug}/lineup/${heroYmd}` : null;
               const hDays = horizonDaysFor(v.subscriptionTier);
               const lineupBadge =
@@ -499,7 +492,8 @@ export default async function VenuePortalPage({
                       <div>
                         <h3 className="om-heading text-2xl font-bold tracking-wide text-white">Lineup & sharing</h3>
                         <p className="mt-2 max-w-xl text-sm text-white/70">
-                          What audiences and artists see next. Share the date link everywhere you promote the room.
+                          Copy links for socials and your site. The audience-facing lineup lives on the public URL — edit
+                          slots in <span className="text-white/85">Lineup slots</span> below.
                         </p>
                       </div>
                       {lineupBadge ? (
@@ -519,7 +513,7 @@ export default async function VenuePortalPage({
                             jsonUrl={absoluteUrl(`/api/public/venues/${v.slug}/lineup?date=${heroYmd}`)}
                           />
                         </div>
-                        {upcomingYmds.length > 1 ? (
+                        {upcomingYmds.length > 0 ? (
                           <div className="mt-6">
                             <div className="text-xs font-semibold uppercase tracking-wider text-white/50">Upcoming dates</div>
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -537,54 +531,12 @@ export default async function VenuePortalPage({
                                 </Link>
                               ))}
                             </div>
+                            <p className="mt-3 text-xs text-white/45">
+                              Open <span className="text-white/65">Open public lineup</span> above to preview the guest view,
+                              or jump a date from the list.
+                            </p>
                           </div>
                         ) : null}
-                        <div className="mt-6 rounded-xl border border-white/10 bg-black/35 p-4">
-                          <div className="text-xs font-semibold uppercase tracking-wider text-white/55">Preview</div>
-                          {heroLineups.length === 0 ? (
-                            <p className="mt-2 text-sm text-white/55">
-                              No published slots for this date yet — generate slots under your blocks below.
-                            </p>
-                          ) : (
-                            <div className="mt-3 space-y-4">
-                              {heroLineups.map(({ template: t, instance: inst }) => (
-                                <div key={inst.id}>
-                                  <div className="text-sm font-semibold text-white">{t.title}</div>
-                                  <ul className="mt-2 divide-y divide-white/10 rounded-lg border border-white/10">
-                                    {inst.slots.slice(0, 12).map((s) => {
-                                      const bk = s.booking && !s.booking.cancelledAt ? s.booking : null;
-                                      const open = s.status === "AVAILABLE" && !bk;
-                                      const name = publicSlotArtistLabel(s, s.booking).trim();
-                                      const right =
-                                        name ||
-                                        (open ? "Open" : s.status === "CANCELLED" ? "Cancelled" : "Unavailable");
-                                      return (
-                                        <li
-                                          key={s.id}
-                                          className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2 text-sm"
-                                        >
-                                          <span className="font-bold tabular-nums text-white">
-                                            {minutesToTimeLabel(s.startMin)}
-                                          </span>
-                                          <span
-                                            className={`text-right ${open && !name ? "font-semibold text-[rgb(var(--om-neon))]" : "text-white/85"}`}
-                                          >
-                                            {right}
-                                          </span>
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                  {inst.slots.length > 12 ? (
-                                    <Link href={lineupPath} className="mt-2 inline-block text-xs text-white/50 underline">
-                                      Full lineup →
-                                    </Link>
-                                  ) : null}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
                       </>
                     ) : (
                       <p className="mt-6 text-sm text-white/65">

@@ -37,6 +37,16 @@ function badgeLabel(b: LineupBadge): string {
   return "Upcoming";
 }
 
+function reserveReturnPath(returnPath: string, slotId: string): string {
+  const joiner = returnPath.includes("?") ? "&" : "?";
+  return `${returnPath}${joiner}reserve=${encodeURIComponent(slotId)}`;
+}
+
+const performPrimaryClass =
+  "inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-bold text-black hover:brightness-110 disabled:opacity-60 sm:h-11 sm:w-auto sm:min-w-[7.5rem]";
+const performCompleteClass =
+  "inline-flex h-10 w-full items-center justify-center rounded-lg bg-emerald-400 px-4 text-sm font-bold text-black hover:brightness-110 disabled:opacity-60 sm:h-11 sm:w-auto sm:min-w-[7.5rem]";
+
 export function VenueLineupBoard({
   venue,
   lineups,
@@ -51,6 +61,9 @@ export function VenueLineupBoard({
   heroBadge,
   showShareStrip,
 }: Props) {
+  const isVenueStaffHere =
+    session?.kind === "venue" && venueStaffVenueIds.includes(venue.id);
+
   const canonicalPath = `/venues/${venue.slug}/lineup/${ymd}`;
   const canonicalUrl = absoluteUrl(canonicalPath);
   const embedUrl = `${canonicalUrl}?embed=1`;
@@ -167,6 +180,9 @@ export function VenueLineupBoard({
                             ? "Open"
                             : "—";
 
+                      const performLabel = isReservedCandidate ? "Confirm" : "Perform";
+                      const loginNext = encodeURIComponent(reserveReturnPath(returnPath, s.id));
+
                       return (
                         <li key={s.id} className="px-4 py-3 sm:px-5">
                           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -185,16 +201,16 @@ export function VenueLineupBoard({
                               </span>
                             </div>
 
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                               {activeBooking && canCancelBooking ? (
-                                <form action={cancelBooking}>
+                                <form action={cancelBooking} className="w-full sm:w-auto">
                                     <input type="hidden" name="venueSlug" value={venue.slug} />
                                     <input type="hidden" name="returnPath" value={returnPath} />
                                     <input type="hidden" name="bookingId" value={activeBooking.id} />
                                   <FormSubmitButton
                                     label="Cancel"
                                     pendingLabel="…"
-                                    className="h-11 min-w-[7rem] rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-60"
+                                    className="h-10 w-full rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-60 sm:h-11 sm:w-auto sm:min-w-[7rem]"
                                   />
                                 </form>
                               ) : canBook ? (
@@ -202,7 +218,7 @@ export function VenueLineupBoard({
                                   <form
                                     id={`reserve-form-${s.id}`}
                                     action={bookSlot}
-                                    className="flex flex-wrap items-center gap-2"
+                                    className="w-full sm:w-auto"
                                   >
                                     <input type="hidden" name="venueSlug" value={venue.slug} />
                                     <input type="hidden" name="returnPath" value={returnPath} />
@@ -213,28 +229,33 @@ export function VenueLineupBoard({
                                         <input type="hidden" name="clientLng" value="" />
                                         <OnPremiseReserveButton
                                           formId={`reserve-form-${s.id}`}
-                                          label={isReservedCandidate ? "Complete" : "Reserve"}
-                                          className={`h-11 min-w-[8rem] rounded-lg px-4 text-sm font-bold text-black ${
-                                            isReservedCandidate ? "bg-emerald-400" : "bg-[rgb(var(--om-neon))]"
-                                          } hover:brightness-110 disabled:opacity-60`}
+                                          label={performLabel}
+                                          className={
+                                            isReservedCandidate
+                                              ? performCompleteClass
+                                              : `${performPrimaryClass} bg-[rgb(var(--om-neon))]`
+                                          }
                                         />
                                       </>
                                     ) : (
                                       <FormSubmitButton
-                                        label={isReservedCandidate ? "Complete" : "Reserve"}
+                                        label={performLabel}
                                         pendingLabel="…"
-                                        className={`h-11 min-w-[8rem] rounded-lg px-4 text-sm font-bold text-black disabled:opacity-60 ${
-                                          isReservedCandidate ? "bg-emerald-400" : "bg-[rgb(var(--om-neon))]"
-                                        } hover:brightness-110`}
+                                        className={
+                                          isReservedCandidate
+                                            ? performCompleteClass
+                                            : `${performPrimaryClass} bg-[rgb(var(--om-neon))]`
+                                        }
                                       />
                                     )}
                                   </form>
                                 ) : (
                                   <Link
-                                    href={`/login/musician?next=${encodeURIComponent(`${returnPath.includes("?") ? `${returnPath}&` : `${returnPath}?`}reserve=${s.id}`)}`}
-                                    className="inline-flex h-11 min-w-[8rem] items-center justify-center rounded-lg border-2 border-[rgba(var(--om-neon),0.55)] bg-[rgba(var(--om-neon),0.15)] px-4 text-sm font-bold text-white hover:bg-[rgba(var(--om-neon),0.25)]"
+                                    href={`/login/musician?next=${loginNext}`}
+                                    title="Sign in with your artist account to book this slot"
+                                    className={`${performPrimaryClass} bg-[rgb(var(--om-neon))]`}
                                   >
-                                    Reserve
+                                    Perform
                                   </Link>
                                 )
                               ) : activeBooking ? null : (
@@ -260,6 +281,16 @@ export function VenueLineupBoard({
           })}
         </div>
       )}
+
+      {!embed && !isMusician && !isVenueStaffHere && lineups.length > 0 ? (
+        <p className="text-center text-xs leading-relaxed text-white/50">
+          New artist?{" "}
+          <Link href="/register/musician" className="text-white/75 underline hover:text-white">
+            Create a free profile
+          </Link>
+          , then tap <span className="text-white/70">Perform</span> on an open slot.
+        </p>
+      ) : null}
 
       {!embed ? (
         <p className="text-center text-xs text-white/40">

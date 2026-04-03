@@ -106,6 +106,10 @@ export default async function VenueLineupDatePage(props: {
               <h1 className="mt-2 text-3xl font-bold leading-tight sm:text-4xl">{venue.name}</h1>
               <p className="mt-2 text-base text-white/70">{venue.formattedAddress}</p>
               <p className="mt-1 text-lg font-semibold text-white/90">{lineupNavLabelFromYmd(dateParam)}</p>
+              <p className="mt-3 max-w-xl text-sm text-white/60">
+                <span className="text-white/80">Open</span> slots: artists tap{" "}
+                <span className="font-medium text-white/85">Perform</span> to sign in and claim a set.
+              </p>
             </div>
             <div className="flex flex-wrap gap-3 text-sm">
               <Link
@@ -136,7 +140,7 @@ export default async function VenueLineupDatePage(props: {
         ) : null}
         {isMusician && reserve ? (
           <div className="mb-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Tap <span className="font-semibold">Reserve</span> on your slot to finish booking.
+            Tap <span className="font-semibold">Confirm</span> on your slot to finish booking.
           </div>
         ) : null}
 

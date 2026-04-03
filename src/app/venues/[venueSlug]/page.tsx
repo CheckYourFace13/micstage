@@ -220,7 +220,7 @@ export default async function VenuePublicPage(props: {
         ) : null}
         {isMusician && reserve ? (
           <div className="mt-4 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Continue your reservation by tapping <span className="font-semibold">Reserve</span> on the selected slot below.
+            Finish booking: tap <span className="font-semibold">Confirm</span> on the slot you chose.
           </div>
         ) : null}
 
@@ -246,8 +246,8 @@ export default async function VenuePublicPage(props: {
               ) : null}
             </div>
             <p className="mt-2 text-sm text-white/60">
-              Set times and who&apos;s on — <span className="text-white/80">Open</span> means bookable for artists (sign in to
-              reserve).
+              <span className="text-white/80">Open</span> slots can be claimed by artists — tap{" "}
+              <span className="font-medium text-white/85">Perform</span> (sign in or create a free profile if needed).
             </p>
 
             {heroYmd ? (

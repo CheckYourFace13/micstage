@@ -8,6 +8,7 @@ import {
   storageYmdUtc,
   upcomingLineupDateYmds,
 } from "@/lib/venuePublicLineup";
+import { publicSlotArtistLabel } from "@/lib/slotDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -91,12 +92,14 @@ export async function GET(
         isCancelled: inst.isCancelled,
         slots: inst.slots.map((s) => {
           const active = s.booking && !s.booking.cancelledAt ? s.booking : null;
+          const artistName = publicSlotArtistLabel(s, s.booking);
           return {
             id: s.id,
             startMin: s.startMin,
             endMin: s.endMin,
             status: s.status,
             open: s.status === "AVAILABLE" && !active,
+            artistName: artistName || null,
             booking: active ? { performerName: active.performerName } : null,
           };
         }),

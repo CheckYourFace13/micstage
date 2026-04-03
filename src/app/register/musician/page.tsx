@@ -8,6 +8,7 @@ import { getSession } from "@/lib/session";
 import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { registerMusician } from "./actions";
+import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 
 export default async function MusicianRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await props.searchParams;
@@ -82,6 +83,7 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
             className="mt-2 inline-flex h-11 min-w-[200px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
           />
           <p className="text-xs text-white/50">After signup, you’ll be able to book slots and track your upcoming sets.</p>
+          <LineupSlotTypesHelp className="mt-4" />
         </form>
       </main>
     </div>

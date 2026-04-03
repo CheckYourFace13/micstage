@@ -91,6 +91,10 @@ export function slotRestrictionBlockReason(
 
   if (mode === "NONE") return null;
 
+  if (mode === "HOUSE_ONLY") {
+    return "This slot is managed by the venue only. Artists can’t self-book it here.";
+  }
+
   if (mode === "ATTENDEE_DAY_OF") {
     const nowDay = DateTime.fromJSDate(now, { zone: "utc" }).setZone(tz).startOf("day");
     const slotDay = DateTime.fromJSDate(slotStartUtc, { zone: "utc" }).setZone(tz).startOf("day");

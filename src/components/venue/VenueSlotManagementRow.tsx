@@ -1,0 +1,92 @@
+import type { Booking, EventTemplate, Slot } from "@/generated/prisma/client";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { deleteVenueSlot, updateVenueSlotLine } from "@/app/venue/actions";
+import { LINEUP_RULE_TIER_OPTIONS, lineupRuleTierFromSlot } from "@/lib/lineupRuleTiers";
+import { publicSlotArtistLabel, slotHasMusicianBooking } from "@/lib/slotDisplay";
+import { minutesToTimeInputValue } from "@/lib/time";
+
+type Props = {
+  venueId: string;
+  slot: Slot & { booking: Booking | null };
+  template: EventTemplate;
+};
+
+function defaultArtistInputValue(slot: Slot, booking: Booking | null): string {
+  const active = booking && !booking.cancelledAt ? booking : null;
+  if (active && !active.musicianId) return active.performerName;
+  return slot.manualLineupLabel ?? "";
+}
+
+export function VenueSlotManagementRow({ venueId, slot, template }: Props) {
+  const lockedMusician = slotHasMusicianBooking(slot.booking);
+  const defaultTier = lineupRuleTierFromSlot(slot, template);
+  const displayName = publicSlotArtistLabel(slot, slot.booking);
+
+  return (
+    <div className="flex flex-wrap items-stretch gap-2 border-b border-white/10 py-2.5 last:border-b-0">
+      <form action={updateVenueSlotLine} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <input type="hidden" name="venueId" value={venueId} />
+        <input type="hidden" name="slotId" value={slot.id} />
+        <label className="flex shrink-0 flex-col gap-0.5">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">Time</span>
+          <input
+            name="startTime"
+            type="time"
+            defaultValue={minutesToTimeInputValue(slot.startMin)}
+            className="h-9 w-[6.75rem] rounded-md border border-white/15 bg-black/40 px-1.5 font-mono text-sm text-white"
+          />
+        </label>
+        <label className="min-w-[6rem] flex-1 flex-col gap-0.5 sm:min-w-[10rem]">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">Artist</span>
+          {lockedMusician ? (
+            <span
+              className="flex h-9 items-center truncate rounded-md border border-emerald-400/25 bg-emerald-500/10 px-2 text-sm text-white/95"
+              title="Booked by a MicStage artist — name can’t be edited here."
+            >
+              {displayName}
+            </span>
+          ) : (
+            <input
+              name="artistDisplay"
+              type="text"
+              defaultValue={defaultArtistInputValue(slot, slot.booking)}
+              placeholder="Name or open"
+              className="h-9 w-full min-w-0 rounded-md border border-white/15 bg-black/40 px-2 text-sm text-white placeholder:text-white/35"
+            />
+          )}
+        </label>
+        <label className="flex min-w-[8.5rem] flex-col gap-0.5">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-white/45">Booking</span>
+          <select
+            name="lineupRuleTier"
+            defaultValue={defaultTier}
+            className="h-9 rounded-md border border-white/15 bg-black/40 px-1.5 text-xs text-white"
+          >
+            {LINEUP_RULE_TIER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex items-end">
+          <FormSubmitButton
+            label="Save"
+            pendingLabel="…"
+            className="h-9 rounded-md bg-[rgb(var(--om-neon))] px-3 text-xs font-bold text-black hover:brightness-110 disabled:opacity-60"
+          />
+        </div>
+      </form>
+      <form action={deleteVenueSlot} className="flex items-end">
+        <input type="hidden" name="venueId" value={venueId} />
+        <input type="hidden" name="slotId" value={slot.id} />
+        <FormSubmitButton
+          label="Delete"
+          pendingLabel="…"
+          disabled={lockedMusician}
+          className="h-9 rounded-md border border-red-400/40 bg-red-500/10 px-3 text-xs font-semibold text-red-200/95 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+        />
+      </form>
+    </div>
+  );
+}

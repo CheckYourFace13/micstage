@@ -19,6 +19,8 @@ import {
 } from "@/lib/venueBookingRules";
 import { BookingRestrictionMode, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
+import { isLineupRuleTier, prismaOverridesForLineupRuleTier } from "@/lib/lineupRuleTiers";
+import { timeInputValueToMinutes } from "@/lib/time";
 import { parseVenuePerformanceFormat } from "@/lib/venuePerformanceFormat";
 
 /** Missing/tampered fields → friendly portal message instead of generic error UI. */
@@ -625,7 +627,7 @@ export async function houseBookSlot(formData: FormData) {
 
       await tx.slot.update({
         where: { id: slot.id },
-        data: { status: "RESERVED" },
+        data: { status: "RESERVED", manualLineupLabel: null },
       });
     });
   } catch (e) {
@@ -711,5 +713,101 @@ export async function updateSlotBookingRules(formData: FormData) {
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
   redirect("/venue?slotRule=saved");
+}
+
+/** One horizontal row: time, artist label, simplified rule tier, save. */
+export async function updateVenueSlotLine(formData: FormData) {
+  const session = await requireVenueSession();
+  const venueId = reqString(formData, "venueId");
+  const slotId = reqString(formData, "slotId");
+  const tierRaw = reqString(formData, "lineupRuleTier");
+  if (!isLineupRuleTier(tierRaw)) redirect("/venue?venueError=invalidForm");
+  const startTimeStr = reqString(formData, "startTime");
+  const newStartMin = timeInputValueToMinutes(startTimeStr);
+  if (newStartMin == null) redirect("/venue?venueError=invalidForm");
+  const artistField = optString(formData, "artistDisplay");
+
+  const allowed = await venueIdsForSession(session);
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
+
+  const slot = await requirePrisma().slot.findUnique({
+    where: { id: slotId },
+    include: { booking: true, instance: { include: { template: true } } },
+  });
+  if (!slot || slot.instance.template.venueId !== venueId) redirect("/venue?venueError=forbidden");
+
+  const tpl = slot.instance.template;
+  const duration = slot.endMin - slot.startMin;
+  const newEndMin = newStartMin + duration;
+  if (newStartMin < tpl.startTimeMin || newEndMin > tpl.endTimeMin) {
+    redirect("/venue?venueError=invalidForm");
+  }
+
+  const overrides = prismaOverridesForLineupRuleTier(tierRaw, tpl);
+  const activeBooking = slot.booking && !slot.booking.cancelledAt ? slot.booking : null;
+  const hasMusician = Boolean(activeBooking?.musicianId);
+
+  const baseData = {
+    startMin: newStartMin,
+    endMin: newEndMin,
+    bookingRestrictionModeOverride: overrides.bookingRestrictionModeOverride,
+    restrictionHoursBeforeOverride: overrides.restrictionHoursBeforeOverride,
+    onPremiseMaxDistanceMetersOverride: overrides.onPremiseMaxDistanceMetersOverride,
+  };
+
+  await requirePrisma().$transaction(async (tx) => {
+    if (hasMusician) {
+      await tx.slot.update({ where: { id: slotId }, data: baseData });
+      return;
+    }
+    if (activeBooking && !activeBooking.musicianId) {
+      await tx.booking.update({
+        where: { id: activeBooking.id },
+        data: { performerName: artistField?.trim() || activeBooking.performerName },
+      });
+      await tx.slot.update({
+        where: { id: slotId },
+        data: { ...baseData, manualLineupLabel: null },
+      });
+      return;
+    }
+    await tx.slot.update({
+      where: { id: slotId },
+      data: {
+        ...baseData,
+        manualLineupLabel: artistField?.trim() ? artistField.trim() : null,
+      },
+    });
+  });
+
+  revalidatePath("/venue");
+  const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+  if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+  redirect("/venue?slotLine=saved");
+}
+
+export async function deleteVenueSlot(formData: FormData) {
+  const session = await requireVenueSession();
+  const venueId = reqString(formData, "venueId");
+  const slotId = reqString(formData, "slotId");
+
+  const allowed = await venueIdsForSession(session);
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
+
+  const slot = await requirePrisma().slot.findUnique({
+    where: { id: slotId },
+    include: { booking: true, instance: { include: { template: true } } },
+  });
+  if (!slot || slot.instance.template.venueId !== venueId) redirect("/venue?venueError=forbidden");
+
+  const active = slot.booking && !slot.booking.cancelledAt ? slot.booking : null;
+  if (active?.musicianId) redirect("/venue?slotDeleteError=musicianBooked");
+
+  await requirePrisma().slot.delete({ where: { id: slotId } });
+
+  revalidatePath("/venue");
+  const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+  if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+  redirect("/venue?slotDeleted=1");
 }
 

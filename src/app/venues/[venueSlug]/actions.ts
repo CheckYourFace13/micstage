@@ -146,7 +146,7 @@ export async function bookSlot(formData: FormData) {
 
     await tx.slot.update({
       where: { id: slot.id },
-      data: { status: "RESERVED" },
+      data: { status: "RESERVED", manualLineupLabel: null },
     });
   });
 

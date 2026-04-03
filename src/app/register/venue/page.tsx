@@ -8,6 +8,7 @@ import { registerVenue } from "./actions";
 import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { VenuePlaceFields } from "./venuePlaceFields";
+import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 
 export default async function VenueRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await props.searchParams;
@@ -81,6 +82,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
             This saves your venue using Google’s Place ID + coordinates, so maps and your public MicStage marketing pages
             reference the correct location (SEO-friendly URLs and listings).
           </p>
+          <LineupSlotTypesHelp className="mt-4" />
         </form>
       </main>
     </div>

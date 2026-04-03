@@ -11,6 +11,7 @@ import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { absoluteUrl } from "@/lib/publicSeo";
+import { publicSlotArtistLabel } from "@/lib/slotDisplay";
 
 type Props = {
   venue: PublicVenueForLineup;
@@ -155,37 +156,33 @@ export function VenueLineupBoard({
                           activeBooking.musicianId === session.musicianId) ||
                           (session.kind === "venue" && venueStaffVenueIds.includes(venue.id)));
 
-                      const isOpen = slotUsable && !activeBooking;
+                      const lineupLabel = publicSlotArtistLabel(s, s.booking).trim();
+                      const artistCell = lineupLabel
+                        ? lineupLabel
+                        : !slotUsable
+                          ? s.status === "CANCELLED"
+                            ? "Cancelled"
+                            : "Unavailable"
+                          : canBook
+                            ? "Open"
+                            : "—";
 
                       return (
-                        <li key={s.id} className="px-4 py-4 sm:px-5">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                                <span className="text-2xl font-bold tabular-nums tracking-tight text-white sm:text-3xl">
-                                  {minutesToTimeLabel(s.startMin)}
-                                </span>
-                                <span className="text-lg text-white/40">–</span>
-                                <span className="text-xl font-semibold tabular-nums text-white/90 sm:text-2xl">
-                                  {minutesToTimeLabel(s.endMin)}
-                                </span>
-                                {isOpen ? (
-                                  <span className="ml-1 inline-flex items-center rounded-full bg-[rgb(var(--om-neon))]/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-[rgb(var(--om-neon))]">
-                                    Open
-                                  </span>
-                                ) : null}
-                              </div>
-                              <div className="mt-2 text-lg font-medium leading-snug text-white sm:text-xl">
-                                {activeBooking ? (
-                                  <span>{activeBooking.performerName}</span>
-                                ) : !slotUsable ? (
-                                  <span className="text-white/45">
-                                    {s.status === "CANCELLED" ? "Slot cancelled" : "Unavailable"}
-                                  </span>
-                                ) : (
-                                  <span className="text-white/50">Open slot — be the first to book</span>
-                                )}
-                              </div>
+                        <li key={s.id} className="px-4 py-3 sm:px-5">
+                          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            <div className="flex min-w-0 flex-1 items-baseline gap-3 sm:gap-4">
+                              <span className="shrink-0 text-lg font-bold tabular-nums text-white sm:text-xl">
+                                {minutesToTimeLabel(s.startMin)}
+                              </span>
+                              <span
+                                className={`min-w-0 truncate text-base leading-snug sm:text-lg ${
+                                  !lineupLabel && canBook
+                                    ? "font-medium text-[rgb(var(--om-neon))]"
+                                    : "font-medium text-white/90"
+                                }`}
+                              >
+                                {artistCell}
+                              </span>
                             </div>
 
                             <div className="flex shrink-0 flex-wrap items-center gap-2">

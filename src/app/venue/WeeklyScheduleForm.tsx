@@ -7,6 +7,7 @@ import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
 import { ALL_WEEKDAYS, computeWeeklySchedulePreview } from "@/lib/weeklySchedule";
 import { weekdayToLabel } from "@/lib/time";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 import { saveWeeklyScheduleAndGenerateSlots } from "./actions";
 
 function timeToMinutesHHMM(value: string): number | null {
@@ -285,6 +286,8 @@ export function WeeklyScheduleForm({
           </label>
         </div>
       </fieldset>
+
+      <LineupSlotTypesHelp className="mt-1" />
 
       <div className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/80">
         {preview && weekdays.size > 0 ? (

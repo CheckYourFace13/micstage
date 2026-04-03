@@ -4,4 +4,5 @@ export const BOOKING_RESTRICTION_OPTIONS: { value: string; label: string }[] = [
   { value: "ATTENDEE_DAY_OF", label: "Reserved for attendees (unlock on the day)" },
   { value: "HOURS_BEFORE", label: "Unlock up to X hours before start" },
   { value: "ON_PREMISE", label: "On-premise only (location required) + X hours before start" },
+  { value: "HOUSE_ONLY", label: "House only (venue assigns; artists cannot self-book)" },
 ];

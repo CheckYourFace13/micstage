@@ -52,6 +52,8 @@ enum BookingRestrictionMode {
   ATTENDEE_DAY_OF
   HOURS_BEFORE
   ON_PREMISE
+  /// Public artists cannot book; venue assigns via house booking only.
+  HOUSE_ONLY
 }
 
 enum PasswordResetAccountType {
@@ -327,6 +329,9 @@ model Slot {
   endMin   Int
 
   status SlotStatus @default(AVAILABLE)
+
+  /// Shown on public lineup when there is no active booking (venue-filled placeholder name).
+  manualLineupLabel String?
 
   /// When set, public booking + restrictions use these instead of the template defaults.
   bookingRestrictionModeOverride BookingRestrictionMode?

@@ -110,6 +110,9 @@ export function VenueLineupBoard({
               >
                 <header className="border-b border-white/10 px-4 py-4 sm:px-5">
                   <h2 className="text-xl font-bold leading-tight text-white sm:text-2xl">{t.title}</h2>
+                  {t.description ? (
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">{t.description}</p>
+                  ) : null}
                   <p className="mt-1 text-sm text-white/65">
                     {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–{minutesToTimeLabel(t.endTimeMin)} ·{" "}
                     {t.slotMinutes} min slots

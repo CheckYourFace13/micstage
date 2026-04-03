@@ -1,8 +1,12 @@
-import type { Venue } from "@/generated/prisma/client";
+import type { Venue, VenuePerformanceFormat } from "@/generated/prisma/client";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { createEventTemplate } from "./actions";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
+
+function coerceVenueFormatDefault(f: VenuePerformanceFormat): VenuePerformanceFormat {
+  return f === "COMEDY_SPOKEN_WORD" ? "COMEDY" : f;
+}
 
 type VenueRecurringNightSlice = Pick<
   Venue,
@@ -39,6 +43,17 @@ export function VenueAddRecurringNightFormFields({
           required
           className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
           placeholder="Monday Songwriter Night"
+        />
+      </label>
+
+      <label className="grid gap-1 text-sm">
+        <span className="text-white/80">Description for artists (optional)</span>
+        <textarea
+          name="description"
+          rows={3}
+          maxLength={900}
+          className="min-h-[5rem] rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40"
+          placeholder="What artists should know about this night."
         />
       </label>
 
@@ -82,14 +97,12 @@ export function VenueAddRecurringNightFormFields({
             <option value="SUN">Sunday</option>
           </select>
         </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Time zone (auto from venue location)</span>
-          <input
-            name="timeZone"
-            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-            defaultValue={v.timeZone}
-          />
-        </label>
+        <div className="flex flex-col justify-end gap-1 text-xs text-white/50">
+          <span className="font-medium text-white/70">Time zone</span>
+          <span>
+            Show times use <span className="text-white/75">{v.timeZone}</span> from your venue address — not editable here.
+          </span>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -144,7 +157,7 @@ export function VenueAddRecurringNightFormFields({
         <span className="text-white/80">Performance format (this night, public)</span>
         <select
           name="performanceFormat"
-          defaultValue={v.performanceFormat}
+          defaultValue={coerceVenueFormatDefault(v.performanceFormat)}
           className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
         >
           {VENUE_PERFORMANCE_FORMAT_OPTIONS.map((o) => (

@@ -400,6 +400,9 @@ export default async function ArtistPortalPage({
                             {date} · {minutesToTimeLabel(b.slot!.startMin)}–{minutesToTimeLabel(b.slot!.endMin)} ·{" "}
                             {tpl.title}
                           </div>
+                          {tpl.description ? (
+                            <p className="mt-2 max-w-xl text-xs leading-relaxed text-white/55">{tpl.description}</p>
+                          ) : null}
                           <div className="mt-2 text-xs text-white/60">
                             <Link className="underline" href={`/venues/${v.slug}`}>
                               View venue page

@@ -77,6 +77,7 @@ export async function GET(
       template: {
         id: t.id,
         title: t.title,
+        description: t.description,
         weekday: t.weekday,
         startTimeMin: t.startTimeMin,
         endTimeMin: t.endTimeMin,

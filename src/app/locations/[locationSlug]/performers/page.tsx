@@ -236,6 +236,9 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
                     </Link>
                     {v.region ? ` (${v.city}, ${v.region})` : v.city ? ` (${v.city})` : ""}
                   </div>
+                  {t.description ? (
+                    <p className="mt-2 max-w-xl text-xs leading-relaxed text-white/55">{t.description}</p>
+                  ) : null}
                 </article>
               );
             })}

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
-import { ALL_WEEKDAYS, computeWeeklySchedulePreview } from "@/lib/weeklySchedule";
+import { ALL_WEEKDAYS, computeWeeklySchedulePreview, weekdayFromIsoDateInTimeZone } from "@/lib/weeklySchedule";
 import { weekdayToLabel } from "@/lib/time";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
@@ -19,6 +19,12 @@ function timeToMinutesHHMM(value: string): number | null {
   return hh * 60 + mm;
 }
 
+function coerceScheduleFormatDefault(f: VenuePerformanceFormat): VenuePerformanceFormat {
+  return f === "COMEDY_SPOKEN_WORD" ? "COMEDY" : f;
+}
+
+type ScheduleMode = "recurring" | "one_event";
+
 type Props = {
   venueId: string;
   venueTimeZone: string;
@@ -27,6 +33,7 @@ type Props = {
   defaultSeriesStart: string;
   defaultSeriesEnd: string;
   defaultTitle: string;
+  defaultDescription: string;
   bookingRestrictionMode: string;
   restrictionHoursBefore: number;
   onPremiseMaxDistanceMeters: number;
@@ -43,6 +50,7 @@ export function WeeklyScheduleForm({
   defaultSeriesStart,
   defaultSeriesEnd,
   defaultTitle,
+  defaultDescription,
   bookingRestrictionMode,
   restrictionHoursBefore,
   onPremiseMaxDistanceMeters,
@@ -55,10 +63,12 @@ export function WeeklyScheduleForm({
     return d.toISOString().slice(0, 10);
   };
 
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("recurring");
   const [title, setTitle] = useState(defaultTitle);
+  const [description, setDescription] = useState(defaultDescription);
   const [seriesStart, setSeriesStart] = useState(defaultSeriesStart);
   const [seriesEnd, setSeriesEnd] = useState(defaultSeriesEnd);
-  const [timeZone, setTimeZone] = useState(venueTimeZone);
+  const [oneEventDate, setOneEventDate] = useState(defaultSeriesStart);
   const [startTime, setStartTime] = useState("17:00");
   const [endTime, setEndTime] = useState("21:00");
   const [slotMinutes, setSlotMinutes] = useState(25);
@@ -74,27 +84,50 @@ export function WeeklyScheduleForm({
     });
   };
 
+  const previewRangeStart = scheduleMode === "one_event" ? oneEventDate : seriesStart;
+  const previewRangeEnd = scheduleMode === "one_event" ? oneEventDate : seriesEnd;
+
+  const effectiveWeekdays = useMemo((): Weekday[] => {
+    if (scheduleMode === "one_event") {
+      return [weekdayFromIsoDateInTimeZone(oneEventDate, venueTimeZone)];
+    }
+    return [...weekdays];
+  }, [scheduleMode, oneEventDate, venueTimeZone, weekdays]);
+
   const preview = useMemo(() => {
     const startMin = timeToMinutesHHMM(startTime);
     const endMin = timeToMinutesHHMM(endTime);
     if (startMin == null || endMin == null) return null;
-    const s = new Date(`${seriesStart}T00:00:00.000Z`);
-    const e = new Date(`${seriesEnd}T00:00:00.000Z`);
+    const s = new Date(`${previewRangeStart}T00:00:00.000Z`);
+    const e = new Date(`${previewRangeEnd}T00:00:00.000Z`);
     return computeWeeklySchedulePreview({
       seriesStart: s,
       seriesEnd: e,
-      weekdays: [...weekdays],
-      timeZone,
+      weekdays: effectiveWeekdays,
+      timeZone: venueTimeZone,
       startTimeMin: startMin,
       endTimeMin: endMin,
       slotMinutes,
       breakMinutes,
     });
-  }, [seriesStart, seriesEnd, weekdays, timeZone, startTime, endTime, slotMinutes, breakMinutes]);
+  }, [
+    previewRangeStart,
+    previewRangeEnd,
+    effectiveWeekdays,
+    venueTimeZone,
+    startTime,
+    endTime,
+    slotMinutes,
+    breakMinutes,
+  ]);
+
+  const previewReady =
+    scheduleMode === "one_event" ? effectiveWeekdays.length > 0 : weekdays.size > 0;
 
   return (
     <form action={saveWeeklyScheduleAndGenerateSlots} className={formClassName}>
       <input type="hidden" name="venueId" value={venueId} />
+      <input type="hidden" name="scheduleMode" value={scheduleMode} />
 
       <label className="grid gap-1 text-sm">
         <span className="text-white/80">Open mic name</span>
@@ -104,76 +137,129 @@ export function WeeklyScheduleForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-          placeholder="Weekly open mic"
+          placeholder="Tuesday songwriter open mic"
         />
       </label>
 
-      <fieldset className="grid gap-2 rounded-xl border border-white/10 bg-black/25 p-4">
-        <legend className="px-1 text-sm font-semibold text-white">Which nights?</legend>
-        <p className="text-xs text-white/55">Select every weekday this schedule applies to.</p>
-        <div className="flex flex-wrap gap-2">
-          {ALL_WEEKDAYS.map((w) => (
-            <label
-              key={w}
-              className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                weekdays.has(w)
-                  ? "border-[rgb(var(--om-neon))]/60 bg-[rgb(var(--om-neon))]/15 text-white"
-                  : "border-white/15 bg-black/30 text-white/80"
-              }`}
-            >
-              <input
-                type="checkbox"
-                name="weekdays"
-                value={w}
-                checked={weekdays.has(w)}
-                onChange={() => toggleWeekday(w)}
-                className="h-4 w-4 accent-[rgb(var(--om-neon))]"
-              />
-              {weekdayToLabel(w).slice(0, 3)}
-            </label>
-          ))}
+      <label className="grid gap-1 text-sm">
+        <span className="text-white/80">Description for artists (optional)</span>
+        <textarea
+          name="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          maxLength={900}
+          className="min-h-[5rem] rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40"
+          placeholder="Genre, vibe, signup rules, or what performers should expect."
+        />
+        <span className="text-xs text-white/45">Shown on the public lineup and anywhere artists see this open mic.</span>
+      </label>
+
+      <fieldset className="grid gap-3 rounded-xl border border-white/10 bg-black/25 p-4">
+        <legend className="px-1 text-sm font-semibold text-white">How often?</legend>
+        <p className="text-xs text-white/55">Pick a single night or a recurring weekly pattern.</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+            <input
+              type="radio"
+              className="h-4 w-4 accent-[rgb(var(--om-neon))]"
+              checked={scheduleMode === "one_event"}
+              onChange={() => setScheduleMode("one_event")}
+            />
+            One event
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+            <input
+              type="radio"
+              className="h-4 w-4 accent-[rgb(var(--om-neon))]"
+              checked={scheduleMode === "recurring"}
+              onChange={() => setScheduleMode("recurring")}
+            />
+            Recurring weekly
+          </label>
         </div>
       </fieldset>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Booking window start</span>
-          <input
-            name="seriesStartDate"
-            type="date"
-            min={todayIso}
-            max={plusDaysIso(horizonDays)}
-            value={seriesStart}
-            onChange={(e) => setSeriesStart(e.target.value)}
-            required
-            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Booking window end (max {horizonDays} days)</span>
-          <input
-            name="seriesEndDate"
-            type="date"
-            min={todayIso}
-            max={plusDaysIso(horizonDays)}
-            value={seriesEnd}
-            onChange={(e) => setSeriesEnd(e.target.value)}
-            required
-            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-          />
-        </label>
-      </div>
+      {scheduleMode === "one_event" ? (
+        <>
+          <input type="hidden" name="seriesStartDate" value={oneEventDate} />
+          <input type="hidden" name="seriesEndDate" value={oneEventDate} />
+          <label className="grid gap-1 text-sm">
+            <span className="text-white/80">Open mic date</span>
+            <input
+              type="date"
+              min={todayIso}
+              max={plusDaysIso(horizonDays)}
+              value={oneEventDate}
+              onChange={(e) => setOneEventDate(e.target.value)}
+              required
+              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
+            />
+          </label>
+        </>
+      ) : (
+        <>
+          <fieldset className="grid gap-2 rounded-xl border border-white/10 bg-black/25 p-4">
+            <legend className="px-1 text-sm font-semibold text-white">Which nights?</legend>
+            <p className="text-xs text-white/55">Select every weekday this schedule applies to.</p>
+            <div className="flex flex-wrap gap-2">
+              {ALL_WEEKDAYS.map((w) => (
+                <label
+                  key={w}
+                  className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                    weekdays.has(w)
+                      ? "border-[rgb(var(--om-neon))]/60 bg-[rgb(var(--om-neon))]/15 text-white"
+                      : "border-white/15 bg-black/30 text-white/80"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    name="weekdays"
+                    value={w}
+                    checked={weekdays.has(w)}
+                    onChange={() => toggleWeekday(w)}
+                    className="h-4 w-4 accent-[rgb(var(--om-neon))]"
+                  />
+                  {weekdayToLabel(w).slice(0, 3)}
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
-      <label className="grid gap-1 text-sm">
-        <span className="text-white/80">Time zone</span>
-        <input
-          name="timeZone"
-          value={timeZone}
-          onChange={(e) => setTimeZone(e.target.value)}
-          className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-          placeholder="America/Chicago"
-        />
-      </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">Booking window start</span>
+              <input
+                name="seriesStartDate"
+                type="date"
+                min={todayIso}
+                max={plusDaysIso(horizonDays)}
+                value={seriesStart}
+                onChange={(e) => setSeriesStart(e.target.value)}
+                required
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">Booking window end (max {horizonDays} days)</span>
+              <input
+                name="seriesEndDate"
+                type="date"
+                min={todayIso}
+                max={plusDaysIso(horizonDays)}
+                value={seriesEnd}
+                onChange={(e) => setSeriesEnd(e.target.value)}
+                required
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
+              />
+            </label>
+          </div>
+        </>
+      )}
+
+      <p className="text-xs text-white/50">
+        Times use your venue’s time zone from the address on file ({venueTimeZone}). You can’t change it here.
+      </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
@@ -201,13 +287,17 @@ export function WeeklyScheduleForm({
       </div>
 
       <fieldset className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4">
-        <legend className="text-sm font-semibold text-white">Performance format (this schedule)</legend>
-        <p className="text-xs text-white/55">Applies to every night you select below. You can use different formats for other weekdays by saving another combination.</p>
+        <legend className="text-sm font-semibold text-white">Performance format</legend>
+        <p className="text-xs text-white/55">
+          {scheduleMode === "one_event"
+            ? "What kinds of acts can book this night?"
+            : "Applies to every selected weekday for this save. Use another save if different nights need different formats."}
+        </p>
         <label className="grid gap-1 text-sm">
-          <span className="text-white/80">What kinds of acts for this block?</span>
+          <span className="text-white/80">Act types</span>
           <select
             name="performanceFormat"
-            defaultValue={defaultPerformanceFormat}
+            defaultValue={coerceScheduleFormatDefault(defaultPerformanceFormat)}
             className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
           >
             {VENUE_PERFORMANCE_FORMAT_OPTIONS.map((o) => (
@@ -293,19 +383,20 @@ export function WeeklyScheduleForm({
       <LineupSlotTypesHelp className="mt-1" />
 
       <div className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/80">
-        {preview && weekdays.size > 0 ? (
+        {preview && previewReady ? (
           <p>
             <span className="font-semibold text-white">Preview:</span> up to{" "}
             <span className="font-mono text-[rgb(var(--om-neon))]">{preview.totalNewSlots}</span> bookable slots across{" "}
             <span className="font-mono text-white">{preview.showNights}</span> show night
-            {preview.showNights === 1 ? "" : "s"} (~{preview.slotsPerShow} slots per night) for the nights you checked.
-            Existing bookings stay intact. If you already have other recurring nights saved, those are refreshed too when you
-            save.
+            {preview.showNights === 1 ? "" : "s"} (~{preview.slotsPerShow} slots per night) for the nights that match this
+            save. Existing bookings stay intact. Other saved weeknights are refreshed too when you save.
           </p>
         ) : (
           <p>
-            <span className="font-semibold text-white">Preview:</span> select at least one weekday and valid times to
-            see slot counts.
+            <span className="font-semibold text-white">Preview:</span>{" "}
+            {scheduleMode === "recurring"
+              ? "Select at least one weekday and valid times to see slot counts."
+              : "Pick a valid event date and times to see slot counts."}
           </p>
         )}
       </div>
@@ -316,9 +407,19 @@ export function WeeklyScheduleForm({
         className="h-12 rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
       />
       <p className="text-xs text-white/50">
-        Saves one recurring template per selected weekday (updates the latest template for that day if it already
-        exists), then fills your booking window. Run again anytime to add missing slots or align open slots with new
-        times — booked slots are left alone.
+        {scheduleMode === "one_event" ? (
+          <>
+            Updates the template for that calendar weekday, generates slots for the date you picked, and keeps your existing
+            booking window if it already covered that date (otherwise it extends to include it). Booked slots are left
+            alone.
+          </>
+        ) : (
+          <>
+            Saves one recurring template per selected weekday (updates the latest template for that day if it already
+            exists), then fills your booking window. Run again anytime to add missing slots or align open slots with new
+            times — booked slots are left alone.
+          </>
+        )}
       </p>
     </form>
   );

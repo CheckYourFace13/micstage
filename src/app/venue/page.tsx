@@ -273,9 +273,9 @@ export default async function VenuePortalPage({
         ) : null}
         {q.profileError === "duplicateWeekday" || q.scheduleError === "duplicateWeekday" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
-            You already have a recurring schedule for that weekday. Use{" "}
-            <span className="font-semibold text-white">Weekly schedule</span> to change it — MicStage keeps one template per
-            weekday per venue.
+            You already have a schedule for that weekday. Use{" "}
+            <span className="font-semibold text-white">Schedule Open Mic</span> below to change it — MicStage keeps one
+            template per weekday per venue.
           </div>
         ) : null}
         {q.profileError === "badRange" || q.scheduleError === "badRange" ? (
@@ -318,7 +318,7 @@ export default async function VenuePortalPage({
         {q.scheduleSuccess === "template" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
             <span className="font-semibold text-emerald-100/95">Recurring night added.</span> Generate dates for this
-            template, or use <span className="font-medium text-white">Weekly schedule</span> to manage everything in one
+            template, or use <span className="font-medium text-white">Schedule Open Mic</span> to manage everything in one
             place.
           </div>
         ) : null}
@@ -621,8 +621,8 @@ export default async function VenuePortalPage({
                       </>
                     ) : (
                       <p className="mt-6 text-sm text-white/65">
-                        No generated open mic nights yet. Use <span className="text-white/80">Each schedule block</span> below
-                        to pick a date and <span className="text-white/80">Generate slots</span> — nights with real lineups appear
+                        No generated open mic nights yet. Use <span className="text-white/80">Schedule Open Mic</span> below to
+                        save a night, then <span className="text-white/80">Generate slots</span> — nights with real lineups appear
                         here as chips.
                       </p>
                     )}
@@ -642,7 +642,12 @@ export default async function VenuePortalPage({
                           {templatesForSelectedDay.map(({ template: t, instances }) => (
                             <div key={t.id} className="rounded-xl border border-white/10 bg-black/30 p-3 sm:p-4">
                               <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
-                                <div className="font-semibold text-white">{t.title}</div>
+                                <div>
+                                  <div className="font-semibold text-white">{t.title}</div>
+                                  {t.description ? (
+                                    <p className="mt-1 max-w-xl text-xs leading-relaxed text-white/50">{t.description}</p>
+                                  ) : null}
+                                </div>
                                 <div className="text-xs text-white/55">
                                   {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–
                                   {minutesToTimeLabel(t.endTimeMin)}
@@ -690,32 +695,31 @@ export default async function VenuePortalPage({
                   }
                 >
                   <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
-                    {operational ? "Blocks" : "Schedule"}
+                    Schedule Open Mic
                   </div>
                   <h3 className="om-heading mt-2 text-xl font-bold tracking-wide text-white sm:text-2xl">
-                    {operational ? "Each schedule block" : "Set up your schedule & generate slots"}
+                    {operational ? "Plan your open mic nights" : "Set up your open mic & generate slots"}
                   </h3>
                   <p className="mt-2 max-w-2xl text-sm text-white/65">
                     {operational ? (
                       <>
-                        Set or update your weekly nights, hours, and booking window, then generate slots per block. New nights
-                        show up in <span className="text-white/80">Lineup & sharing</span> above. Booked slots are never
-                        overwritten.
+                        Name the night, add a short note for artists, choose one date or a recurring pattern, then save. MicStage
+                        builds the slot grid from your venue’s time zone. New nights appear under{" "}
+                        <span className="text-white/80">Lineup & sharing</span> above. Booked slots are never overwritten.
                       </>
                     ) : (
                       <>
-                        <span className="font-medium text-white/85">Start here:</span> save your weekly nights and window, then
-                        generate dates for each block. MicStage creates templates and fills open slots — re-run anytime; confirmed
-                        bookings stay put.
+                        <span className="font-medium text-white/85">Start here:</span> describe the open mic, pick a single date
+                        or weekly nights, set times and rules, then generate slots. Re-run anytime; confirmed bookings stay put.
                       </>
                     )}
                   </p>
 
                   <div className="mt-6 border-t border-white/10 pt-6">
-                    <h4 className="text-base font-semibold text-white">Weekly schedule</h4>
+                    <h4 className="text-base font-semibold text-white">Schedule setup</h4>
                     <p className="mt-1 max-w-2xl text-sm text-white/55">
-                      Choose which nights run, slot length, and booking release rules. Saves one template per selected weekday and
-                      fills slots across your booking window.
+                      One-off or recurring: MicStage saves one template per weekday you use and fills slots in your booking
+                      window.
                     </p>
                     <WeeklyScheduleForm
                       venueId={v.id}
@@ -727,6 +731,7 @@ export default async function VenuePortalPage({
                         v.seriesEndDate ? toIsoDateOnly(v.seriesEndDate) : plusDaysIso(hDays)
                       }
                       defaultTitle={v.eventTemplates[0]?.title ?? "Open mic"}
+                      defaultDescription={v.eventTemplates[0]?.description ?? ""}
                       defaultPerformanceFormat={v.eventTemplates[0]?.performanceFormat ?? v.performanceFormat}
                       bookingRestrictionMode={v.bookingRestrictionMode}
                       restrictionHoursBefore={v.restrictionHoursBefore ?? 6}
@@ -746,7 +751,7 @@ export default async function VenuePortalPage({
                     </p>
                     {v.eventTemplates.length === 0 ? (
                       <p className="mt-4 text-sm text-white/55">
-                        No templates yet — use <span className="text-white/75">Weekly schedule</span> above first.
+                        No templates yet — use <span className="text-white/75">Schedule setup</span> above first.
                       </p>
                     ) : (
                       <div className="mt-4 grid gap-3">
@@ -755,6 +760,9 @@ export default async function VenuePortalPage({
                             <div className="flex flex-wrap items-baseline justify-between gap-2">
                               <div>
                                 <div className="font-semibold">{t.title}</div>
+                                {t.description ? (
+                                  <p className="mt-1 max-w-xl text-xs leading-relaxed text-white/55">{t.description}</p>
+                                ) : null}
                                 <div className="mt-0.5 text-xs text-white/55">
                                   Format:{" "}
                                   <span className="text-white/80">{performanceFormatLabel(t.performanceFormat)}</span>
@@ -802,8 +810,8 @@ export default async function VenuePortalPage({
                         Add another recurring night (one weekday)
                       </span>
                       <span className="mt-1 block text-sm font-normal text-white/55">
-                        One template per weekday. If it already exists, update it with <span className="text-white/70">Weekly schedule</span>{" "}
-                        above.
+                        One template per weekday. If it already exists, update it with{" "}
+                        <span className="text-white/70">Schedule setup</span> above.
                       </span>
                     </summary>
                     <VenueAddRecurringNightFormFields
@@ -825,7 +833,7 @@ export default async function VenuePortalPage({
                         <p className="mt-2 max-w-2xl text-sm text-white/70">
                           Only if you don’t use the weekly form yet — you can add <span className="text-white/90">one</span>{" "}
                           template per weekday. If that weekday already exists, use{" "}
-                          <span className="font-medium text-white/90">Weekly schedule</span> instead.
+                          <span className="font-medium text-white/90">Schedule setup</span> instead.
                         </p>
                       </div>
                     </div>

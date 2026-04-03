@@ -2,6 +2,27 @@ import { DateTime } from "luxon";
 import { slotStartInstant } from "@/lib/venueBookingRules";
 import type { LineupInstance, LineupTemplate } from "@/lib/venuePublicLineupData";
 
+/**
+ * Event window for “current / next / upcoming” logic.
+ * Uses real slot times when the grid exists; otherwise falls back to the template’s
+ * start/end on that calendar night so venues still get date chips and a hero date
+ * before slots are generated.
+ */
+export function instanceWindowForSchedule(
+  template: Pick<LineupTemplate, "timeZone" | "startTimeMin" | "endTimeMin">,
+  instance: Pick<LineupInstance, "date" | "slots">,
+): { start: Date; end: Date } {
+  const slots = instance.slots ?? [];
+  if (slots.length > 0) {
+    const w = instanceWindow(instance, template.timeZone);
+    if (w) return w;
+  }
+  return {
+    start: slotStartInstant(instance.date, template.startTimeMin, template.timeZone),
+    end: slotStartInstant(instance.date, template.endTimeMin, template.timeZone),
+  };
+}
+
 export function storageYmdUtc(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -49,8 +70,7 @@ export function pickPrimaryLineup(
   for (const t of templates) {
     for (const i of t.instances) {
       if (i.isCancelled) continue;
-      const w = instanceWindow(i, t.timeZone);
-      if (!w) continue;
+      const w = instanceWindowForSchedule(t, i);
       candidates.push({ t, i, w });
     }
   }
@@ -80,7 +100,6 @@ export function lineupsForStorageYmd(templates: LineupTemplate[], ymd: string): 
   for (const t of templates) {
     for (const i of t.instances) {
       if (i.isCancelled) continue;
-      if (!i.slots?.length) continue;
       if (storageYmdUtc(i.date) !== ymd) continue;
       out.push({ template: t, instance: i });
     }
@@ -103,8 +122,7 @@ export function upcomingLineupDateYmds(
   for (const t of templates) {
     for (const i of t.instances) {
       if (i.isCancelled) continue;
-      const w = instanceWindow(i, t.timeZone);
-      if (!w) continue;
+      const w = instanceWindowForSchedule(t, i);
       if (w.end.getTime() <= now.getTime()) continue;
       cands.push({ ymd: storageYmdUtc(i.date), end: w.end });
     }

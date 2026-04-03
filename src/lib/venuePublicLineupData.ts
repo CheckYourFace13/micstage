@@ -1,7 +1,12 @@
 import { getPrismaOrNull } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 
-/** Public templates with enough upcoming instances for lineup + date navigation. */
+/**
+ * Public venue + lineup graph. Requires DB columns on `Slot`:
+ * `bookingRestrictionModeOverride`, `restrictionHoursBeforeOverride`,
+ * `onPremiseMaxDistanceMetersOverride` (plus existing slot/booking fields).
+ * If the query fails after deploy, run migrations and `prisma generate`.
+ */
 export const publicVenueLineupInclude = {
   eventTemplates: {
     where: { isPublic: true },
@@ -27,12 +32,8 @@ export type LineupInstance = LineupTemplate["instances"][number];
 export async function loadPublicVenueForLineup(slug: string): Promise<PublicVenueForLineup | null> {
   const prisma = getPrismaOrNull();
   if (!prisma) return null;
-  try {
-    return await prisma.venue.findUnique({
-      where: { slug },
-      include: publicVenueLineupInclude,
-    });
-  } catch {
-    return null;
-  }
+  return prisma.venue.findUnique({
+    where: { slug },
+    include: publicVenueLineupInclude,
+  });
 }

@@ -110,6 +110,11 @@ export function VenueLineupBoard({
                   <p className="px-4 py-4 text-sm text-amber-200/90 sm:px-5">This date was cancelled.</p>
                 ) : instanceBookBlock ? (
                   <p className="px-4 py-4 text-sm text-amber-200/90 sm:px-5">{instanceBookBlock}</p>
+                ) : inst.slots.length === 0 ? (
+                  <p className="px-4 py-5 text-sm leading-relaxed text-white/65 sm:px-5">
+                    No time slots are published for this night yet. The venue may still be building the grid — check back
+                    soon.
+                  </p>
                 ) : (
                   <ul className="divide-y divide-white/10">
                     {inst.slots.map((s) => {

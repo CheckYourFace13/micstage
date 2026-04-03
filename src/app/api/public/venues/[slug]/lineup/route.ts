@@ -23,7 +23,16 @@ export async function GET(
   const { slug } = await ctx.params;
   const dateParam = new URL(req.url).searchParams.get("date")?.trim() ?? "";
 
-  const venue = await loadPublicVenueForLineup(slug);
+  let venue;
+  try {
+    venue = await loadPublicVenueForLineup(slug);
+  } catch (e) {
+    console.error("[api public lineup] load failed", slug, e);
+    return NextResponse.json(
+      { error: "server_error", hint: "Database schema may be out of date; run migrations and prisma generate." },
+      { status: 503 },
+    );
+  }
   if (!venue) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }

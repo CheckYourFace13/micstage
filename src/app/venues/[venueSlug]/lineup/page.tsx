@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { isValidPublicSlug } from "@/lib/locationSlugValidation";
 import { loadPublicVenueForLineup } from "@/lib/venuePublicLineupData";
 import {
@@ -15,7 +16,18 @@ export default async function VenueLineupIndexPage(props: {
   const { venueSlug } = await props.params;
   if (!isValidPublicSlug(venueSlug)) notFound();
 
-  const venue = await loadPublicVenueForLineup(venueSlug);
+  let venue;
+  try {
+    venue = await loadPublicVenueForLineup(venueSlug);
+  } catch (e) {
+    console.error("[public lineup index] load failed", venueSlug, e);
+    return (
+      <PublicDataUnavailable
+        title="Lineup couldn’t load"
+        description="Apply database migrations and regenerate Prisma client if you recently deployed slot changes."
+      />
+    );
+  }
   if (!venue) notFound();
 
   const now = new Date();

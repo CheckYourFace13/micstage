@@ -594,14 +594,17 @@ export default async function VenuePortalPage({
                           <div className="text-[10px] font-semibold uppercase tracking-wider text-[rgb(var(--om-neon))]/90">
                             Selected night
                           </div>
-                          <div className="mt-1 text-lg font-semibold tracking-tight text-white">
-                            {lineupNavLabelFromYmd(selectedYmd)}
+                          <div className="mt-1">
+                            <VenueDeleteOpenMicDayPanel
+                              venueId={v.id}
+                              dateYmd={selectedYmd}
+                              nightLabel={lineupNavLabelFromYmd(selectedYmd)}
+                            >
+                              <div className="text-lg font-semibold tracking-tight text-white">
+                                {lineupNavLabelFromYmd(selectedYmd)}
+                              </div>
+                            </VenueDeleteOpenMicDayPanel>
                           </div>
-                          <VenueDeleteOpenMicDayPanel
-                            venueId={v.id}
-                            dateYmd={selectedYmd}
-                            nightLabel={lineupNavLabelFromYmd(selectedYmd)}
-                          />
                         </div>
 
                         <div className="mt-5">

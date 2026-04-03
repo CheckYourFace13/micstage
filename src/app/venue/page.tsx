@@ -492,8 +492,7 @@ export default async function VenuePortalPage({
                       <div>
                         <h3 className="om-heading text-2xl font-bold tracking-wide text-white">Lineup & sharing</h3>
                         <p className="mt-2 max-w-xl text-sm text-white/70">
-                          Copy links for socials and your site. The audience-facing lineup lives on the public URL — edit
-                          slots in <span className="text-white/85">Lineup slots</span> below.
+                          Share links, pick a night, then edit the live grid — this is your open mic control center.
                         </p>
                       </div>
                       {lineupBadge ? (
@@ -532,8 +531,8 @@ export default async function VenuePortalPage({
                               ))}
                             </div>
                             <p className="mt-3 text-xs text-white/45">
-                              Open <span className="text-white/65">Open public lineup</span> above to preview the guest view,
-                              or jump a date from the list.
+                              Open <span className="text-white/65">Open public lineup</span> to preview the guest view, or jump
+                              a date from the list.
                             </p>
                           </div>
                         ) : null}
@@ -544,6 +543,50 @@ export default async function VenuePortalPage({
                         will show up here.
                       </p>
                     )}
+
+                    <div className="mt-8 border-t border-white/15 pt-6">
+                      <div className="text-base font-semibold text-white">Lineup slots</div>
+                      <p className="mt-1 text-xs text-white/50">
+                        One row per slot: start time, who appears on the public lineup (when not booked by a MicStage artist),
+                        booking type, Save. Delete removes an empty or house-held slot — not slots with an active artist booking.
+                      </p>
+                      {v.eventTemplates.some((t) => t.instances.length > 0) ? (
+                        <div className="mt-4 grid gap-6">
+                          {v.eventTemplates.map((t) =>
+                            t.instances.length ? (
+                              <div key={t.id} className="rounded-xl border border-white/10 bg-black/30 p-3 sm:p-4">
+                                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
+                                  <div className="font-semibold text-white">{t.title}</div>
+                                  <div className="text-xs text-white/55">
+                                    {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–
+                                    {minutesToTimeLabel(t.endTimeMin)}
+                                  </div>
+                                </div>
+                                <div className="mt-3 grid gap-5">
+                                  {t.instances.map((inst) => (
+                                    <div key={inst.id}>
+                                      <div className="text-xs font-medium uppercase tracking-wide text-white/45">
+                                        {inst.date.toISOString().slice(0, 10)}
+                                      </div>
+                                      <div className="mt-1 rounded-lg border border-white/10 bg-black/25 px-2 sm:px-3">
+                                        {inst.slots.map((s) => (
+                                          <VenueSlotManagementRow key={s.id} venueId={v.id} slot={s} template={t} />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null,
+                          )}
+                        </div>
+                      ) : (
+                        <p className="mt-4 text-sm text-white/55">
+                          No generated nights in view yet — use <span className="text-white/75">Each schedule block</span> below
+                          to pick a date and <span className="text-white/75">Generate slots</span>.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ) : null}
 
@@ -649,7 +692,7 @@ export default async function VenuePortalPage({
                   </div>
                   <p className="mt-1 text-sm text-white/60">
                     {operational
-                      ? "Pick a block, generate or refresh slots for a single date, and handle walk-ups. Booked slots are never overwritten."
+                      ? "Pick a block and date, then generate or refresh slots. New nights show up in Lineup & sharing above for editing. Booked slots are never overwritten."
                       : "Use this for a single calendar day without re-running the full window (same safe rules — booked slots are not overwritten)."}
                   </p>
                   {v.eventTemplates.length === 0 ? (
@@ -690,31 +733,6 @@ export default async function VenuePortalPage({
                               className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
                             />
                           </form>
-
-                          {t.instances.length ? (
-                            <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
-                              <div className="text-sm font-semibold text-white/90">Lineup slots</div>
-                              <p className="mt-1 text-xs text-white/50">
-                                One row per slot: adjust start time, who appears on the public lineup (when not booked by a
-                                MicStage artist), how booking opens, then Save. Delete removes an empty or house-held slot —
-                                not slots with an active artist booking.
-                              </p>
-                              <div className="mt-3 grid gap-5">
-                                {t.instances.map((inst) => (
-                                  <div key={inst.id}>
-                                    <div className="text-xs font-medium uppercase tracking-wide text-white/45">
-                                      {inst.date.toISOString().slice(0, 10)}
-                                    </div>
-                                    <div className="mt-1 rounded-lg border border-white/10 bg-black/25 px-2 sm:px-3">
-                                      {inst.slots.map((s) => (
-                                        <VenueSlotManagementRow key={s.id} venueId={v.id} slot={s} template={t} />
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
                         </div>
                       ))}
                     </div>

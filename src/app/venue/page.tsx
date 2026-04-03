@@ -10,15 +10,11 @@ import { generateDateSchedule, inviteManager } from "./actions";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { absoluteUrl } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
-import {
-  isValidLineupYmd,
-  pickPrimaryLineup,
-  storageYmdUtc,
-  upcomingLineupDateYmds,
-} from "@/lib/venuePublicLineup";
+import { isValidLineupYmd, pickPrimaryLineup, storageYmdUtc } from "@/lib/venuePublicLineup";
 import type { LineupTemplate } from "@/lib/venuePublicLineupData";
 import { loadLineupTemplatesByVenueIds, venueIsOperational } from "@/lib/venueDashboardOperational";
 import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
+import { VenueDeleteOpenMicDayPanel } from "@/components/venue/VenueDeleteOpenMicDayPanel";
 import { VenueSlotManagementRow } from "@/components/venue/VenueSlotManagementRow";
 import { VenueAddRecurringNightFormFields } from "./VenueAddRecurringNightForm";
 import { VenueProfileForm } from "./VenueProfileForm";
@@ -38,7 +34,7 @@ function venueScheduleTemplateIncludeAtRequest(): VenueScheduleTemplateInclude {
     instances: {
       where: { date: { gte: new Date() } },
       orderBy: { date: "asc" },
-      take: 2,
+      take: 90,
       include: { slots: { orderBy: { startMin: "asc" }, include: { booking: true } } },
     },
   };
@@ -157,6 +153,8 @@ export default async function VenuePortalPage({
     slotDeleteError?: string;
     slotDeleted?: string;
     lineupDay?: string;
+    dayDeleted?: string;
+    dayDeleteError?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -437,6 +435,21 @@ export default async function VenuePortalPage({
             That slot has an active MicStage artist booking — cancel the booking first, or keep the slot.
           </div>
         ) : null}
+        {q.dayDeleted === "1" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            That open mic night was removed from MicStage (templates unchanged). Slots and walk-up holds on that date are gone.
+          </div>
+        ) : null}
+        {q.dayDeleteError === "musicianBooked" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            That night still has an active MicStage artist booking — cancel it first, then you can delete the night.
+          </div>
+        ) : null}
+        {q.dayDeleteError === "noInstances" ? (
+          <div className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/80">
+            That night was already removed or isn&apos;t on your dashboard. Refresh if this looks wrong.
+          </div>
+        ) : null}
 
         {venues.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-8">
@@ -465,20 +478,18 @@ export default async function VenuePortalPage({
               const lineupTemplates = lineupByVenueId[v.id] ?? [];
               const nowDash = new Date();
               const primary = operational ? pickPrimaryLineup(lineupTemplates, v.timeZone, nowDash) : null;
-              const upcomingYmds = operational
-                ? upcomingLineupDateYmds(lineupTemplates, v.timeZone, nowDash, 21)
-                : [];
-              const heroYmd = primary
-                ? storageYmdUtc(primary.instance.date)
-                : upcomingYmds[0] ?? null;
               const managedYmds = new Set(
                 v.eventTemplates.flatMap((t) => t.instances.map((i) => storageYmdUtc(i.date))),
               );
+              const generatedDayYmds = [...managedYmds].sort();
+              const primaryYmd = primary ? storageYmdUtc(primary.instance.date) : null;
+              const heroYmd =
+                primaryYmd && generatedDayYmds.includes(primaryYmd)
+                  ? primaryYmd
+                  : generatedDayYmds[0] ?? null;
               const rawLineupDay = typeof q.lineupDay === "string" ? q.lineupDay.trim() : "";
               const selectedYmd =
-                rawLineupDay &&
-                isValidLineupYmd(rawLineupDay) &&
-                (upcomingYmds.includes(rawLineupDay) || managedYmds.has(rawLineupDay))
+                rawLineupDay && isValidLineupYmd(rawLineupDay) && managedYmds.has(rawLineupDay)
                   ? rawLineupDay
                   : heroYmd;
               const lineupPath = selectedYmd ? `/venues/${v.slug}/lineup/${selectedYmd}` : null;
@@ -544,15 +555,17 @@ export default async function VenuePortalPage({
                       ) : null}
                     </div>
 
-                    {upcomingYmds.length > 0 ? (
+                    {generatedDayYmds.length > 0 ? (
                       <div className="mt-6">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-white/50">Upcoming nights</div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-white/50">
+                          Open mic nights (generated)
+                        </div>
                         <div
                           className="mt-2 flex flex-wrap gap-2"
                           role="tablist"
                           aria-label="Select which night to manage"
                         >
-                          {upcomingYmds.map((ymd) => {
+                          {generatedDayYmds.map((ymd) => {
                             const isSelected = ymd === selectedYmd;
                             return (
                               <Link
@@ -584,6 +597,11 @@ export default async function VenuePortalPage({
                           <div className="mt-1 text-lg font-semibold tracking-tight text-white">
                             {lineupNavLabelFromYmd(selectedYmd)}
                           </div>
+                          <VenueDeleteOpenMicDayPanel
+                            venueId={v.id}
+                            dateYmd={selectedYmd}
+                            nightLabel={lineupNavLabelFromYmd(selectedYmd)}
+                          />
                         </div>
 
                         <div className="mt-5">
@@ -600,8 +618,9 @@ export default async function VenuePortalPage({
                       </>
                     ) : (
                       <p className="mt-6 text-sm text-white/65">
-                        No upcoming nights in the booking window yet. Save your schedule blocks and generate dates — night chips
-                        and share links will show up here.
+                        No generated open mic nights yet. Use <span className="text-white/80">Each schedule block</span> below
+                        to pick a date and <span className="text-white/80">Generate slots</span> — nights with real lineups appear
+                        here as chips.
                       </p>
                     )}
 

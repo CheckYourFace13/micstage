@@ -820,3 +820,56 @@ export async function deleteVenueSlot(formData: FormData) {
   redirectVenueWithOptionalLineupDay("slotDeleted=1", formData);
 }
 
+/**
+ * Remove all EventInstances (and cascaded slots/bookings) for this venue on a single calendar date.
+ * Does not delete EventTemplates. Blocks if any slot has an active musician booking.
+ */
+export async function deleteVenueOpenMicDay(formData: FormData) {
+  const session = await requireVenueSession();
+  const venueId = reqString(formData, "venueId");
+  const dateYmd = reqString(formData, "dateYmd");
+  if (!isValidLineupYmd(dateYmd)) redirect("/venue?venueError=invalidForm");
+
+  const allowed = await venueIdsForSession(session);
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
+
+  const dayStart = new Date(`${dateYmd}T00:00:00.000Z`);
+  const prisma = requirePrisma();
+
+  const instances = await prisma.eventInstance.findMany({
+    where: { date: dayStart, template: { venueId } },
+    include: { slots: { include: { booking: true } } },
+  });
+  if (instances.length === 0) redirect("/venue?dayDeleteError=noInstances");
+
+  for (const inst of instances) {
+    for (const slot of inst.slots) {
+      const b = slot.booking;
+      if (b && !b.cancelledAt && b.musicianId) {
+        redirect("/venue?dayDeleteError=musicianBooked");
+      }
+    }
+  }
+
+  await prisma.eventInstance.deleteMany({
+    where: { id: { in: instances.map((i) => i.id) } },
+  });
+
+  const venue = await prisma.venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+  revalidatePath("/venue");
+  if (venue?.slug) revalidatePath(`/venues/${venue.slug}`);
+
+  const now = new Date();
+  const startToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const remainingRows = await prisma.eventInstance.findMany({
+    where: { template: { venueId }, date: { gte: startToday } },
+    select: { date: true },
+  });
+  const remainingYmds = [...new Set(remainingRows.map((r) => storageYmdUtc(r.date)))].sort();
+  const nextYmd = remainingYmds[0] ?? null;
+  if (nextYmd) {
+    redirect(`/venue?dayDeleted=1&lineupDay=${encodeURIComponent(nextYmd)}`);
+  }
+  redirect("/venue?dayDeleted=1");
+}
+

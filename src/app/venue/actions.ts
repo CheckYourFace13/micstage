@@ -553,51 +553,6 @@ export async function discoverVenueSocials(formData: FormData) {
   redirect("/venue?venueNotice=socialsDiscovered");
 }
 
-export async function generateDateSchedule(formData: FormData) {
-  const session = await requireVenueSession();
-  const templateId = reqString(formData, "templateId");
-  const date = reqDate(formData, "date");
-
-  const template = await requirePrisma().eventTemplate.findUnique({
-    where: { id: templateId },
-    include: { venue: true },
-  });
-  if (!template) redirect("/venue?scheduleError=templateMissing");
-
-  const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(template.venueId)) redirect("/venue?venueError=forbidden");
-
-  if (!isDateInSeriesRange(template.venue, date)) {
-    redirect("/venue?scheduleError=outsideSeries");
-  }
-
-  const instance =
-    (await requirePrisma().eventInstance.findUnique({
-      where: { templateId_date: { templateId: template.id, date } },
-    })) ??
-    (await requirePrisma().eventInstance.create({
-      data: { templateId: template.id, date },
-    }));
-
-  const slots = generateSlotsForWindow({
-    startTimeMin: template.startTimeMin,
-    endTimeMin: template.endTimeMin,
-    slotMinutes: template.slotMinutes,
-    breakMinutes: template.breakMinutes,
-  });
-
-  if (!instance.isCancelled) {
-    await requirePrisma().$transaction(async (tx) => {
-      await syncSlotsForInstance(tx, instance.id, slots);
-    });
-  }
-
-  revalidatePath("/venue");
-  revalidatePath(`/venues/${template.venue.slug}`);
-  const ymd = storageYmdUtc(date);
-  redirect(`/venue?scheduleSuccess=date&lineupDay=${encodeURIComponent(ymd)}`);
-}
-
 export async function inviteManager(formData: FormData) {
   const session = await requireVenueSession();
   if (!session.venueOwnerId) redirect("/venue?inviteError=ownerOnly");

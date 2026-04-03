@@ -6,7 +6,8 @@ import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
-import { generateDateSchedule, inviteManager } from "./actions";
+import { inviteManager } from "./actions";
+import { VenueChangeRequestForm } from "./VenueChangeRequestForm";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { absoluteUrl } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
@@ -230,7 +231,8 @@ export default async function VenuePortalPage({
                 </>
               )}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <VenueChangeRequestForm defaultEmail={session.email} />
               <Link
                 className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
                 href="/performers"
@@ -317,15 +319,8 @@ export default async function VenuePortalPage({
         ) : null}
         {q.scheduleSuccess === "template" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            <span className="font-semibold text-emerald-100/95">Recurring night added.</span> Generate dates for this
-            template, or use <span className="font-medium text-white">Schedule Open Mic</span> to manage everything in one
-            place.
-          </div>
-        ) : null}
-        {q.scheduleSuccess === "date" ? (
-          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            <span className="font-semibold text-emerald-100/95">Slots refreshed</span> for that date—bookings already held
-            were not changed.
+            <span className="font-semibold text-emerald-100/95">Recurring night added.</span> Use{" "}
+            <span className="font-medium text-white">Schedule Open Mic</span> above to align slots with your booking window.
           </div>
         ) : null}
         {q.houseBook === "1" ? (
@@ -622,7 +617,7 @@ export default async function VenuePortalPage({
                     ) : (
                       <p className="mt-6 text-sm text-white/65">
                         No generated open mic nights yet. Use <span className="text-white/80">Schedule Open Mic</span> below to
-                        save a night, then <span className="text-white/80">Generate slots</span> — nights with real lineups appear
+                        use <span className="text-white/80">Schedule setup</span> below — nights with real lineups appear
                         here as chips.
                       </p>
                     )}
@@ -678,7 +673,7 @@ export default async function VenuePortalPage({
                           No slots for{" "}
                           <span className="text-white/80">{lineupNavLabelFromYmd(selectedYmd)}</span> yet — use{" "}
                           <span className="text-white/75">Each schedule block</span> below, pick this date, and{" "}
-                          <span className="text-white/75">Generate slots</span>.
+                          <span className="text-white/75">Schedule setup</span>.
                         </p>
                       )}
                     </div>
@@ -738,68 +733,6 @@ export default async function VenuePortalPage({
                       onPremiseMaxDistanceMeters={v.onPremiseMaxDistanceMeters ?? 1000}
                       formClassName="mt-4 grid gap-4"
                     />
-                  </div>
-
-                  <div className="mt-8 border-t border-white/10 pt-6">
-                    <div className="text-sm font-semibold text-white/90">
-                      {operational ? "Generate slots by date" : "Generate slots for one date"}
-                    </div>
-                    <p className="mt-1 text-xs text-white/50">
-                      {operational
-                        ? "Pick a block and calendar day to materialize or refresh that night’s grid."
-                        : "Pick a block once templates exist."}
-                    </p>
-                    {v.eventTemplates.length === 0 ? (
-                      <p className="mt-4 text-sm text-white/55">
-                        No templates yet — use <span className="text-white/75">Schedule setup</span> above first.
-                      </p>
-                    ) : (
-                      <div className="mt-4 grid gap-3">
-                        {v.eventTemplates.map((t) => (
-                          <div key={t.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
-                            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                              <div>
-                                <div className="font-semibold">{t.title}</div>
-                                {t.description ? (
-                                  <p className="mt-1 max-w-xl text-xs leading-relaxed text-white/55">{t.description}</p>
-                                ) : null}
-                                <div className="mt-0.5 text-xs text-white/55">
-                                  Format:{" "}
-                                  <span className="text-white/80">{performanceFormatLabel(t.performanceFormat)}</span>
-                                </div>
-                              </div>
-                              <div className="text-xs text-white/60">
-                                {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–
-                                {minutesToTimeLabel(t.endTimeMin)} · {t.slotMinutes}m + {t.breakMinutes}m
-                              </div>
-                            </div>
-                            <form action={generateDateSchedule} className="mt-3 flex flex-wrap items-end gap-2">
-                              <input type="hidden" name="templateId" value={t.id} />
-                              <label className="grid gap-1 text-xs">
-                                <span className="text-white/60">Date</span>
-                                <input
-                                  name="date"
-                                  type="date"
-                                  defaultValue={todayIso}
-                                  min={v.seriesStartDate ? toIsoDateOnly(v.seriesStartDate) : todayIso}
-                                  max={
-                                    v.seriesEndDate
-                                      ? toIsoDateOnly(v.seriesEndDate)
-                                      : plusDaysIso(horizonDaysFor(v.subscriptionTier))
-                                  }
-                                  className="h-10 rounded-md border border-white/10 bg-black/40 px-2 text-sm text-white"
-                                />
-                              </label>
-                              <FormSubmitButton
-                                label="Generate slots"
-                                pendingLabel="Generating…"
-                                className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-3 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
-                              />
-                            </form>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
 

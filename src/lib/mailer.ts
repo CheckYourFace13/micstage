@@ -19,6 +19,8 @@ export async function sendEmail(input: {
   html: string;
   text: string;
   replyTo?: string;
+  /** Resend: max ~40MB per email total; keep uploads small in app code. */
+  attachments?: { filename: string; content: Buffer; contentType?: string }[];
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -47,14 +49,22 @@ export async function sendEmail(input: {
   const resend = new Resend(apiKey);
   try {
     const replyTo = input.replyTo || replyToEmail();
-    const { error } = await resend.emails.send({
+    const payload: Parameters<typeof resend.emails.send>[0] = {
       from: fromAddr,
       to: input.to,
       subject: input.subject,
       html: input.html,
       text: input.text,
       replyTo,
-    });
+    };
+    if (input.attachments?.length) {
+      payload.attachments = input.attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      }));
+    }
+    const { error } = await resend.emails.send(payload);
     if (error) {
       console.error("[mailer] Resend API rejected send", {
         message: error.message,

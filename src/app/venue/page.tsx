@@ -2,12 +2,10 @@ import Link from "next/link";
 import type { Venue } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
-import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { inviteManager } from "./actions";
-import { VenueChangeRequestForm } from "./VenueChangeRequestForm";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { absoluteUrl } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
@@ -180,17 +178,10 @@ export default async function VenuePortalPage({
             >
               Retry dashboard
             </Link>
-            <Link
-              className="inline-flex h-11 items-center justify-center rounded-md border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
-              href="/"
-            >
-              Home
-            </Link>
-            <LogoutVenueArtistButton
-              label="Logout"
-              className="inline-flex h-11 items-center justify-center rounded-md border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
-            />
           </div>
+          <p className="mt-4 text-xs text-white/50">
+            Use the MicStage header for Home, search, and sign out.
+          </p>
         </main>
       </div>
     );
@@ -214,49 +205,23 @@ export default async function VenuePortalPage({
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-6xl px-6 py-14">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-widest text-white/60">Venue portal</div>
-            <h1 className="om-heading mt-2 text-4xl tracking-wide">Venue dashboard</h1>
-            <p className="mt-2 text-sm text-white/70">
-              {anyVenueOperational ? (
-                <>
-                  <span className="text-white/85">Control center:</span> share your lineup, watch tonight&apos;s board, and
-                  manage slots below. Signed in as <span className="font-mono">{session.email}</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-white/85">Finish setup:</span> save your venue profile and weekly schedule — your public
-                  page updates as you go. Signed in as <span className="font-mono">{session.email}</span>
-                </>
-              )}
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-              <VenueChangeRequestForm defaultEmail={session.email} />
-              <Link
-                className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
-                href="/performers"
-              >
-                Search artists
-              </Link>
-              <Link
-                className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
-                href="/locations"
-              >
-                Search open mic venues
-              </Link>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link className="text-sm text-white/70 hover:text-white" href="/">
-              Home
-            </Link>
-            <LogoutVenueArtistButton
-              label="Logout"
-              className="text-sm text-white/70 hover:text-white"
-            />
-          </div>
-        </header>
+        <div className="max-w-3xl">
+          <div className="text-xs font-medium uppercase tracking-widest text-white/60">Venue portal</div>
+          <h1 className="om-heading mt-2 text-4xl tracking-wide">Venue dashboard</h1>
+          <p className="mt-2 text-sm text-white/70">
+            {anyVenueOperational ? (
+              <>
+                <span className="text-white/85">Control center:</span> share your lineup, watch tonight&apos;s board, and
+                manage slots below. Signed in as <span className="font-mono">{session.email}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-white/85">Finish setup:</span> save your venue profile and weekly schedule — your public
+                page updates as you go. Signed in as <span className="font-mono">{session.email}</span>
+              </>
+            )}
+          </p>
+        </div>
 
         {q.profile === "saved" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">

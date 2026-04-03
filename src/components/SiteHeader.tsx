@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ADMIN_LOGOUT_PATH } from "@/lib/adminEdge";
 import { getAuthUiState } from "@/lib/authUiState";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
+import { VenueChangeRequestForm } from "@/app/venue/VenueChangeRequestForm";
 
 function roleBadgeLink(text: string, tone: "admin", href: string) {
   const cls = "border-amber-400/40 bg-amber-500/15 text-amber-100";
@@ -16,7 +17,7 @@ function roleBadgeLink(text: string, tone: "admin", href: string) {
 }
 
 export async function SiteHeader() {
-  const { role: auth, signedInLine, signedInHref } = await getAuthUiState();
+  const { role: auth, signedInLine, signedInHref, venueSessionEmail } = await getAuthUiState();
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/15 bg-black/85 backdrop-blur-md">
@@ -56,6 +57,9 @@ export async function SiteHeader() {
             ) : null}
             {auth === "venue" && signedInLine && signedInHref ? (
               <>
+                {venueSessionEmail ? (
+                  <VenueChangeRequestForm defaultEmail={venueSessionEmail} variant="header" />
+                ) : null}
                 <Link
                   href={signedInHref}
                   className="max-w-[min(100%,20rem)] truncate text-right text-[12px] font-medium leading-snug text-sky-100/95 underline decoration-sky-400/40 decoration-1 underline-offset-2 hover:decoration-sky-300/70 sm:max-w-md sm:text-sm"

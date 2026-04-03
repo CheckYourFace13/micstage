@@ -11,6 +11,8 @@ export type AuthUiState = {
   signedInLine: string | null;
   /** Dashboard for artist/venue; null for public/admin */
   signedInHref: string | null;
+  /** Venue login email for header tools (e.g. support form prefill); null if not a venue session. */
+  venueSessionEmail: string | null;
 };
 
 function emailLocalPart(email: string | undefined): string {
@@ -104,15 +106,15 @@ async function resolveVenueLine(session: Extract<Session, { kind: "venue" }>): P
 export async function getAuthUiState(): Promise<AuthUiState> {
   const [session, adminOk] = await Promise.all([getSession(), isAdminSessionCookieValid()]);
   if (adminOk) {
-    return { role: "admin", signedInLine: null, signedInHref: null };
+    return { role: "admin", signedInLine: null, signedInHref: null, venueSessionEmail: null };
   }
   if (session?.kind === "venue") {
     const { signedInLine, signedInHref } = await resolveVenueLine(session);
-    return { role: "venue", signedInLine, signedInHref };
+    return { role: "venue", signedInLine, signedInHref, venueSessionEmail: session.email };
   }
   if (session?.kind === "musician") {
     const { signedInLine, signedInHref } = await resolveArtistLine(session);
-    return { role: "artist", signedInLine, signedInHref };
+    return { role: "artist", signedInLine, signedInHref, venueSessionEmail: null };
   }
-  return { role: "public", signedInLine: null, signedInHref: null };
+  return { role: "public", signedInLine: null, signedInHref: null, venueSessionEmail: null };
 }

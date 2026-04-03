@@ -10,6 +10,7 @@ import { syncSlotsForInstance } from "@/lib/slotSync";
 import {
   iterStorageDatesInVenueSeries,
   parseWeekdaysFromForm,
+  weekdayFromIsoDateInTimeZone,
 } from "@/lib/weeklySchedule";
 import {
   bookingBlockReason,
@@ -100,6 +101,14 @@ function firstMatchingLink(links: string[], patterns: RegExp[]): string | null {
 
 const ALLOWED_BOOKING_MODES = new Set<string>(BOOKING_RESTRICTION_OPTIONS.map((o) => o.value));
 
+function normalizeOpenMicDescription(raw: string | undefined | null): string | null {
+  if (raw == null) return null;
+  const t = raw.trim();
+  if (!t) return null;
+  const max = 900;
+  return t.length > max ? t.slice(0, max) : t;
+}
+
 /** Start/end times on schedule forms; redirects instead of throwing into the error overlay. */
 function scheduleTimeMinutesFromForm(formData: FormData, field: string): number {
   const raw = formData.get(field);
@@ -145,7 +154,8 @@ export async function createEventTemplate(formData: FormData) {
       performanceFormat: true,
     },
   });
-  const timeZone = optString(formData, "timeZone") ?? venue?.timeZone ?? "America/Chicago";
+  const timeZone = venue?.timeZone ?? "America/Chicago";
+  const description = normalizeOpenMicDescription(optString(formData, "description"));
   const maxHorizonDays = venue?.subscriptionTier === "FREE" ? 60 : 90;
 
   const today = new Date();
@@ -189,6 +199,7 @@ export async function createEventTemplate(formData: FormData) {
     data: {
       venueId,
       title,
+      description,
       weekday,
       startTimeMin,
       endTimeMin,
@@ -228,10 +239,8 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
   const allowed = await venueIdsForSession(session);
   if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
 
-  const weekdays = parseWeekdaysFromForm(formData);
-  if (weekdays.length === 0) {
-    redirect("/venue?scheduleError=noWeekdays");
-  }
+  const scheduleMode = optString(formData, "scheduleMode") ?? "recurring";
+  const isOneEvent = scheduleMode === "one_event";
 
   const title = reqString(formData, "title");
   const startTimeMin = scheduleTimeMinutesFromForm(formData, "startTime");
@@ -240,11 +249,6 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
 
   const slotMinutes = reqInt(formData, "slotMinutes");
   const breakMinutes = reqInt(formData, "breakMinutes");
-  const seriesStartDate = reqDate(formData, "seriesStartDate");
-  const seriesEndDate = reqDate(formData, "seriesEndDate");
-  if (seriesEndDate.getTime() < seriesStartDate.getTime()) {
-    redirect("/venue?scheduleError=badRange");
-  }
 
   const prisma = requirePrisma();
   const venue = await prisma.venue.findUnique({
@@ -257,11 +261,54 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
       onPremiseMaxDistanceMeters: true,
       subscriptionTier: true,
       performanceFormat: true,
+      seriesStartDate: true,
+      seriesEndDate: true,
     },
   });
   if (!venue) redirect("/venue?venueError=venueMissing");
 
-  const timeZone = optString(formData, "timeZone") ?? venue.timeZone ?? "America/Chicago";
+  const timeZone = venue.timeZone ?? "America/Chicago";
+
+  let weekdays: Weekday[];
+  let seriesStartDate: Date;
+  let seriesEndDate: Date;
+
+  if (isOneEvent) {
+    const startIso = reqString(formData, "seriesStartDate");
+    const endIso = reqString(formData, "seriesEndDate");
+    if (startIso !== endIso) redirect("/venue?scheduleError=badRange");
+    seriesStartDate = new Date(`${startIso}T00:00:00.000Z`);
+    seriesEndDate = seriesStartDate;
+    weekdays = [weekdayFromIsoDateInTimeZone(startIso, timeZone)];
+  } else {
+    weekdays = parseWeekdaysFromForm(formData);
+    if (weekdays.length === 0) {
+      redirect("/venue?scheduleError=noWeekdays");
+    }
+    seriesStartDate = reqDate(formData, "seriesStartDate");
+    seriesEndDate = reqDate(formData, "seriesEndDate");
+    if (seriesEndDate.getTime() < seriesStartDate.getTime()) {
+      redirect("/venue?scheduleError=badRange");
+    }
+  }
+
+  /** For one-off nights, widen (never shrink) the venue booking window so other recurring nights stay valid. */
+  let venueSeriesStartForDb = seriesStartDate;
+  let venueSeriesEndForDb = seriesEndDate;
+  if (isOneEvent) {
+    const curS = venue.seriesStartDate;
+    const curE = venue.seriesEndDate;
+    if (curS && curE) {
+      const cs = curS.getTime();
+      const ce = curE.getTime();
+      if (cs <= ce) {
+        const ns = seriesStartDate.getTime();
+        const ne = seriesEndDate.getTime();
+        venueSeriesStartForDb = ns < cs ? seriesStartDate : curS;
+        venueSeriesEndForDb = ne > ce ? seriesEndDate : curE;
+      }
+    }
+  }
   const maxHorizonDays = venue.subscriptionTier === "FREE" ? 60 : 90;
 
   const today = new Date();
@@ -275,9 +322,18 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
     redirect("/venue?scheduleError=badRange");
   }
 
+  if (
+    venueSeriesStartForDb.getTime() < todayUtc.getTime() ||
+    venueSeriesStartForDb.getTime() > horizonEndUtc.getTime() ||
+    venueSeriesEndForDb.getTime() < todayUtc.getTime() ||
+    venueSeriesEndForDb.getTime() > horizonEndUtc.getTime()
+  ) {
+    redirect("/venue?scheduleError=badRange");
+  }
+
   const bookingOpensDaysAhead = Math.max(
     1,
-    Math.min(maxHorizonDays, Math.round((seriesEndDate.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000))),
+    Math.min(maxHorizonDays, Math.round((venueSeriesEndForDb.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000))),
   );
 
   const bookingRestrictionModeStr =
@@ -294,8 +350,11 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
     venue.performanceFormat,
   );
 
+  const description = normalizeOpenMicDescription(optString(formData, "description"));
+
   const templatePayload = {
     title,
+    description,
     startTimeMin,
     endTimeMin,
     slotMinutes,
@@ -329,8 +388,8 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData) {
   await prisma.venue.update({
     where: { id: venueId },
     data: {
-      seriesStartDate,
-      seriesEndDate,
+      seriesStartDate: venueSeriesStartForDb,
+      seriesEndDate: venueSeriesEndForDb,
       bookingOpensDaysAhead,
     },
   });

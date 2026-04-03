@@ -5,10 +5,15 @@ export const VENUE_PERFORMANCE_FORMAT_OPTIONS: { value: VenuePerformanceFormat; 
   { value: "ACOUSTIC_ONLY", label: "Acoustic only" },
   { value: "GUITAR_VOCAL_ONLY", label: "Guitar & vocals only" },
   { value: "FULL_BANDS_ALLOWED", label: "Full bands allowed" },
-  { value: "COMEDY_SPOKEN_WORD", label: "Comedy / spoken word" },
+  { value: "COMEDY", label: "Comedy" },
+  { value: "SPOKEN_WORD", label: "Spoken word" },
 ];
 
-const ALLOWED = new Set<VenuePerformanceFormat>(VENUE_PERFORMANCE_FORMAT_OPTIONS.map((o) => o.value));
+/** Values accepted from forms/API; includes legacy DB value until fully retired. */
+const ALLOWED = new Set<VenuePerformanceFormat>([
+  ...VENUE_PERFORMANCE_FORMAT_OPTIONS.map((o) => o.value),
+  "COMEDY_SPOKEN_WORD",
+]);
 
 export function parseVenuePerformanceFormat(raw: string | undefined | null, fallback: VenuePerformanceFormat) {
   const v = raw?.trim();

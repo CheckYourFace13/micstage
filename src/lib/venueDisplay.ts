@@ -12,6 +12,10 @@ export function performanceFormatLabel(f: VenuePerformanceFormat): string {
       return "Full bands allowed";
     case "COMEDY_SPOKEN_WORD":
       return "Comedy / spoken word";
+    case "COMEDY":
+      return "Comedy";
+    case "SPOKEN_WORD":
+      return "Spoken word";
     default:
       return f;
   }

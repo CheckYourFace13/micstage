@@ -39,7 +39,10 @@ enum VenuePerformanceFormat {
   ACOUSTIC_ONLY
   GUITAR_VOCAL_ONLY
   FULL_BANDS_ALLOWED
+  /// Legacy; no longer offered in UI — migrated rows use COMEDY or SPOKEN_WORD.
   COMEDY_SPOKEN_WORD
+  COMEDY
+  SPOKEN_WORD
 }
 
 enum SubscriptionTier {

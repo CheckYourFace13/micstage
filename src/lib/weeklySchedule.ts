@@ -14,6 +14,19 @@ const LUXON_TO_WEEKDAY: Record<number, Weekday> = {
 
 export const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
+/** Civil calendar weekday for `YYYY-MM-DD` interpreted in `timeZone` (matches series date handling). */
+export function weekdayFromIsoDateInTimeZone(isoYmd: string, timeZone: string): Weekday {
+  const year = Number.parseInt(isoYmd.slice(0, 4), 10);
+  const month = Number.parseInt(isoYmd.slice(5, 7), 10);
+  const day = Number.parseInt(isoYmd.slice(8, 10), 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return "MON";
+  }
+  const dt = DateTime.fromObject({ year, month, day }, { zone: timeZone?.trim() || "America/Chicago" });
+  if (!dt.isValid) return "MON";
+  return LUXON_TO_WEEKDAY[dt.weekday]!;
+}
+
 export function parseWeekdaysFromForm(formData: FormData, fieldName = "weekdays"): Weekday[] {
   const raw = formData.getAll(fieldName);
   const out: Weekday[] = [];

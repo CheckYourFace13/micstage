@@ -24,6 +24,19 @@ function defaultArtistInputValue(slot: Slot, booking: Booking | null): string {
   return slot.manualLineupLabel ?? "";
 }
 
+/** Remount the row form when server slot data changes so uncontrolled inputs reflect saved overrides. */
+function slotLineFormVersion(slot: Slot): string {
+  return [
+    slot.id,
+    String(slot.updatedAt),
+    slot.bookingRestrictionModeOverride ?? "",
+    slot.restrictionHoursBeforeOverride ?? "",
+    slot.onPremiseMaxDistanceMetersOverride ?? "",
+    slot.startMin,
+    slot.endMin,
+  ].join("|");
+}
+
 export function VenueSlotManagementRow({
   venueId,
   slot,
@@ -35,10 +48,15 @@ export function VenueSlotManagementRow({
   const lockedMusician = slotHasMusicianBooking(slot.booking);
   const defaultTier = lineupRuleTierFromSlot(slot, template);
   const displayName = publicSlotArtistLabel(slot, slot.booking);
+  const lineFormKey = slotLineFormVersion(slot);
 
   return (
     <div className="flex flex-wrap items-stretch gap-2 border-b border-white/10 py-2.5 last:border-b-0">
-      <form action={async (fd) => go(await updateVenueSlotLine(fd))} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <form
+        key={lineFormKey}
+        action={async (fd) => go(await updateVenueSlotLine(fd))}
+        className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+      >
         <input type="hidden" name="venueId" value={venueId} />
         <input type="hidden" name="slotId" value={slot.id} />
         {lineupDay ? <input type="hidden" name="lineupDay" value={lineupDay} /> : null}
@@ -62,7 +80,7 @@ export function VenueSlotManagementRow({
             </span>
           ) : (
             <VenueSlotArtistField
-              key={slot.id}
+              key={`${lineFormKey}-artist`}
               venueId={venueId}
               suggestions={performerSuggestions}
               defaultDisplay={defaultArtistInputValue(slot, slot.booking)}

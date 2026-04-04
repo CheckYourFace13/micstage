@@ -231,7 +231,6 @@ export default async function VenuePortalPage({
 
   const todayIso = toIsoDateOnly(new Date());
   const horizonDaysFor = (tier: "FREE" | "PRO") => (tier === "FREE" ? 60 : 90);
-  const plusDaysIso = (days: number) => toIsoDateOnly(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -491,6 +490,7 @@ export default async function VenuePortalPage({
                   : heroYmd;
               const lineupPath = selectedYmd ? `/venues/${v.slug}/lineup/${selectedYmd}` : null;
               const hDays = horizonDaysFor(v.subscriptionTier);
+              const bookingWindowMaxIso = toIsoDateOnly(new Date(Date.now() + hDays * 24 * 60 * 60 * 1000));
               const lineupBadge =
                 operational && primary && selectedYmd && storageYmdUtc(primary.instance.date) === selectedYmd
                   ? primary.badge
@@ -740,7 +740,7 @@ export default async function VenuePortalPage({
                       horizonDays={hDays}
                       defaultSeriesStart={v.seriesStartDate ? toIsoDateOnly(v.seriesStartDate) : todayIso}
                       defaultSeriesEnd={
-                        v.seriesEndDate ? toIsoDateOnly(v.seriesEndDate) : plusDaysIso(hDays)
+                        v.seriesEndDate ? toIsoDateOnly(v.seriesEndDate) : bookingWindowMaxIso
                       }
                       defaultTitle={v.eventTemplates[0]?.title ?? "Open mic"}
                       defaultDescription={v.eventTemplates[0]?.description ?? ""}
@@ -768,7 +768,7 @@ export default async function VenuePortalPage({
                       venue={v}
                       todayIso={todayIso}
                       horizonDays={hDays}
-                      plusDaysIso={plusDaysIso}
+                      bookingWindowMaxIso={bookingWindowMaxIso}
                       formClassName="mt-4 grid gap-3"
                     />
                   </details>
@@ -791,7 +791,7 @@ export default async function VenuePortalPage({
                       venue={v}
                       todayIso={todayIso}
                       horizonDays={hDays}
-                      plusDaysIso={plusDaysIso}
+                      bookingWindowMaxIso={bookingWindowMaxIso}
                     />
                   </div>
                 )}

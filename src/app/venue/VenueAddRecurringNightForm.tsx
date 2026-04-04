@@ -25,7 +25,8 @@ type Props = {
   venue: VenueRecurringNightSlice;
   todayIso: string;
   horizonDays: number;
-  plusDaysIso: (days: number) => string;
+  /** Max selectable end of booking window (`today + horizonDays`), computed on the server. */
+  bookingWindowMaxIso: string;
   formClassName?: string;
 };
 
@@ -33,7 +34,7 @@ export function VenueAddRecurringNightFormFields({
   venue: v,
   todayIso,
   horizonDays,
-  plusDaysIso,
+  bookingWindowMaxIso,
   formClassName = "mt-6 grid gap-3",
 }: Props) {
   const go = useVenuePortalRedirect();
@@ -68,7 +69,7 @@ export function VenueAddRecurringNightFormFields({
             name="seriesStartDate"
             type="date"
             min={todayIso}
-            max={plusDaysIso(horizonDays)}
+            max={bookingWindowMaxIso}
             defaultValue={todayIso}
             required
             className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
@@ -80,8 +81,8 @@ export function VenueAddRecurringNightFormFields({
             name="seriesEndDate"
             type="date"
             min={todayIso}
-            max={plusDaysIso(horizonDays)}
-            defaultValue={plusDaysIso(horizonDays)}
+            max={bookingWindowMaxIso}
+            defaultValue={bookingWindowMaxIso}
             required
             className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
           />

@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 
 export type LocationRow = {
   key: string;
-  city: string;
-  region: string | null;
+  /** Metro, regional hub, or dense city label for the discovery page. */
+  label: string;
   count: number;
   slug: string;
 };
@@ -17,30 +17,28 @@ export function LocationsDirectory({ rows }: { rows: LocationRow[] }) {
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return rows;
-    return rows.filter(
-      (r) =>
-        r.city.toLowerCase().includes(s) ||
-        (r.region ?? "").toLowerCase().includes(s) ||
-        `${r.city} ${r.region ?? ""}`.toLowerCase().includes(s),
-    );
+    return rows.filter((r) => r.label.toLowerCase().includes(s));
   }, [q, rows]);
 
   return (
     <div className="mt-8 grid gap-4">
       <label className="grid max-w-md gap-1 text-sm">
-        <span className="text-white/80">Search cities / regions</span>
+        <span className="text-white/80">Search metros, regions &amp; cities</span>
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="e.g. Austin, Chicago IL…"
+          placeholder="e.g. Chicagoland, Austin TX, Central Illinois…"
           className="h-11 rounded-md border bg-black/40 px-3 text-white placeholder:text-white/40"
           autoComplete="off"
         />
       </label>
       {rows.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/65">
-          <p>No MicStage venues list a city yet. When venues add their address, they&apos;ll appear here.</p>
+          <p>
+            No MicStage venues have address data yet. When venues add a full address, they&apos;ll roll up into discovery
+            markets here.
+          </p>
           <p className="mt-3">
             <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
               Register a venue
@@ -53,7 +51,7 @@ export function LocationsDirectory({ rows }: { rows: LocationRow[] }) {
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/65">
-          No locations match that search.
+          No markets match that search.
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -63,13 +61,8 @@ export function LocationsDirectory({ rows }: { rows: LocationRow[] }) {
               href={`/locations/${l.slug}/performers`}
               className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10"
             >
-              <div className="font-semibold">
-                {l.city}
-                {l.region ? `, ${l.region}` : ""}
-              </div>
-              <div className="mt-1 text-xs text-white/60">
-                {l.count} registered venue{l.count === 1 ? "" : "s"} · public artist activity
-              </div>
+              <div className="font-semibold">{l.label}</div>
+              <div className="mt-1 text-xs text-white/55">{l.count} venue{l.count === 1 ? "" : "s"} on MicStage</div>
             </Link>
           ))}
         </div>

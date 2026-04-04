@@ -143,7 +143,7 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
           </div>
           <p className="text-xs text-white/55">
             Helps people and venues find you. Pick a city with Google (same tech as venue signup) or type city/region
-            manually. Mile radii power future “gigs near you” emails and venue search — they’re stored on your profile.
+            manually. Mile radii power future gig-alert emails and venue matching — they’re stored on your profile.
           </p>
           <MusicianTravelAreasField
             initial={{
@@ -320,12 +320,12 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
         <div className="grid gap-3 rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.06)] p-4">
           <div className="text-sm font-semibold text-white">Open mics & venues to explore</div>
           <p className="text-xs text-white/60">
-            Venues with at least one public schedule on MicStage. Local matches use your home city/region when you fill them in
-            above.
+            Venues with at least one public schedule on MicStage. Rows that match your home city/region (above) sort to the
+            top—exact addresses stay on each venue page; public discovery uses metro/regional markets when scenes are thin.
           </p>
           {venuesForInterest.every((v) => !v.isLocal) ? (
             <p className="text-sm text-amber-200/90">
-              Add your home city/region to see “near you” venues at the top of the list.
+              Add your home city/region to see home-area matches at the top of the list.
             </p>
           ) : null}
           <div className="grid max-h-72 gap-2 overflow-y-auto pr-1">
@@ -337,7 +337,7 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
                 <span className="min-w-0 text-white/90">
                   {v.isLocal ? (
                     <span className="mr-2 rounded bg-[rgba(var(--om-neon),0.2)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--om-neon))]">
-                      Near you
+                      Home area
                     </span>
                   ) : null}
                   <span className="break-words">{formatVenuePickLabel(v)}</span>

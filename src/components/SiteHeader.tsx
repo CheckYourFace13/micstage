@@ -103,7 +103,7 @@ export async function SiteHeader() {
                 className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
                 href="/locations"
               >
-                Find Venues
+                By area
               </Link>
             </nav>
             {auth === "public" ? (

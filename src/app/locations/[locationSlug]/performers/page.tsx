@@ -6,11 +6,10 @@ import { getPrismaOrNull } from "@/lib/prisma";
 import {
   assertKnownLocationSlugOrNotFound,
   canonicalLocationSlugOrNull,
-  locationDirectorySlug,
   locationSlugToFallbackTitle,
   resolveLocationPlaceTitle,
 } from "@/lib/locationSlugValidation";
-import { slugify } from "@/lib/slug";
+import { getVenueCityDiscoveryCounts, venueIncludedInDiscoveryPage } from "@/lib/discoveryMarket";
 import { minutesToTimeLabel } from "@/lib/time";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { relatedLocationsForLocationSlug } from "@/lib/relatedLocations";
@@ -24,7 +23,7 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
   const place = await resolveLocationPlaceTitle(slug);
   return buildPublicMetadata({
     title: `${place} open mic artists`,
-    description: `See who’s playing upcoming open mics in ${place}. Public, shareable artist list on MicStage.`,
+    description: `Upcoming open mic performers across the ${place} discovery market on MicStage—public, shareable artist list (venue addresses stay exact on each venue page).`,
     path: `/locations/${slug}/performers`,
   });
 }
@@ -42,6 +41,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
   today.setUTCHours(0, 0, 0, 0);
 
   const prisma = getPrismaOrNull();
+  const discoveryCounts = await getVenueCityDiscoveryCounts();
 
   const bookingInclude = {
     slot: {
@@ -82,21 +82,18 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
 
       bookings = allCityBookings.filter((b) => {
         const v = b.slot.instance.template.venue;
-        const c = (v.city ?? "").trim();
-        if (!c) return false;
-        if (locationDirectorySlug(c, v.region) === locationSlug) return true;
-        return slugify(c) === locationSlug;
+        return venueIncludedInDiscoveryPage(
+          { city: v.city, region: v.region },
+          locationSlug,
+          discoveryCounts,
+        );
       });
 
       const cityVenues = await prisma.venue.findMany({
         where: { city: { not: null } },
         select: { id: true, slug: true, name: true, city: true, region: true },
       });
-      venuesInArea = cityVenues.filter((v) => {
-        const c = (v.city ?? "").trim();
-        if (!c) return false;
-        return locationDirectorySlug(c, v.region) === locationSlug || slugify(c) === locationSlug;
-      });
+      venuesInArea = cityVenues.filter((v) => venueIncludedInDiscoveryPage(v, locationSlug, discoveryCounts));
     }
   } catch (err) {
     console.error("DB query failed", err);
@@ -104,14 +101,14 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
   }
 
   const shareUrl = absoluteUrl(`/locations/${locationSlug}/performers`);
-  const shareText = `Who's playing upcoming open mics in ${placeTitle}?`;
+  const shareText = `Who's playing upcoming open mics across ${placeTitle}?`;
   const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
   const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
 
   const emptyMessage = queryFailed
-    ? "We couldn’t load upcoming bookings for this area. Try again in a moment."
-    : "No upcoming artists found yet in this location.";
+    ? "We couldn’t load upcoming bookings for this market. Try again in a moment."
+    : "No upcoming artists listed for this market yet.";
   const nearbyLocations = await relatedLocationsForLocationSlug(locationSlug, 6);
   const uniqueVenueCount = new Set(bookings.map((b) => b.slot.instance.template.venue.id)).size;
   const uniquePerformerCount = new Set(bookings.map((b) => b.performerName.toLowerCase().trim())).size;
@@ -120,7 +117,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Locations", item: absoluteUrl("/locations") },
+      { "@type": "ListItem", position: 1, name: "Markets", item: absoluteUrl("/locations") },
       {
         "@type": "ListItem",
         position: 2,
@@ -167,12 +164,13 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Public artist list</div>
             <h1 className="om-heading mt-2 text-4xl tracking-wide">{placeTitle} artists</h1>
             <p className="mt-2 max-w-3xl text-sm text-white/70">
-              Track upcoming open mic performers in {placeTitle}. This page highlights artist activity, participating
-              venues, and quick links to related nearby markets.
+              Track upcoming open mic performers in {placeTitle}. MicStage groups thin towns into metro or regional
+              discovery pages until a local scene has enough venues to earn its own directory; venue addresses stay exact on
+              each venue page. Related markets and venue links are below.
             </p>
           </div>
           <Link className="text-sm text-white/70 hover:text-white" href="/locations">
-            All locations
+            All markets
           </Link>
         </div>
 
@@ -247,7 +245,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
 
         {venuesInArea.length > 0 ? (
           <section className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-5">
-            <h2 className="text-xl font-semibold">Open mic venues in {placeTitle}</h2>
+            <h2 className="text-xl font-semibold">Venues in this discovery market ({placeTitle})</h2>
             <p className="mt-2 text-sm text-white/70">
               Browse venue pages to view recurring schedule structure, available slots, and performer booking details.
             </p>
@@ -270,9 +268,9 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
 
         {nearbyLocations.length > 0 ? (
           <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
-            <h2 className="text-xl font-semibold">Nearby open mic markets</h2>
+            <h2 className="text-xl font-semibold">Related metro &amp; regional markets</h2>
             <p className="mt-2 text-sm text-white/70">
-              Explore related locations {nearbyLocations[0]?.relation === "nearby" ? "near this city" : "in this region"}.
+              Explore other discovery hubs {nearbyLocations[0]?.relation === "nearby" ? "nearby" : "in the same state or region"}.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {nearbyLocations.map((l) => (
@@ -294,7 +292,8 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
             <div>
               <h3 className="font-semibold text-white">What does this page show?</h3>
               <p className="mt-1">
-                Upcoming performer bookings for public open mic schedules in {placeTitle}. Cancelled bookings are not listed.
+                Upcoming performer bookings for venues mapped to the {placeTitle} discovery market. Cancelled bookings are
+                not listed.
               </p>
             </div>
             <div>
@@ -306,7 +305,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
             <div>
               <h3 className="font-semibold text-white">How often is this updated?</h3>
               <p className="mt-1">
-                Results are rendered from current MicStage booking data and reflect upcoming activity for this area.
+                Results are rendered from current MicStage booking data and reflect upcoming activity for this market.
               </p>
             </div>
           </div>
@@ -315,7 +314,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-xl font-semibold">Guides for venues and performers</h2>
           <p className="mt-2 text-sm text-white/70">
-            Learn how strong open mic operations improve local discovery, performer retention, and repeat attendance.
+            Learn how strong open mic operations improve discovery, performer retention, and repeat attendance.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link

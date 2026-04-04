@@ -2,7 +2,12 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { isValidPublicSlug, locationDirectorySlug } from "@/lib/locationSlugValidation";
+import {
+  getVenueCityDiscoveryCounts,
+  MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY,
+  primaryDiscoverySlugForVenue,
+} from "@/lib/discoveryMarket";
+import { isValidPublicSlug, resolveLocationPlaceTitle } from "@/lib/locationSlugValidation";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { lineupNavLabelFromYmd } from "@/lib/time";
@@ -116,13 +121,35 @@ export default async function VenuePublicPage(props: {
         ? { "@type": "GeoCoordinates", latitude: venue.lat, longitude: venue.lng }
         : undefined,
   };
+
+  const discoveryCounts = await getVenueCityDiscoveryCounts();
+  const artistDiscoverySlug = venue.city
+    ? primaryDiscoverySlugForVenue(venue.city, venue.region, discoveryCounts)
+    : "";
+  const artistDiscoveryTitle = artistDiscoverySlug
+    ? await resolveLocationPlaceTitle(artistDiscoverySlug)
+    : "";
+  const nearbyLocations = await relatedLocationsForVenue(venue, 5);
+
   const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Venues", item: absoluteUrl("/venues") },
-      { "@type": "ListItem", position: 2, name: venue.name, item: absoluteUrl(`/venues/${venue.slug}`) },
-    ],
+    itemListElement:
+      venue.city && artistDiscoverySlug
+        ? [
+            { "@type": "ListItem", position: 1, name: "Markets", item: absoluteUrl("/locations") },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: artistDiscoveryTitle,
+              item: absoluteUrl(`/locations/${artistDiscoverySlug}/performers`),
+            },
+            { "@type": "ListItem", position: 3, name: venue.name, item: absoluteUrl(`/venues/${venue.slug}`) },
+          ]
+        : [
+            { "@type": "ListItem", position: 1, name: "Venues", item: absoluteUrl("/venues") },
+            { "@type": "ListItem", position: 2, name: venue.name, item: absoluteUrl(`/venues/${venue.slug}`) },
+          ],
   };
 
   const isMusician = session?.kind === "musician";
@@ -146,7 +173,6 @@ export default async function VenuePublicPage(props: {
       return href ? ([label, href] as [string, string]) : null;
     })
     .filter(Boolean) as [string, string][];
-  const nearbyLocations = await relatedLocationsForVenue(venue, 5);
   const templateCount = venue.eventTemplates.length;
   const upcomingInstances = venue.eventTemplates.flatMap((t) =>
     t.instances.filter((i) => !i.isCancelled && i.date >= now),
@@ -177,14 +203,17 @@ export default async function VenuePublicPage(props: {
                 <span className="text-white/45">(share this link)</span>
               </p>
             ) : null}
-            {venue.city ? (
-              <Link
-                className="mt-2 inline-block text-xs text-white/60 underline hover:text-white"
-                href={`/locations/${locationDirectorySlug(venue.city, venue.region)}/performers`}
-              >
-                Explore artists in {venue.city}
-                {venue.region ? `, ${venue.region}` : ""}
-              </Link>
+            {venue.city && artistDiscoverySlug ? (
+              <p className="mt-2 text-xs text-white/60">
+                <Link className="underline hover:text-white" href={`/locations/${artistDiscoverySlug}/performers`}>
+                  Browse the {artistDiscoveryTitle} artist directory
+                </Link>
+                <span className="text-white/45">
+                  {" "}
+                  — artist discovery rolls up to metro/regional pages when your municipality has fewer than{" "}
+                  {MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY} MicStage venues; your address above is always exact.
+                </span>
+              </p>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -427,8 +456,11 @@ export default async function VenuePublicPage(props: {
 
             {nearbyLocations.length > 0 ? (
               <section className="rounded-xl border border-white/10 bg-white/5 p-5">
-                <h3 className="text-lg font-semibold text-white">Related nearby locations</h3>
-                <p className="mt-2 text-sm text-white/70">More performer activity in nearby markets.</p>
+                <h3 className="text-lg font-semibold text-white">Related metro &amp; regional markets</h3>
+                <p className="mt-2 text-sm text-white/70">
+                  More performer activity in nearby or same-state discovery hubs (thin areas roll up to these pages until
+                  they reach enough venues).
+                </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {nearbyLocations.map((l) => (
                     <Link

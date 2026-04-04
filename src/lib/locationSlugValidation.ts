@@ -1,7 +1,14 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { slugify } from "@/lib/slug";
+import {
+  buildDiscoveryValidationData,
+  getDiscoveryValidationFromDb,
+  getVenueCityDiscoveryCounts,
+  primaryDiscoverySlugForVenue,
+  rollupDiscoveryLabel,
+} from "@/lib/discoveryMarket";
+export { locationDirectorySlug } from "@/lib/locationDirectorySlug";
 
 /** Matches slugify() output for city names (and venue slugs). */
 export const PUBLIC_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -12,21 +19,14 @@ export function isValidPublicSlug(slug: string): boolean {
   return slug.length > 0 && slug.length <= MAX_SLUG_LEN && PUBLIC_SLUG_RE.test(slug);
 }
 
-/** Public location URL segment: city + optional region so duplicate city names do not collide. */
-export function locationDirectorySlug(city: string, region: string | null | undefined): string {
-  const c = (city ?? "").trim();
-  const r = (region ?? "").trim();
-  if (!c) return "";
-  return r ? slugify(`${c} ${r}`) : slugify(c);
-}
-
 /**
- * Cached set of location slugs derived from venues that list a city.
- * Includes `city-region` composites when region is set, plus a bare `slugify(city)` alias only when that city name
- * is unambiguous (single distinct region among venues).
+ * Cached set of location slugs derived from venues + metro/regional discovery rollups.
  * `null` = DB unavailable or query failed (caller should not 404 solely on this).
  */
 export const getValidLocationSlugs = cache(async (): Promise<Set<string> | null> => {
+  const d = await getDiscoveryValidationFromDb();
+  if (d) return d.validSlugs;
+
   const prisma = getPrismaOrNull();
   if (!prisma) return null;
   try {
@@ -34,50 +34,19 @@ export const getValidLocationSlugs = cache(async (): Promise<Set<string> | null>
       where: { city: { not: null } },
       select: { city: true, region: true },
     });
-
-    const cityKeyToRegions = new Map<string, Set<string>>();
-    for (const v of venues) {
-      const city = (v.city ?? "").trim();
-      if (!city) continue;
-      const cityKey = city.toLowerCase();
-      const reg = (v.region ?? "").trim().toLowerCase();
-      if (!cityKeyToRegions.has(cityKey)) cityKeyToRegions.set(cityKey, new Set());
-      cityKeyToRegions.get(cityKey)!.add(reg);
-    }
-
-    const slugs = new Set<string>();
-    const seenPairs = new Set<string>();
-    for (const v of venues) {
-      const city = (v.city ?? "").trim();
-      if (!city) continue;
-      const pairKey = `${city.toLowerCase()}|${(v.region ?? "").trim().toLowerCase()}`;
-      if (seenPairs.has(pairKey)) continue;
-      seenPairs.add(pairKey);
-      const s = locationDirectorySlug(city, v.region);
-      if (s) slugs.add(s);
-    }
-
-    for (const [cityKey, regions] of cityKeyToRegions) {
-      if (regions.size <= 1) {
-        const rep = venues.find((v) => (v.city ?? "").trim().toLowerCase() === cityKey);
-        if (rep) {
-          const bare = slugify((rep.city ?? "").trim());
-          if (bare) slugs.add(bare);
-        }
-      }
-    }
-
-    return slugs;
+    return buildDiscoveryValidationData(venues).validSlugs;
   } catch {
     return null;
   }
 });
 
 /**
- * Canonical public location slugs keyed by each accepted incoming alias.
- * Canonical always prefers `city-region` when region exists for that venue pair.
+ * Canonical discovery slug for each alias (thin cities redirect to metro/regional hubs).
  */
 export const getLocationAliasToCanonicalMap = cache(async (): Promise<Map<string, string> | null> => {
+  const d = await getDiscoveryValidationFromDb();
+  if (d) return d.aliasToCanonical;
+
   const prisma = getPrismaOrNull();
   if (!prisma) return null;
   try {
@@ -85,35 +54,7 @@ export const getLocationAliasToCanonicalMap = cache(async (): Promise<Map<string
       where: { city: { not: null } },
       select: { city: true, region: true },
     });
-
-    const map = new Map<string, string>();
-    const cityKeyToRegionSet = new Map<string, Set<string>>();
-    for (const v of venues) {
-      const city = (v.city ?? "").trim();
-      if (!city) continue;
-      const cityKey = city.toLowerCase();
-      const region = (v.region ?? "").trim();
-      if (!cityKeyToRegionSet.has(cityKey)) cityKeyToRegionSet.set(cityKey, new Set());
-      cityKeyToRegionSet.get(cityKey)!.add(region.toLowerCase());
-    }
-
-    for (const v of venues) {
-      const city = (v.city ?? "").trim();
-      if (!city) continue;
-      const region = (v.region ?? "").trim();
-      const canonical = locationDirectorySlug(city, region || null);
-      if (!canonical) continue;
-      map.set(canonical, canonical);
-
-      const bare = slugify(city);
-      if (!bare) continue;
-      const regionSet = cityKeyToRegionSet.get(city.toLowerCase()) ?? new Set<string>();
-      if (regionSet.size <= 1) {
-        map.set(bare, canonical);
-      }
-    }
-
-    return map;
+    return buildDiscoveryValidationData(venues).aliasToCanonical;
   } catch {
     return null;
   }
@@ -135,6 +76,9 @@ export function locationSlugToFallbackTitle(slug: string): string {
 }
 
 export async function resolveLocationPlaceTitle(locationSlug: string): Promise<string> {
+  const rollup = rollupDiscoveryLabel(locationSlug);
+  if (rollup) return rollup;
+
   const prisma = getPrismaOrNull();
   if (!prisma) return locationSlugToFallbackTitle(locationSlug);
   try {
@@ -142,11 +86,12 @@ export async function resolveLocationPlaceTitle(locationSlug: string): Promise<s
       where: { city: { not: null } },
       select: { city: true, region: true },
     });
-    const hit = venues.find(
-      (v) =>
-        locationDirectorySlug(v.city!, v.region) === locationSlug ||
-        slugify((v.city ?? "").trim()) === locationSlug,
-    );
+    const counts = await getVenueCityDiscoveryCounts();
+    const hit = venues.find((v) => {
+      const c = (v.city ?? "").trim();
+      if (!c) return false;
+      return primaryDiscoverySlugForVenue(c, v.region, counts) === locationSlug;
+    });
     if (hit?.city) {
       const c = hit.city.trim();
       const r = hit.region?.trim();

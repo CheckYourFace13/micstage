@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Find open mic artists by stage name",
   description:
-    "Search MicStage artists by public stage name. Discover open mic regulars and hire-ready acts—legal names stay private.",
+    "Search MicStage artists by public stage name—not by town directory. For upcoming performers grouped by metro or region, start from MicStage’s discovery markets.",
   path: "/performers",
 });
 
@@ -97,7 +97,7 @@ export default async function PerformersPage({
             </p>
           </div>
           <Link href="/locations" className="text-sm text-white/70 hover:text-white">
-            Find Venues
+            By area
           </Link>
         </div>
 

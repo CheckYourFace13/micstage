@@ -25,8 +25,11 @@ export default function WhyMarketingAndSeoPage() {
         <section className="mt-8 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">What gets indexed and shared</h2>
           <ul className="grid gap-3 text-sm text-white/75">
-            <li>Public venue pages and city/location artist pages.</li>
-            <li>Structured route paths for location-based discovery (city slugs and venue slugs).</li>
+            <li>Public venue pages (exact addresses) and metro/regional artist discovery pages.</li>
+            <li>
+              Structured routes: venue slugs plus market-level location pages—thin towns roll up until local venue density
+              earns a dedicated directory.
+            </li>
             <li>Sitemap and robots support for cleaner crawling and launch readiness.</li>
           </ul>
         </section>
@@ -34,7 +37,7 @@ export default function WhyMarketingAndSeoPage() {
         <section className="mt-6 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">Why this converts better</h2>
           <p className="text-sm text-white/75">
-            People searching for local open mics care about clear timing, venue identity, and who is performing. When
+            People scouting an open mic care about clear timing, venue identity, and who is performing. When
             those details live on stable public pages, your promotion becomes cumulative instead of one-off social
             posts.
           </p>
@@ -52,10 +55,10 @@ export default function WhyMarketingAndSeoPage() {
             Start marketing your venue with MicStage
           </Link>
           <Link
-            href="/performers"
+            href="/locations"
             className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Browse artist discovery pages
+            Browse performers by market
           </Link>
         </div>
 

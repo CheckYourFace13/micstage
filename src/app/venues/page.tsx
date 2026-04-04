@@ -2,14 +2,14 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
-import { locationDirectorySlug } from "@/lib/locationSlugValidation";
+import { getVenueCityDiscoveryCounts, primaryDiscoverySlugForVenue } from "@/lib/discoveryMarket";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Open mic venues directory by city",
+  title: "Open mic venues directory",
   description:
-    "Browse MicStage open mic venues by city and region. Open each venue page for recurring schedule details, open slots, and public performer activity.",
+    "Browse every MicStage venue page—addresses stay exact on each listing. Links to upcoming performers use metro and regional discovery hubs until a city has enough venues to stand alone.",
   path: "/venues",
 });
 
@@ -57,6 +57,7 @@ export default async function VenuesDirectoryPage() {
     }
   }
   const sections = [...grouped.values()].sort((a, b) => a.city.localeCompare(b.city));
+  const discoveryCounts = await getVenueCityDiscoveryCounts();
   const totalLocations = sections.length;
   const totalVenues = venues.length;
   const recentlyUpdated = [...venues]
@@ -86,14 +87,15 @@ export default async function VenuesDirectoryPage() {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList) }} />
         <h1 className="om-heading text-4xl tracking-wide">Open mic venues</h1>
         <p className="mt-2 max-w-3xl text-sm text-white/70">
-          Explore MicStage venue pages by city. Each venue page includes public schedule details, upcoming dates, and
-          booking visibility for artists and local fans.
+          Venues are grouped below by the city and state on file—your address on each venue page is always the source of
+          truth. For artist discovery, MicStage prefers metro and regional markets until a city reaches enough venues to
+          earn its own directory.
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/60">
           <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{totalVenues} public venues</span>
-          <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{totalLocations} location groups</span>
+          <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{totalLocations} city/state groupings</span>
           <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/locations">
-            Browse by performer activity
+            Upcoming performers by market
           </Link>
           <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/resources">
             Open mic guides
@@ -140,10 +142,10 @@ export default async function VenuesDirectoryPage() {
                     {section.region ? `, ${section.region}` : ""}
                   </h2>
                   <Link
-                    href={`/locations/${locationDirectorySlug(section.city, section.region)}/performers`}
+                    href={`/locations/${primaryDiscoverySlugForVenue(section.city, section.region, discoveryCounts)}/performers`}
                     className="text-xs text-white/60 underline hover:text-white"
                   >
-                    See artists in this area
+                    See artists in this market
                   </Link>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { locationDirectorySlug } from "@/lib/locationSlugValidation";
+import { computeCitySlugVenueCounts, primaryDiscoverySlugForVenue } from "@/lib/discoveryMarket";
 import { siteOrigin } from "@/lib/publicSeo";
 import { getAllResourceArticles } from "@/lib/resourcesContent";
 
@@ -56,11 +56,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.75,
     }));
 
+    const counts = computeCitySlugVenueCounts(venues);
     const locationUpdatedAt = new Map<string, Date>();
     for (const v of venues) {
       const city = (v.city ?? "").trim();
       if (!city) continue;
-      const slug = locationDirectorySlug(city, v.region);
+      const slug = primaryDiscoverySlugForVenue(city, v.region, counts);
       if (!slug) continue;
       const prev = locationUpdatedAt.get(slug);
       if (!prev || v.updatedAt > prev) {

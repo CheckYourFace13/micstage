@@ -2,13 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
-const homeTitle = "MicStage — Open mic venues, artist discovery & local SEO";
+const homeTitle = "MicStage — Open mic venues, artist discovery & search-friendly pages";
 
 export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
-      "MicStage helps open mic venues and artists get found: structured schedules, bookable slots, artist search, and shareable public pages for local discovery.",
+      "MicStage helps open mic venues and artists get found: structured schedules, bookable slots, artist search, and shareable public pages—with metro and regional discovery when local venue density is still thin.",
     path: "/",
   }),
   /** Avoid root layout `title.template` appending "| MicStage" twice. */
@@ -32,7 +32,7 @@ export default function Home() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
                 <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--om-neon))]" />
-                Built for local scenes
+                Built for open mic communities
               </div>
               <div className="inline-flex items-center rounded-full border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-3 py-1 text-xs font-medium text-white/85">
                 Free to use · Simple to launch
@@ -78,9 +78,10 @@ export default function Home() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold">Find open mics near you</div>
+                      <div className="font-semibold">Find open mics in your area</div>
                       <div className="mt-1 text-sm text-white/70">
-                        Browse venues by city, then book a slot on public schedules.
+                        Browse by metro and regional markets—thin towns roll up to bigger hubs until local scenes are dense
+                        enough for their own directory.
                       </div>
                     </div>
                     <div className="text-white/60 group-hover:text-white">→</div>

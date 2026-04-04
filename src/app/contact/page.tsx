@@ -53,13 +53,17 @@ export default function ContactPage() {
               <li>Cancellations or disputes about a particular show or reservation</li>
             </ul>
             <p className="mt-4 text-white/65">
-              Find public venue pages from{" "}
-              <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/locations">
-                Find Venues
+              Browse the{" "}
+              <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/venues">
+                venue directory
               </Link>{" "}
-              or{" "}
+              for every public room, see{" "}
+              <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/locations">
+                upcoming performers by market
+              </Link>
+              , or search{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
-                Find Artists
+                artists by stage name
               </Link>
               — each venue page may list website or social links when provided.
             </p>

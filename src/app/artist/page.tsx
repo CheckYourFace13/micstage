@@ -271,7 +271,7 @@ export default async function ArtistPortalPage({
                   Complete your profile below—especially <span className="text-white/85">stage name</span> and where you
                   play.
                 </li>
-                <li>Track venues you like, or browse open mics by location.</li>
+                <li>Track venues you like, or browse upcoming performers by discovery market.</li>
                 <li>
                   Book a slot from any venue&apos;s public page while signed in—your upcoming gigs appear in{" "}
                   <span className="text-white/85">Your upcoming bookings</span> below.
@@ -289,7 +289,7 @@ export default async function ArtistPortalPage({
                 className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
                 href="/locations"
               >
-                Search open mic venues
+                Browse by area
               </Link>
             </div>
           </div>
@@ -378,7 +378,7 @@ export default async function ArtistPortalPage({
                   <p className="mt-2">
                     Open a venue&apos;s public page, pick an open time, and reserve while signed in. Start from{" "}
                     <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/locations">
-                      locations
+                      discovery markets
                     </Link>{" "}
                     or venues you&apos;re tracking above.
                   </p>

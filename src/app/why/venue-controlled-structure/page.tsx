@@ -5,7 +5,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Venue-controlled open mic schedules that scale",
   description:
-    "Define recurring open mic structure once on MicStage, generate bookable slots, and publish indexable venue pages for local discovery.",
+    "Define recurring open mic structure once on MicStage, generate bookable slots, and publish indexable venue pages for search and shareable discovery.",
   path: "/why/venue-controlled-structure",
 });
 
@@ -39,8 +39,8 @@ export default function WhyVenueControlledStructurePage() {
         <section className="mt-6 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">Why this helps you signups and traffic</h2>
           <p className="text-sm text-white/75">
-            Structured venue pages improve discoverability for searches like “open mic near me,” “open mic in [city],”
-            and “[venue name] open mic schedule.” When your listing is clear and updated, artists trust the page,
+            Structured venue pages improve discoverability for searches like “open mic near me,” “open mic in [metro or
+            region],” and “[venue name] open mic schedule.” When your listing is clear and updated, artists trust the page,
             click-through improves, and repeat attendance becomes easier.
           </p>
         </section>
@@ -62,10 +62,10 @@ export default function WhyVenueControlledStructurePage() {
             Create your venue account
           </Link>
           <Link
-            href="/locations"
+            href="/venues"
             className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Explore public venue discovery pages
+            Browse public venue pages
           </Link>
         </div>
 

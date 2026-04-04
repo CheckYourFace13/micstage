@@ -15,7 +15,7 @@ export default function NotFound() {
         <h1 className="om-heading mt-3 text-5xl tracking-wide text-white">404</h1>
         <p className="mt-4 text-lg text-white/85">This page isn’t here.</p>
         <p className="mt-2 text-sm text-white/60">
-          The link may be wrong, or the venue or city page may have moved. Try home, find artists, or browse by location.
+          The link may be wrong, or the venue or discovery page may have moved. Try home, find artists, or browse markets.
         </p>
         <div className="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
           <Link
@@ -34,7 +34,7 @@ export default function NotFound() {
             href="/locations"
             className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-6 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Find Venues
+            Browse by area
           </Link>
         </div>
       </main>

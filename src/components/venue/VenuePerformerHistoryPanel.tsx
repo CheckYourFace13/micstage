@@ -1,4 +1,7 @@
+"use client";
+
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 import { toggleVenuePerformerHistoryPublic } from "@/app/venue/actions";
 import { VenuePerformerHistoryKind } from "@/generated/prisma/client";
 
@@ -20,6 +23,7 @@ export function VenuePerformerHistoryPanel({
   venueId: string;
   rows: VenuePerformerHistoryRow[];
 }) {
+  const go = useVenuePortalRedirect();
   if (rows.length === 0) {
     return (
       <div className="mt-6 rounded-xl border border-dashed border-white/15 bg-black/20 px-4 py-5 text-sm text-white/55">
@@ -54,7 +58,7 @@ export function VenuePerformerHistoryPanel({
               <td className="px-3 py-2 text-xs tabular-nums text-white/55">{r.useCount}</td>
               <td className="px-3 py-2">
                 {r.kind === VenuePerformerHistoryKind.MANUAL ? (
-                  <form action={toggleVenuePerformerHistoryPublic} className="inline">
+                  <form action={async (fd) => go(await toggleVenuePerformerHistoryPublic(fd))} className="inline">
                     <input type="hidden" name="venueId" value={venueId} />
                     <input type="hidden" name="historyId" value={r.id} />
                     <input type="hidden" name="nextPublic" value={r.showOnPublicProfile ? "0" : "1"} />

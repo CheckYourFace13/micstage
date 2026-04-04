@@ -1,5 +1,8 @@
+"use client";
+
 import type { Venue, VenuePerformanceFormat } from "@/generated/prisma/client";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 import { createEventTemplate } from "./actions";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
@@ -33,8 +36,9 @@ export function VenueAddRecurringNightFormFields({
   plusDaysIso,
   formClassName = "mt-6 grid gap-3",
 }: Props) {
+  const go = useVenuePortalRedirect();
   return (
-    <form action={createEventTemplate} className={formClassName}>
+    <form action={async (fd) => go(await createEventTemplate(fd))} className={formClassName}>
       <input type="hidden" name="venueId" value={v.id} />
       <label className="grid gap-1 text-sm">
         <span className="text-white/80">Open mic night name (public)</span>

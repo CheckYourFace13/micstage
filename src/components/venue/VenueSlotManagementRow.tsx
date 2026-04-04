@@ -1,6 +1,9 @@
+"use client";
+
 import type { Booking, EventTemplate, Slot } from "@/generated/prisma/client";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { VenueSlotArtistField, type VenueSlotArtistSuggestion } from "@/components/venue/VenueSlotArtistField";
+import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 import { deleteVenueSlot, updateVenueSlotLine } from "@/app/venue/actions";
 import { LINEUP_RULE_TIER_OPTIONS, lineupRuleTierFromSlot } from "@/lib/lineupRuleTiers";
 import { publicSlotArtistLabel, slotHasMusicianBooking } from "@/lib/slotDisplay";
@@ -28,13 +31,14 @@ export function VenueSlotManagementRow({
   lineupDay,
   performerSuggestions = [],
 }: Props) {
+  const go = useVenuePortalRedirect();
   const lockedMusician = slotHasMusicianBooking(slot.booking);
   const defaultTier = lineupRuleTierFromSlot(slot, template);
   const displayName = publicSlotArtistLabel(slot, slot.booking);
 
   return (
     <div className="flex flex-wrap items-stretch gap-2 border-b border-white/10 py-2.5 last:border-b-0">
-      <form action={updateVenueSlotLine} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <form action={async (fd) => go(await updateVenueSlotLine(fd))} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <input type="hidden" name="venueId" value={venueId} />
         <input type="hidden" name="slotId" value={slot.id} />
         {lineupDay ? <input type="hidden" name="lineupDay" value={lineupDay} /> : null}
@@ -87,7 +91,7 @@ export function VenueSlotManagementRow({
           />
         </div>
       </form>
-      <form action={deleteVenueSlot} className="flex items-end">
+      <form action={async (fd) => go(await deleteVenueSlot(fd))} className="flex items-end">
         <input type="hidden" name="venueId" value={venueId} />
         <input type="hidden" name="slotId" value={slot.id} />
         {lineupDay ? <input type="hidden" name="lineupDay" value={lineupDay} /> : null}

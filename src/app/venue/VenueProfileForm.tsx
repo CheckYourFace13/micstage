@@ -1,10 +1,14 @@
+"use client";
+
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 import { discoverVenueSocials, upgradeVenuePlan, updateVenueProfile } from "./actions";
 import type { Venue } from "../../generated/prisma/client";
 
 type Props = { venue: Venue; emphasis?: "primary" | "secondary" };
 
 export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
+  const go = useVenuePortalRedirect();
   const secondary = emphasis === "secondary";
   return (
     <div className={secondary ? "mt-0 rounded-xl border border-white/10 bg-black/25 p-5" : "mt-6 rounded-2xl border border-white/10 bg-black/30 p-6"}>
@@ -34,7 +38,7 @@ export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
         ) : null}
       </p>
 
-      <form action={updateVenueProfile} className="mt-6 grid gap-5">
+      <form action={async (fd) => go(await updateVenueProfile(fd))} className="mt-6 grid gap-5">
         <input type="hidden" name="venueId" value={venue.id} />
 
         <label className="grid gap-1 text-sm">
@@ -209,7 +213,7 @@ export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
         />
       </form>
 
-      <form action={discoverVenueSocials} className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-white/15 bg-black/15 px-4 py-3">
+      <form action={async (fd) => go(await discoverVenueSocials(fd))} className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-white/15 bg-black/15 px-4 py-3">
         <input type="hidden" name="venueId" value={venue.id} />
         <div className="min-w-0 flex-1">
           <div className="text-xs font-medium text-white/70">Auto-find socials from website</div>
@@ -225,7 +229,7 @@ export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
       </form>
 
       {venue.subscriptionTier === "FREE" ? (
-        <form action={upgradeVenuePlan} className="mt-4 flex flex-wrap items-center gap-3">
+        <form action={async (fd) => go(await upgradeVenuePlan(fd))} className="mt-4 flex flex-wrap items-center gap-3">
           <input type="hidden" name="venueId" value={venue.id} />
           <FormSubmitButton
             label="Upgrade to PRO (unlock longer booking windows)"

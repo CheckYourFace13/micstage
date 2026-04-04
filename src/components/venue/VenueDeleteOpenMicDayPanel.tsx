@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { deleteVenueOpenMicDay } from "@/app/venue/actions";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 
 type Props = {
   venueId: string;
@@ -15,6 +16,7 @@ type Props = {
 
 export function VenueDeleteOpenMicDayPanel({ venueId, dateYmd, nightLabel, children }: Props) {
   const [open, setOpen] = useState(false);
+  const go = useVenuePortalRedirect();
 
   return (
     <div className="w-full min-w-0">
@@ -32,7 +34,7 @@ export function VenueDeleteOpenMicDayPanel({ venueId, dateYmd, nightLabel, child
       </div>
 
       {open ? (
-        <form action={deleteVenueOpenMicDay} className="mt-2 max-w-lg rounded-md border border-red-400/30 bg-red-950/20 p-2.5">
+        <form action={async (fd) => go(await deleteVenueOpenMicDay(fd))} className="mt-2 max-w-lg rounded-md border border-red-400/30 bg-red-950/20 p-2.5">
           <input type="hidden" name="venueId" value={venueId} />
           <input type="hidden" name="dateYmd" value={dateYmd} />
           <p className="text-[11px] leading-relaxed text-white/70">

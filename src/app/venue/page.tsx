@@ -1,11 +1,10 @@
 import Link from "next/link";
 import type { Venue } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
-import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
 import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
-import { inviteManager } from "./actions";
+import { VenueInviteManagerForm } from "./VenueInviteManagerForm";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { absoluteUrl } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
@@ -822,33 +821,7 @@ export default async function VenuePortalPage({
                         Managers can help maintain schedules. For now, set a temp password they use to log in at Venue login.
                       </div>
                     </div>
-                    <form action={inviteManager} className="grid gap-3 md:grid-cols-3">
-                      <input type="hidden" name="venueId" value={v.id} />
-                      <label className="grid gap-1 text-sm md:col-span-2">
-                        <span className="text-white/80">Manager email</span>
-                        <input
-                          name="managerEmail"
-                          type="email"
-                          required
-                          className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-                          placeholder="manager@venue.com"
-                        />
-                      </label>
-                      <label className="grid gap-1 text-sm">
-                        <span className="text-white/80">Temp password</span>
-                        <input
-                          name="tempPassword"
-                          required
-                          className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-                          placeholder="Temp password"
-                        />
-                      </label>
-                      <FormSubmitButton
-                        label="Add manager"
-                        pendingLabel="Saving…"
-                        className="h-11 rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60 md:col-span-3"
-                      />
-                    </form>
+                    <VenueInviteManagerForm venueId={v.id} />
                   </div>
                 ) : null}
               </section>

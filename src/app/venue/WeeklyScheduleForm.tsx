@@ -8,6 +8,7 @@ import { ALL_WEEKDAYS, computeWeeklySchedulePreview, weekdayFromIsoDateInTimeZon
 import { weekdayToLabel } from "@/lib/time";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
+import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 import { saveWeeklyScheduleAndGenerateSlots } from "./actions";
 
 function timeToMinutesHHMM(value: string): number | null {
@@ -124,8 +125,9 @@ export function WeeklyScheduleForm({
   const previewReady =
     scheduleMode === "one_event" ? effectiveWeekdays.length > 0 : weekdays.size > 0;
 
+  const go = useVenuePortalRedirect();
   return (
-    <form action={saveWeeklyScheduleAndGenerateSlots} className={formClassName}>
+    <form action={async (fd) => go(await saveWeeklyScheduleAndGenerateSlots(fd))} className={formClassName}>
       <input type="hidden" name="venueId" value={venueId} />
       <input type="hidden" name="scheduleMode" value={scheduleMode} />
 

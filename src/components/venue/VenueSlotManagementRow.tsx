@@ -1,5 +1,6 @@
 import type { Booking, EventTemplate, Slot } from "@/generated/prisma/client";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { VenueSlotArtistField, type VenueSlotArtistSuggestion } from "@/components/venue/VenueSlotArtistField";
 import { deleteVenueSlot, updateVenueSlotLine } from "@/app/venue/actions";
 import { LINEUP_RULE_TIER_OPTIONS, lineupRuleTierFromSlot } from "@/lib/lineupRuleTiers";
 import { publicSlotArtistLabel, slotHasMusicianBooking } from "@/lib/slotDisplay";
@@ -11,6 +12,7 @@ type Props = {
   template: EventTemplate;
   /** Preserves dashboard day tab after save/delete (`YYYY-MM-DD`). */
   lineupDay?: string;
+  performerSuggestions?: VenueSlotArtistSuggestion[];
 };
 
 function defaultArtistInputValue(slot: Slot, booking: Booking | null): string {
@@ -19,7 +21,13 @@ function defaultArtistInputValue(slot: Slot, booking: Booking | null): string {
   return slot.manualLineupLabel ?? "";
 }
 
-export function VenueSlotManagementRow({ venueId, slot, template, lineupDay }: Props) {
+export function VenueSlotManagementRow({
+  venueId,
+  slot,
+  template,
+  lineupDay,
+  performerSuggestions = [],
+}: Props) {
   const lockedMusician = slotHasMusicianBooking(slot.booking);
   const defaultTier = lineupRuleTierFromSlot(slot, template);
   const displayName = publicSlotArtistLabel(slot, slot.booking);
@@ -49,12 +57,11 @@ export function VenueSlotManagementRow({ venueId, slot, template, lineupDay }: P
               {displayName}
             </span>
           ) : (
-            <input
-              name="artistDisplay"
-              type="text"
-              defaultValue={defaultArtistInputValue(slot, slot.booking)}
-              placeholder="Name or open"
-              className="h-9 w-full min-w-0 rounded-md border border-white/15 bg-black/40 px-2 text-sm text-white placeholder:text-white/35"
+            <VenueSlotArtistField
+              key={slot.id}
+              venueId={venueId}
+              suggestions={performerSuggestions}
+              defaultDisplay={defaultArtistInputValue(slot, slot.booking)}
             />
           )}
         </label>

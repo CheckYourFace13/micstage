@@ -64,6 +64,12 @@ enum PasswordResetAccountType {
   MUSICIAN
 }
 
+/// Row in venue performer history: linked MicStage artist vs manual lineup-only name.
+enum VenuePerformerHistoryKind {
+  MUSICIAN
+  MANUAL
+}
+
 model VenueOwner {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -149,6 +155,7 @@ model Venue {
 
   pastPerformers        MusicianPastVenue[]
   interestedMusicians   MusicianVenueInterest[]
+  performerHistory      VenuePerformerHistory[]
 }
 
 model VenueManager {
@@ -235,6 +242,42 @@ model MusicianUser {
   bookings          Booking[]
   pastVenues        MusicianPastVenue[]
   interestedVenues  MusicianVenueInterest[]
+  venuePerformerHistory            VenuePerformerHistory[] @relation("VenuePerformerHistoryMusician")
+  venuePerformerHistoryManualLinks VenuePerformerHistory[] @relation("VenuePerformerHistoryManualLink")
+}
+
+/// Deduplicated performers who have appeared (or been typed) on a venue lineup — for autocomplete, dashboard review, and optional public “past performers”.
+model VenuePerformerHistory {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  venueId String
+  venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  kind VenuePerformerHistoryKind
+  /// MUSICIAN: musicianId; MANUAL: normalized lowercase name for dedupe (see app logic).
+  key  String
+
+  musicianId String?
+  musician   MusicianUser? @relation("VenuePerformerHistoryMusician", fields: [musicianId], references: [id], onDelete: SetNull)
+
+  /// Shown on lineups and lists (stage name or manual entry).
+  displayName String
+
+  lastUsedAt DateTime @default(now())
+  useCount   Int      @default(1)
+
+  /// Manual rows: venue can hide from public venue page. Linked musicians use stage name only (always public-safe when shown).
+  showOnPublicProfile Boolean @default(true)
+
+  /// Optional manual row linked to a real account (venue-confirmed later; no auto-merge).
+  linkedMusicianId String?
+  linkedMusician   MusicianUser? @relation("VenuePerformerHistoryManualLink", fields: [linkedMusicianId], references: [id], onDelete: SetNull)
+
+  @@unique([venueId, kind, key])
+  @@index([venueId, lastUsedAt(sort: Desc)])
+  @@index([venueId, kind])
 }
 
 // Venues this musician says they have performed at (marketing + trust signals).

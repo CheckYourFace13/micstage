@@ -12,8 +12,13 @@ import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabe
 import { isValidLineupYmd, pickPrimaryLineup, storageYmdUtc } from "@/lib/venuePublicLineup";
 import type { LineupTemplate } from "@/lib/venuePublicLineupData";
 import { loadLineupTemplatesByVenueIds, venueIsOperational } from "@/lib/venueDashboardOperational";
+import {
+  loadVenuePerformerHistoryForDashboard,
+  loadVenuePerformerSuggestions,
+} from "@/lib/venuePerformerHistory";
 import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
 import { VenueDeleteOpenMicDayPanel } from "@/components/venue/VenueDeleteOpenMicDayPanel";
+import { VenuePerformerHistoryPanel } from "@/components/venue/VenuePerformerHistoryPanel";
 import { VenueSlotManagementRow } from "@/components/venue/VenueSlotManagementRow";
 import { VenueAddRecurringNightFormFields } from "./VenueAddRecurringNightForm";
 import { VenueProfileForm } from "./VenueProfileForm";
@@ -55,13 +60,20 @@ function logVenuePortalFailure(phase: string, e: unknown) {
 async function loadVenuePortalRows(session: Awaited<ReturnType<typeof requireVenueSession>>): Promise<{
   venues: VenuePortalRow[];
   loadError: "none" | "requirePrisma" | "venueList";
+  performerSuggestionsByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerSuggestions>>>;
+  performerHistoryByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerHistoryForDashboard>>>;
 }> {
   let prisma: ReturnType<typeof requirePrisma>;
   try {
     prisma = requirePrisma();
   } catch (e) {
     logVenuePortalFailure("requirePrisma", e);
-    return { venues: [], loadError: "requirePrisma" };
+    return {
+      venues: [],
+      loadError: "requirePrisma",
+      performerSuggestionsByVenueId: {},
+      performerHistoryByVenueId: {},
+    };
   }
 
   let venueIds: string[] = [];
@@ -81,7 +93,12 @@ async function loadVenuePortalRows(session: Awaited<ReturnType<typeof requireVen
       });
     } catch (e) {
       logVenuePortalFailure("venue.findMany (scalars)", e);
-      return { venues: [], loadError: "venueList" };
+      return {
+        venues: [],
+        loadError: "venueList",
+        performerSuggestionsByVenueId: {},
+        performerHistoryByVenueId: {},
+      };
     }
   }
 
@@ -108,7 +125,20 @@ async function loadVenuePortalRows(session: Awaited<ReturnType<typeof requireVen
     eventTemplates: templatesByVenueId[v.id] ?? [],
   }));
 
-  return { venues, loadError: "none" };
+  const performerSuggestionsByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerSuggestions>>> = {};
+  const performerHistoryByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerHistoryForDashboard>>> = {};
+  if (venueIds.length > 0) {
+    try {
+      for (const id of venueIds) {
+        performerSuggestionsByVenueId[id] = await loadVenuePerformerSuggestions(prisma, id);
+        performerHistoryByVenueId[id] = await loadVenuePerformerHistoryForDashboard(prisma, id);
+      }
+    } catch (e) {
+      logVenuePortalFailure("performer history / suggestions", e);
+    }
+  }
+
+  return { venues, loadError: "none", performerSuggestionsByVenueId, performerHistoryByVenueId };
 }
 
 export const metadata = {
@@ -154,6 +184,7 @@ export default async function VenuePortalPage({
     lineupDay?: string;
     dayDeleted?: string;
     dayDeleteError?: string;
+    performerHistory?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -161,7 +192,8 @@ export default async function VenuePortalPage({
     Object.entries(q).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
   );
   const session = await requireVenueSession();
-  const { venues, loadError } = await loadVenuePortalRows(session);
+  const { venues, loadError, performerSuggestionsByVenueId, performerHistoryByVenueId } =
+    await loadVenuePortalRows(session);
 
   if (loadError === "requirePrisma" || loadError === "venueList") {
     return (
@@ -381,8 +413,14 @@ export default async function VenuePortalPage({
         ) : null}
         {q.slotLine === "saved" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            <span className="font-semibold text-emerald-100/95">Lineup row saved.</span> Times, display name, and booking type
-            are updated for that slot.
+            <span className="font-semibold text-emerald-100/95">Lineup row saved.</span> Times, artist assignment, and booking
+            type are updated for that slot.
+          </div>
+        ) : null}
+        {q.performerHistory === "toggled" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            <span className="font-semibold text-emerald-100/95">Performer list updated.</span> Public venue page visibility for
+            that manual name was saved.
           </div>
         ) : null}
         {q.slotDeleted === "1" ? (
@@ -590,8 +628,9 @@ export default async function VenuePortalPage({
                     <div className="mt-8 border-t border-white/15 pt-6">
                       <div className="text-base font-semibold text-white">Lineup slots</div>
                       <p className="mt-1 text-xs text-white/50">
-                        One row per slot: start time, who appears on the public lineup (when not booked by a MicStage artist),
-                        booking type, Save. Delete removes an empty or house-held slot — not slots with an active artist booking.
+                        Start time, then artist: MicStage accounts show in search; you can still type a manual name. Slots with
+                        an active artist booking are read-only for the name. Save updates the row; Delete skips booked artist
+                        slots.
                       </p>
                       {!selectedYmd ? (
                         <p className="mt-4 text-sm text-white/55">
@@ -624,6 +663,7 @@ export default async function VenuePortalPage({
                                           slot={s}
                                           template={t}
                                           lineupDay={selectedYmd}
+                                          performerSuggestions={performerSuggestionsByVenueId[v.id] ?? []}
                                         />
                                       ))}
                                     </div>
@@ -641,6 +681,19 @@ export default async function VenuePortalPage({
                           <span className="text-white/75">Schedule setup</span>.
                         </p>
                       )}
+                    </div>
+
+                    <div className="mt-8 border-t border-white/15 pt-6">
+                      <div className="text-base font-semibold text-white">Previous performers at this venue</div>
+                      <p className="mt-1 max-w-xl text-xs text-white/50">
+                        Built from lineup saves, house bookings, and public reservations. MicStage accounts are always
+                        eligible for the public “Past performers” section; manual names default to public but you can hide
+                        each one below. Linking manual rows to accounts is coming — data is stored for safe future matching.
+                      </p>
+                      <VenuePerformerHistoryPanel
+                        venueId={v.id}
+                        rows={performerHistoryByVenueId[v.id] ?? []}
+                      />
                     </div>
                   </div>
                 ) : null}

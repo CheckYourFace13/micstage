@@ -25,6 +25,8 @@ import {
 } from "@/lib/venuePublicLineup";
 import { safeExternalHref } from "@/lib/externalUrl";
 import { relatedLocationsForVenue } from "@/lib/relatedLocations";
+import { VenuePerformerHistoryKind } from "@/generated/prisma/client";
+import { loadPublicVenuePastPerformers } from "@/lib/venuePerformerHistory";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 
 export const dynamic = "force-dynamic";
@@ -130,6 +132,30 @@ export default async function VenuePublicPage(props: {
     ? await resolveLocationPlaceTitle(artistDiscoverySlug)
     : "";
   const nearbyLocations = await relatedLocationsForVenue(venue, 5);
+
+  let pastPerformers: Awaited<ReturnType<typeof loadPublicVenuePastPerformers>> = [];
+  try {
+    pastPerformers = await loadPublicVenuePastPerformers(prisma, venue.id);
+  } catch (e) {
+    console.error("[public venue] past performers", venueSlug, e);
+  }
+
+  const pastPerformersLd =
+    pastPerformers.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          name: `Past performers at ${venue.name}`,
+          itemListElement: pastPerformers.map((p, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            name: p.displayName,
+            ...(p.kind === VenuePerformerHistoryKind.MUSICIAN && p.musicianId
+              ? { url: absoluteUrl(`/performers?q=${encodeURIComponent(p.displayName)}`) }
+              : {}),
+          })),
+        }
+      : null;
 
   const breadcrumbLd = {
     "@context": "https://schema.org",
@@ -239,6 +265,9 @@ export default async function VenuePublicPage(props: {
 
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+        {pastPerformersLd ? (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pastPerformersLd) }} />
+        ) : null}
 
         <VenueBookingFlash initialBooked={booked === "1"} initialCancelled={cancelled === "1"} />
 
@@ -453,6 +482,34 @@ export default async function VenuePublicPage(props: {
                 advance.
               </div>
             </div>
+
+            {pastPerformers.length > 0 ? (
+              <section className="rounded-xl border border-white/10 bg-white/5 p-5">
+                <h3 className="text-lg font-semibold text-white">Past performers on MicStage</h3>
+                <p className="mt-2 text-sm text-white/65">
+                  Names from past lineups, bookings, and venue-entered slots. MicStage artist accounts link to search;
+                  manual names appear as text only. Venues can hide manual entries from this list.
+                </p>
+                <ul className="mt-4 flex flex-wrap gap-2">
+                  {pastPerformers.map((p, idx) => (
+                    <li key={`${idx}-${p.kind}-${p.displayName}-${p.musicianId ?? "m"}`}>
+                      {p.kind === VenuePerformerHistoryKind.MUSICIAN && p.musicianId ? (
+                        <Link
+                          href={`/performers?q=${encodeURIComponent(p.displayName)}`}
+                          className="rounded-md border border-white/15 bg-black/25 px-3 py-1.5 text-sm text-white/90 hover:bg-black/40"
+                        >
+                          {p.displayName}
+                        </Link>
+                      ) : (
+                        <span className="inline-flex rounded-md border border-white/10 bg-black/20 px-3 py-1.5 text-sm text-white/80">
+                          {p.displayName}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
             {nearbyLocations.length > 0 ? (
               <section className="rounded-xl border border-white/10 bg-white/5 p-5">

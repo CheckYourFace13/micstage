@@ -19,11 +19,15 @@ import {
   slotStartInstant,
 } from "@/lib/venueBookingRules";
 import { isValidLineupYmd, storageYmdUtc } from "@/lib/venuePublicLineup";
-import { BookingRestrictionMode, Weekday } from "@/generated/prisma/client";
+import { BookingRestrictionMode, VenuePerformerHistoryKind, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { isLineupRuleTier, prismaOverridesForLineupRuleTier } from "@/lib/lineupRuleTiers";
 import { timeInputValueToMinutes } from "@/lib/time";
 import { parseVenuePerformanceFormat } from "@/lib/venuePerformanceFormat";
+import {
+  touchVenuePerformerHistoryForManual,
+  touchVenuePerformerHistoryForMusician,
+} from "@/lib/venuePerformerHistory";
 
 /** Missing/tampered fields → friendly portal message instead of generic error UI. */
 function reqString(formData: FormData, key: string): string {
@@ -652,6 +656,8 @@ export async function houseBookSlot(formData: FormData) {
         where: { id: slot.id },
         data: { status: "RESERVED", manualLineupLabel: null },
       });
+
+      await touchVenuePerformerHistoryForManual(tx, venueId, performerName);
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
@@ -749,6 +755,9 @@ export async function updateVenueSlotLine(formData: FormData) {
   const newStartMin = timeInputValueToMinutes(startTimeStr);
   if (newStartMin == null) redirect("/venue?venueError=invalidForm");
   const artistField = optString(formData, "artistDisplay");
+  const selectedMusicianIdRaw = optString(formData, "selectedMusicianId");
+  const selectedMusicianId =
+    selectedMusicianIdRaw && selectedMusicianIdRaw.length > 0 ? selectedMusicianIdRaw : null;
 
   const allowed = await venueIdsForSession(session);
   if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
@@ -779,28 +788,81 @@ export async function updateVenueSlotLine(formData: FormData) {
   };
 
   await requirePrisma().$transaction(async (tx) => {
-    if (hasMusician) {
+    const slotRow = await tx.slot.findUnique({
+      where: { id: slotId },
+      include: { booking: true },
+    });
+    if (!slotRow) return;
+    const ab = slotRow.booking && !slotRow.booking.cancelledAt ? slotRow.booking : null;
+    const lockedMusician = Boolean(ab?.musicianId);
+
+    let linkMusician: { id: string; stageName: string; email: string } | null = null;
+    if (selectedMusicianId) {
+      const m = await tx.musicianUser.findUnique({
+        where: { id: selectedMusicianId },
+        select: { id: true, stageName: true, email: true },
+      });
+      if (m) linkMusician = m;
+    }
+
+    if (lockedMusician) {
       await tx.slot.update({ where: { id: slotId }, data: baseData });
       return;
     }
-    if (activeBooking && !activeBooking.musicianId) {
+
+    if (linkMusician) {
+      if (ab && !ab.musicianId) {
+        await tx.booking.update({
+          where: { id: ab.id },
+          data: {
+            musicianId: linkMusician.id,
+            performerName: linkMusician.stageName.trim(),
+            performerEmail: linkMusician.email,
+          },
+        });
+      } else if (!ab) {
+        await tx.booking.create({
+          data: {
+            slotId,
+            musicianId: linkMusician.id,
+            performerName: linkMusician.stageName.trim(),
+            performerEmail: linkMusician.email,
+            notes: null,
+          },
+        });
+      }
+      await tx.slot.update({
+        where: { id: slotId },
+        data: { ...baseData, manualLineupLabel: null, status: "RESERVED" },
+      });
+      await touchVenuePerformerHistoryForMusician(tx, venueId, linkMusician.id);
+      return;
+    }
+
+    const trimmedArtist = artistField?.trim() ?? "";
+
+    if (ab && !ab.musicianId) {
+      const nextName = trimmedArtist || ab.performerName;
       await tx.booking.update({
-        where: { id: activeBooking.id },
-        data: { performerName: artistField?.trim() || activeBooking.performerName },
+        where: { id: ab.id },
+        data: { performerName: nextName },
       });
       await tx.slot.update({
         where: { id: slotId },
         data: { ...baseData, manualLineupLabel: null },
       });
+      if (nextName.trim()) await touchVenuePerformerHistoryForManual(tx, venueId, nextName.trim());
       return;
     }
+
     await tx.slot.update({
       where: { id: slotId },
       data: {
         ...baseData,
-        manualLineupLabel: artistField?.trim() ? artistField.trim() : null,
+        manualLineupLabel: trimmedArtist ? trimmedArtist : null,
       },
     });
+    if (trimmedArtist) await touchVenuePerformerHistoryForManual(tx, venueId, trimmedArtist);
   });
 
   revalidatePath("/venue");
@@ -885,5 +947,34 @@ export async function deleteVenueOpenMicDay(formData: FormData) {
     redirect(`/venue?dayDeleted=1&lineupDay=${encodeURIComponent(nextYmd)}`);
   }
   redirect("/venue?dayDeleted=1");
+}
+
+/** Manual history rows only: toggle visibility on the public venue page. */
+export async function toggleVenuePerformerHistoryPublic(formData: FormData) {
+  const session = await requireVenueSession();
+  const venueId = reqString(formData, "venueId");
+  const historyId = reqString(formData, "historyId");
+  const nextRaw = reqString(formData, "nextPublic");
+  const nextPublic = nextRaw === "1";
+
+  const allowed = await venueIdsForSession(session);
+  if (!allowed.includes(venueId)) redirect("/venue?venueError=forbidden");
+
+  const row = await requirePrisma().venuePerformerHistory.findUnique({
+    where: { id: historyId },
+    select: { venueId: true, kind: true },
+  });
+  if (!row || row.venueId !== venueId) redirect("/venue?venueError=forbidden");
+  if (row.kind !== VenuePerformerHistoryKind.MANUAL) redirect("/venue?venueError=invalidForm");
+
+  await requirePrisma().venuePerformerHistory.update({
+    where: { id: historyId },
+    data: { showOnPublicProfile: nextPublic },
+  });
+
+  revalidatePath("/venue");
+  const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+  if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+  redirect("/venue?performerHistory=toggled");
 }
 

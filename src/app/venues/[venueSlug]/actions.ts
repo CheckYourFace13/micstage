@@ -9,6 +9,10 @@ import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { appendQueryToPath, safePublicVenueReturnPath } from "@/lib/publicVenueReturnPath";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
+import {
+  touchVenuePerformerHistoryForManual,
+  touchVenuePerformerHistoryForMusician,
+} from "@/lib/venuePerformerHistory";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -148,6 +152,13 @@ export async function bookSlot(formData: FormData) {
       where: { id: slot.id },
       data: { status: "RESERVED", manualLineupLabel: null },
     });
+
+    const vid = txVenue.id;
+    if (musicianId) {
+      await touchVenuePerformerHistoryForMusician(tx, vid, musicianId);
+    } else if (performerName.trim()) {
+      await touchVenuePerformerHistoryForManual(tx, vid, performerName.trim());
+    }
   });
 
   const lineupYmd = slotPreview.instance.date.toISOString().slice(0, 10);

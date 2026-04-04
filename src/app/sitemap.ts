@@ -3,6 +3,7 @@ import { getPrismaOrNull } from "@/lib/prisma";
 import { computeCitySlugVenueCounts, primaryDiscoverySlugForVenue } from "@/lib/discoveryMarket";
 import { siteOrigin } from "@/lib/publicSeo";
 import { getAllResourceArticles } from "@/lib/resourcesContent";
+import { marketingSitemapSupplements } from "@/lib/marketing/indexability";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.72,
   }));
   if (!prisma) {
-    return [...staticEntries, ...resourceEntries];
+    return [...staticEntries, ...resourceEntries, ...marketingSitemapSupplements()];
   }
 
   try {
@@ -75,8 +76,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.65,
     }));
 
-    return [...staticEntries, ...resourceEntries, ...venueEntries, ...locationEntries];
+    return [...staticEntries, ...resourceEntries, ...venueEntries, ...locationEntries, ...marketingSitemapSupplements()];
   } catch {
-    return [...staticEntries, ...resourceEntries];
+    return [...staticEntries, ...resourceEntries, ...marketingSitemapSupplements()];
   }
 }

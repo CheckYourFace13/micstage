@@ -82,6 +82,23 @@ if (production) {
   }
   ok("EMAIL_FROM is set");
 
+  if (!process.env.EMAIL_FROM_TRANSACTIONAL?.trim()) {
+    warn(
+      "EMAIL_FROM_TRANSACTIONAL not set — transactional mail falls back to EMAIL_FROM (OK if same identity).",
+    );
+  }
+  if (!process.env.EMAIL_FROM_OUTREACH?.trim() && !process.env.EMAIL_FROM_MARKETING?.trim()) {
+    warn(
+      "EMAIL_FROM_OUTREACH / EMAIL_FROM_MARKETING not set — outreach and marketing use EMAIL_FROM (weaker deliverability separation).",
+    );
+  }
+  if (!process.env.MARKETING_UNSUBSCRIBE_SECRET?.trim()) {
+    warn("MARKETING_UNSUBSCRIBE_SECRET not set — unsubscribe signing falls back to AUTH_SECRET.");
+  }
+  if (!process.env.MARKETING_PHYSICAL_ADDRESS?.trim() && !process.env.EMAIL_PHYSICAL_ADDRESS?.trim()) {
+    warn("MARKETING_PHYSICAL_ADDRESS not set — commercial footers use placeholder text until set.");
+  }
+
   const contactInbox =
     process.env.MICSTAGE_CONTACT_INBOX?.trim() ||
     process.env.CONTACT_INBOX?.trim() ||

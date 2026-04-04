@@ -156,6 +156,12 @@ model Venue {
   pastPerformers        MusicianPastVenue[]
   interestedMusicians   MusicianVenueInterest[]
   performerHistory      VenuePerformerHistory[]
+
+  marketingEvents         MarketingEvent[]
+  marketingJobs           MarketingJob[]
+  marketingContacts       MarketingContact[]
+  marketingEmailSends     MarketingEmailSend[]
+  marketingOutreachDrafts MarketingOutreachDraft[]
 }
 
 model VenueManager {
@@ -440,4 +446,282 @@ model AuthRateLimitCounter {
 
   @@unique([key, bucket])
   @@index([updatedAt])
+}
+
+// --- MicStage marketing automation (controlled live beta; deliverability + compliance) ---
+
+enum MarketingEventType {
+  INTERNAL_AUDIT
+  JOB_ENQUEUED
+  JOB_COMPLETED
+  JOB_FAILED
+  CONTACT_UPSERTED
+  SUPPRESSION_RECORDED
+  DRAFT_MATERIALIZED
+  EMAIL_SENT
+  EMAIL_BLOCKED
+  EMAIL_FAILED
+}
+
+enum MarketingContactStatus {
+  ACTIVE
+  UNSUBSCRIBED
+  BOUNCED
+  COMPLAINED
+  REPLIED
+  DO_NOT_CONTACT
+}
+
+enum MarketingEmailCategory {
+  TRANSACTIONAL
+  OUTREACH
+  MARKETING
+}
+
+enum MarketingEmailSendStatus {
+  QUEUED
+  SENT
+  BLOCKED
+  FAILED
+}
+
+enum MarketingOutreachDraftStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  SENT
+  REJECTED
+}
+
+enum MarketingJobStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum MarketingJobKind {
+  VENUE_OUTREACH_DRAFT
+  EMAIL_PAYLOAD_RENDER
+  SOCIAL_PAYLOAD_RENDER
+  INDEXABILITY_SNAPSHOT
+}
+
+enum MarketingSuppressionReason {
+  UNSUBSCRIBE
+  HARD_BOUNCE
+  COMPLAINT
+  ADMIN_SUPPRESS
+}
+
+/// Append-only internal log for marketing operations (audits, dry-runs, future sends).
+model MarketingEvent {
+  id        String             @id @default(cuid())
+  createdAt DateTime           @default(now())
+  type      MarketingEventType
+  /// Discovery rollup slug from `primaryDiscoverySlugForVenue` / locations directory (optional context).
+  discoveryMarketSlug String?
+  actorEmail          String?
+
+  venueId String?
+  venue   Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  contactId String?
+  contact   MarketingContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  jobId String?
+  job   MarketingJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  /// Non-PII JSON metadata only (no email bodies in phase 1).
+  payload Json?
+
+  @@index([createdAt])
+  @@index([type])
+  @@index([discoveryMarketSlug])
+  @@index([venueId])
+  @@index([jobId])
+}
+
+/// Durable job queue for future workers; phase 1 records jobs only (no outbound dispatch).
+model MarketingJob {
+  id        String             @id @default(cuid())
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  status    MarketingJobStatus @default(PENDING)
+  kind      MarketingJobKind
+
+  /// Process at or after this time (null = as soon as possible).
+  runAfter DateTime?
+  attempts Int                 @default(0)
+  maxAttempts Int              @default(5)
+
+  /// Dedupe key for idempotent enqueue (optional).
+  idempotencyKey String? @unique
+
+  discoveryMarketSlug String?
+
+  venueId String?
+  venue   Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  contactId String?
+  contact   MarketingContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  /// Parameters / refs (no secrets).
+  payload   Json?
+  lastError String?
+
+  events MarketingEvent[]
+
+  @@index([status, runAfter])
+  @@index([kind, status])
+  @@index([venueId])
+}
+
+/// Outreach identity; keep separate from product auth accounts.
+model MarketingContact {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailNormalized String @unique
+  displayName     String?
+
+  venueId String?
+  venue   Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  /// Discovery market context for rollups (optional).
+  discoveryMarketSlug String?
+
+  source String?
+  notes  String?
+  meta   Json?
+
+  /// Primary lifecycle state for outreach (kept in sync with unsubscribe/suppression flows).
+  status MarketingContactStatus @default(ACTIVE)
+
+  /// SHA-256 hex of raw unsubscribe token (raw token only appears in email links).
+  unsubscribeTokenHash String? @unique
+
+  repliedAt DateTime?
+
+  /// User-initiated marketing opt-out (separate from technical suppression).
+  marketingUnsubscribedAt DateTime?
+
+  /// Hard block for any future outreach (bounces, complaints, admin).
+  suppressedAt          DateTime?
+  suppressionReason     MarketingSuppressionReason?
+
+  jobs            MarketingJob[]
+  events          MarketingEvent[]
+  emailSends      MarketingEmailSend[]
+  outreachDrafts  MarketingOutreachDraft[]
+
+  @@index([discoveryMarketSlug])
+  @@index([suppressedAt])
+  @@index([marketingUnsubscribedAt])
+  @@index([status])
+}
+
+/// Venue cold outreach: approval required before live send (default PENDING_REVIEW).
+model MarketingOutreachDraft {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  venueId String
+  venue   Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   MarketingContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  toEmailNormalized String
+  status            MarketingOutreachDraftStatus @default(PENDING_REVIEW)
+
+  subject  String
+  textBody String @db.Text
+  htmlBody String @db.Text
+
+  discoveryMarketSlug String?
+
+  approvedAt      DateTime?
+  approvedByEmail String?
+  rejectedAt      DateTime?
+  rejectedByEmail String?
+
+  sentAt    DateTime?
+  lastError String?
+
+  marketingEmailSendId String?            @unique
+  emailSend            MarketingEmailSend? @relation(fields: [marketingEmailSendId], references: [id], onDelete: SetNull)
+
+  @@index([venueId, status])
+  @@index([status, createdAt])
+}
+
+/// Immutable send audit trail (includes blocked attempts).
+model MarketingEmailSend {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contactId String?
+  contact   MarketingContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  toEmailNormalized String
+  toDomain          String
+
+  category       MarketingEmailCategory
+  templateKind   String
+  purposeKey     String
+  idempotencyKey String @unique
+
+  subject String
+
+  status            MarketingEmailSendStatus @default(QUEUED)
+  blockedReason     String?
+  providerMessageId String?
+  sentAt            DateTime?
+  failedAt          DateTime?
+  lastError         String?
+
+  venueId String?
+  venue   Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  discoveryMarketSlug String?
+
+  outreachDraft MarketingOutreachDraft?
+
+  @@index([contactId, createdAt])
+  @@index([category, sentAt])
+  @@index([toDomain, sentAt])
+  @@index([status, createdAt])
+  @@index([templateKind])
+}
+
+/// Inbound provider hooks (bounces/complaints) — populate when webhooks are configured.
+model MarketingProviderWebhookEvent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  provider   String
+  eventType  String
+  externalId String?
+  payload    Json
+  processedAt DateTime?
+
+  @@index([provider, createdAt])
+  @@index([processedAt])
+}
+
+/// Global email-level suppression even when no `MarketingContact` row exists yet.
+model MarketingEmailSuppression {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  emailNormalized String               @unique
+  reason          MarketingSuppressionReason
+  sourceNote      String?
+
+  @@index([reason])
 }

@@ -9,6 +9,7 @@ import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { JOINED_VENUE, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
+import { sendVenueWelcomeEmailAfterRegistration } from "@/lib/marketing/venueWelcomeSend";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -71,6 +72,7 @@ export async function registerVenue(formData: FormData) {
       slug = `${baseSlug}-${i + 2}`;
     }
 
+    let newVenueId: string | null = null;
     await prisma.$transaction(async (tx) => {
       const existing = await tx.venueOwner.findUnique({ where: { email } });
       if (existing) {
@@ -80,7 +82,7 @@ export async function registerVenue(formData: FormData) {
       const owner = existing ?? (await tx.venueOwner.create({ data: { email, passwordHash } }));
 
       // If the owner already existed, we leave their passwordHash as-is (login flow comes next).
-      await tx.venue.create({
+      const created = await tx.venue.create({
         data: {
           ownerId: owner.id,
           name: venueName,
@@ -95,9 +97,14 @@ export async function registerVenue(formData: FormData) {
           timeZone,
         },
       });
+      newVenueId = created.id;
 
       await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
     });
+
+    if (newVenueId) {
+      await sendVenueWelcomeEmailAfterRegistration(prisma, newVenueId, email);
+    }
 
     redirect(`/venue?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_VENUE}`);
   } catch (e) {

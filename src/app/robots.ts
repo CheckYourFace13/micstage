@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { siteOrigin } from "@/lib/publicSeo";
+import { marketingRobotsDisallowExtra } from "@/lib/marketing/indexability";
 
 export default function robots(): MetadataRoute.Robots {
   const base = siteOrigin();
@@ -17,6 +18,7 @@ export default function robots(): MetadataRoute.Robots {
         "/login",
         "/register",
         "/reset",
+        ...marketingRobotsDisallowExtra(),
       ],
     },
     sitemap: `${base}/sitemap.xml`,

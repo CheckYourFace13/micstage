@@ -9,7 +9,7 @@ export function appendCommercialEmailFooter(input: {
   const textFooter = [
     "",
     "---",
-    `Unsubscribe: ${input.unsubscribeUrl}`,
+    `Unsubscribe (one-click supported in Gmail, Apple Mail, and other RFC 8058 clients): ${input.unsubscribeUrl}`,
     "",
     addr,
   ].join("\n");
@@ -18,6 +18,7 @@ export function appendCommercialEmailFooter(input: {
 <hr style="border:none;border-top:1px solid #333;margin:24px 0" />
 <p style="font-size:12px;color:#666;line-height:1.5">
   <a href="${escapeAttr(input.unsubscribeUrl)}">Unsubscribe from MicStage marketing emails</a>
+  <span style="display:block;margin-top:6px;font-size:11px;color:#888">One-click unsubscribe is available in supported inbox clients (List-Unsubscribe-Post).</span>
 </p>
 <p style="font-size:11px;color:#888;white-space:pre-line">${escapeHtml(addr)}</p>`;
 

@@ -10,6 +10,8 @@ const links: { href: string; label: string }[] = [
   { href: "/internal/admin/templates", label: "Templates" },
   { href: "/internal/admin/events", label: "Instances" },
   { href: "/internal/admin/marketing", label: "Marketing" },
+  { href: "/internal/admin/growth", label: "Growth" },
+  { href: "/internal/admin/growth/expansion", label: "Launch markets" },
 ];
 
 export function AdminNav() {

@@ -183,3 +183,43 @@ export async function adminMarketingTestSendAction(formData: FormData) {
   }
   redirect(qmsg("/internal/admin/marketing", "testOk", "1"));
 }
+
+export async function adminDeliverabilitySeedTestAction(formData: FormData) {
+  await assertAdminSession();
+  const prisma = requirePrisma();
+  const to = normalizeMarketingEmail(String(formData.get("seedEmail") ?? ""));
+  if (!to) redirect(qmsg("/internal/admin/marketing", "seedErr", "email"));
+
+  const inner = `
+<p><strong>MicStage deliverability seed</strong></p>
+<p>Send this to inboxes you control in <strong>Gmail</strong> and <strong>Outlook</strong> (Microsoft 365 or consumer).</p>
+<ol>
+<li><strong>Gmail:</strong> Open the ⋮ menu → check List-Unsubscribe / one-click; note Primary vs Promotions placement.</li>
+<li><strong>Outlook:</strong> Compare Focused vs Other; open View → message source for authentication results.</li>
+<li>Keep volume conservative; raise <code>MARKETING_CAP_*</code> only when deliverability is stable.</li>
+</ol>
+<p>Template: ADMIN_DELIVERABILITY_SEED · category: marketing (commercial footer + List-Unsubscribe-Post).</p>
+`.trim();
+
+  const r = await sendThroughMarketingPipeline(prisma, {
+    to,
+    category: "marketing",
+    templateKind: MARKETING_TEMPLATE_KINDS.ADMIN_DELIVERABILITY_SEED,
+    purposeKey: `admin-deliverability-seed:${Date.now()}`,
+    subject: "[MicStage placement] Gmail + Outlook seed checklist",
+    htmlBody: `<div style="font-family:system-ui,sans-serif;line-height:1.55;color:#111">${inner}</div>`,
+    textBody: [
+      "MicStage deliverability seed (Gmail + Outlook).",
+      "",
+      "Gmail: check one-click unsub + tab placement.",
+      "Outlook: Focused vs Other + auth headers.",
+      "Keep sends under configured daily caps.",
+    ].join("\n"),
+  });
+
+  revalidatePath("/internal/admin/marketing");
+  if (!r.ok) {
+    redirect(qmsg("/internal/admin/marketing", "seedErr", r.reasons.join("|").slice(0, 200)));
+  }
+  redirect(qmsg("/internal/admin/marketing", "seedOk", "1"));
+}

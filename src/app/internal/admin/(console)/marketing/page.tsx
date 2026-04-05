@@ -3,6 +3,7 @@ import { assertAdminSession } from "@/lib/adminAuth";
 import {
   adminApproveOutreachDraftAction,
   adminCreateOutreachDraftAction,
+  adminDeliverabilitySeedTestAction,
   adminEnqueueMarketingInfraSelfTestAction,
   adminMarketingTestSendAction,
   adminRejectOutreachDraftAction,
@@ -10,6 +11,11 @@ import {
   adminSendOutreachDraftAction,
 } from "@/app/internal/admin/marketingLiveActions";
 import { explainMarketingSendBlock } from "@/lib/marketing/blockReasons";
+import {
+  fromAddressForMicStageCategory,
+  marketingDailyCap,
+  marketingPerDomainDailyCap,
+} from "@/lib/marketing/emailConfig";
 import { loadVenueOutreachDraft } from "@/lib/marketing/venueOutreachDrafts";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { requirePrisma } from "@/lib/prisma";
@@ -29,6 +35,8 @@ export default async function AdminMarketingPage(props: {
     bulkErr?: string;
     testOk?: string;
     testErr?: string;
+    seedOk?: string;
+    seedErr?: string;
   }>;
 }) {
   await assertAdminSession();
@@ -176,6 +184,33 @@ export default async function AdminMarketingPage(props: {
 
       <Flash params={params} />
 
+      <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h2 className="text-lg font-medium text-white">Sending identity &amp; daily caps (effective)</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          From strings resolve from <code className="text-zinc-400">EMAIL_FROM_*</code> env (see code for fallbacks).
+        </p>
+        <ul className="mt-3 space-y-2 text-xs text-zinc-300">
+          <li>
+            <span className="text-zinc-500">Transactional:</span>{" "}
+            <code className="break-all text-[11px] text-emerald-200/90">{fromAddressForMicStageCategory("transactional")}</code>{" "}
+            · cap {marketingDailyCap("transactional")}/day
+          </li>
+          <li>
+            <span className="text-zinc-500">Outreach:</span>{" "}
+            <code className="break-all text-[11px] text-emerald-200/90">{fromAddressForMicStageCategory("outreach")}</code> · cap{" "}
+            {marketingDailyCap("outreach")}/day
+          </li>
+          <li>
+            <span className="text-zinc-500">Marketing:</span>{" "}
+            <code className="break-all text-[11px] text-emerald-200/90">{fromAddressForMicStageCategory("marketing")}</code> · cap{" "}
+            {marketingDailyCap("marketing")}/day
+          </li>
+          <li className="text-zinc-500">
+            Per recipient domain (outreach+marketing): {marketingPerDomainDailyCap()}/day
+          </li>
+        </ul>
+      </section>
+
       <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label="Email sends (all)" value={sendCount} sub={`${blockedSendCount} blocked`} />
         <Stat label="Marketing events" value={eventCount} />
@@ -184,7 +219,7 @@ export default async function AdminMarketingPage(props: {
         <Stat label="Global suppressions" value={suppressionCount} />
       </section>
 
-      <section className="mt-10 grid gap-8 lg:grid-cols-2">
+      <section className="mt-10 grid gap-8 lg:grid-cols-3">
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
           <h2 className="text-lg font-medium text-white">Manual test send</h2>
           <p className="mt-1 text-xs text-zinc-500">Sends a real outreach-class email to your inbox (subject prefixed). Uses the live pipeline.</p>
@@ -204,6 +239,32 @@ export default async function AdminMarketingPage(props: {
               className="h-10 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-500"
             >
               Send test
+            </button>
+          </form>
+        </div>
+
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+          <h2 className="text-lg font-medium text-white">Deliverability seed (Gmail + Outlook)</h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Sends a <span className="text-zinc-300">marketing</span>-category message with the full commercial footer and
+            List-Unsubscribe headers. Use seed inboxes you control in both providers.
+          </p>
+          <form action={adminDeliverabilitySeedTestAction} className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="grid gap-1 text-sm">
+              <span className="text-zinc-400">Seed inbox</span>
+              <input
+                name="seedEmail"
+                type="email"
+                required
+                placeholder="seed@gmail.com"
+                className="h-10 min-w-[14rem] rounded border border-zinc-700 bg-black/40 px-2 text-white"
+              />
+            </label>
+            <button
+              type="submit"
+              className="h-10 rounded-md bg-sky-700 px-4 text-sm font-semibold text-white hover:bg-sky-600"
+            >
+              Send seed checklist
             </button>
           </form>
         </div>
@@ -438,6 +499,8 @@ function Flash({ params }: { params: Record<string, string | undefined> }) {
   if (params.bulkErr) bits.push(`Bulk error: ${params.bulkErr}`);
   if (params.testOk === "1") bits.push("Test email dispatched.");
   if (params.testErr) bits.push(`Test error: ${params.testErr}`);
+  if (params.seedOk === "1") bits.push("Deliverability seed email dispatched.");
+  if (params.seedErr) bits.push(`Seed error: ${params.seedErr}`);
   if (bits.length === 0) return null;
   return (
     <div className="mt-4 space-y-1 rounded border border-zinc-700 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200">

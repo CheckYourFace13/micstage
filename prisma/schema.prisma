@@ -616,6 +616,7 @@ model MarketingContact {
   events          MarketingEvent[]
   emailSends      MarketingEmailSend[]
   outreachDrafts  MarketingOutreachDraft[]
+  growthLeadOutreachDrafts GrowthLeadOutreachDraft[]
 
   @@index([discoveryMarketSlug])
   @@index([suppressedAt])
@@ -690,7 +691,8 @@ model MarketingEmailSend {
 
   discoveryMarketSlug String?
 
-  outreachDraft MarketingOutreachDraft?
+  outreachDraft            MarketingOutreachDraft?
+  growthLeadOutreachDraft GrowthLeadOutreachDraft?
 
   @@index([contactId, createdAt])
   @@index([category, sentAt])
@@ -724,4 +726,204 @@ model MarketingEmailSuppression {
   sourceNote      String?
 
   @@index([reason])
+}
+
+// --- Growth / outbound lead pipeline (manual + CSV; no auto-scrape or auto-send) ---
+
+enum GrowthLeadType {
+  VENUE
+  ARTIST
+  PROMOTER_ACCOUNT
+}
+
+enum GrowthLeadStatus {
+  DISCOVERED
+  REVIEWED
+  APPROVED
+  CONTACTED
+  REPLIED
+  /// Lead became a real MicStage venue owner, artist, or similar participant.
+  JOINED
+  BOUNCED
+  UNSUBSCRIBED
+  REJECTED
+}
+
+enum GrowthLeadPerformanceTag {
+  MUSIC
+  COMEDY
+  POETRY
+  VARIETY
+}
+
+enum GrowthLeadOutreachDraftStatus {
+  PENDING_REVIEW
+  APPROVED
+  SENT
+  REJECTED
+}
+
+enum GrowthLeadResponseChannel {
+  EMAIL
+  NOTE
+  OTHER
+}
+
+enum GrowthLeadFollowUpStatus {
+  PLANNED
+  CANCELLED
+  SKIPPED
+  COMPLETED
+}
+
+/// Imported or hand-entered prospect; outreach is draft → approve → send only.
+model GrowthLead {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leadType GrowthLeadType
+  status   GrowthLeadStatus @default(DISCOVERED)
+
+  name String
+
+  /// Normalized email when available (outreach sends require this).
+  contactEmailNormalized String?
+  /// Booking / contact page when no email yet.
+  contactUrl             String?
+
+  websiteUrl   String?
+  instagramUrl String?
+  youtubeUrl   String?
+  tiktokUrl    String?
+
+  city                String?
+  /// Suburb or neighborhood within the metro (e.g. Evanston under Chicagoland).
+  suburb              String?
+  region              String?
+  discoveryMarketSlug String?
+
+  performanceTags GrowthLeadPerformanceTag[] @default([])
+
+  source   String?
+  fitScore Int?
+
+  /// Optional stable key for import dedupe (e.g. CSV row id or domain).
+  importKey String? @unique
+
+  internalNotes String? @db.Text
+
+  outreachDrafts  GrowthLeadOutreachDraft[]
+  responses       GrowthLeadResponse[]
+  followUpSchedules GrowthLeadFollowUpSchedule[]
+
+  @@index([leadType, status])
+  @@index([discoveryMarketSlug])
+  @@index([suburb])
+  @@index([status, createdAt])
+  @@index([contactEmailNormalized])
+}
+
+model GrowthLeadOutreachDraft {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leadId String
+  lead   GrowthLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   MarketingContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  toEmailNormalized String
+  status            GrowthLeadOutreachDraftStatus @default(PENDING_REVIEW)
+
+  subject  String
+  textBody String @db.Text
+  htmlBody String @db.Text
+
+  discoveryMarketSlug String?
+
+  approvedAt      DateTime?
+  approvedByEmail String?
+  rejectedAt      DateTime?
+  rejectedByEmail String?
+
+  sentAt    DateTime?
+  lastError String?
+
+  marketingEmailSendId String?            @unique
+  emailSend            MarketingEmailSend? @relation(fields: [marketingEmailSendId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, status])
+  @@index([status, createdAt])
+}
+
+model GrowthLeadResponse {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  leadId String
+  lead   GrowthLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  channel GrowthLeadResponseChannel @default(NOTE)
+  summary String                    @db.Text
+  meta    Json?
+
+  actorEmail String?
+
+  @@index([leadId, createdAt])
+}
+
+/// Follow-up hooks for future automation; `enabled` defaults false — no worker sends yet.
+model GrowthLeadFollowUpSchedule {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leadId String
+  lead   GrowthLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  /// Master switch per row; global automation stays off until product enables it.
+  enabled Boolean @default(false)
+
+  runAfter   DateTime?
+  templateKey String?
+
+  status GrowthLeadFollowUpStatus @default(PLANNED)
+
+  lastError String?
+
+  @@index([enabled, runAfter])
+  @@index([leadId])
+}
+
+/// Outbound growth launch queue + auto-expansion (MicStage markets).
+enum GrowthLaunchMarketStatus {
+  ACTIVE
+  QUEUED
+  PAUSED
+}
+
+model GrowthLaunchMarket {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  discoveryMarketSlug String @unique
+  label               String
+  regionDefault       String?
+
+  status    GrowthLaunchMarketStatus @default(QUEUED)
+  sortOrder Int                       @default(0)
+
+  activatedAt DateTime?
+  pausedAt    DateTime?
+
+  coldApprovalRelaxed  Boolean @default(false)
+  autoExpansionEnabled Boolean @default(true)
+
+  notes String?
+
+  @@index([status, sortOrder])
 }

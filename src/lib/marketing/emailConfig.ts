@@ -56,16 +56,16 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
     case "transactional":
       return parseIntEnv("MARKETING_CAP_DAILY_TRANSACTIONAL", 50_000);
     case "outreach":
-      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 500);
+      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 80);
     case "marketing":
-      return parseIntEnv("MARKETING_CAP_DAILY_MARKETING", 200);
+      return parseIntEnv("MARKETING_CAP_DAILY_MARKETING", 40);
     default:
       return 0;
   }
 }
 
 export function marketingPerDomainDailyCap(): number {
-  return parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 50);
+  return parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 15);
 }
 
 /** Hours between sends to same contact for outreach+marketing (same template family uses purposeKey). */
@@ -101,4 +101,9 @@ export function venueWelcomeEmailEnabled(): boolean {
 
 export function performerLifecycleEmailEnabled(): boolean {
   return process.env.MARKETING_AUTO_PERFORMER_LIFECYCLE === "true";
+}
+
+/** Growth lead follow-up schedules exist in DB; no worker sends until this is true. */
+export function growthFollowUpAutomationEnabled(): boolean {
+  return process.env.GROWTH_FOLLOW_UP_AUTOMATION_ENABLED === "true";
 }

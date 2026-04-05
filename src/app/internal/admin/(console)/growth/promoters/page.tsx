@@ -1,0 +1,55 @@
+import Link from "next/link";
+import { assertAdminSession } from "@/lib/adminAuth";
+import { GrowthLeadsFilteredTable } from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
+import { defaultGrowthMetro, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
+
+export const dynamic = "force-dynamic";
+
+export default async function AdminGrowthPromotersPage(props: {
+  searchParams: Promise<{ market?: string; metro?: string; all?: string }>;
+}) {
+  await assertAdminSession();
+  const params = await props.searchParams;
+  const market = resolveGrowthMarketSlug({ market: params.market, metro: params.metro });
+  const pipelineOnly = params.all !== "1";
+
+  return (
+    <main className="mx-auto max-w-7xl px-3 py-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-lg font-semibold text-white">Promoters / social accounts to contact</h1>
+        <Link href="/internal/admin/growth" className="text-sm text-zinc-400 hover:text-white">
+          ← Growth hub
+        </Link>
+      </div>
+      <p className="mt-1 text-xs text-zinc-500">
+        Defaults to <strong className="text-zinc-300">{defaultGrowthMetro().label}</strong>.{" "}
+        <Link className="text-emerald-400 hover:text-emerald-300" href="/internal/admin/growth/leads">
+          Filtered leads →
+        </Link>
+      </p>
+
+      <form method="get" className="mt-4 flex flex-wrap items-end gap-2 text-sm">
+        <label className="grid gap-1">
+          <span className="text-zinc-500">Discovery market slug</span>
+          <input
+            name="market"
+            defaultValue={market}
+            className="h-9 min-w-[12rem] rounded border border-zinc-700 bg-black/40 px-2 font-mono text-xs text-white"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-zinc-300">
+          <input type="checkbox" name="all" value="1" defaultChecked={params.all === "1"} />
+          Show all statuses
+        </label>
+        <button type="submit" className="h-9 rounded-md bg-zinc-700 px-3 text-white hover:bg-zinc-600">
+          Apply
+        </button>
+      </form>
+
+      <GrowthLeadsFilteredTable
+        filters={{ marketSlug: market, leadType: "PROMOTER_ACCOUNT", pipelineOnly }}
+        title="Promoter / social leads"
+      />
+    </main>
+  );
+}

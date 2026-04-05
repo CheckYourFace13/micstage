@@ -16,12 +16,14 @@ import {
   loadVenuePerformerSuggestions,
 } from "@/lib/venuePerformerHistory";
 import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
+import { VenueTestLineupCleanupPanel } from "@/components/venue/VenueTestLineupCleanupPanel";
 import { VenueDeleteOpenMicDayPanel } from "@/components/venue/VenueDeleteOpenMicDayPanel";
 import { VenuePerformerHistoryPanel } from "@/components/venue/VenuePerformerHistoryPanel";
 import { VenueSlotManagementRow } from "@/components/venue/VenueSlotManagementRow";
 import { VenueAddRecurringNightFormFields } from "./VenueAddRecurringNightForm";
 import { VenueProfileForm } from "./VenueProfileForm";
 import { WeeklyScheduleForm } from "./WeeklyScheduleForm";
+import { isVenueLineupTestCleanupUiEnabled } from "@/lib/venueTestLineupCleanup";
 
 type VenueScheduleTemplateInclude = {
   instances: {
@@ -147,13 +149,28 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 /** Preserve flash/query params when switching `lineupDay` from the dashboard. */
+const VENUE_DASHBOARD_EPHEMERAL_QUERY_KEYS = new Set([
+  "lineupDay",
+  "lineupTestCleanup",
+  "lineupTestCleanupError",
+  "ltcScope",
+  "ltcYmd",
+  "ltcBookings",
+  "ltcManual",
+  "ltcAvail",
+  "ltcHistDel",
+  "ltcHistDec",
+  "ltcInst",
+  "ltcSlots",
+]);
+
 function venueDashboardChipHref(
   preserved: Record<string, string | undefined>,
   ymd: string,
 ): string {
   const p = new URLSearchParams();
   for (const [key, val] of Object.entries(preserved)) {
-    if (val == null || val === "" || key === "lineupDay") continue;
+    if (val == null || val === "" || VENUE_DASHBOARD_EPHEMERAL_QUERY_KEYS.has(key)) continue;
     p.set(key, val);
   }
   p.set("lineupDay", ymd);
@@ -184,6 +201,17 @@ export default async function VenuePortalPage({
     dayDeleted?: string;
     dayDeleteError?: string;
     performerHistory?: string;
+    lineupTestCleanup?: string;
+    lineupTestCleanupError?: string;
+    ltcScope?: string;
+    ltcYmd?: string;
+    ltcBookings?: string;
+    ltcManual?: string;
+    ltcAvail?: string;
+    ltcHistDel?: string;
+    ltcHistDec?: string;
+    ltcInst?: string;
+    ltcSlots?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -367,6 +395,45 @@ export default async function VenuePortalPage({
         {q.venueError === "venueMissing" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             Venue data could not be loaded. Refresh and try again.
+          </div>
+        ) : null}
+        {q.venueError === "featureDisabled" ? (
+          <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-3 text-sm text-amber-50">
+            Lineup test cleanup is disabled in this environment. For production, set{" "}
+            <code className="text-amber-200/90">VENUE_ALLOW_LINEUP_TEST_CLEANUP=true</code> if you need it.
+          </div>
+        ) : null}
+        {q.lineupTestCleanup === "ok" ? (
+          <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-950/25 px-4 py-3 text-sm text-white">
+            <span className="font-semibold text-amber-100">Lineup test cleanup finished.</span> Scope:{" "}
+            <span className="font-mono text-xs text-white/80">{q.ltcScope ?? "?"}</span>
+            {q.ltcYmd ? (
+              <>
+                {" "}
+                · night <span className="font-mono text-xs text-white/80">{q.ltcYmd}</span>
+              </>
+            ) : null}
+            . Bookings removed: {q.ltcBookings ?? "0"}, manual labels cleared: {q.ltcManual ?? "0"}, slots freed (RESERVED→
+            AVAILABLE): {q.ltcAvail ?? "0"}, performer history rows deleted: {q.ltcHistDel ?? "0"}, decremented:{" "}
+            {q.ltcHistDec ?? "0"} (instances touched: {q.ltcInst ?? "0"}, slots scanned: {q.ltcSlots ?? "0"}).
+          </div>
+        ) : null}
+        {q.lineupTestCleanupError === "confirm" ? (
+          <div className="mt-6 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm text-red-50">
+            Confirmation phrase did not match for <strong>selected night</strong>. Type exactly:{" "}
+            <code className="text-red-100/90">CLEAR LINEUP TEST DATA</code>
+          </div>
+        ) : null}
+        {q.lineupTestCleanupError === "confirmVenue" ? (
+          <div className="mt-6 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm text-red-50">
+            Confirmation phrase did not match for <strong>entire venue</strong>. Type exactly:{" "}
+            <code className="text-red-100/90">CLEAR ALL LINEUP DATA FOR THIS VENUE</code>
+          </div>
+        ) : null}
+        {q.lineupTestCleanupError === "needDay" ? (
+          <div className="mt-6 rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm text-red-50">
+            Select a night from the date chips before running cleanup for <strong>selected night only</strong>, or choose{" "}
+            <strong>entire venue</strong>.
           </div>
         ) : null}
         {q.inviteError === "ownerOnly" ? (
@@ -583,6 +650,14 @@ export default async function VenuePortalPage({
                           })}
                         </div>
                       </div>
+                    ) : null}
+
+                    {generatedDayYmds.length > 0 && isVenueLineupTestCleanupUiEnabled() ? (
+                      <VenueTestLineupCleanupPanel
+                        venueId={v.id}
+                        selectedYmd={selectedYmd}
+                        selectedNightLabel={selectedYmd ? lineupNavLabelFromYmd(selectedYmd) : null}
+                      />
                     ) : null}
 
                     {selectedYmd && lineupPath ? (

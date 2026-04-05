@@ -33,6 +33,10 @@ import {
   touchVenuePerformerHistoryForManual,
   touchVenuePerformerHistoryForMusician,
 } from "@/lib/venuePerformerHistory";
+import {
+  isVenueLineupTestCleanupUiEnabled,
+  runVenueLineupTestCleanup,
+} from "@/lib/venueTestLineupCleanup";
 
 /** Missing/tampered fields → friendly portal message instead of generic error UI. */
 function reqString(formData: FormData, key: string): string {
@@ -1050,4 +1054,75 @@ export async function toggleVenuePerformerHistoryPublic(formData: FormData): Pro
   }
 }
 
+const LINEUP_TEST_CONFIRM_DAY = "CLEAR LINEUP TEST DATA";
+const LINEUP_TEST_CONFIRM_VENUE = "CLEAR ALL LINEUP DATA FOR THIS VENUE";
 
+/** Destructive: clears bookings / manual labels / reconciles performer history for a night or whole venue. Never deletes accounts or slot rows. */
+export async function clearVenueLineupTestDataAction(formData: FormData): Promise<VenuePortalActionResult> {
+  try {
+    if (!isVenueLineupTestCleanupUiEnabled()) {
+      return portalRedirect("/venue?venueError=featureDisabled");
+    }
+    const session = await requireVenueSession();
+    const venueId = reqString(formData, "venueId");
+    const allowed = await venueIdsForSession(session);
+    if (!allowed.includes(venueId)) return portalRedirect("/venue?venueError=forbidden");
+
+    const scopeRaw = (optString(formData, "cleanupScope") ?? "selected_day").trim();
+    const scope = scopeRaw === "entire_venue" ? ("entire_venue" as const) : ("selected_day" as const);
+    const dateYmdRaw = optString(formData, "dateYmd") ?? "";
+    const confirmEntry = formData.get("confirmPhrase");
+    const confirm = typeof confirmEntry === "string" ? confirmEntry.trim() : "";
+
+    if (scope === "selected_day") {
+      if (!dateYmdRaw || !isValidLineupYmd(dateYmdRaw)) {
+        return portalRedirect("/venue?lineupTestCleanupError=needDay");
+      }
+      if (confirm !== LINEUP_TEST_CONFIRM_DAY) {
+        return portalRedirect("/venue?lineupTestCleanupError=confirm");
+      }
+    } else {
+      if (confirm !== LINEUP_TEST_CONFIRM_VENUE) {
+        return portalRedirect("/venue?lineupTestCleanupError=confirmVenue");
+      }
+    }
+
+    const prisma = requirePrisma();
+    const result = await runVenueLineupTestCleanup(prisma, {
+      venueId,
+      scope,
+      dateYmd: scope === "selected_day" ? dateYmdRaw : null,
+    });
+
+    revalidatePath("/venue");
+    const v = await prisma.venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+    if (v?.slug) {
+      revalidatePath(`/venues/${v.slug}`);
+      if (scope === "selected_day" && dateYmdRaw) {
+        revalidatePath(`/venues/${v.slug}/lineup/${dateYmdRaw}`);
+      }
+    }
+
+    const q = new URLSearchParams();
+    q.set("lineupTestCleanup", "ok");
+    q.set("ltcScope", result.scope);
+    if (result.dateYmd) q.set("ltcYmd", result.dateYmd);
+    q.set("ltcBookings", String(result.bookingsDeleted));
+    q.set("ltcManual", String(result.slotsManualLabelCleared));
+    q.set("ltcAvail", String(result.slotsReservedResetToAvailable));
+    q.set("ltcHistDel", String(result.performerHistoryRowsDeleted));
+    q.set("ltcHistDec", String(result.performerHistoryRowsDecremented));
+    q.set("ltcInst", String(result.instanceCount));
+    q.set("ltcSlots", String(result.slotCount));
+    if (scope === "selected_day" && dateYmdRaw) q.set("lineupDay", dateYmdRaw);
+    return portalRedirect(`/venue?${q.toString()}`);
+  } catch (e) {
+    if (e instanceof VenuePortalRedirectSignal) return e.result;
+    throw e;
+  }
+}
+
+/** `<form action>` typing expects `Promise<void>`; delegates to {@link clearVenueLineupTestDataAction}. */
+export async function clearVenueLineupTestDataFormAction(formData: FormData): Promise<void> {
+  void (await clearVenueLineupTestDataAction(formData));
+}

@@ -48,6 +48,73 @@ export async function touchVenuePerformerHistoryForMusician(tx: Tx, venueId: str
   });
 }
 
+/**
+ * Reverses `touchVenuePerformerHistoryForMusician` by `delta` uses (test cleanup).
+ * Deletes the row when useCount would drop to 0 or below.
+ */
+export async function decrementVenuePerformerHistoryMusicianUses(
+  tx: Tx,
+  venueId: string,
+  musicianId: string,
+  delta: number,
+): Promise<"deleted" | "decremented" | "noop"> {
+  if (delta <= 0) return "noop";
+  const row = await tx.venuePerformerHistory.findUnique({
+    where: {
+      venueId_kind_key: {
+        venueId,
+        kind: VenuePerformerHistoryKind.MUSICIAN,
+        key: musicianId,
+      },
+    },
+    select: { id: true, useCount: true },
+  });
+  if (!row) return "noop";
+  const next = row.useCount - delta;
+  if (next <= 0) {
+    await tx.venuePerformerHistory.delete({ where: { id: row.id } });
+    return "deleted";
+  }
+  await tx.venuePerformerHistory.update({
+    where: { id: row.id },
+    data: { useCount: next },
+  });
+  return "decremented";
+}
+
+/**
+ * Reverses `touchVenuePerformerHistoryForManual` by `delta` uses (test cleanup).
+ */
+export async function decrementVenuePerformerHistoryManualUses(
+  tx: Tx,
+  venueId: string,
+  normalizedKey: string,
+  delta: number,
+): Promise<"deleted" | "decremented" | "noop"> {
+  if (delta <= 0 || !normalizedKey) return "noop";
+  const row = await tx.venuePerformerHistory.findUnique({
+    where: {
+      venueId_kind_key: {
+        venueId,
+        kind: VenuePerformerHistoryKind.MANUAL,
+        key: normalizedKey,
+      },
+    },
+    select: { id: true, useCount: true },
+  });
+  if (!row) return "noop";
+  const next = row.useCount - delta;
+  if (next <= 0) {
+    await tx.venuePerformerHistory.delete({ where: { id: row.id } });
+    return "deleted";
+  }
+  await tx.venuePerformerHistory.update({
+    where: { id: row.id },
+    data: { useCount: next },
+  });
+  return "decremented";
+}
+
 export async function touchVenuePerformerHistoryForManual(tx: Tx, venueId: string, manualName: string): Promise<void> {
   const display = manualName.trim();
   const key = normalizeManualPerformerKey(manualName);

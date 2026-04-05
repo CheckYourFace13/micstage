@@ -10,8 +10,8 @@ export function LineupSlotTypesHelp({ className = "" }: { className?: string }) 
           <span className="text-white/75">Open</span> — anyone can reserve this slot in advance.
         </li>
         <li>
-          <span className="text-white/75">Attendees</span> — only available to people physically at the venue on the day,
-          within 1 hour before the slot starts (on-premise check).
+          <span className="text-white/75">Attendees</span> — same idea as the public grid: you must be in attendance and can
+          book within the venue&apos;s hours-before window (on-premise location check when booking).
         </li>
         <li>
           <span className="text-white/75">Daily</span> — the slot cannot be reserved until the day of the event.

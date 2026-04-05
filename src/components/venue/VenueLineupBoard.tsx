@@ -12,6 +12,12 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { absoluteUrl } from "@/lib/publicSeo";
 import { publicSlotArtistLabel } from "@/lib/slotDisplay";
+import { LineupShareStrip } from "@/components/venue/LineupShareStrip";
+import {
+  lineupPrimaryActionClass,
+  lineupPrimaryConfirmClass,
+  lineupSecondaryActionClass,
+} from "@/components/venue/lineupActionStyles";
 
 type Props = {
   venue: PublicVenueForLineup;
@@ -27,7 +33,7 @@ type Props = {
   embed?: boolean;
   /** Shown above the first panel (e.g. Live now / Tonight / Upcoming) */
   heroBadge?: LineupBadge | null;
-  /** Show canonical + embed links (hidden in embed mode) */
+  /** Show share actions (hidden in embed mode) */
   showShareStrip?: boolean;
 };
 
@@ -41,11 +47,6 @@ function reserveReturnPath(returnPath: string, slotId: string): string {
   const joiner = returnPath.includes("?") ? "&" : "?";
   return `${returnPath}${joiner}reserve=${encodeURIComponent(slotId)}`;
 }
-
-const performPrimaryClass =
-  "inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-bold text-black hover:brightness-110 disabled:opacity-60 sm:h-11 sm:w-auto sm:min-w-[7.5rem]";
-const performCompleteClass =
-  "inline-flex h-10 w-full items-center justify-center rounded-lg bg-emerald-400 px-4 text-sm font-bold text-black hover:brightness-110 disabled:opacity-60 sm:h-11 sm:w-auto sm:min-w-[7.5rem]";
 
 export function VenueLineupBoard({
   venue,
@@ -61,8 +62,7 @@ export function VenueLineupBoard({
   heroBadge,
   showShareStrip,
 }: Props) {
-  const isVenueStaffHere =
-    session?.kind === "venue" && venueStaffVenueIds.includes(venue.id);
+  const isVenueStaffHere = session?.kind === "venue" && venueStaffVenueIds.includes(venue.id);
 
   const canonicalPath = `/venues/${venue.slug}/lineup/${ymd}`;
   const canonicalUrl = absoluteUrl(canonicalPath);
@@ -78,22 +78,12 @@ export function VenueLineupBoard({
       ) : null}
 
       {showShareStrip && !embed ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/70">
-          <div className="font-medium text-white/90">Share this lineup</div>
-          <p className="mt-1 text-xs text-white/55">
-            Canonical link (best for Facebook / posts):{" "}
-            <Link className="break-all text-[rgb(var(--om-neon))] underline" href={canonicalPath}>
-              {canonicalUrl}
-            </Link>
-          </p>
-          <p className="mt-2 text-xs text-white/55">
-            Embed on your site (iframe): append <span className="font-mono text-white/75">?embed=1</span> —{" "}
-            <span className="font-mono text-white/75 break-all">{embedUrl}</span>
-          </p>
-          <p className="mt-2 text-xs text-white/55">
-            JSON: <span className="font-mono break-all text-white/75">{apiUrl}</span>
-          </p>
-        </div>
+        <LineupShareStrip
+          lineupUrl={canonicalUrl}
+          embedUrl={embedUrl}
+          apiUrl={apiUrl}
+          publicVenuePath={`/venues/${venue.slug}`}
+        />
       ) : null}
 
       {lineups.length === 0 ? (
@@ -118,9 +108,7 @@ export function VenueLineupBoard({
                     {t.slotMinutes} min slots
                     {t.breakMinutes ? ` · ${t.breakMinutes} min breaks` : ""}
                   </p>
-                  <p className="mt-1 text-xs text-white/50">
-                    {performanceFormatLabel(t.performanceFormat)}
-                  </p>
+                  <p className="mt-1 text-xs text-white/50">{performanceFormatLabel(t.performanceFormat)}</p>
                 </header>
 
                 {instanceCancelled ? (
@@ -133,7 +121,7 @@ export function VenueLineupBoard({
                     soon.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-white/10">
+                  <ul className="border-t border-white/5">
                     {inst.slots.map((s) => {
                       const activeBooking = s.booking && !s.booking.cancelledAt ? s.booking : null;
                       const isReservedCandidate = reserve === s.id;
@@ -173,106 +161,100 @@ export function VenueLineupBoard({
                           (session.kind === "venue" && venueStaffVenueIds.includes(venue.id)));
 
                       const lineupLabel = publicSlotArtistLabel(s, s.booking).trim();
-                      const artistCell = lineupLabel
-                        ? lineupLabel
-                        : !slotUsable
-                          ? s.status === "CANCELLED"
-                            ? "Cancelled"
-                            : "Unavailable"
-                          : canBook
-                            ? "Open"
-                            : "—";
+
+                      let middleCell: string;
+                      if (activeBooking && lineupLabel) {
+                        middleCell = lineupLabel;
+                      } else if (!slotUsable) {
+                        middleCell = s.status === "CANCELLED" ? "Cancelled" : "Unavailable";
+                      } else {
+                        middleCell = "Open";
+                      }
 
                       const performLabel = isReservedCandidate ? "Confirm" : "Perform";
                       const loginNext = encodeURIComponent(reserveReturnPath(returnPath, s.id));
 
-                      return (
-                        <li key={s.id} className="px-4 py-3 sm:px-5">
-                          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                            <div className="flex min-w-0 flex-1 items-baseline gap-3 sm:gap-4">
-                              <span className="shrink-0 text-lg font-bold tabular-nums text-white sm:text-xl">
-                                {minutesToTimeLabel(s.startMin)}
-                              </span>
-                              <span
-                                className={`min-w-0 truncate text-base leading-snug sm:text-lg ${
-                                  !lineupLabel && canBook
-                                    ? "font-medium text-[rgb(var(--om-neon))]"
-                                    : "font-medium text-white/90"
-                                }`}
-                              >
-                                {artistCell}
-                              </span>
-                            </div>
-
-                            <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                              {activeBooking && canCancelBooking ? (
-                                <form action={cancelBooking} className="w-full sm:w-auto">
-                                    <input type="hidden" name="venueSlug" value={venue.slug} />
-                                    <input type="hidden" name="returnPath" value={returnPath} />
-                                    <input type="hidden" name="bookingId" value={activeBooking.id} />
-                                  <FormSubmitButton
-                                    label="Cancel"
-                                    pendingLabel="…"
-                                    className="h-10 w-full rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-60 sm:h-11 sm:w-auto sm:min-w-[7rem]"
+                      const rightCell =
+                        activeBooking && canCancelBooking ? (
+                          <form action={cancelBooking} className="w-full sm:flex sm:justify-end">
+                            <input type="hidden" name="venueSlug" value={venue.slug} />
+                            <input type="hidden" name="returnPath" value={returnPath} />
+                            <input type="hidden" name="bookingId" value={activeBooking.id} />
+                            <FormSubmitButton
+                              label="Cancel"
+                              pendingLabel="…"
+                              className={lineupSecondaryActionClass}
+                            />
+                          </form>
+                        ) : canBook ? (
+                          isMusician ? (
+                            <form id={`reserve-form-${s.id}`} action={bookSlot} className="w-full sm:flex sm:justify-end">
+                              <input type="hidden" name="venueSlug" value={venue.slug} />
+                              <input type="hidden" name="returnPath" value={returnPath} />
+                              <input type="hidden" name="slotId" value={s.id} />
+                              {eff.bookingRestrictionMode === "ON_PREMISE" ? (
+                                <>
+                                  <input type="hidden" name="clientLat" value="" />
+                                  <input type="hidden" name="clientLng" value="" />
+                                  <OnPremiseReserveButton
+                                    formId={`reserve-form-${s.id}`}
+                                    label={performLabel}
+                                    className={
+                                      isReservedCandidate ? lineupPrimaryConfirmClass : lineupPrimaryActionClass
+                                    }
                                   />
-                                </form>
-                              ) : canBook ? (
-                                isMusician ? (
-                                  <form
-                                    id={`reserve-form-${s.id}`}
-                                    action={bookSlot}
-                                    className="w-full sm:w-auto"
-                                  >
-                                    <input type="hidden" name="venueSlug" value={venue.slug} />
-                                    <input type="hidden" name="returnPath" value={returnPath} />
-                                    <input type="hidden" name="slotId" value={s.id} />
-                                    {eff.bookingRestrictionMode === "ON_PREMISE" ? (
-                                      <>
-                                        <input type="hidden" name="clientLat" value="" />
-                                        <input type="hidden" name="clientLng" value="" />
-                                        <OnPremiseReserveButton
-                                          formId={`reserve-form-${s.id}`}
-                                          label={performLabel}
-                                          className={
-                                            isReservedCandidate
-                                              ? performCompleteClass
-                                              : `${performPrimaryClass} bg-[rgb(var(--om-neon))]`
-                                          }
-                                        />
-                                      </>
-                                    ) : (
-                                      <FormSubmitButton
-                                        label={performLabel}
-                                        pendingLabel="…"
-                                        className={
-                                          isReservedCandidate
-                                            ? performCompleteClass
-                                            : `${performPrimaryClass} bg-[rgb(var(--om-neon))]`
-                                        }
-                                      />
-                                    )}
-                                  </form>
-                                ) : (
-                                  <Link
-                                    href={`/login/musician?next=${loginNext}`}
-                                    title="Sign in with your artist account to book this slot"
-                                    className={`${performPrimaryClass} bg-[rgb(var(--om-neon))]`}
-                                  >
-                                    Perform
-                                  </Link>
-                                )
-                              ) : activeBooking ? null : (
-                                <span className="max-w-xs text-xs text-white/45">
-                                  {instanceCancelled
-                                    ? "Closed."
-                                    : !slotUsable
-                                      ? s.status === "CANCELLED"
-                                        ? "Cancelled."
-                                        : "Unavailable."
-                                      : slotBlockReasonText ?? "Booking closed."}
-                                </span>
+                                </>
+                              ) : (
+                                <FormSubmitButton
+                                  label={performLabel}
+                                  pendingLabel="…"
+                                  className={
+                                    isReservedCandidate ? lineupPrimaryConfirmClass : lineupPrimaryActionClass
+                                  }
+                                />
                               )}
+                            </form>
+                          ) : (
+                            <div className="flex justify-end">
+                              <Link
+                                href={`/login/musician?next=${loginNext}`}
+                                title="Sign in with your artist account to book this slot"
+                                className={lineupPrimaryActionClass}
+                              >
+                                Perform
+                              </Link>
                             </div>
+                          )
+                        ) : activeBooking ? (
+                          <p className="text-right text-sm text-white/45">Booked</p>
+                        ) : (
+                          <p className="text-right text-sm leading-snug text-white/60">
+                            {instanceCancelled
+                              ? "Closed"
+                              : !slotUsable
+                                ? s.status === "CANCELLED"
+                                  ? "Cancelled"
+                                  : "Unavailable"
+                                : slotBlockReasonText ?? "Booking unavailable"}
+                          </p>
+                        );
+
+                      return (
+                        <li key={s.id} className="border-b border-white/10 last:border-b-0">
+                          <div className="grid grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-[minmax(4.5rem,5.5rem)_minmax(0,1fr)_minmax(10rem,14rem)] sm:items-center sm:gap-4 sm:px-5">
+                            <div className="text-base font-bold tabular-nums text-white sm:text-lg">
+                              {minutesToTimeLabel(s.startMin)}
+                            </div>
+                            <div
+                              className={`min-w-0 text-base leading-snug sm:text-lg ${
+                                middleCell === "Open" && !activeBooking
+                                  ? "font-semibold text-[rgb(var(--om-neon))]"
+                                  : "font-medium text-white/90"
+                              }`}
+                            >
+                              {middleCell}
+                            </div>
+                            <div className="min-w-0 sm:flex sm:justify-end">{rightCell}</div>
                           </div>
                         </li>
                       );
@@ -296,27 +278,33 @@ export function VenueLineupBoard({
       ) : null}
 
       {!embed ? (
-        <p className="text-center text-xs text-white/40">
-          <Link href="/" className="underline hover:text-white/60">
-            MicStage
-          </Link>
-          {" · "}
-          <Link href={`/venues/${venue.slug}`} className="underline hover:text-white/60">
-            Full venue page
-          </Link>
-          {isMusician ? (
-            <>
-              {" · "}
-              <Link href={ARTIST_DASHBOARD_HREF} className="underline hover:text-white/60">
-                Artist portal
-              </Link>
-            </>
-          ) : null}
-        </p>
+        <footer className="border-t border-white/10 pt-4 text-center">
+          <p className="text-[11px] text-white/45">
+            <span className="text-white/55">Provided by MicStage</span>
+            {" · "}
+            <Link href="/" className="underline hover:text-white/75">
+              micstage.com
+            </Link>
+            {" · "}
+            <Link href={`/venues/${venue.slug}`} className="underline hover:text-white/75">
+              Full venue page
+            </Link>
+            {isMusician ? (
+              <>
+                {" · "}
+                <Link href={ARTIST_DASHBOARD_HREF} className="underline hover:text-white/75">
+                  Artist portal
+                </Link>
+              </>
+            ) : null}
+          </p>
+        </footer>
       ) : (
-        <p className="mt-4 text-center text-[11px] text-white/35">
-          <a href={canonicalUrl} className="underline hover:text-white/55" target="_blank" rel="noreferrer">
-            Open on MicStage
+        <p className="mt-4 text-center text-[11px] leading-relaxed text-white/40">
+          <span className="text-white/45">Provided by MicStage</span>
+          {" · "}
+          <a href={canonicalUrl} className="underline hover:text-white/60" target="_blank" rel="noreferrer">
+            Open full lineup
           </a>
         </p>
       )}

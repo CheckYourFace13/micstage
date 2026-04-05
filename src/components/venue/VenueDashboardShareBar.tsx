@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
+import { lineupPrimaryActionClass, lineupSecondaryActionClass } from "@/components/venue/lineupActionStyles";
 
 type Props = {
   lineupUrl: string;
@@ -23,7 +25,7 @@ export function VenueDashboardShareBar({ lineupUrl, embedUrl, publicVenueUrl, js
         await navigator.clipboard.writeText(text);
         flash(`Copied ${label}`);
       } catch {
-        flash("Could not copy — select the link manually");
+        flash("Could not copy — open “Show raw URLs” below");
       }
     },
     [flash],
@@ -36,49 +38,58 @@ export function VenueDashboardShareBar({ lineupUrl, embedUrl, publicVenueUrl, js
         <button
           type="button"
           onClick={() => copy(lineupUrl, "lineup link")}
-          className="inline-flex h-11 items-center justify-center rounded-lg bg-[rgb(var(--om-neon))] px-4 text-sm font-bold text-black hover:brightness-110"
+          className={lineupPrimaryActionClass}
         >
           Copy lineup link
         </button>
         <button
           type="button"
           onClick={() => copy(embedUrl, "embed link")}
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15"
+          className={lineupSecondaryActionClass}
         >
           Copy embed link
+        </button>
+        <button
+          type="button"
+          onClick={() => copy(jsonUrl, "API link")}
+          className={lineupSecondaryActionClass}
+        >
+          Copy API link
         </button>
         <a
           href={lineupUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
+          className={lineupSecondaryActionClass}
         >
           Open public lineup
         </a>
-        <a
-          href={embedUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
-        >
+        <a href={embedUrl} target="_blank" rel="noopener noreferrer" className={lineupSecondaryActionClass}>
           Open embed view
         </a>
-        <a
-          href={publicVenueUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-white/15 bg-transparent px-4 text-sm font-medium text-white/75 underline-offset-4 hover:text-white"
-        >
+        <Link href={publicVenueUrl} target="_blank" rel="noopener noreferrer" className={lineupSecondaryActionClass}>
           Full venue page
-        </a>
-        <button
-          type="button"
-          onClick={() => copy(jsonUrl, "JSON API URL")}
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-white/15 px-4 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white"
-        >
-          Copy API URL
-        </button>
+        </Link>
       </div>
+      <details className="rounded-lg border border-white/10 bg-black/25">
+        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-white/50 marker:content-none [&::-webkit-details-marker]:hidden hover:text-white/70">
+          Show raw URLs
+        </summary>
+        <div className="space-y-2 border-t border-white/10 px-3 py-3 text-[11px] leading-relaxed text-white/45">
+          <div>
+            <span className="font-medium text-white/55">Lineup</span>
+            <p className="mt-0.5 break-all font-mono">{lineupUrl}</p>
+          </div>
+          <div>
+            <span className="font-medium text-white/55">Embed</span>
+            <p className="mt-0.5 break-all font-mono">{embedUrl}</p>
+          </div>
+          <div>
+            <span className="font-medium text-white/55">API</span>
+            <p className="mt-0.5 break-all font-mono">{jsonUrl}</p>
+          </div>
+        </div>
+      </details>
       <p className="text-xs text-white/45">
         Lineup and embed links are read-only for the public — safe to post on your site or socials.
       </p>

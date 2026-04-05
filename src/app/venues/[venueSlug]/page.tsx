@@ -28,6 +28,12 @@ import { relatedLocationsForVenue } from "@/lib/relatedLocations";
 import { VenuePerformerHistoryKind } from "@/generated/prisma/client";
 import { loadPublicVenuePastPerformers } from "@/lib/venuePerformerHistory";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
+import {
+  lineupDateChipActive,
+  lineupDateChipIdle,
+  lineupPrimaryActionClass,
+  lineupSecondaryActionClass,
+} from "@/components/venue/lineupActionStyles";
 
 export const dynamic = "force-dynamic";
 
@@ -219,15 +225,14 @@ export default async function VenuePublicPage(props: {
             <h1 className="mt-2 text-3xl font-bold leading-tight sm:text-4xl">{venue.name}</h1>
             <div className="mt-2 text-sm text-white/70">{venue.formattedAddress}</div>
             {heroYmd ? (
-              <p className="mt-3 text-sm text-white/60">
+              <div className="mt-4">
                 <Link
-                  className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110"
                   href={`/venues/${venue.slug}/lineup/${heroYmd}`}
+                  className={`${lineupSecondaryActionClass} inline-flex w-fit`}
                 >
-                  Lineup for {lineupNavLabelFromYmd(heroYmd)} →
-                </Link>{" "}
-                <span className="text-white/45">(share this link)</span>
-              </p>
+                  Open lineup for {lineupNavLabelFromYmd(heroYmd)}
+                </Link>
+              </div>
             ) : null}
             {venue.city && artistDiscoverySlug ? (
               <p className="mt-2 text-xs text-white/60">
@@ -296,7 +301,7 @@ export default async function VenuePublicPage(props: {
               <h2 className="text-2xl font-bold text-white sm:text-3xl">Lineup</h2>
               {heroYmd ? (
                 <Link
-                  className="shrink-0 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+                  className={`${lineupPrimaryActionClass} shrink-0`}
                   href={`/venues/${venue.slug}/lineup/${heroYmd}`}
                 >
                   Full-screen lineup
@@ -318,11 +323,7 @@ export default async function VenuePublicPage(props: {
                         <Link
                           key={ymd}
                           href={`/venues/${venue.slug}/lineup/${ymd}`}
-                          className={`rounded-full border px-4 py-2.5 text-sm font-medium ${
-                            ymd === heroYmd
-                              ? "border-[rgb(var(--om-neon))] bg-[rgb(var(--om-neon))]/15 text-white"
-                              : "border-white/15 bg-black/30 text-white/85 hover:border-white/25 hover:bg-black/45"
-                          }`}
+                          className={ymd === heroYmd ? lineupDateChipActive : lineupDateChipIdle}
                         >
                           {lineupNavLabelFromYmd(ymd)}
                         </Link>

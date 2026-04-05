@@ -92,27 +92,31 @@ export function slotRestrictionBlockReason(
   if (mode === "NONE") return null;
 
   if (mode === "HOUSE_ONLY") {
-    return "This slot is managed by the venue only. Artists can’t self-book it here.";
+    return "This slot is managed by the venue only.";
   }
 
   if (mode === "ATTENDEE_DAY_OF") {
     const nowDay = DateTime.fromJSDate(now, { zone: "utc" }).setZone(tz).startOf("day");
     const slotDay = DateTime.fromJSDate(slotStartUtc, { zone: "utc" }).setZone(tz).startOf("day");
-    if (nowDay < slotDay) return "Reserved for attendees. Booking opens on the day of the show.";
+    if (nowDay < slotDay) return "Booking opens on the day of the event.";
     return null;
   }
 
   if (mode === "HOURS_BEFORE") {
     const hours = restriction.restrictionHoursBefore ?? 6;
     const unlockAt = new Date(slotStartUtc.getTime() - hours * 60 * 60 * 1000);
-    if (now.getTime() < unlockAt.getTime()) return `Booking opens ${hours} hours before the show start.`;
+    if (now.getTime() < unlockAt.getTime()) {
+      return `Booking opens ${hours} hour${hours === 1 ? "" : "s"} before start.`;
+    }
     return null;
   }
 
   if (mode === "ON_PREMISE") {
     const hours = restriction.restrictionHoursBefore ?? 6;
     const unlockAt = new Date(slotStartUtc.getTime() - hours * 60 * 60 * 1000);
-    if (now.getTime() < unlockAt.getTime()) return `On-premise booking opens ${hours} hours before start.`;
+    if (now.getTime() < unlockAt.getTime()) {
+      return `You must be in attendance and can book ${hours} hour${hours === 1 ? "" : "s"} before start.`;
+    }
 
     const venueLat = restriction.lat;
     const venueLng = restriction.lng;

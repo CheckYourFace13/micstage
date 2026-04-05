@@ -18,9 +18,9 @@ export function buildVenueDiscoverySocialPayloads(input: {
 }): MarketingSocialPayload[] {
   const loc = input.discoveryLabel ? ` in ${input.discoveryLabel}` : "";
   const lines = [
-    `${input.venueName}${loc} — open mic & lineup on MicStage.`,
+    `${input.venueName}${loc} — MicStage helps market your open mic for free (public lineup + discovery).`,
     input.publicLocationPerformersUrl
-      ? `Artists: browse local rooms ${input.publicLocationPerformersUrl}`
+      ? `Performers & guests: ${input.publicLocationPerformersUrl}`
       : `Venue page: ${input.publicVenueUrl}`,
     "#openmic #livemusic",
   ];

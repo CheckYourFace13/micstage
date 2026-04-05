@@ -1,3 +1,9 @@
+import {
+  buildVenueOutreachLetter,
+  GROWTH_VENUE_OUTREACH_SUBJECT,
+  OUTREACH_DRAFT_FOOTER_TEXT,
+} from "@/lib/marketing/outreachTemplates";
+
 /**
  * Email bodies for future dispatch only — phase 1 generates structured payloads; nothing is sent.
  */
@@ -25,26 +31,22 @@ export function buildInternalMarketingNoticeEmail(input: {
 
 export function buildVenueOutreachEmailPayload(input: {
   venueName: string;
+  /** Discovery rollup label; reserved for future localized copy — default template is Chicagoland-agnostic in the body. */
   discoveryLabel: string | null;
   publicVenueUrl: string;
   locationPerformersUrl: string | null;
-  /** Placeholder — replace with approved copy before any live send. */
-  bodyIntro?: string;
 }): MarketingEmailPayload {
-  const intro =
-    input.bodyIntro ??
-    `We're highlighting open mic activity${input.discoveryLabel ? ` in ${input.discoveryLabel}` : ""}. ` +
-      `MicStage helps venues publish structured lineups and lets artists discover real rooms.`;
+  void input.discoveryLabel;
+
+  const { textBody: coreText, htmlBody: coreHtml } = buildVenueOutreachLetter(input.venueName);
 
   const textBody = [
-    `Hi ${input.venueName} team,`,
-    "",
-    intro,
+    coreText,
     "",
     `Venue page: ${input.publicVenueUrl}`,
     input.locationPerformersUrl ? `Local discovery: ${input.locationPerformersUrl}` : null,
     "",
-    "— MicStage (draft — not sent)",
+    `— ${OUTREACH_DRAFT_FOOTER_TEXT}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -53,10 +55,10 @@ export function buildVenueOutreachEmailPayload(input: {
     ? `<p><a href="${escapeHtml(input.locationPerformersUrl)}">Local discovery</a></p>`
     : "";
 
-  const htmlBody = `<p>Hi <strong>${escapeHtml(input.venueName)}</strong> team,</p><p>${escapeHtml(intro)}</p><p><a href="${escapeHtml(input.publicVenueUrl)}">Venue page</a></p>${loc}<p><em>MicStage draft — not sent</em></p>`;
+  const htmlBody = `${coreHtml}<p><a href="${escapeHtml(input.publicVenueUrl)}">Venue page</a></p>${loc}<p><em>${escapeHtml(OUTREACH_DRAFT_FOOTER_TEXT)}</em></p>`;
 
   return {
-    subject: `MicStage + ${input.venueName} (draft)`,
+    subject: GROWTH_VENUE_OUTREACH_SUBJECT,
     textBody,
     htmlBody,
     tags: ["venue-outreach", "draft"],

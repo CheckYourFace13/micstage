@@ -1,5 +1,14 @@
 import type { GrowthLeadType } from "@/generated/prisma/client";
 import type { MarketingEmailPayload } from "@/lib/marketing/emailPayloads";
+import {
+  buildArtistOutreachLetter,
+  buildPromoterOutreachLetter,
+  buildVenueOutreachLetter,
+  GROWTH_ARTIST_OUTREACH_SUBJECT,
+  GROWTH_PROMOTER_OUTREACH_SUBJECT,
+  GROWTH_VENUE_OUTREACH_SUBJECT,
+  OUTREACH_DRAFT_FOOTER_TEXT,
+} from "@/lib/marketing/outreachTemplates";
 
 function escapeHtml(s: string): string {
   return s
@@ -7,12 +16,6 @@ function escapeHtml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-function discoveryPhrase(slug: string | null, city: string | null): string | null {
-  if (slug) return slug.replace(/-/g, " ");
-  if (city) return city;
-  return null;
 }
 
 /** Draft outreach bodies for imported / manual growth leads (not venue-claim cold). */
@@ -24,32 +27,38 @@ export function buildGrowthLeadOutreachPayload(input: {
   contactUrl: string | null;
   websiteUrl: string | null;
 }): MarketingEmailPayload {
-  const loc = discoveryPhrase(input.discoveryMarketSlug, input.city);
-  const introByType: Record<GrowthLeadType, string> = {
-    VENUE: `We're mapping open mics and live rooms${loc ? ` around ${loc}` : ""}. MicStage gives venues a structured public lineup and helps artists find real stages.`,
-    ARTIST: `We're connecting performers with verified open mics${loc ? ` near ${loc}` : ""}. MicStage is built for artists who want real rooms, not random DMs.`,
-    PROMOTER_ACCOUNT: `We're partnering with people who promote local lineups${loc ? ` in ${loc}` : ""}. MicStage surfaces structured venue pages and discovery by city.`,
+  const subjectByType: Record<GrowthLeadType, string> = {
+    VENUE: GROWTH_VENUE_OUTREACH_SUBJECT,
+    ARTIST: GROWTH_ARTIST_OUTREACH_SUBJECT,
+    PROMOTER_ACCOUNT: GROWTH_PROMOTER_OUTREACH_SUBJECT,
   };
-  const intro = introByType[input.leadType];
 
-  const lines = [
-    `Hi ${input.name},`,
-    "",
-    intro,
-    "",
-    input.websiteUrl ? `Site: ${input.websiteUrl}` : null,
-    input.contactUrl ? `Contact: ${input.contactUrl}` : null,
-    "",
-    "— MicStage (draft — not sent)",
-  ].filter(Boolean) as string[];
+  const letterByType: Record<GrowthLeadType, { textBody: string; htmlBody: string }> = {
+    VENUE: buildVenueOutreachLetter(input.name),
+    ARTIST: buildArtistOutreachLetter(input.name),
+    PROMOTER_ACCOUNT: buildPromoterOutreachLetter(input.name),
+  };
 
-  const textBody = lines.join("\n");
-  const htmlBody = `<p>Hi <strong>${escapeHtml(input.name)}</strong>,</p><p>${escapeHtml(intro)}</p>${
-    input.websiteUrl ? `<p><a href="${escapeHtml(input.websiteUrl)}">Website</a></p>` : ""
-  }${input.contactUrl ? `<p><a href="${escapeHtml(input.contactUrl)}">Contact / booking</a></p>` : ""}<p><em>MicStage draft — not sent</em></p>`;
+  const { textBody: coreText, htmlBody: coreHtml } = letterByType[input.leadType];
+
+  let textBody = coreText;
+  if (input.websiteUrl || input.contactUrl) {
+    textBody += "\n";
+    if (input.websiteUrl) textBody += `\nSite: ${input.websiteUrl}`;
+    if (input.contactUrl) textBody += `\nContact: ${input.contactUrl}`;
+  }
+  textBody += `\n\n— ${OUTREACH_DRAFT_FOOTER_TEXT}`;
+
+  const appendixHtml = [
+    input.websiteUrl ? `<p><a href="${escapeHtml(input.websiteUrl)}">Website</a></p>` : "",
+    input.contactUrl ? `<p><a href="${escapeHtml(input.contactUrl)}">Contact / booking</a></p>` : "",
+    `<p><em>${escapeHtml(OUTREACH_DRAFT_FOOTER_TEXT)}</em></p>`,
+  ].join("");
+
+  const htmlBody = `${coreHtml}${appendixHtml}`;
 
   return {
-    subject: `MicStage + ${input.name} (draft)`,
+    subject: subjectByType[input.leadType],
     textBody,
     htmlBody,
     tags: ["growth-lead", input.leadType.toLowerCase(), "draft"],

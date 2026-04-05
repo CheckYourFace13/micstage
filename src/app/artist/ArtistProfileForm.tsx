@@ -1,5 +1,6 @@
 import { FormSubmitButton } from "@/components/FormSubmitButton";
-import { updateMusicianProfile } from "./actions";
+import { ArtistProfileWebsiteImport } from "@/components/portal/ProfileWebsiteImportPanels";
+import { updateMusicianProfile, uploadMusicianProfilePhoto, uploadMusicianSecondaryPhoto } from "./actions";
 
 // Prisma payload is wide; fields are validated at save time.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- server-only prop from artist portal query
@@ -74,29 +75,19 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
         </p>
       </div>
 
-      <form action={updateMusicianProfile} className="mt-6 grid gap-6">
+      <form action={updateMusicianProfile} encType="multipart/form-data" className="mt-6 grid gap-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid gap-1 text-sm">
             <span className="text-white/80">
               Stage / performance name <span className="text-emerald-300/80">(public)</span>
             </span>
             <input
+              id="artist-profile-stageName"
               name="stageName"
               required
               defaultValue={musician.stageName}
               className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
               placeholder="How you want to be listed & searched"
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-white/80">
-              Profile image URL <span className="text-emerald-300/80">(public)</span>
-            </span>
-            <input
-              name="imageUrl"
-              defaultValue={musician.imageUrl ?? ""}
-              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-              placeholder="https://..."
             />
           </label>
         </div>
@@ -129,6 +120,7 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
             Bio <span className="text-emerald-300/80">(public)</span>
           </span>
           <textarea
+            id="artist-profile-bio"
             name="bio"
             rows={4}
             defaultValue={musician.bio ?? ""}
@@ -136,6 +128,124 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
             placeholder="Your sound, influences, what you bring to a room…"
           />
         </label>
+
+        <div className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="text-sm font-semibold text-white">Website & socials</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm sm:col-span-2">
+              <span className="text-white/80">Website</span>
+              <input
+                id="artist-profile-websiteUrl"
+                name="websiteUrl"
+                defaultValue={musician.websiteUrl ?? ""}
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                placeholder="https://..."
+              />
+            </label>
+            <ArtistProfileWebsiteImport />
+            {(
+              [
+                ["facebookUrl", "Facebook", musician.facebookUrl],
+                ["instagramUrl", "Instagram", musician.instagramUrl],
+                ["twitterUrl", "X / Twitter", musician.twitterUrl],
+                ["tiktokUrl", "TikTok", musician.tiktokUrl],
+                ["youtubeUrl", "YouTube", musician.youtubeUrl],
+                ["soundcloudUrl", "SoundCloud", musician.soundcloudUrl],
+              ] as const
+            ).map(([name, label, val]) => (
+              <label key={name} className="grid gap-1 text-sm">
+                <span className="text-white/80">{label}</span>
+                <input
+                  id={`artist-profile-${name}`}
+                  name={name}
+                  defaultValue={val ?? ""}
+                  className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                  placeholder="https://..."
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="text-sm font-semibold text-white">
+            Profile photos <span className="text-emerald-300/80">(public)</span>
+          </div>
+          <p className="text-xs text-white/55">
+            Optional. Paste image URLs or upload (JPEG, PNG, WebP, GIF — max ~2.5MB). Uploads apply immediately; save the
+            form to commit URL edits with the rest of your profile.
+          </p>
+          <div className="grid gap-3 border-b border-white/10 pb-4">
+            <p className="text-[11px] text-white/50">
+              Active profile photo:{" "}
+              {musician.imageUrl?.trim() ? (
+                <span className="break-all font-mono text-emerald-200/80">{musician.imageUrl}</span>
+              ) : (
+                <span className="text-white/40">none</span>
+              )}
+            </p>
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">Profile image URL</span>
+              <input
+                id="artist-profile-imageUrl"
+                name="imageUrl"
+                defaultValue={musician.imageUrl ?? ""}
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                placeholder="https://..."
+              />
+            </label>
+            <div className="flex flex-wrap items-end gap-2">
+              <input
+                name="artistUploadProfile"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="max-w-xs text-xs text-white/70 file:mr-2 file:rounded file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white"
+              />
+              <FormSubmitButton
+                formAction={uploadMusicianProfilePhoto}
+                label="Upload profile photo"
+                pendingLabel="Uploading…"
+                className="h-9 rounded-md border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/15 disabled:opacity-60"
+              />
+            </div>
+          </div>
+          <div className="grid gap-3">
+            <p className="text-[11px] text-white/50">
+              Extra photo:{" "}
+              {(musician as { imageSecondaryUrl?: string | null }).imageSecondaryUrl?.trim() ? (
+                <span className="break-all font-mono text-emerald-200/80">
+                  {(musician as { imageSecondaryUrl?: string }).imageSecondaryUrl}
+                </span>
+              ) : (
+                <span className="text-white/40">none</span>
+              )}
+            </p>
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">Second image URL (optional)</span>
+              <input
+                id="artist-profile-imageSecondaryUrl"
+                name="imageSecondaryUrl"
+                defaultValue={(musician as { imageSecondaryUrl?: string | null }).imageSecondaryUrl ?? ""}
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                placeholder="https://..."
+              />
+            </label>
+            <div className="flex flex-wrap items-end gap-2">
+              <input
+                name="artistUploadSecondary"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="max-w-xs text-xs text-white/70 file:mr-2 file:rounded file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white"
+              />
+              <FormSubmitButton
+                formAction={uploadMusicianSecondaryPhoto}
+                label="Upload second photo"
+                pendingLabel="Uploading…"
+                className="h-9 rounded-md border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/15 disabled:opacity-60"
+              />
+            </div>
+          </div>
+        </div>
 
         <div className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
           <div className="text-sm font-semibold text-white">
@@ -163,41 +273,6 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
               secondaryRadiusMiles: musician.secondaryRadiusMiles,
             }}
           />
-        </div>
-
-        <div className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
-          <div className="text-sm font-semibold text-white">Website & socials</div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm sm:col-span-2">
-              <span className="text-white/80">Website</span>
-              <input
-                name="websiteUrl"
-                defaultValue={musician.websiteUrl ?? ""}
-                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-                placeholder="https://..."
-              />
-            </label>
-            {(
-              [
-                ["facebookUrl", "Facebook", musician.facebookUrl],
-                ["instagramUrl", "Instagram", musician.instagramUrl],
-                ["twitterUrl", "X / Twitter", musician.twitterUrl],
-                ["tiktokUrl", "TikTok", musician.tiktokUrl],
-                ["youtubeUrl", "YouTube", musician.youtubeUrl],
-                ["soundcloudUrl", "SoundCloud", musician.soundcloudUrl],
-              ] as const
-            ).map(([name, label, val]) => (
-              <label key={name} className="grid gap-1 text-sm">
-                <span className="text-white/80">{label}</span>
-                <input
-                  name={name}
-                  defaultValue={val ?? ""}
-                  className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-                  placeholder="https://..."
-                />
-              </label>
-            ))}
-          </div>
         </div>
 
         <fieldset className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4">

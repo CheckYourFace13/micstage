@@ -310,6 +310,37 @@ export default async function ArtistPortalPage({
             your stage-facing details—give it a moment to update everywhere.
           </div>
         ) : null}
+        {q.profile === "imageUploaded" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            <span className="font-semibold text-emerald-100/95">Photo uploaded.</span> It is saved on your profile. You can still
+            change the URL field and save if you prefer a different image.
+          </div>
+        ) : null}
+        {q.profileError === "uploadMissing" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            Choose an image file before uploading.
+          </div>
+        ) : null}
+        {q.profileError === "upload_unsupported_type" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            That file type is not supported. Use JPEG, PNG, WebP, or GIF.
+          </div>
+        ) : null}
+        {q.profileError === "upload_too_large" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            That file is too large (max about 2.5MB). Try a smaller image.
+          </div>
+        ) : null}
+        {q.profileError === "upload_blob_failed" || q.profileError === "upload_local_write_failed" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            Upload storage failed. Try again in a moment; if it keeps happening, contact support.
+          </div>
+        ) : null}
+        {q.profileError === "upload_uploads_not_configured" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            File uploads are not enabled on this server. Paste an image URL instead, or ask your host to configure blob storage.
+          </div>
+        ) : null}
         {q.profileError === "invalidForm" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             That save request was incomplete or out of date. Refresh the page and try again.

@@ -7,6 +7,7 @@ import { requirePrisma } from "@/lib/prisma";
 import { requireMusicianSession } from "@/lib/authz";
 import { MUSICIAN_INSTRUMENTS, MUSICIAN_SPECIALIZATIONS } from "@/lib/musicianProfile";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
+import { storeProfileImage } from "@/lib/profileAssetStorage";
 
 export async function lookupMicStageVenueByGooglePlaceId(googlePlaceId: string) {
   if (!googlePlaceId?.trim()) return null;
@@ -85,6 +86,7 @@ export async function updateMusicianProfile(formData: FormData) {
   const bio = optString(formData, "bio");
   const websiteUrl = normalizeUrl(optString(formData, "websiteUrl"));
   const imageUrl = normalizeUrl(optString(formData, "imageUrl"));
+  const imageSecondaryUrl = normalizeUrl(optString(formData, "imageSecondaryUrl"));
   const facebookUrl = normalizeUrl(optString(formData, "facebookUrl"));
   const instagramUrl = normalizeUrl(optString(formData, "instagramUrl"));
   const twitterUrl = normalizeUrl(optString(formData, "twitterUrl"));
@@ -165,6 +167,7 @@ export async function updateMusicianProfile(formData: FormData) {
         bio,
         websiteUrl,
         imageUrl,
+        imageSecondaryUrl,
         facebookUrl,
         instagramUrl,
         twitterUrl,
@@ -221,4 +224,55 @@ export async function updateMusicianProfile(formData: FormData) {
 
   revalidatePath(ARTIST_DASHBOARD_HREF);
   redirect(`${ARTIST_DASHBOARD_HREF}?profile=saved`);
+}
+
+async function readNamedImageFile(
+  formData: FormData,
+  fieldName: string,
+): Promise<{ buf: Buffer; type: string } | { error: string }> {
+  const file = formData.get(fieldName);
+  if (!file || typeof file !== "object" || !("arrayBuffer" in file)) {
+    return { error: "missing_file" };
+  }
+  const blob = file as File;
+  const type = (blob.type || "").split(";")[0]?.trim().toLowerCase() || "application/octet-stream";
+  const buf = Buffer.from(await blob.arrayBuffer());
+  return { buf, type };
+}
+
+async function uploadMusicianImageSlot(formData: FormData, slot: "profile" | "secondary") {
+  const session = await requireMusicianSession();
+  const musicianId = session.musicianId;
+  const field = slot === "profile" ? "artistUploadProfile" : "artistUploadSecondary";
+  const read = await readNamedImageFile(formData, field);
+  if ("error" in read) {
+    redirect(`${ARTIST_DASHBOARD_HREF}?profileError=uploadMissing`);
+  }
+
+  const stored = await storeProfileImage(
+    read.buf,
+    read.type,
+    `artist/${musicianId}/${slot}-${Date.now()}`,
+  );
+  if (!stored.ok) {
+    redirect(`${ARTIST_DASHBOARD_HREF}?profileError=upload_${stored.error}`);
+  }
+
+  const data =
+    slot === "profile" ? { imageUrl: stored.publicUrl } : { imageSecondaryUrl: stored.publicUrl };
+
+  await requirePrisma().musicianUser.update({
+    where: { id: musicianId },
+    data,
+  });
+  revalidatePath(ARTIST_DASHBOARD_HREF);
+  redirect(`${ARTIST_DASHBOARD_HREF}?profile=imageUploaded`);
+}
+
+export async function uploadMusicianProfilePhoto(formData: FormData) {
+  return uploadMusicianImageSlot(formData, "profile");
+}
+
+export async function uploadMusicianSecondaryPhoto(formData: FormData) {
+  return uploadMusicianImageSlot(formData, "secondary");
 }

@@ -215,6 +215,8 @@ model MusicianUser {
 
   websiteUrl   String?
   imageUrl     String?
+  /// Optional second public photo (URL or uploaded asset URL).
+  imageSecondaryUrl String?
   facebookUrl  String?
   instagramUrl String?
   twitterUrl   String?

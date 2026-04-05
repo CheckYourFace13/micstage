@@ -37,6 +37,7 @@ import {
   isVenueLineupTestCleanupUiEnabled,
   runVenueLineupTestCleanup,
 } from "@/lib/venueTestLineupCleanup";
+import { storeProfileImage } from "@/lib/profileAssetStorage";
 
 /** Missing/tampered fields → friendly portal message instead of generic error UI. */
 function reqString(formData: FormData, key: string): string {
@@ -97,13 +98,6 @@ function normalizeUrl(v?: string): string | null {
   if (!t) return null;
   if (/^https?:\/\//i.test(t)) return t;
   return `https://${t}`;
-}
-
-function firstMatchingLink(links: string[], patterns: RegExp[]): string | null {
-  for (const l of links) {
-    if (patterns.some((p) => p.test(l))) return l;
-  }
-  return null;
 }
 
 const ALLOWED_BOOKING_MODES = new Set<string>(BOOKING_RESTRICTION_OPTIONS.map((o) => o.value));
@@ -533,58 +527,81 @@ export async function updateVenueProfile(formData: FormData): Promise<VenuePorta
 }
 
 
-export async function discoverVenueSocials(formData: FormData): Promise<VenuePortalActionResult> {
-  try {
-  const session = await requireVenueSession();
-  const venueId = reqString(formData, "venueId");
-  const allowed = await venueIdsForSession(session);
-  if (!allowed.includes(venueId)) return portalRedirect("/venue?venueError=forbidden");
+const VENUE_UPLOAD_FIELD: Record<"logo" | "primary" | "secondary", string> = {
+  logo: "venueUploadLogo",
+  primary: "venueUploadPrimary",
+  secondary: "venueUploadSecondary",
+};
 
-  const venue = await requirePrisma().venue.findUnique({
-    where: { id: venueId },
-    select: { websiteUrl: true, slug: true },
-  });
-  const website = venue?.websiteUrl;
-  if (!website) return portalRedirect("/venue?socialsError=needWebsite");
-
-  let html = "";
-  try {
-    const res = await fetch(website, { redirect: "follow", cache: "no-store" });
-    if (!res.ok) return portalRedirect("/venue?socialsError=fetchFailed");
-    html = await res.text();
-  } catch {
-    return portalRedirect("/venue?socialsError=fetchFailed");
+async function readNamedImageFile(
+  formData: FormData,
+  fieldName: string,
+): Promise<{ buf: Buffer; type: string } | { error: string }> {
+  const file = formData.get(fieldName);
+  if (!file || typeof file !== "object" || !("arrayBuffer" in file)) {
+    return { error: "missing_file" };
   }
+  const blob = file as File;
+  const type = (blob.type || "").split(";")[0]?.trim().toLowerCase() || "application/octet-stream";
+  const buf = Buffer.from(await blob.arrayBuffer());
+  return { buf, type };
+}
 
-  const links = Array.from(html.matchAll(/https?:\/\/[^\s"'<>]+/gi)).map((m) => m[0]);
-  const facebookUrl = firstMatchingLink(links, [/facebook\.com\//i]);
-  const instagramUrl = firstMatchingLink(links, [/instagram\.com\//i]);
-  const twitterUrl = firstMatchingLink(links, [/twitter\.com\//i, /x\.com\//i]);
-  const tiktokUrl = firstMatchingLink(links, [/tiktok\.com\//i]);
-  const youtubeUrl = firstMatchingLink(links, [/youtube\.com\//i, /youtu\.be\//i]);
-  const soundcloudUrl = firstMatchingLink(links, [/soundcloud\.com\//i]);
+async function uploadVenueProfileImageSlot(
+  formData: FormData,
+  slot: "logo" | "primary" | "secondary",
+): Promise<VenuePortalActionResult> {
+  try {
+    const session = await requireVenueSession();
+    const venueIdRaw = formData.get("venueId");
+    const venueId = typeof venueIdRaw === "string" ? venueIdRaw.trim() : "";
+    if (!venueId) {
+      return portalRedirect("/venue?profileError=invalidForm");
+    }
+    const allowed = await venueIdsForSession(session);
+    if (!allowed.includes(venueId)) return portalRedirect("/venue?venueError=forbidden");
 
-  await requirePrisma().venue.update({
-    where: { id: venueId },
-    data: {
-      facebookUrl,
-      instagramUrl,
-      twitterUrl,
-      tiktokUrl,
-      youtubeUrl,
-      soundcloudUrl,
-    },
-  });
+    const field = VENUE_UPLOAD_FIELD[slot];
+    const read = await readNamedImageFile(formData, field);
+    if ("error" in read) {
+      return portalRedirect("/venue?profileError=uploadMissing");
+    }
 
-  revalidatePath("/venue");
-  if (venue?.slug) revalidatePath(`/venues/${venue.slug}`);
-  return portalRedirect("/venue?venueNotice=socialsDiscovered");
+    const stored = await storeProfileImage(read.buf, read.type, `venue/${venueId}/${slot}-${Date.now()}`);
+    if (!stored.ok) {
+      return portalRedirect(`/venue?profileError=upload_${stored.error}`);
+    }
+
+    const data =
+      slot === "logo"
+        ? { logoUrl: stored.publicUrl }
+        : slot === "primary"
+          ? { imagePrimaryUrl: stored.publicUrl }
+          : { imageSecondaryUrl: stored.publicUrl };
+
+    const prisma = requirePrisma();
+    await prisma.venue.update({ where: { id: venueId }, data });
+    const v = await prisma.venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+    revalidatePath("/venue");
+    if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+    return portalRedirect("/venue?profile=imageUploaded");
   } catch (e) {
     if (e instanceof VenuePortalRedirectSignal) return e.result;
     throw e;
   }
 }
 
+export async function uploadVenueLogoImage(formData: FormData): Promise<VenuePortalActionResult> {
+  return uploadVenueProfileImageSlot(formData, "logo");
+}
+
+export async function uploadVenuePrimaryImage(formData: FormData): Promise<VenuePortalActionResult> {
+  return uploadVenueProfileImageSlot(formData, "primary");
+}
+
+export async function uploadVenueSecondaryImage(formData: FormData): Promise<VenuePortalActionResult> {
+  return uploadVenueProfileImageSlot(formData, "secondary");
+}
 
 export async function inviteManager(formData: FormData): Promise<VenuePortalActionResult> {
   try {

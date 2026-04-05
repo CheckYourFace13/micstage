@@ -30,7 +30,14 @@ export default async function AdminVenueDetailPage(props: {
   const venue = await prisma.venue.findUnique({
     where: { id },
     include: {
-      owner: { select: { id: true, email: true } },
+      owner: {
+        select: {
+          id: true,
+          email: true,
+          registrationContentConsentAt: true,
+          registrationContentConsentVersion: true,
+        },
+      },
       managerAccess: {
         include: { manager: { select: { id: true, email: true } } },
         take: 20,
@@ -112,6 +119,15 @@ export default async function AdminVenueDetailPage(props: {
         </div>
       ) : null}
 
+      <p className="mt-2 text-xs">
+        <Link
+          className="text-sky-400 underline hover:text-sky-300"
+          href={`/internal/admin/performer-history?venueId=${encodeURIComponent(id)}`}
+        >
+          Lineup / performer history for this venue
+        </Link>
+      </p>
+
       <section className="mt-6 rounded border border-zinc-700 bg-zinc-900 p-4 text-zinc-300">
         <h2 className="font-semibold text-white">Schedule health</h2>
         <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
@@ -126,6 +142,19 @@ export default async function AdminVenueDetailPage(props: {
       <section className="mt-6 rounded border border-zinc-700 bg-zinc-900 p-4">
         <h2 className="font-semibold text-white">Owner</h2>
         <p className="mt-1 text-zinc-300">{venue.owner.email}</p>
+        <p className="mt-2 text-xs text-zinc-500">
+          Registration content consent:{" "}
+          {venue.owner.registrationContentConsentAt ? (
+            <>
+              <span className="text-zinc-300">{venue.owner.registrationContentConsentAt.toISOString().slice(0, 19)}Z</span>
+              {venue.owner.registrationContentConsentVersion ? (
+                <span className="ml-2 font-mono">v{venue.owner.registrationContentConsentVersion}</span>
+              ) : null}
+            </>
+          ) : (
+            <span className="text-amber-500/90">not recorded (pre-policy signup)</span>
+          )}
+        </p>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <form action={adminSendResetEmail} className="grid gap-2">
             <input type="hidden" name="returnPath" value={`/internal/admin/venues/${id}`} />

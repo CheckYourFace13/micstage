@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { assertAdminSession } from "@/lib/adminAuth";
 import { requirePrisma } from "@/lib/prisma";
-import { adminUpdateBooking } from "@/app/internal/admin/actions";
+import { adminDeleteBooking, adminUpdateBooking } from "@/app/internal/admin/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,15 @@ export default async function AdminBookingDetailPage(props: {
   const v = booking.slot.instance.template.venue;
   const ins = booking.slot.instance;
 
+  function temporalLabel(instanceDate: Date): string {
+    const a = instanceDate.toISOString().slice(0, 10);
+    const b = new Date().toISOString().slice(0, 10);
+    if (a < b) return "Past";
+    if (a > b) return "Future";
+    return "Today (date)";
+  }
+  const when = temporalLabel(ins.date);
+
   function fmtMin(m: number) {
     const h = Math.floor(m / 60);
     const mm = m % 60;
@@ -49,7 +58,29 @@ export default async function AdminBookingDetailPage(props: {
         ← Bookings
       </Link>
       <h1 className="mt-4 text-lg font-semibold text-white">Booking</h1>
-      <p className="text-xs text-zinc-500">{booking.id}</p>
+      <p className="text-xs text-zinc-500">
+        <span
+          className={
+            when === "Future"
+              ? "font-semibold text-emerald-400"
+              : when === "Past"
+                ? "font-semibold text-zinc-500"
+                : "font-semibold text-amber-400"
+          }
+        >
+          {when}
+        </span>
+        <span className="ml-2 font-mono">{booking.id}</span>
+      </p>
+      <p className="mt-2 text-xs">
+        <Link className="text-sky-400 underline" href={`/internal/admin/slots/${booking.slot.id}`}>
+          Open slot editor
+        </Link>
+        {" · "}
+        <Link className="text-sky-400 underline" href={`/internal/admin/events/${ins.id}`}>
+          Open instance
+        </Link>
+      </p>
 
       {params.saved ? (
         <p className="mt-3 rounded border border-emerald-600/40 bg-emerald-950/40 px-3 py-2 text-emerald-100">Saved.</p>
@@ -89,8 +120,11 @@ export default async function AdminBookingDetailPage(props: {
       </section>
 
       <section className="mt-6 rounded border border-zinc-700 bg-zinc-900 p-4">
-        <h2 className="font-semibold text-white">Edit display fields</h2>
-        <p className="text-xs text-zinc-500">Does not change slot times or cancellation — safe labeling only.</p>
+        <h2 className="font-semibold text-white">Edit booking</h2>
+        <p className="text-xs text-zinc-500">
+          Correct performer labels, link/unlink the MicStage artist account (cuid), and mark whether this booking is
+          cancelled. Slot times are edited on the slot page.
+        </p>
         <form action={adminUpdateBooking} className="mt-3 grid max-w-lg gap-3">
           <input type="hidden" name="id" value={booking.id} />
           <label className="grid gap-1">
@@ -102,11 +136,46 @@ export default async function AdminBookingDetailPage(props: {
             <input name="performerEmail" type="email" defaultValue={booking.performerEmail ?? ""} className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1" />
           </label>
           <label className="grid gap-1">
+            <span className="text-zinc-400">Linked artist id (MicStage cuid, empty = unlink)</span>
+            <input
+              name="musicianId"
+              defaultValue={booking.musicianId ?? ""}
+              placeholder="cuid…"
+              className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1 font-mono text-xs"
+            />
+          </label>
+          <label className="grid gap-1">
             <span className="text-zinc-400">Notes</span>
             <textarea name="notes" rows={4} defaultValue={booking.notes ?? ""} className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1" />
           </label>
+          <label className="flex items-center gap-2 text-zinc-200">
+            <input type="checkbox" name="bookingCancelled" value="true" defaultChecked={Boolean(booking.cancelledAt)} />
+            Booking cancelled (sets timestamp when first checked; uncheck clears)
+          </label>
           <button type="submit" className="rounded bg-zinc-200 px-3 py-2 font-medium text-zinc-900 hover:bg-white">
-            Save
+            Save booking
+          </button>
+        </form>
+      </section>
+
+      <section className="mt-8 rounded border border-red-900/50 bg-red-950/20 p-4">
+        <h2 className="font-semibold text-red-200">Delete booking (destructive)</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Removes the booking row and sets the slot to AVAILABLE. Optional: clear manual lineup label on the slot. Does not
+          automatically adjust venue performer history counts—use Lineup history admin if you need that cleanup.
+        </p>
+        <form action={adminDeleteBooking} className="mt-3 grid max-w-lg gap-2">
+          <input type="hidden" name="id" value={booking.id} />
+          <label className="flex items-center gap-2 text-zinc-300">
+            <input type="checkbox" name="clearManualLineupLabel" value="true" />
+            Also clear manual lineup label on the slot
+          </label>
+          <label className="grid gap-1">
+            <span className="text-red-300/90">Type DELETE BOOKING to confirm</span>
+            <input name="confirmPhrase" autoComplete="off" className="rounded border border-red-800/60 bg-zinc-950 px-2 py-1" />
+          </label>
+          <button type="submit" className="w-fit rounded border border-red-600/60 bg-red-950/50 px-3 py-2 text-sm font-medium text-red-100 hover:bg-red-950/80">
+            Delete booking
           </button>
         </form>
       </section>

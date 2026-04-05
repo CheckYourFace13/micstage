@@ -8,6 +8,7 @@ import {
 import {
   ADMIN_COOKIE_NAME,
   ADMIN_EMAIL_COOKIE_NAME,
+  ADMIN_LOGIN_SUBMIT_PATH,
   ADMIN_LOGOUT_PATH,
   ADMIN_PATH_PREFIX,
   ADMIN_SESSION_COOKIE_PATH,
@@ -75,15 +76,7 @@ async function runMiddleware(request: NextRequest) {
   }
 
   if (pathname.startsWith(ADMIN_PATH_PREFIX)) {
-    const rawAdmin = process.env.MICSTAGE_ADMIN_SECRET;
-    const adminSecret = rawAdmin?.trim();
-    // Temporary diagnostic (no secret value or length)
-    if (process.env.MICSTAGE_ADMIN_DEBUG_LOG === "1") {
-      console.info("[micstage:middleware] admin path", pathname, {
-        secretNonEmpty: Boolean(adminSecret),
-        hasUtf8Bom: rawAdmin != null && rawAdmin.charCodeAt(0) === 0xfeff,
-      });
-    }
+    const adminSecret = process.env.MICSTAGE_ADMIN_SECRET?.trim();
     if (!adminSecret) {
       return new NextResponse(null, { status: 404 });
     }
@@ -91,7 +84,8 @@ async function runMiddleware(request: NextRequest) {
     const loginPath = `${ADMIN_PATH_PREFIX}/login`;
     const isLogin = pathname === loginPath || pathname.startsWith(`${loginPath}/`);
     const isLogoutRoute = pathname === ADMIN_LOGOUT_PATH || pathname.startsWith(`${ADMIN_LOGOUT_PATH}/`);
-    const skipAdminCookieCheck = isLogin || isLogoutRoute;
+    const isLoginSubmit = pathname === ADMIN_LOGIN_SUBMIT_PATH;
+    const skipAdminCookieCheck = isLogin || isLogoutRoute || isLoginSubmit;
 
     if (isLogoutRoute) {
       logAdminLogoutDebug("middleware", {

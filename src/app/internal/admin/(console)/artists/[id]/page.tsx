@@ -41,6 +41,8 @@ export default async function AdminArtistDetailPage(props: {
       stageName: true,
       bio: true,
       createdAt: true,
+      registrationContentConsentAt: true,
+      registrationContentConsentVersion: true,
     },
   });
   if (!artist) notFound();
@@ -63,6 +65,19 @@ export default async function AdminArtistDetailPage(props: {
       </Link>
       <h1 className="mt-4 text-lg font-semibold text-white">{artist.stageName}</h1>
       <p className="font-mono text-xs text-zinc-400">{artist.email}</p>
+      <p className="mt-2 text-xs text-zinc-500">
+        Registration content consent:{" "}
+        {artist.registrationContentConsentAt ? (
+          <>
+            <span className="text-zinc-300">{artist.registrationContentConsentAt.toISOString().slice(0, 19)}Z</span>
+            {artist.registrationContentConsentVersion ? (
+              <span className="ml-2 font-mono">v{artist.registrationContentConsentVersion}</span>
+            ) : null}
+          </>
+        ) : (
+          <span className="text-amber-500/90">not recorded (pre-policy signup)</span>
+        )}
+      </p>
 
       {params.saved ? (
         <p className="mt-3 rounded border border-emerald-600/40 bg-emerald-950/40 px-3 py-2 text-emerald-100">Saved.</p>

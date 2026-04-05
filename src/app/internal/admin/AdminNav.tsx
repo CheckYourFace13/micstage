@@ -9,6 +9,7 @@ const links: { href: string; label: string }[] = [
   { href: "/internal/admin/bookings", label: "Bookings" },
   { href: "/internal/admin/templates", label: "Templates" },
   { href: "/internal/admin/events", label: "Instances" },
+  { href: "/internal/admin/performer-history", label: "Lineup history" },
   { href: "/internal/admin/marketing", label: "Marketing" },
   { href: "/internal/admin/growth", label: "Growth" },
   { href: "/internal/admin/growth/expansion", label: "Launch markets" },

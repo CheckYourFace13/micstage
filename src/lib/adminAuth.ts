@@ -8,6 +8,7 @@ import {
   ADMIN_LOGOUT_COOKIE_TARGETS,
   ADMIN_SESSION_COOKIE_PATH,
 } from "@/lib/adminEdge";
+import { OM_SESSION_COOKIE_NAME } from "@/lib/authCookieNames";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
 import { clearSession } from "@/lib/session";
 
@@ -39,11 +40,61 @@ function adminLogoutSetCookieHeader(name: string, path: string, secure: boolean)
   return parts.join("; ");
 }
 
+function adminSetCookieHeader(name: string, value: string, path: string, maxAge: number, secure: boolean): string {
+  const pair = value ? `${name}=${encodeURIComponent(value)}` : `${name}=`;
+  const parts = [pair, `Path=${path}`, `Max-Age=${maxAge}`, "HttpOnly", "SameSite=Lax"];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
 /** Expire all admin session cookies on a `NextResponse` (use from Route Handlers only; see `ADMIN_LOGOUT_PATH`). */
 export function applyAdminLogoutCookiesToResponse(res: NextResponse): void {
   const secure = process.env.NODE_ENV === "production";
   for (const t of ADMIN_LOGOUT_COOKIE_TARGETS) {
     res.headers.append("Set-Cookie", adminLogoutSetCookieHeader(t.name, t.path, secure));
+  }
+}
+
+/**
+ * Route Handler sign-in: same cookie outcome as {@link setAdminSessionCookie}, with every `Set-Cookie` on the redirect
+ * response (matches admin logout reliability; avoids Next Server Action redirect internal `fetch`, which can log
+ * `failed to get redirect response` when that fetch fails in dev/Docker).
+ */
+export function applyAdminLoginSessionCookiesToResponse(
+  res: NextResponse,
+  secret: string,
+  emailForAudit: string | null,
+): void {
+  const secure = process.env.NODE_ENV === "production";
+  const token = adminSessionNodeToken(secret);
+  const week = 60 * 60 * 24 * 7;
+
+  res.headers.append(
+    "Set-Cookie",
+    adminSetCookieHeader(OM_SESSION_COOKIE_NAME, "", "/", 0, secure),
+  );
+
+  for (const t of ADMIN_LOGOUT_COOKIE_TARGETS) {
+    if (t.name === ADMIN_COOKIE_NAME || t.name === ADMIN_EMAIL_COOKIE_NAME) continue;
+    res.headers.append("Set-Cookie", adminSetCookieHeader(t.name, "", t.path, 0, secure));
+  }
+
+  res.headers.append(
+    "Set-Cookie",
+    adminSetCookieHeader(ADMIN_COOKIE_NAME, token, ADMIN_SESSION_COOKIE_PATH, week, secure),
+  );
+
+  const emailTrim = emailForAudit?.trim();
+  if (emailTrim) {
+    res.headers.append(
+      "Set-Cookie",
+      adminSetCookieHeader(ADMIN_EMAIL_COOKIE_NAME, emailTrim.toLowerCase(), ADMIN_SESSION_COOKIE_PATH, week, secure),
+    );
+  } else {
+    res.headers.append(
+      "Set-Cookie",
+      adminSetCookieHeader(ADMIN_EMAIL_COOKIE_NAME, "", ADMIN_SESSION_COOKIE_PATH, 0, secure),
+    );
   }
 }
 

@@ -78,6 +78,10 @@ model VenueOwner {
   email        String @unique
   passwordHash String
 
+  /// Set on registration when the operator accepts Terms, Privacy, and platform content/promotional use.
+  registrationContentConsentAt      DateTime?
+  registrationContentConsentVersion String?
+
   venues Venue[]
 }
 
@@ -198,6 +202,10 @@ model MusicianUser {
 
   email        String @unique
   passwordHash String
+
+  /// Set on registration when the artist accepts Terms, Privacy, and platform content/promotional use.
+  registrationContentConsentAt      DateTime?
+  registrationContentConsentVersion String?
 
   stageName String
 

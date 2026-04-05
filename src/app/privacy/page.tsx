@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LegalDocument } from "@/components/LegalDocument";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
-const updated = "March 18, 2026";
+const updated = "March 31, 2026";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Privacy Policy",
@@ -25,7 +25,9 @@ export default function PrivacyPage() {
         <li>
           <strong>Account information.</strong> When you register or log in, we collect data you provide—such as email
           address, password (stored securely), and profile details you choose to add (for example, stage name for
-          artists or venue and location information for venues).
+          artists or venue and location information for venues). When you complete registration, we record the time and
+          policy version associated with your acceptance of our Terms, Privacy Policy, and the content-use permissions
+          described there, so we can demonstrate what was agreed for compliance and support.
         </li>
         <li>
           <strong>Booking and scheduling data.</strong> We store information needed to run the service: open mic
@@ -41,7 +43,14 @@ export default function PrivacyPage() {
       <h2>How we use your information</h2>
       <ul>
         <li>To create and maintain your account and to authenticate you.</li>
-        <li>To display schedules, process bookings, and show information you or venues choose to make public.</li>
+        <li>
+          To display schedules, process bookings, and show information you or venues choose to make public—including
+          using submitted names, images, logos, and similar materials to operate and promote MicStage as outlined in our{" "}
+          <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/terms">
+            Terms of Service
+          </Link>
+          .
+        </li>
         <li>To send service-related emails (for example, account verification, password resets, and important notices).</li>
         <li>To improve reliability, security, and product experience, including through aggregated analytics.</li>
         <li>To comply with law or protect rights and safety where required.</li>

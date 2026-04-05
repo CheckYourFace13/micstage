@@ -6,6 +6,14 @@ import { adminUpdateEventInstance } from "@/app/internal/admin/actions";
 
 export const dynamic = "force-dynamic";
 
+function temporalLabel(instanceDate: Date): string {
+  const a = instanceDate.toISOString().slice(0, 10);
+  const b = new Date().toISOString().slice(0, 10);
+  if (a < b) return "Past";
+  if (a > b) return "Future";
+  return "Today (date)";
+}
+
 function fmtMin(m: number) {
   const h = Math.floor(m / 60);
   const mm = m % 60;
@@ -44,6 +52,7 @@ export default async function AdminEventInstanceDetailPage(props: {
   if (!instance) notFound();
 
   const v = instance.template.venue;
+  const when = temporalLabel(instance.date);
 
   return (
     <main className="mx-auto max-w-4xl px-3 py-6 text-sm">
@@ -51,7 +60,20 @@ export default async function AdminEventInstanceDetailPage(props: {
         ← Instances
       </Link>
       <h1 className="mt-4 text-lg font-semibold text-white">Instance</h1>
-      <p className="font-mono text-xs text-zinc-500">{instance.date.toISOString().slice(0, 10)}</p>
+      <p className="mt-1 text-xs text-zinc-500">
+        <span
+          className={
+            when === "Future"
+              ? "font-semibold text-emerald-400"
+              : when === "Past"
+                ? "font-semibold text-zinc-500"
+                : "font-semibold text-amber-400"
+          }
+        >
+          {when}
+        </span>
+        <span className="ml-2 font-mono">{instance.date.toISOString().slice(0, 10)}</span>
+      </p>
 
       {params.saved ? (
         <p className="mt-3 rounded border border-emerald-600/40 bg-emerald-950/40 px-3 py-2 text-emerald-100">Saved.</p>
@@ -77,16 +99,43 @@ export default async function AdminEventInstanceDetailPage(props: {
       </section>
 
       <section className="mt-6 rounded border border-zinc-700 bg-zinc-900 p-4">
-        <h2 className="font-semibold text-white">Operations</h2>
-        <p className="text-xs text-zinc-500">Cancelling an instance affects availability; does not rewrite booked slot times.</p>
-        <form action={adminUpdateEventInstance} className="mt-3 flex flex-wrap items-center gap-4">
+        <h2 className="font-semibold text-white">Instance operations</h2>
+        <p className="text-xs text-zinc-500">
+          Cancelling an instance affects availability. Time overrides are minutes from midnight in the template timezone
+          (leave blank to clear an override).
+        </p>
+        <form action={adminUpdateEventInstance} className="mt-3 grid max-w-md gap-3">
           <input type="hidden" name="id" value={instance.id} />
           <label className="flex items-center gap-2 text-zinc-200">
             <input type="checkbox" name="isCancelled" value="true" defaultChecked={instance.isCancelled} />
             Instance cancelled
           </label>
-          <button type="submit" className="rounded bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white">
-            Save
+          <div className="grid grid-cols-2 gap-2">
+            <label className="grid gap-1 text-xs">
+              <span className="text-zinc-400">Start override (min, blank = none)</span>
+              <input
+                name="startTimeMinOverride"
+                type="number"
+                min={0}
+                max={1440}
+                defaultValue={instance.startTimeMinOverride ?? ""}
+                className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1"
+              />
+            </label>
+            <label className="grid gap-1 text-xs">
+              <span className="text-zinc-400">End override (min, blank = none)</span>
+              <input
+                name="endTimeMinOverride"
+                type="number"
+                min={0}
+                max={1440}
+                defaultValue={instance.endTimeMinOverride ?? ""}
+                className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1"
+              />
+            </label>
+          </div>
+          <button type="submit" className="w-fit rounded bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-white">
+            Save instance
           </button>
         </form>
       </section>
@@ -106,7 +155,9 @@ export default async function AdminEventInstanceDetailPage(props: {
               {instance.slots.map((s) => (
                 <tr key={s.id}>
                   <td className="px-2 py-2 font-mono text-zinc-300">
-                    {fmtMin(s.startMin)}–{fmtMin(s.endMin)}
+                    <Link className="text-sky-400 underline hover:text-sky-300" href={`/internal/admin/slots/${s.id}`}>
+                      {fmtMin(s.startMin)}–{fmtMin(s.endMin)}
+                    </Link>
                   </td>
                   <td className="px-2 py-2 text-zinc-400">{s.status}</td>
                   <td className="px-2 py-2">

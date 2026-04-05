@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { privateNoIndexMetadata } from "@/lib/privateSeo";
-import { ADMIN_COOKIE_NAME } from "@/lib/adminEdge";
+import { ADMIN_COOKIE_NAME, ADMIN_LOGIN_SUBMIT_PATH } from "@/lib/adminEdge";
 import { adminSessionNodeToken, getAdminSecretOrNull } from "@/lib/adminAuth";
 import { parseAdminEmailAllowlist } from "@/lib/adminAuthShared";
-import { adminLoginAction } from "./actions";
 
 export const metadata: Metadata = {
   title: "Admin sign-in",
@@ -64,7 +63,7 @@ export default async function AdminLoginPage(props: {
             </p>
           ) : null}
 
-          <form action={adminLoginAction} className="mt-6 grid gap-3">
+          <form method="post" action={ADMIN_LOGIN_SUBMIT_PATH} className="mt-6 grid gap-3">
             <label className="grid gap-1 text-sm">
               <span className="text-zinc-300">Secret</span>
               <input

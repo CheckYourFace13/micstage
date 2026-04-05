@@ -9,6 +9,7 @@ import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { registerMusician } from "./actions";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
+import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
 
 export default async function MusicianRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await props.searchParams;
@@ -17,6 +18,7 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
 
   const showRate = error === "rate";
   const showUnavailable = error === "unavailable";
+  const showConsent = error === "consent";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -43,6 +45,11 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
           {showUnavailable ? (
             <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
               Registration could not complete. Check your connection and try again. If this keeps happening, contact support.
+            </div>
+          ) : null}
+          {showConsent ? (
+            <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+              Please confirm the agreement below (Terms, Privacy, and content use) to create your account.
             </div>
           ) : null}
           <label className="grid gap-1 text-sm">
@@ -76,6 +83,8 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
               required
             />
           </label>
+
+          <RegistrationContentConsent />
 
           <FormSubmitButton
             label="Create artist account"

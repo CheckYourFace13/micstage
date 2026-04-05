@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 
 export default async function AdminBookingsPage(props: {
-  searchParams: Promise<{ q?: string; page?: string; cancelled?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; cancelled?: string; deleted?: string }>;
 }) {
   await assertAdminSession();
   const params = await props.searchParams;
@@ -46,6 +46,7 @@ export default async function AdminBookingsPage(props: {
         musician: { select: { stageName: true, email: true } },
         slot: {
           select: {
+            id: true,
             status: true,
             startMin: true,
             endMin: true,
@@ -79,6 +80,11 @@ export default async function AdminBookingsPage(props: {
   return (
     <main className="mx-auto max-w-7xl px-3 py-6">
       <h1 className="text-lg font-semibold text-white">Bookings</h1>
+      {params.deleted === "1" ? (
+        <p className="mt-3 rounded border border-emerald-600/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-100">
+          Booking deleted; slot set to AVAILABLE.
+        </p>
+      ) : null}
       <p className="mt-1 text-xs text-zinc-500">
         Global totals: {activeCount} active · {cancelledCount} cancelled
       </p>
@@ -123,7 +129,10 @@ export default async function AdminBookingsPage(props: {
                   <td className="px-2 py-2 text-xs text-zinc-300">{v.name}</td>
                   <td className="px-2 py-2 font-mono text-xs text-zinc-400">{ins.date.toISOString().slice(0, 10)}</td>
                   <td className="px-2 py-2 font-mono text-xs text-zinc-500">
-                    {fmtMin(b.slot.startMin)}–{fmtMin(b.slot.endMin)} ({ins.template.timeZone})
+                    <Link className="text-sky-400 hover:underline" href={`/internal/admin/slots/${b.slot.id}`}>
+                      {fmtMin(b.slot.startMin)}–{fmtMin(b.slot.endMin)}
+                    </Link>{" "}
+                    ({ins.template.timeZone})
                   </td>
                   <td className="px-2 py-2 text-xs">
                     {b.cancelledAt ? <span className="text-red-400">cancelled</span> : <span className="text-zinc-400">{b.slot.status}</span>}

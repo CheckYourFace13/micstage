@@ -10,6 +10,10 @@ import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { JOINED_VENUE, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
 import { sendVenueWelcomeEmailAfterRegistration } from "@/lib/marketing/venueWelcomeSend";
+import {
+  REGISTRATION_CONTENT_CONSENT_VERSION,
+  registrationContentConsentChecked,
+} from "@/lib/registrationConsent";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -53,6 +57,10 @@ export async function registerVenue(formData: FormData) {
     redirect("/register/venue?error=place");
   }
 
+  if (!registrationContentConsentChecked(formData)) {
+    redirect("/register/venue?error=consent");
+  }
+
   const timeZone = tzLookup(lat, lng);
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -73,13 +81,32 @@ export async function registerVenue(formData: FormData) {
     }
 
     let newVenueId: string | null = null;
+    const consentAt = new Date();
+    const consentVer = REGISTRATION_CONTENT_CONSENT_VERSION;
+
     await prisma.$transaction(async (tx) => {
       const existing = await tx.venueOwner.findUnique({ where: { email } });
+      let owner;
       if (existing) {
         const ok = await bcrypt.compare(password, existing.passwordHash);
         if (!ok) redirect("/login/venue?error=invalid");
+        owner = await tx.venueOwner.update({
+          where: { id: existing.id },
+          data: {
+            registrationContentConsentAt: consentAt,
+            registrationContentConsentVersion: consentVer,
+          },
+        });
+      } else {
+        owner = await tx.venueOwner.create({
+          data: {
+            email,
+            passwordHash,
+            registrationContentConsentAt: consentAt,
+            registrationContentConsentVersion: consentVer,
+          },
+        });
       }
-      const owner = existing ?? (await tx.venueOwner.create({ data: { email, passwordHash } }));
 
       // If the owner already existed, we leave their passwordHash as-is (login flow comes next).
       const created = await tx.venue.create({

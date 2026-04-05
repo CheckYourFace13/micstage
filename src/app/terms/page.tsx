@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LegalDocument } from "@/components/LegalDocument";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
-const updated = "March 18, 2026";
+const updated = "March 31, 2026";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Terms of Service",
@@ -71,8 +71,37 @@ export default function TermsPage() {
       <h2>Intellectual property</h2>
       <p>
         MicStage and its branding, software, and content we create are owned by us or our licensors. You receive a
-        limited, non-exclusive license to use the service as intended. You retain rights to content you upload; you
-        grant us a license to host, display, and process that content to run MicStage.
+        limited, non-exclusive license to use the service as intended. You retain ownership of content and rights you
+        already hold in materials you submit.
+      </p>
+
+      <h2>Your content and promotional use</h2>
+      <p>
+        You may upload or submit profile, venue, or booking-related materials—such as names, stage or venue branding,
+        logos, photos or likeness, biographical text, links, and optional audio or music samples or clips you choose to
+        provide. By submitting that material, you confirm you have the rights needed to share it on MicStage.
+      </p>
+      <p>
+        You grant MicStage a worldwide, non-exclusive, royalty-free license to host, store, reproduce, display,
+        distribute, and otherwise use those submitted materials to operate, improve, and promote the platform and
+        MicStage’s products and community—including on the site, in email or in-app communications about the service,
+        and in marketing or educational materials that reference MicStage (for example, showcasing how the platform
+        works or highlighting public listings). Where reasonable, we will use good faith efforts to present your
+        materials in a truthful, context-appropriate way. You may remove or update much of this content through the
+        product; some copies may persist in backups or logs for a period as described in our{" "}
+        <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/privacy">
+          Privacy Policy
+        </Link>
+        .
+      </p>
+      <p>
+        This license continues for as long as needed to provide the service and the uses above, subject to your
+        account controls and applicable law. If you believe material on MicStage infringes your rights, contact us via
+        the{" "}
+        <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/contact">
+          contact form
+        </Link>
+        .
       </p>
 
       <h2>Disclaimers</h2>

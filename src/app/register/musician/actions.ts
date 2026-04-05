@@ -8,6 +8,10 @@ import { redirect } from "next/navigation";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { JOINED_MUSICIAN, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
+import {
+  REGISTRATION_CONTENT_CONSENT_VERSION,
+  registrationContentConsentChecked,
+} from "@/lib/registrationConsent";
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -19,6 +23,10 @@ export async function registerMusician(formData: FormData) {
   const email = reqString(formData, "email").toLowerCase();
   const password = reqString(formData, "password");
   const stageName = reqString(formData, "stageName");
+
+  if (!registrationContentConsentChecked(formData)) {
+    redirect("/register/musician?error=consent");
+  }
 
   const rl = await consumeRateLimit({
     scope: "register:musician",
@@ -40,8 +48,15 @@ export async function registerMusician(formData: FormData) {
     const existing = await prisma.musicianUser.findUnique({ where: { email } });
     if (existing) redirect("/login/musician");
 
+    const now = new Date();
     const musician = await prisma.musicianUser.create({
-      data: { email, passwordHash, stageName },
+      data: {
+        email,
+        passwordHash,
+        stageName,
+        registrationContentConsentAt: now,
+        registrationContentConsentVersion: REGISTRATION_CONTENT_CONSENT_VERSION,
+      },
     });
 
     await setSession({ kind: "musician", musicianId: musician.id, email: musician.email });

@@ -7,8 +7,14 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
 
+function startOfTodayUtc(): Date {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
 export default async function AdminEventsPage(props: {
-  searchParams: Promise<{ venueId?: string; page?: string; sort?: string }>;
+  searchParams: Promise<{ venueId?: string; page?: string; sort?: string; when?: string }>;
 }) {
   await assertAdminSession();
   const params = await props.searchParams;
@@ -16,10 +22,17 @@ export default async function AdminEventsPage(props: {
   const venueId = params.venueId?.trim();
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const sortDesc = params.sort !== "asc";
+  const when = params.when?.trim() ?? "all";
+  const today = startOfTodayUtc();
 
   const where: Prisma.EventInstanceWhereInput = {};
   if (venueId) {
     where.template = { venueId };
+  }
+  if (when === "future") {
+    where.date = { gte: today };
+  } else if (when === "past") {
+    where.date = { lt: today };
   }
 
   const [total, rows, venuesMini] = await Promise.all([
@@ -90,6 +103,14 @@ export default async function AdminEventsPage(props: {
           <select name="sort" defaultValue={sortDesc ? "desc" : "asc"} className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-white">
             <option value="desc">Newest first</option>
             <option value="asc">Oldest first</option>
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="text-zinc-400">When (UTC date)</span>
+          <select name="when" defaultValue={when} className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-white">
+            <option value="all">All</option>
+            <option value="future">Future + today</option>
+            <option value="past">Past only</option>
           </select>
         </label>
         <button type="submit" className="rounded bg-zinc-200 px-3 py-1 text-zinc-900">

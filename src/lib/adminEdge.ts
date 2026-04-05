@@ -30,6 +30,9 @@ export const ADMIN_PATH_PREFIX = "/internal/admin";
 /** Canonical admin logout URL (GET clears cookies and redirects home). */
 export const ADMIN_LOGOUT_PATH = `${ADMIN_PATH_PREFIX}/logout` as const;
 
+/** POST target for sign-in form (Route Handler + redirect; avoids Server Action redirect internal fetch noise). */
+export const ADMIN_LOGIN_SUBMIT_PATH = `${ADMIN_PATH_PREFIX}/login-submit` as const;
+
 /** Opt-in: `MICSTAGE_ADMIN_LOGOUT_DEBUG=1` logs logout + middleware cookie visibility (no secrets). */
 export function logAdminLogoutDebug(phase: string, detail?: Record<string, unknown>): void {
   if (process.env.MICSTAGE_ADMIN_LOGOUT_DEBUG !== "1") return;

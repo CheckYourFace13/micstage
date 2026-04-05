@@ -1,13 +1,14 @@
 "use server";
 
 import { assertAdminSession, getOptionalAdminEmailFromLoginForm } from "@/lib/adminAuth";
-import { buildGrowthLeadOutreachPayload } from "@/lib/growth/outreachEmailBodies";
+import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { CsvImportDefaults } from "@/lib/growth/csvImport";
 import { parseGrowthLeadsFromCsv } from "@/lib/growth/csvImport";
+import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
+import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
 import { sendGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadDraftSend";
 import type { GrowthLeadPerformanceTag, GrowthLeadStatus, GrowthLeadType } from "@/generated/prisma/client";
-import { MarketingContactStatus } from "@/generated/prisma/client";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { requirePrisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -49,28 +50,38 @@ export async function createGrowthLeadAction(formData: FormData) {
   const contactUrl = String(formData.get("contactUrl") ?? "").trim() || null;
   const fitRaw = String(formData.get("fitScore") ?? "").trim();
   const fitScore = fitRaw ? Number.parseInt(fitRaw, 10) : null;
+  const discoveryMarketSlug = String(formData.get("discoveryMarketSlug") ?? "").trim();
+  if (!discoveryMarketSlug) redirect(q("/internal/admin/growth", "err", "needMarket"));
 
-  await prisma.growthLead.create({
-    data: {
-      name,
-      leadType,
-      contactEmailNormalized: email || null,
-      contactUrl,
-      websiteUrl: String(formData.get("websiteUrl") ?? "").trim() || null,
-      instagramUrl: String(formData.get("instagramUrl") ?? "").trim() || null,
-      youtubeUrl: String(formData.get("youtubeUrl") ?? "").trim() || null,
-      tiktokUrl: String(formData.get("tiktokUrl") ?? "").trim() || null,
-      city: String(formData.get("city") ?? "").trim() || null,
-      suburb: String(formData.get("suburb") ?? "").trim() || null,
-      region: String(formData.get("region") ?? "").trim() || null,
-      discoveryMarketSlug: String(formData.get("discoveryMarketSlug") ?? "").trim() || null,
-      source: String(formData.get("source") ?? "").trim() || "manual",
-      fitScore: Number.isFinite(fitScore as number) ? fitScore : null,
-      performanceTags: parseTagsFromForm(String(formData.get("tags") ?? "")),
-      internalNotes: String(formData.get("internalNotes") ?? "").trim() || null,
-      status: "DISCOVERED",
-    },
-  });
+  const candidate: GrowthLeadCandidate = {
+    leadType,
+    name,
+    contactEmailNormalized: email || null,
+    contactUrl,
+    websiteUrl: String(formData.get("websiteUrl") ?? "").trim() || null,
+    instagramUrl: String(formData.get("instagramUrl") ?? "").trim() || null,
+    youtubeUrl: String(formData.get("youtubeUrl") ?? "").trim() || null,
+    tiktokUrl: String(formData.get("tiktokUrl") ?? "").trim() || null,
+    city: String(formData.get("city") ?? "").trim() || null,
+    suburb: String(formData.get("suburb") ?? "").trim() || null,
+    region: String(formData.get("region") ?? "").trim() || null,
+    discoveryMarketSlug,
+    source: String(formData.get("source") ?? "").trim() || "manual",
+    sourceKind: "MANUAL_ADMIN",
+    fitScore: Number.isFinite(fitScore as number) ? fitScore : null,
+    discoveryConfidence: null,
+    performanceTags: parseTagsFromForm(String(formData.get("tags") ?? "")),
+    importKey: null,
+    internalNotes: String(formData.get("internalNotes") ?? "").trim() || null,
+  };
+
+  const ingested = await ingestGrowthLeadCandidate(prisma, candidate);
+  if (ingested.status === "duplicate") {
+    redirect(q("/internal/admin/growth", "err", "duplicateLead"));
+  }
+  if (ingested.status === "skipped") {
+    redirect(q("/internal/admin/growth", "err", "badLead"));
+  }
 
   revalidatePath("/internal/admin/growth");
   revalidatePath("/internal/admin/growth/leads");
@@ -139,32 +150,41 @@ export async function importGrowthLeadsCsvAction(formData: FormData) {
   };
   const { rows, errors } = parseGrowthLeadsFromCsv(text, defaults);
   let inserted = 0;
+  let importDuplicates = 0;
   const rowErrors = [...errors];
 
   for (const r of rows) {
+    const slug = r.discoveryMarketSlug?.trim();
+    if (!slug) {
+      rowErrors.push(`Row ${r.rowIndex}: missing discovery market slug`);
+      continue;
+    }
+    const candidate: GrowthLeadCandidate = {
+      leadType: r.leadType,
+      name: r.name,
+      contactEmailNormalized: r.contactEmailNormalized,
+      contactUrl: r.contactUrl,
+      websiteUrl: r.websiteUrl,
+      instagramUrl: r.instagramUrl,
+      youtubeUrl: r.youtubeUrl,
+      tiktokUrl: r.tiktokUrl,
+      city: r.city,
+      suburb: r.suburb,
+      region: r.region,
+      discoveryMarketSlug: slug,
+      source: r.source,
+      sourceKind: "CSV_IMPORT",
+      fitScore: r.fitScore,
+      discoveryConfidence: null,
+      performanceTags: r.performanceTags,
+      importKey: r.importKey,
+      internalNotes: null,
+    };
     try {
-      await prisma.growthLead.create({
-        data: {
-          name: r.name,
-          leadType: r.leadType,
-          contactEmailNormalized: r.contactEmailNormalized,
-          contactUrl: r.contactUrl,
-          websiteUrl: r.websiteUrl,
-          instagramUrl: r.instagramUrl,
-          youtubeUrl: r.youtubeUrl,
-          tiktokUrl: r.tiktokUrl,
-          city: r.city,
-          suburb: r.suburb,
-          region: r.region,
-          discoveryMarketSlug: r.discoveryMarketSlug,
-          source: r.source,
-          fitScore: r.fitScore,
-          performanceTags: r.performanceTags,
-          importKey: r.importKey,
-          status: "DISCOVERED",
-        },
-      });
-      inserted++;
+      const res = await ingestGrowthLeadCandidate(prisma, candidate);
+      if (res.status === "created") inserted++;
+      else if (res.status === "duplicate") importDuplicates++;
+      else rowErrors.push(`Row ${r.rowIndex}: ${res.reason}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       rowErrors.push(`Row ${r.rowIndex}: ${msg.slice(0, 200)}`);
@@ -177,10 +197,10 @@ export async function importGrowthLeadsCsvAction(formData: FormData) {
   revalidatePath("/internal/admin/growth/artists");
   revalidatePath("/internal/admin/growth/promoters");
 
-  const failedCreates = rows.length - inserted;
+  const failedCreates = rows.length - inserted - importDuplicates;
   if (rowErrors.length) console.error("[growth csv import]", rowErrors);
   redirect(
-    `/internal/admin/growth?importInserted=${inserted}&importFailed=${failedCreates}&parseErrs=${errors.length}`,
+    `/internal/admin/growth?importInserted=${inserted}&importFailed=${failedCreates}&importDuplicates=${importDuplicates}&parseErrs=${errors.length}`,
   );
 }
 
@@ -190,50 +210,18 @@ export async function generateGrowthLeadDraftAction(formData: FormData) {
   const leadId = String(formData.get("leadId") ?? "").trim();
   if (!leadId) redirect(q("/internal/admin/growth", "err", "noLead"));
 
-  const lead = await prisma.growthLead.findUnique({ where: { id: leadId } });
-  if (!lead) redirect(q("/internal/admin/growth", "err", "missingLead"));
-
-  const email = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
-  if (!email) {
-    redirect(q(`/internal/admin/growth/leads/${leadId}`, "err", "needEmail"));
+  const r = await createPendingGrowthLeadOutreachDraft(prisma, leadId);
+  if (!r.ok) {
+    const key =
+      r.reason === "Lead not found"
+        ? "missingLead"
+        : r.reason.includes("email")
+          ? "needEmail"
+          : r.reason.includes("already has")
+            ? "draftExists"
+            : "draftErr";
+    redirect(q(`/internal/admin/growth/leads/${leadId}`, "err", key));
   }
-
-  const payload = buildGrowthLeadOutreachPayload({
-    leadType: lead.leadType,
-    name: lead.name,
-    city: lead.city,
-    discoveryMarketSlug: lead.discoveryMarketSlug,
-    contactUrl: lead.contactUrl,
-    websiteUrl: lead.websiteUrl,
-  });
-
-  const contact = await prisma.marketingContact.upsert({
-    where: { emailNormalized: email },
-    create: {
-      emailNormalized: email,
-      displayName: lead.name,
-      discoveryMarketSlug: lead.discoveryMarketSlug ?? undefined,
-      source: "growth-lead",
-      status: MarketingContactStatus.ACTIVE,
-    },
-    update: {
-      displayName: lead.name,
-      discoveryMarketSlug: lead.discoveryMarketSlug ?? undefined,
-    },
-  });
-
-  await prisma.growthLeadOutreachDraft.create({
-    data: {
-      leadId: lead.id,
-      contactId: contact.id,
-      toEmailNormalized: email,
-      status: "PENDING_REVIEW",
-      subject: payload.subject,
-      textBody: payload.textBody,
-      htmlBody: payload.htmlBody,
-      discoveryMarketSlug: lead.discoveryMarketSlug,
-    },
-  });
 
   revalidatePath("/internal/admin/growth/leads");
   revalidatePath(`/internal/admin/growth/leads/${leadId}`);

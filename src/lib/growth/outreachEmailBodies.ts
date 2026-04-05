@@ -8,15 +8,8 @@ import {
   GROWTH_PROMOTER_OUTREACH_SUBJECT,
   GROWTH_VENUE_OUTREACH_SUBJECT,
   OUTREACH_DRAFT_FOOTER_TEXT,
+  outreachPlainLeanHtml,
 } from "@/lib/marketing/outreachTemplates";
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 /** Draft outreach bodies for imported / manual growth leads (not venue-claim cold). */
 export function buildGrowthLeadOutreachPayload(input: {
@@ -33,13 +26,13 @@ export function buildGrowthLeadOutreachPayload(input: {
     PROMOTER_ACCOUNT: GROWTH_PROMOTER_OUTREACH_SUBJECT,
   };
 
-  const letterByType: Record<GrowthLeadType, { textBody: string; htmlBody: string }> = {
+  const letterByType: Record<GrowthLeadType, { textBody: string }> = {
     VENUE: buildVenueOutreachLetter(input.name),
     ARTIST: buildArtistOutreachLetter(input.name),
     PROMOTER_ACCOUNT: buildPromoterOutreachLetter(input.name),
   };
 
-  const { textBody: coreText, htmlBody: coreHtml } = letterByType[input.leadType];
+  const { textBody: coreText } = letterByType[input.leadType];
 
   let textBody = coreText;
   if (input.websiteUrl || input.contactUrl) {
@@ -49,13 +42,7 @@ export function buildGrowthLeadOutreachPayload(input: {
   }
   textBody += `\n\n— ${OUTREACH_DRAFT_FOOTER_TEXT}`;
 
-  const appendixHtml = [
-    input.websiteUrl ? `<p><a href="${escapeHtml(input.websiteUrl)}">Website</a></p>` : "",
-    input.contactUrl ? `<p><a href="${escapeHtml(input.contactUrl)}">Contact / booking</a></p>` : "",
-    `<p><em>${escapeHtml(OUTREACH_DRAFT_FOOTER_TEXT)}</em></p>`,
-  ].join("");
-
-  const htmlBody = `${coreHtml}${appendixHtml}`;
+  const htmlBody = outreachPlainLeanHtml(textBody);
 
   return {
     subject: subjectByType[input.leadType],

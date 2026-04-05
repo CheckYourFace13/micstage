@@ -98,3 +98,14 @@ export function buildPromoterOutreachLetter(name: string): { textBody: string; h
 }
 
 export const OUTREACH_DRAFT_FOOTER_TEXT = "MicStage draft — not sent";
+
+/** Minimal HTML mirroring plain text (paragraphs + line breaks) for deliverability-friendly outreach. */
+export function outreachPlainLeanHtml(plainBody: string): string {
+  return plainBody
+    .split(/\n\n+/)
+    .map((block) => {
+      const inner = escapeHtml(block).replace(/\n/g, "<br />");
+      return `<p style="margin:0 0 1em 0;line-height:1.45;">${inner}</p>`;
+    })
+    .join("");
+}

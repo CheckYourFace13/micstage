@@ -64,6 +64,7 @@ export default async function AdminGrowthLeadDetailPage(props: {
       leadStatus: lead.status,
       toEmail: email,
       contact,
+      discoveryMarketSlug: lead.discoveryMarketSlug,
     });
   }
 
@@ -91,7 +92,17 @@ export default async function AdminGrowthLeadDetailPage(props: {
       </p>
 
       {flash.err ? (
-        <p className="mt-3 rounded border border-red-600/40 bg-red-950/40 px-3 py-2 text-sm text-red-100">{flash.err}</p>
+        <p className="mt-3 rounded border border-red-600/40 bg-red-950/40 px-3 py-2 text-sm text-red-100">
+          {flash.err === "draftExists"
+            ? "This lead already has an active or sent outreach draft."
+            : flash.err === "needEmail"
+              ? "Add a contact email before generating a draft."
+              : flash.err === "missingLead"
+                ? "Lead not found."
+                : flash.err === "draftErr"
+                  ? "Could not create draft (check email and duplicates)."
+                  : flash.err}
+        </p>
       ) : null}
       {flash.sendErr ? (
         <p className="mt-3 rounded border border-amber-600/40 bg-amber-950/40 px-3 py-2 text-sm text-amber-100">
@@ -145,9 +156,10 @@ export default async function AdminGrowthLeadDetailPage(props: {
             <dd className="text-zinc-200">{lead.performanceTags.join(", ") || "—"}</dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Source / fit</dt>
+            <dt className="text-zinc-500">Source / kind / confidence / fit</dt>
             <dd className="text-zinc-200">
-              {lead.source ?? "—"} · {lead.fitScore ?? "—"}
+              {lead.source ?? "—"} · {lead.sourceKind}
+              {lead.discoveryConfidence != null ? ` · conf ${lead.discoveryConfidence}` : ""} · fit {lead.fitScore ?? "—"}
             </dd>
           </div>
           <div className="sm:col-span-2">

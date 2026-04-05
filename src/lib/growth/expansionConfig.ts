@@ -12,6 +12,27 @@ export function growthAutoExpansionCronEnabled(): boolean {
   return process.env.GROWTH_AUTO_EXPANSION_ENABLED === "true";
 }
 
+/** When true, POST /api/cron/growth-pipeline may run discovery adapters (still Chicagoland-first via GROWTH_DISCOVERY_MARKET_SLUGS). */
+export function growthLeadDiscoveryCronEnabled(): boolean {
+  return process.env.GROWTH_LEAD_DISCOVERY_CRON_ENABLED === "true";
+}
+
+/** When true, cron may auto-create PENDING_REVIEW outreach drafts (never auto-send). */
+export function growthAutoDraftCronEnabled(): boolean {
+  return process.env.GROWTH_AUTO_DRAFT_CRON_ENABLED === "true";
+}
+
+export function growthAutoDraftFitMin(): number {
+  const v = process.env.GROWTH_AUTO_DRAFT_FIT_MIN?.trim();
+  if (!v) return 7;
+  const n = Number.parseInt(v, 10);
+  return Number.isFinite(n) ? n : 7;
+}
+
+export function growthAutoDraftBatchLimit(): number {
+  return parseIntEnv("GROWTH_AUTO_DRAFT_BATCH_LIMIT", 100);
+}
+
 export type ExpansionThresholds = {
   minApprovedLeads: number;
   minSentEmails: number;

@@ -4,9 +4,15 @@ import {
   createGrowthLeadAction,
   importGrowthLeadsCsvAction,
 } from "@/app/internal/admin/growthActions";
-import { growthFollowUpAutomationEnabled } from "@/lib/marketing/emailConfig";
-import { loadGrowthMarketMetrics } from "@/lib/growth/marketMetrics";
+import { loadGrowthDailyActivityStats } from "@/lib/growth/growthDailyActivity";
+import { loadGrowthFunnelMetrics, loadGrowthMarketMetrics } from "@/lib/growth/marketMetrics";
 import { defaultGrowthMetro, GROWTH_METROS, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
+import {
+  growthFollowUpAutomationEnabled,
+  marketingContactCooldownHours,
+  marketingDailyCap,
+  marketingPerDomainDailyCap,
+} from "@/lib/marketing/emailConfig";
 import { requirePrisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +25,7 @@ export default async function AdminGrowthHubPage(props: {
     err?: string;
     importInserted?: string;
     importFailed?: string;
+    importDuplicates?: string;
     parseErrs?: string;
   }>;
 }) {
@@ -30,8 +37,11 @@ export default async function AdminGrowthHubPage(props: {
   const metroConfig =
     GROWTH_METROS.find((m) => m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase()) ?? defaultGrowthMetro();
 
-  const [metrics, byType, total] = await Promise.all([
+  const [metrics, funnel, overallFunnel, daily, byType, total, launchRows] = await Promise.all([
     loadGrowthMarketMetrics(prisma, marketSlug),
+    loadGrowthFunnelMetrics(prisma, marketSlug),
+    loadGrowthFunnelMetrics(prisma, null),
+    loadGrowthDailyActivityStats(prisma),
     prisma.growthLead.groupBy({
       by: ["leadType"],
       where: { discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" } },
@@ -40,6 +50,7 @@ export default async function AdminGrowthHubPage(props: {
     prisma.growthLead.count({
       where: { discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" } },
     }),
+    prisma.growthLaunchMarket.findMany({ orderBy: { sortOrder: "asc" } }),
   ]);
 
   const counts = Object.fromEntries(byType.map((g) => [g.leadType, g._count._all])) as Record<string, number>;
@@ -49,10 +60,20 @@ export default async function AdminGrowthHubPage(props: {
     <main className="mx-auto max-w-5xl px-3 py-6">
       <h1 className="text-xl font-semibold text-white">Growth &amp; outbound</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-        Market-by-market launch. Default is <strong className="text-zinc-200">{defaultGrowthMetro().label}</strong>. Manual
-        and CSV leads only — no auto-scrape. Cold outreach stays <span className="text-zinc-300">draft → approve → send</span>{" "}
-        with existing marketing caps. Follow-up automation:{" "}
-        <span className="text-zinc-300">{growthFollowUpAutomationEnabled() ? "ON" : "OFF"}</span>.
+        Market-by-market launch. Default is <strong className="text-zinc-200">{defaultGrowthMetro().label}</strong>. Leads:
+        manual, CSV, and optional scheduled discovery jobs (adapters). Cold outreach stays{" "}
+        <span className="text-zinc-300">draft → approve → send</span> — never mass auto-send. Only{" "}
+        <strong className="text-zinc-200">ACTIVE</strong> launch markets may send; queued markets can accumulate leads and
+        drafts. Follow-up automation:{" "}
+        <span className="text-zinc-300">{growthFollowUpAutomationEnabled() ? "ON" : "OFF"}</span> (default off).
+      </p>
+      <p className="mt-2 max-w-2xl text-xs text-zinc-500">
+        Cron: <code className="text-zinc-400">POST /api/cron/growth-pipeline</code> with{" "}
+        <code className="text-zinc-400">GROWTH_LEAD_DISCOVERY_CRON_ENABLED</code> /{" "}
+        <code className="text-zinc-400">GROWTH_AUTO_DRAFT_CRON_ENABLED</code>. Discovery markets default to Chicagoland via{" "}
+        <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>. Caps: outreach{" "}
+        {marketingDailyCap("outreach")}/day · per-domain {marketingPerDomainDailyCap()}/day · contact cooldown{" "}
+        {marketingContactCooldownHours()}h.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
@@ -91,7 +112,11 @@ export default async function AdminGrowthHubPage(props: {
 
       {params.err ? (
         <p className="mt-3 rounded border border-red-600/40 bg-red-950/40 px-3 py-2 text-sm text-red-100">
-          {params.err}
+          {params.err === "duplicateLead"
+            ? "That lead looks like a duplicate (email, website, Instagram, import key, or name+city in this market)."
+            : params.err === "needMarket"
+              ? "Discovery market slug is required."
+              : params.err}
         </p>
       ) : null}
       {params.ok ? (
@@ -101,31 +126,78 @@ export default async function AdminGrowthHubPage(props: {
       ) : null}
       {params.importInserted !== undefined ? (
         <p className="mt-3 rounded border border-zinc-600/40 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200">
-          CSV import: inserted {params.importInserted}, failed creates {params.importFailed ?? "0"}, parse errors{" "}
-          {params.parseErrs ?? "0"}. Check server logs for row details if failures &gt; 0.
+          CSV import: inserted {params.importInserted}, skipped duplicates {params.importDuplicates ?? "0"}, other skips{" "}
+          {params.importFailed ?? "0"}, parse errors {params.parseErrs ?? "0"}. Check server logs for row details if
+          failures &gt; 0.
         </p>
       ) : null}
 
       <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-        <h2 className="text-lg font-medium text-white">Pipeline funnel (this market)</h2>
+        <h2 className="text-lg font-medium text-white">Today (UTC)</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Discovered / in review = DISCOVERED + REVIEWED. Replied = lead status. Reply logs = EMAIL responses logged. Sends =
-          growth outreach drafts marked SENT (this market).
+          Blocked sends = outreach pipeline rows with BLOCKED today. “Approved” uses leads in APPROVED with{" "}
+          <code className="text-zinc-400">updatedAt</code> today (heuristic if you edited other fields).
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <FunnelStat label="Discovered / in review" value={metrics.funnel.discoveredOrReview} />
-          <FunnelStat label="Approved" value={metrics.funnel.approved} />
-          <FunnelStat label="Contacted" value={metrics.funnel.contacted} />
-          <FunnelStat label="Replied (status)" value={metrics.funnel.replied} />
-          <FunnelStat label="Joined" value={metrics.funnel.joined} highlight />
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <FunnelStat label="Leads created" value={daily.leadsDiscovered} />
+          <FunnelStat label="Approved (heuristic)" value={daily.leadsApprovedHeuristic} />
+          <FunnelStat label="Drafts generated" value={daily.draftsGenerated} />
+          <FunnelStat label="Growth sends (SENT)" value={daily.growthSendsCompleted} />
+          <FunnelStat label="Outreach blocked" value={daily.outreachBlockedSends} warn />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h2 className="text-lg font-medium text-white">Launch markets (send gate)</h2>
+        <p className="mt-1 text-xs text-zinc-500">Only ACTIVE rows may send cold growth outreach. Expansion cron unchanged.</p>
+        <ul className="mt-3 space-y-1 text-sm text-zinc-300">
+          {launchRows.map((m) => (
+            <li key={m.id}>
+              <span className="font-mono text-zinc-400">{m.discoveryMarketSlug}</span> · {m.label} ·{" "}
+              <span className={m.status === "ACTIVE" ? "text-emerald-400" : "text-amber-200/90"}>{m.status}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h2 className="text-lg font-medium text-white">Funnel — this market ({marketSlug})</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Drafted = leads with a PENDING_REVIEW or APPROVED outreach draft. Sends = drafts marked SENT (this market).
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <FunnelStat label="Discovered" value={funnel.discovered} />
+          <FunnelStat label="Reviewed" value={funnel.reviewed} />
+          <FunnelStat label="Approved" value={funnel.approved} />
+          <FunnelStat label="Drafted" value={funnel.drafted} />
+          <FunnelStat label="Contacted" value={funnel.contacted} />
+          <FunnelStat label="Replied" value={funnel.replied} />
+          <FunnelStat label="Joined" value={funnel.joined} highlight />
+          <FunnelStat label="Sends" value={funnel.outreachSends} />
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <FunnelStat label="Sends (drafts)" value={metrics.outreach.sends} />
-          <FunnelStat label="Reply logs (EMAIL)" value={metrics.replyLogsEmail} />
-          <FunnelStat label="Bounced" value={metrics.outcomes.bounced} warn />
-          <FunnelStat label="Unsubscribed" value={metrics.outcomes.unsubscribed} warn />
+          <FunnelStat label="Reply logs (EMAIL)" value={funnel.replyLogsEmail} />
+          <FunnelStat label="Bounced" value={funnel.bounced} warn />
+          <FunnelStat label="Unsubscribed" value={funnel.unsubscribed} warn />
+          <FunnelStat label="Rejected" value={funnel.rejected} />
         </div>
-        <p className="mt-2 text-xs text-zinc-600">Rejected in market: {metrics.outcomes.rejected}</p>
+        <p className="mt-2 text-xs text-zinc-600">
+          Legacy “discovered+review” count: {metrics.funnel.discoveredOrReview} (same as expansion health input).
+        </p>
+      </section>
+
+      <section className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h2 className="text-lg font-medium text-white">Funnel — all markets</h2>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <FunnelStat label="Discovered" value={overallFunnel.discovered} />
+          <FunnelStat label="Reviewed" value={overallFunnel.reviewed} />
+          <FunnelStat label="Approved" value={overallFunnel.approved} />
+          <FunnelStat label="Drafted" value={overallFunnel.drafted} />
+          <FunnelStat label="Contacted" value={overallFunnel.contacted} />
+          <FunnelStat label="Replied" value={overallFunnel.replied} />
+          <FunnelStat label="Joined" value={overallFunnel.joined} highlight />
+          <FunnelStat label="Sends" value={overallFunnel.outreachSends} />
+        </div>
       </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -160,6 +232,14 @@ export default async function AdminGrowthHubPage(props: {
               href={`/internal/admin/growth/leads?market=${encodeURIComponent(chiSlug)}&type=PROMOTER_ACCOUNT&pipeline=1`}
             >
               Chicagoland promoters / accounts (pipeline)
+            </Link>
+          </li>
+          <li>
+            <Link
+              className="text-amber-400/90 hover:text-amber-300"
+              href={`/internal/admin/growth/leads?market=${encodeURIComponent(chiSlug)}&draftPending=1`}
+            >
+              Pending-review drafts (bulk review)
             </Link>
           </li>
           <li>

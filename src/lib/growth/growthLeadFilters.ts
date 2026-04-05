@@ -13,6 +13,8 @@ export type GrowthLeadListFilters = {
   nameContains?: string | null;
   /** When true, restricts to DISCOVERED | REVIEWED | APPROVED (ignores `statuses`). */
   pipelineOnly?: boolean;
+  /** When true, only leads with at least one PENDING_REVIEW outreach draft. */
+  draftPending?: boolean;
 };
 
 export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLeadWhereInput {
@@ -55,6 +57,10 @@ export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLea
     if (fitMin !== undefined) score.gte = fitMin;
     if (fitMax !== undefined) score.lte = fitMax;
     w.fitScore = score;
+  }
+
+  if (f.draftPending) {
+    w.outreachDrafts = { some: { status: "PENDING_REVIEW" } };
   }
 
   return w;

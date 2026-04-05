@@ -59,6 +59,7 @@ export default async function AdminGrowthLeadsPage(props: {
     fitMax?: string;
     q?: string;
     pipeline?: string;
+    draftPending?: string;
   }>;
 }) {
   await assertAdminSession();
@@ -77,6 +78,7 @@ export default async function AdminGrowthLeadsPage(props: {
     fitMax: parseIntOpt(p.fitMax),
     nameContains: p.q,
     pipelineOnly: p.pipeline === "1",
+    draftPending: p.draftPending === "1",
   };
 
   const where = buildGrowthLeadWhere(filters);
@@ -166,6 +168,13 @@ export default async function AdminGrowthLeadsPage(props: {
           <label className="grid gap-1">
             <span className="text-xs text-zinc-500">Pipeline only (discovered / reviewed / approved)</span>
             <select name="pipeline" defaultValue={p.pipeline === "1" ? "1" : ""} className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 text-white">
+              <option value="">No</option>
+              <option value="1">Yes</option>
+            </select>
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs text-zinc-500">Has pending-review draft</span>
+            <select name="draftPending" defaultValue={p.draftPending === "1" ? "1" : ""} className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 text-white">
               <option value="">No</option>
               <option value="1">Yes</option>
             </select>

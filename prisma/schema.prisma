@@ -728,7 +728,7 @@ model MarketingEmailSuppression {
   @@index([reason])
 }
 
-// --- Growth / outbound lead pipeline (manual + CSV; no auto-scrape or auto-send) ---
+// --- Growth / outbound lead pipeline (manual, CSV, scheduled discovery adapters; cold send never auto-fired) ---
 
 enum GrowthLeadType {
   VENUE
@@ -754,6 +754,16 @@ enum GrowthLeadPerformanceTag {
   COMEDY
   POETRY
   VARIETY
+}
+
+/// Where the lead row originated (ingestion path).
+enum GrowthLeadSourceKind {
+  MANUAL_ADMIN
+  CSV_IMPORT
+  WEBSITE_CONTACT
+  SOCIAL_PROFILE
+  EVENT_LISTING
+  SCHEDULED_JOB
 }
 
 enum GrowthLeadOutreachDraftStatus {
@@ -805,11 +815,20 @@ model GrowthLead {
 
   performanceTags GrowthLeadPerformanceTag[] @default([])
 
-  source   String?
+  source     String?
+  sourceKind GrowthLeadSourceKind @default(MANUAL_ADMIN)
+  /// 0–100 heuristic from discovery adapters (optional).
+  discoveryConfidence Int?
+
   fitScore Int?
 
   /// Optional stable key for import dedupe (e.g. CSV row id or domain).
   importKey String? @unique
+
+  /// Normalized hostname for dedupe (lowercase, no www).
+  websiteHostNormalized String?
+  /// Normalized Instagram handle without @ (lowercase).
+  instagramHandleNormalized String?
 
   internalNotes String? @db.Text
 
@@ -822,6 +841,8 @@ model GrowthLead {
   @@index([suburb])
   @@index([status, createdAt])
   @@index([contactEmailNormalized])
+  @@index([websiteHostNormalized, leadType])
+  @@index([instagramHandleNormalized, leadType])
 }
 
 model GrowthLeadOutreachDraft {

@@ -51,3 +51,13 @@ export function resolveGrowthMarketSlug(params: { market?: string | null; metro?
   if (fromMetro) return fromMetro.discoveryMarketSlug;
   return defaultGrowthMetro().discoveryMarketSlug;
 }
+
+/**
+ * Markets where scheduled discovery may insert DISCOVERED leads (comma-separated slugs).
+ * Defaults to Chicagoland only so jobs never run “nationwide” unless you expand this list.
+ */
+export function growthDiscoveryMarketSlugs(): string[] {
+  const raw = process.env.GROWTH_DISCOVERY_MARKET_SLUGS?.trim();
+  if (!raw) return [defaultGrowthMetro().discoveryMarketSlug];
+  return [...new Set(raw.split(",").map((s) => s.trim()).filter(Boolean))];
+}

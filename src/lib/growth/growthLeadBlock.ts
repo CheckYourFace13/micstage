@@ -1,6 +1,7 @@
 import type { GrowthLeadStatus } from "@/generated/prisma/client";
 import type { MarketingContact } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { growthMarketAllowsOutboundSend } from "@/lib/growth/growthLaunchMarketGate";
 import { explainMarketingSendBlock } from "@/lib/marketing/blockReasons";
 import type { MicStageEmailCategory } from "@/lib/marketing/emailConfig";
 
@@ -23,11 +24,14 @@ export async function explainGrowthLeadOutreachBlock(
     leadStatus: GrowthLeadStatus;
     toEmail: string;
     contact: MarketingContact | null;
+    discoveryMarketSlug: string | null | undefined;
   },
 ): Promise<{ blocked: boolean; reasons: string[] }> {
   const reasons: string[] = [];
   const gl = growthLeadStatusBlocksOutreach(input.leadStatus);
   if (gl) reasons.push(gl);
+  const marketGate = await growthMarketAllowsOutboundSend(prisma, input.discoveryMarketSlug);
+  if (!marketGate.allowed && marketGate.reason) reasons.push(marketGate.reason);
   const m = await explainMarketingSendBlock(prisma, {
     to: input.toEmail,
     category: "outreach" as MicStageEmailCategory,

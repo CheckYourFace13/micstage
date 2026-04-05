@@ -56,7 +56,7 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
     case "transactional":
       return parseIntEnv("MARKETING_CAP_DAILY_TRANSACTIONAL", 50_000);
     case "outreach":
-      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 80);
+      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 30);
     case "marketing":
       return parseIntEnv("MARKETING_CAP_DAILY_MARKETING", 40);
     default:
@@ -65,12 +65,12 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
 }
 
 export function marketingPerDomainDailyCap(): number {
-  return parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 15);
+  return parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 5);
 }
 
 /** Hours between sends to same contact for outreach+marketing (same template family uses purposeKey). */
 export function marketingContactCooldownHours(): number {
-  return parseIntEnv("MARKETING_CONTACT_COOLDOWN_HOURS", 24);
+  return parseIntEnv("MARKETING_CONTACT_COOLDOWN_HOURS", 168);
 }
 
 /** Minimum minutes between any outreach/marketing sends to the same contact. */

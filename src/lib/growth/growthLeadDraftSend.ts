@@ -73,6 +73,7 @@ export async function sendApprovedGrowthLeadDraft(prisma: PrismaClient, draftId:
     leadStatus: draft.lead.status,
     toEmail: email,
     contact,
+    discoveryMarketSlug: draft.discoveryMarketSlug ?? draft.lead.discoveryMarketSlug,
   });
   if (block.blocked) {
     return { ok: false, blocked: true, reasons: block.reasons };

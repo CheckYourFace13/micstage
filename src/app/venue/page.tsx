@@ -12,7 +12,7 @@ import { isValidLineupYmd, pickPrimaryLineup, storageYmdUtc } from "@/lib/venueP
 import type { LineupTemplate } from "@/lib/venuePublicLineupData";
 import { loadLineupTemplatesByVenueIds, venueIsOperational } from "@/lib/venueDashboardOperational";
 import {
-  loadVenuePerformerHistoryForDashboard,
+  loadVenuePerformerHistoryDashboardEnriched,
   loadVenuePerformerSuggestions,
 } from "@/lib/venuePerformerHistory";
 import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
@@ -60,7 +60,7 @@ async function loadVenuePortalRows(session: Awaited<ReturnType<typeof requireVen
   venues: VenuePortalRow[];
   loadError: "none" | "requirePrisma" | "venueList";
   performerSuggestionsByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerSuggestions>>>;
-  performerHistoryByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerHistoryForDashboard>>>;
+  performerHistoryByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerHistoryDashboardEnriched>>>;
 }> {
   let prisma: ReturnType<typeof requirePrisma>;
   try {
@@ -125,12 +125,12 @@ async function loadVenuePortalRows(session: Awaited<ReturnType<typeof requireVen
   }));
 
   const performerSuggestionsByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerSuggestions>>> = {};
-  const performerHistoryByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerHistoryForDashboard>>> = {};
+  const performerHistoryByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerHistoryDashboardEnriched>>> = {};
   if (venueIds.length > 0) {
     try {
       for (const id of venueIds) {
         performerSuggestionsByVenueId[id] = await loadVenuePerformerSuggestions(prisma, id);
-        performerHistoryByVenueId[id] = await loadVenuePerformerHistoryForDashboard(prisma, id);
+        performerHistoryByVenueId[id] = await loadVenuePerformerHistoryDashboardEnriched(prisma, id);
       }
     } catch (e) {
       logVenuePortalFailure("performer history / suggestions", e);
@@ -685,9 +685,9 @@ export default async function VenuePortalPage({
                     <div className="mt-8 border-t border-white/15 pt-6">
                       <div className="text-base font-semibold text-white">Previous performers at this venue</div>
                       <p className="mt-1 max-w-xl text-xs text-white/50">
-                        Built from lineup saves, house bookings, and public reservations. MicStage accounts are always
-                        eligible for the public “Past performers” section; manual names default to public but you can hide
-                        each one below. Linking manual rows to accounts is coming — data is stored for safe future matching.
+                        Rows come from lineup activity; counts and dates use confirmed MicStage bookings at this venue.
+                        Linked artist accounts get a public search link, cross-venue totals, and a full performance timeline.
+                        Manual names stay plain text until linked; use Show/Hide to control the public venue page list.
                       </p>
                       <VenuePerformerHistoryPanel
                         venueId={v.id}

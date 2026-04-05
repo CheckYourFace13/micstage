@@ -79,8 +79,8 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
             className="mt-2 inline-flex h-11 min-w-[200px] items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
           />
           <p className="text-xs text-white/50">
-            This saves your venue using Google’s Place ID + coordinates, so maps and your public MicStage marketing pages
-            reference the correct location (SEO-friendly URLs and listings).
+            This saves your venue using Google’s Place ID and coordinates so maps, distance search, and your public MicStage
+            pages all reference the correct location—making your open mic easier to find.
           </p>
           <LineupSlotTypesHelp className="mt-4" />
         </form>

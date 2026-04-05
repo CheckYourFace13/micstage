@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticPaths = [
     "",
+    "/find-open-mics",
     "/performers",
     "/locations",
     "/venues",
@@ -31,7 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${base}${path || "/"}`,
     lastModified: staticLastModified,
     changeFrequency: "weekly",
-    priority: path === "" ? 1 : 0.85,
+    priority: path === "" ? 1 : path === "/find-open-mics" ? 0.95 : 0.85,
   }));
 
   const prisma = getPrismaOrNull();

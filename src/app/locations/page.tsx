@@ -2,60 +2,28 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { absoluteUrl } from "@/lib/publicSeo";
 import { getPrismaOrNull } from "@/lib/prisma";
-import {
-  getVenueCityDiscoveryCounts,
-  MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY,
-  primaryDiscoverySlugForVenue,
-  rollupDiscoveryLabel,
-} from "@/lib/discoveryMarket";
+import { loadPublicDiscoveryLocationRows, type PublicDiscoveryLocationRow } from "@/lib/discoveryLocationRows";
+import { MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY } from "@/lib/discoveryMarket";
 import { buildPublicMetadata } from "@/lib/publicSeo";
-import { LocationsDirectory, type LocationRow } from "./LocationsDirectory";
+import { LocationsDirectory } from "./LocationsDirectory";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic artist activity by metro & region",
   description:
-    "Discover open mic activity by metro area and regional markets. Thin towns roll up to broader hubs until local venue density supports a dedicated page—venue addresses stay precise on each venue profile.",
+    "Discover open mic activity by metro and regional markets. Smaller towns roll into larger hubs until there are enough local venues for a dedicated market page—each venue still keeps its exact address on its profile.",
   path: "/locations",
 });
 
 export default async function LocationsPage() {
   const prisma = getPrismaOrNull();
-  let rows: LocationRow[] = [];
+  let rows: PublicDiscoveryLocationRow[] = [];
   let queryFailed = false;
 
   try {
     if (prisma) {
-      const venues = await prisma.venue.findMany({
-        where: { city: { not: null } },
-        select: { city: true, region: true, id: true },
-      });
-
-      const counts = await getVenueCityDiscoveryCounts();
-      const byDiscovery = new Map<string, { label: string; count: number }>();
-      for (const v of venues) {
-        const city = (v.city ?? "").trim();
-        if (!city) continue;
-        const slug = primaryDiscoverySlugForVenue(city, v.region, counts);
-        if (!slug) continue;
-        const cur = byDiscovery.get(slug);
-        if (!cur) {
-          const rollup = rollupDiscoveryLabel(slug);
-          const label = rollup ?? (v.region?.trim() ? `${city}, ${v.region.trim()}` : city);
-          byDiscovery.set(slug, { label, count: 0 });
-        }
-        byDiscovery.get(slug)!.count += 1;
-      }
-
-      rows = [...byDiscovery.entries()]
-        .map(([slug, v]) => ({
-          key: slug,
-          label: v.label,
-          count: v.count,
-          slug,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+      rows = await loadPublicDiscoveryLocationRows(prisma);
     }
   } catch (err) {
     console.error("DB query failed", err);
@@ -89,10 +57,10 @@ export default async function LocationsPage() {
         ) : null}
         <h1 className="om-heading text-4xl tracking-wide">Open mic discovery by market</h1>
         <p className="mt-2 max-w-2xl text-sm text-white/70">
-          Browse metro and regional hubs—not every small town gets its own SEO page. When a place has fewer than{" "}
-          <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> listed venues, we group it into a
-          broader market (for example Chicagoland
-          or Central Illinois). Venue addresses on individual venue pages stay exact.
+          Browse metro and regional hubs—not every small town gets its own directory page yet. When a place has fewer than{" "}
+          <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> MicStage venues, we group it into a
+          broader market (for example Chicagoland or Central Illinois) so discovery is easier. Addresses on each venue page
+          stay exact.
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/60">
           <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{rows.length} discovery markets</span>
@@ -101,11 +69,15 @@ export default async function LocationsPage() {
           </span>
         </div>
         <p className="mt-2 text-sm text-white/65">
-          Looking for specific venues? Browse the{" "}
-          <Link className="underline hover:text-white" href="/venues">
-            open mic venue directory
+          Looking for venues near you? Start with{" "}
+          <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
+            Find Local Open Mic&apos;s
           </Link>
-          {" "}or read{" "}
+          . Or browse the{" "}
+          <Link className="underline hover:text-white" href="/venues">
+            full venue directory
+          </Link>
+          {" "}and{" "}
           <Link className="underline hover:text-white" href="/resources">
             open mic resources
           </Link>

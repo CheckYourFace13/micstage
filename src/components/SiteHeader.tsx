@@ -36,7 +36,7 @@ export async function SiteHeader() {
             </span>
           </span>
           <span className="min-w-0 truncate text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 sm:text-[11px]">
-            Artists to Music to Marketing
+            Find open mics · Artists · Venues
           </span>
         </Link>
 
@@ -93,6 +93,12 @@ export async function SiteHeader() {
               className="flex flex-wrap items-center justify-end gap-x-1 gap-y-2 text-xs font-medium sm:text-sm"
               aria-label="Discover"
             >
+              <Link
+                className="rounded-md px-2 py-1.5 font-semibold text-[rgb(var(--om-neon))] hover:bg-white/10 hover:brightness-110 sm:px-3"
+                href="/find-open-mics"
+              >
+                Find Local Open Mic&apos;s
+              </Link>
               <Link
                 className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
                 href="/performers"

@@ -34,11 +34,11 @@ export default function WhyNoDoubleBookingPage() {
         </section>
 
         <section className="mt-6 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-white">Why this helps growth and SEO</h2>
+          <h2 className="text-lg font-semibold text-white">Why this helps discovery</h2>
           <p className="text-sm text-white/75">
-            Reliable booking flows increase repeat usage and positive mentions. That creates better engagement signals
-            and more shareable links to your public venue pages. Better user behavior + stable content helps long-term
-            organic visibility.
+            Reliable booking flows increase repeat usage and positive mentions. That means more people share your public
+            venue links and come back next week—so your room is easier to find through word of mouth and steady online
+            presence.
           </p>
         </section>
 

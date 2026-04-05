@@ -3,47 +3,46 @@ import type { Metadata } from "next";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Marketing & SEO for open mic venues and artists",
+  title: "Discovery & marketing for open mic venues and artists",
   description:
-    "How MicStage combines artist discovery, venue pages, and crawl-friendly URLs so your open mic attracts more artists, fans, and search traffic.",
+    "How MicStage combines artist discovery, venue pages, and easy-to-share links so your open mic is easier to find—without treating marketing as an afterthought.",
   path: "/why/marketing-and-seo",
 });
 
-export default function WhyMarketingAndSeoPage() {
+export default function WhyMarketingAndDiscoveryPage() {
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-4xl px-6 py-12">
         <div className="text-xs font-medium uppercase tracking-widest text-white/60">Why MicStage works</div>
         <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">
-          Marketing + SEO built into every venue workflow
+          Discovery and marketing built into every venue workflow
         </h1>
         <p className="mt-3 text-sm text-white/75">
-          MicStage is designed to market your venue and artists automatically: clear pages, consistent location routing,
-          and easy-to-share links that search engines can crawl.
+          MicStage is designed to help people find your open mic: clear pages, consistent location routing, and links that
+          are easy to share in newsletters, social posts, and flyers.
         </p>
 
         <section className="mt-8 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-white">What gets indexed and shared</h2>
+          <h2 className="text-lg font-semibold text-white">What gets shared and discovered</h2>
           <ul className="grid gap-3 text-sm text-white/75">
             <li>Public venue pages (exact addresses) and metro/regional artist discovery pages.</li>
             <li>
-              Structured routes: venue slugs plus market-level location pages—thin towns roll up until local venue density
-              earns a dedicated directory.
+              Stable routes: venue pages plus market-level browsing—smaller towns roll up until local venue density supports
+              a dedicated hub.
             </li>
-            <li>Sitemap and robots support for cleaner crawling and launch readiness.</li>
+            <li>Sitemap and robots support for launch-ready discovery.</li>
           </ul>
         </section>
 
         <section className="mt-6 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">Why this converts better</h2>
           <p className="text-sm text-white/75">
-            People scouting an open mic care about clear timing, venue identity, and who is performing. When
-            those details live on stable public pages, your promotion becomes cumulative instead of one-off social
-            posts.
+            People scouting an open mic care about clear timing, venue identity, and who is performing. When those details
+            live on stable public pages, your promotion becomes cumulative instead of one-off social posts.
           </p>
           <p className="text-sm text-white/75">
-            In practical terms: better click confidence, more direct traffic, and stronger repeat discovery for both
-            venues and artists.
+            In practical terms: better click confidence, more direct traffic, and stronger repeat discovery for both venues
+            and artists.
           </p>
         </section>
 
@@ -52,13 +51,13 @@ export default function WhyMarketingAndSeoPage() {
             href="/register/venue"
             className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
           >
-            Start marketing your venue with MicStage
+            List your open mic on MicStage
           </Link>
           <Link
-            href="/locations"
+            href="/find-open-mics"
             className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Browse performers by market
+            Find Local Open Mic&apos;s
           </Link>
         </div>
 
@@ -68,7 +67,7 @@ export default function WhyMarketingAndSeoPage() {
               href="/register/venue"
               className="inline-flex h-10 w-full items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black hover:brightness-110"
             >
-              Start marketing your venue on MicStage
+              List your open mic on MicStage
             </Link>
           </div>
         </div>

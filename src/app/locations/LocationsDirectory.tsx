@@ -3,15 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-export type LocationRow = {
-  key: string;
-  /** Metro, regional hub, or dense city label for the discovery page. */
-  label: string;
-  count: number;
-  slug: string;
-};
+import type { PublicDiscoveryLocationRow } from "@/lib/discoveryLocationRows";
 
-export function LocationsDirectory({ rows }: { rows: LocationRow[] }) {
+export type LocationRow = PublicDiscoveryLocationRow;
+
+export function LocationsDirectory({ rows }: { rows: PublicDiscoveryLocationRow[] }) {
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {

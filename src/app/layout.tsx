@@ -22,9 +22,9 @@ const body = Inter({
 });
 
 const origin = siteOrigin();
-const siteTagline = "Artists to music to marketing";
+const siteTagline = "Find open mics · Book slots · Grow your room";
 const defaultDescription =
-  "MicStage connects open mic venues and artists—bookable slots, artist discovery, and public venue pages built for search, sharing, and metro/regional discovery.";
+  "MicStage helps you find local open mics and helps venues run bookable schedules—public pages that make discovery and marketing easier for rooms and artists.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(origin),
@@ -72,7 +72,7 @@ export default async function RootLayout({
     url: absoluteUrl("/"),
     potentialAction: {
       "@type": "SearchAction",
-      target: `${absoluteUrl("/locations")}?q={search_term_string}`,
+      target: `${absoluteUrl("/find-open-mics")}?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
   };

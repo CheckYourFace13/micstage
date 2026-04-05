@@ -4,8 +4,8 @@ import { locationDirectorySlug } from "@/lib/locationDirectorySlug";
 import { slugify } from "@/lib/slug";
 
 /**
- * Public discovery / SEO: small towns roll up to metro or regional hubs until they reach
- * enough listed venues to justify their own primary indexable directory page.
+ * Public discovery: small towns roll up to metro or regional hubs until they reach
+ * enough listed venues to justify their own primary directory page.
  */
 export const MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY = 10;
 

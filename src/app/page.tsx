@@ -2,13 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
-const homeTitle = "MicStage — Open mic venues, artist discovery & search-friendly pages";
+const homeTitle = "MicStage — Find open mics, book slots, grow your room";
 
 export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
-      "MicStage helps open mic venues and artists get found: structured schedules, bookable slots, artist search, and shareable public pages—with metro and regional discovery when local venue density is still thin.",
+      "Find local open mics, book a slot, and help your venue get discovered. MicStage is free for artists and venues—schedules, bookings, and public pages that make marketing easier.",
     path: "/",
   }),
   /** Avoid root layout `title.template` appending "| MicStage" twice. */
@@ -32,100 +32,104 @@ export default function Home() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
                 <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--om-neon))]" />
-                Built for open mic communities
+                Open mics near you
               </div>
               <div className="inline-flex items-center rounded-full border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-3 py-1 text-xs font-medium text-white/85">
-                Free to use · Simple to launch
+                Free · Built for venues &amp; artists
               </div>
             </div>
-            <h1 className="om-heading mt-4 text-5xl leading-[0.9] tracking-wide sm:text-6xl">
-              Put your open mic on the map.
+            <h1 className="om-heading mt-4 text-5xl leading-[0.95] tracking-wide sm:text-6xl">
+              Find open mics.
+              <br />
+              Fill the room.
             </h1>
-            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-white/80">
-              MicStage is <span className="text-white">free to use</span> with the full toolkit—structured schedules,
-              bookable slots, artist search, and SEO-ready public pages. Most venues get a first publish going in a few
-              guided steps, not weeks of setup.
-            </p>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-white/75">
-              We help you <span className="text-white/90">market venues and artists</span>: structured open mic schedules,
-              bookable slots, and public pages tuned for discovery. Built-in SEO gives you clean titles, shareable URLs, and
-              content Google can index—so marketing and search work together, not as an afterthought.
+            <p className="mt-4 max-w-xl text-lg font-medium leading-snug text-white/85">
+              MicStage helps people discover local open mics and helps venues run a clear schedule with bookable slots.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link
+                href="/find-open-mics"
+                className="inline-flex h-12 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-6 text-base font-semibold text-black shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_10px_30px_rgba(255,45,149,0.25)] hover:brightness-110"
+              >
+                Find Local Open Mic&apos;s
+              </Link>
+              <Link
                 href="/register/musician"
-                className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_10px_30px_rgba(255,45,149,0.25)] hover:brightness-110"
+                className="inline-flex h-12 items-center justify-center rounded-md border-2 border-white/25 bg-white/10 px-6 text-base font-semibold text-white hover:bg-white/15"
               >
-                Artists: Register
-              </a>
-              <a
+                Artists: Sign Up
+              </Link>
+              <Link
                 href="/register/venue"
-                className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
+                className="inline-flex h-12 items-center justify-center rounded-md border border-white/20 bg-transparent px-6 text-base font-semibold text-white hover:bg-white/10"
               >
-                Venues: Register
-              </a>
+                Venues: Sign Up
+              </Link>
             </div>
+            <p className="mt-4 text-sm text-white/50">
+              Already have an account?{" "}
+              <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/login/musician">
+                Artist login
+              </Link>
+              {" · "}
+              <Link className="underline hover:text-white" href="/login/venue">
+                Venue login
+              </Link>
+            </p>
           </div>
 
           <div className="lg:col-span-5">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
-              <div className="text-xs font-medium uppercase tracking-widest text-white/60">Start here</div>
+              <div className="text-xs font-medium uppercase tracking-widest text-white/60">Also on MicStage</div>
               <div className="mt-3 grid gap-3">
-                <a
+                <Link
+                  href="/performers"
+                  className="group rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">Find artists by stage name</div>
+                      <div className="mt-1 text-sm text-white/65">Search the public artist directory.</div>
+                    </div>
+                    <span className="text-white/50 group-hover:text-white">→</span>
+                  </div>
+                </Link>
+                <Link
                   href="/locations"
                   className="group rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold">Find open mics in your area</div>
-                      <div className="mt-1 text-sm text-white/70">
-                        Browse by metro and regional markets—thin towns roll up to bigger hubs until local scenes are dense
-                        enough for their own directory.
-                      </div>
+                      <div className="font-semibold">Browse by metro &amp; region</div>
+                      <div className="mt-1 text-sm text-white/65">Markets and roll-up hubs for discovery.</div>
                     </div>
-                    <div className="text-white/60 group-hover:text-white">→</div>
+                    <span className="text-white/50 group-hover:text-white">→</span>
                   </div>
-                </a>
-                <a
-                  href="/register/venue"
-                  className="group rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold">For Venues: Create Your Open Mic</div>
-                      <div className="mt-1 text-sm text-white/70">
-                        Set your weekly pattern once—MicStage builds the full public schedule and bookable slots for your room.
-                      </div>
-                    </div>
-                    <div className="text-white/60 group-hover:text-white">→</div>
-                  </div>
-                </a>
-              </div>
-              <p className="mt-4 text-xs text-white/50">
-                Artists:{" "}
-                <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
-                  browse artists
-                </Link>{" "}
-                or{" "}
-                <Link className="underline hover:text-white" href="/register/musician">
-                  create an account
                 </Link>
-                .
-              </p>
+              </div>
             </div>
           </div>
         </header>
 
-        <section className="mt-14 grid gap-3 text-sm text-white/70 md:grid-cols-3">
+        <section className="mt-16 max-w-3xl text-sm leading-relaxed text-white/65">
+          <h2 className="text-base font-semibold text-white/90">How MicStage helps</h2>
+          <p className="mt-2">
+            Venues get structured open mic nights, shareable lineup links, and public pages that make marketing and
+            discovery easier—clear titles, stable URLs, and content people (and search) can actually use. Artists get a
+            simple way to find rooms and reserve spots. Most venues can publish a first schedule in a few guided steps.
+          </p>
+        </section>
+
+        <section className="mt-10 grid gap-3 text-sm text-white/70 md:grid-cols-3">
           <Link
             href="/why/venue-controlled-structure"
             className="rounded-xl border border-white/10 bg-white/5 p-4 transition hover:border-[rgb(var(--om-neon))]/40 hover:bg-white/10"
           >
             <div className="font-semibold text-white">Venue-controlled structure</div>
-            <div className="mt-1">Set your day/time, slot length, breaks. The schedule generates itself.</div>
+            <div className="mt-1">Set day/time and slot length—the schedule builds itself.</div>
             <div className="mt-3 inline-flex text-sm text-[rgb(var(--om-neon))] hover:brightness-110">
-              Learn why this drives bookings and visibility →
+              Learn more →
             </div>
           </Link>
           <Link
@@ -133,21 +137,19 @@ export default function Home() {
             className="rounded-xl border border-white/10 bg-white/5 p-4 transition hover:border-[rgb(var(--om-neon))]/40 hover:bg-white/10"
           >
             <div className="font-semibold text-white">Booking that doesn’t double-book</div>
-            <div className="mt-1">Slots lock when reserved. (Rules + waitlists come next.)</div>
+            <div className="mt-1">Slots lock when reserved.</div>
             <div className="mt-3 inline-flex text-sm text-[rgb(var(--om-neon))] hover:brightness-110">
-              See how dependable bookings build trust →
+              Learn more →
             </div>
           </Link>
           <Link
             href="/why/marketing-and-seo"
             className="rounded-xl border border-white/10 bg-white/5 p-4 transition hover:border-[rgb(var(--om-neon))]/40 hover:bg-white/10"
           >
-            <div className="font-semibold text-white">Marketing + SEO built in</div>
-            <div className="mt-1">
-              Indexable venue and schedule pages support your outreach; SEO is part of the product, not a bolt-on.
-            </div>
+            <div className="font-semibold text-white">Discovery &amp; marketing built in</div>
+            <div className="mt-1">Show up where people are searching—without a separate “website project.”</div>
             <div className="mt-3 inline-flex text-sm text-[rgb(var(--om-neon))] hover:brightness-110">
-              Read how this helps venues and artists get found →
+              Learn more →
             </div>
           </Link>
         </section>
@@ -155,4 +157,3 @@ export default function Home() {
     </div>
   );
 }
-

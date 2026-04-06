@@ -34,10 +34,17 @@ type VenueScheduleTemplateInclude = {
   };
 };
 
+function utcStartOfToday(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
 function venueScheduleTemplateIncludeAtRequest(): VenueScheduleTemplateInclude {
   return {
     instances: {
-      where: { date: { gte: new Date() } },
+      // Instance dates are stored at UTC midnight for the venue-calendar day.
+      // Filter from UTC start-of-day (not "right now") so today's night remains selectable/editable.
+      where: { date: { gte: utcStartOfToday() } },
       orderBy: { date: "asc" },
       take: 90,
       include: { slots: { orderBy: { startMin: "asc" }, include: { booking: true } } },

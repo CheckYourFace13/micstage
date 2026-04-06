@@ -20,7 +20,7 @@ export function isLineupRuleTier(raw: string): raw is LineupRuleTier {
 /** Map UI tier → per-slot override fields (explicit overrides; not inherit). */
 export function prismaOverridesForLineupRuleTier(
   tier: LineupRuleTier,
-  template: Pick<TemplateRestrictionSlice, "onPremiseMaxDistanceMeters">,
+  template: Pick<TemplateRestrictionSlice, "restrictionHoursBefore" | "onPremiseMaxDistanceMeters">,
 ): {
   bookingRestrictionModeOverride: BookingRestrictionMode;
   restrictionHoursBeforeOverride: number | null;
@@ -36,7 +36,7 @@ export function prismaOverridesForLineupRuleTier(
     case "ATTENDEES":
       return {
         bookingRestrictionModeOverride: "ON_PREMISE",
-        restrictionHoursBeforeOverride: 1,
+        restrictionHoursBeforeOverride: template.restrictionHoursBefore,
         onPremiseMaxDistanceMetersOverride: template.onPremiseMaxDistanceMeters,
       };
     case "DAILY":
@@ -52,6 +52,29 @@ export function prismaOverridesForLineupRuleTier(
         onPremiseMaxDistanceMetersOverride: null,
       };
   }
+}
+
+/**
+ * Saving a slot row should keep inheriting the template rule unless the venue intentionally
+ * picks a different tier. If they pick the same tier as the template, clear overrides.
+ */
+export function prismaOverridesForLineupRuleTierSelection(
+  tier: LineupRuleTier,
+  template: TemplateRestrictionSlice,
+): {
+  bookingRestrictionModeOverride: BookingRestrictionMode | null;
+  restrictionHoursBeforeOverride: number | null;
+  onPremiseMaxDistanceMetersOverride: number | null;
+} {
+  const templateTier = lineupRuleTierFromEffective(template);
+  if (tier === templateTier) {
+    return {
+      bookingRestrictionModeOverride: null,
+      restrictionHoursBeforeOverride: null,
+      onPremiseMaxDistanceMetersOverride: null,
+    };
+  }
+  return prismaOverridesForLineupRuleTier(tier, template);
 }
 
 /** Best-effort tier for dropdown from effective restriction (after overrides). */

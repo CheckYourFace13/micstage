@@ -26,7 +26,7 @@ import {
 import { isValidLineupYmd, storageYmdUtc } from "@/lib/venuePublicLineup";
 import { BookingRestrictionMode, VenuePerformerHistoryKind, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
-import { isLineupRuleTier, prismaOverridesForLineupRuleTier } from "@/lib/lineupRuleTiers";
+import { isLineupRuleTier, prismaOverridesForLineupRuleTierSelection } from "@/lib/lineupRuleTiers";
 import { timeInputValueToMinutes } from "@/lib/time";
 import { parseVenuePerformanceFormat } from "@/lib/venuePerformanceFormat";
 import {
@@ -846,7 +846,7 @@ export async function updateVenueSlotLine(formData: FormData): Promise<VenuePort
     return portalRedirect(buildVenuePortalRedirect("venueError=invalidForm", formData));
   }
 
-  const overrides = prismaOverridesForLineupRuleTier(tierRaw, tpl);
+  const overrides = prismaOverridesForLineupRuleTierSelection(tierRaw, tpl);
   const activeBooking = slot.booking && !slot.booking.cancelledAt ? slot.booking : null;
   const hasMusician = Boolean(activeBooking?.musicianId);
 

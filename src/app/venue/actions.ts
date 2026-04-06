@@ -253,6 +253,10 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
   }
   const venueId = reqString(formData, "venueId");
   const allowed = await venueIdsForVenueSession(session);
+  console.info("[venue weekly submit] session/access check", {
+    venueId,
+    allowedCount: allowed.length,
+  });
   if (!allowed.includes(venueId)) return portalRedirect("/venue?venueError=forbidden");
 
   const scheduleMode = optString(formData, "scheduleMode") ?? "recurring";
@@ -265,8 +269,17 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
 
   const slotMinutes = reqInt(formData, "slotMinutes");
   const breakMinutes = reqInt(formData, "breakMinutes");
+  console.info("[venue weekly submit] parsed base inputs", {
+    scheduleMode,
+    title,
+    startTimeMin,
+    endTimeMin,
+    slotMinutes,
+    breakMinutes,
+  });
 
   const prisma = requirePrisma();
+  console.info("[venue weekly submit] prisma ready");
   const venue = await prisma.venue.findUnique({
     where: { id: venueId },
     select: {
@@ -282,6 +295,11 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
     },
   });
   if (!venue) return portalRedirect("/venue?venueError=venueMissing");
+  console.info("[venue weekly submit] venue loaded", {
+    hasSeriesStart: Boolean(venue.seriesStartDate),
+    hasSeriesEnd: Boolean(venue.seriesEndDate),
+    subscriptionTier: venue.subscriptionTier,
+  });
 
   const timeZone = venue.timeZone ?? "America/Chicago";
 
@@ -307,6 +325,12 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
       return portalRedirect("/venue?scheduleError=badRange");
     }
   }
+  console.info("[venue weekly submit] resolved date/weekday targets", {
+    weekdayCount: weekdays.length,
+    weekdays,
+    seriesStartDate: seriesStartDate.toISOString(),
+    seriesEndDate: seriesEndDate.toISOString(),
+  });
 
   /** For one-off nights, widen (never shrink) the venue booking window so other recurring nights stay valid. */
   let venueSeriesStartForDb = seriesStartDate;
@@ -351,6 +375,12 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
     1,
     Math.min(maxHorizonDays, Math.round((venueSeriesEndForDb.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000))),
   );
+  console.info("[venue weekly submit] booking window computed", {
+    maxHorizonDays,
+    bookingOpensDaysAhead,
+    venueSeriesStartForDb: venueSeriesStartForDb.toISOString(),
+    venueSeriesEndForDb: venueSeriesEndForDb.toISOString(),
+  });
 
   const bookingRestrictionModeStr =
     optString(formData, "bookingRestrictionMode") ?? venue.bookingRestrictionMode ?? "NONE";
@@ -382,7 +412,9 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
     restrictionHoursBefore,
     onPremiseMaxDistanceMeters,
   };
+  console.info("[venue weekly submit] template payload ready");
 
+  console.info("[venue weekly submit] template upsert start", { weekdays });
   for (const weekday of weekdays) {
     const existing = await prisma.eventTemplate.findFirst({
       where: { venueId, weekday },
@@ -400,6 +432,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
       });
     }
   }
+  console.info("[venue weekly submit] template upsert done");
 
   await prisma.venue.update({
     where: { id: venueId },
@@ -409,6 +442,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
       bookingOpensDaysAhead,
     },
   });
+  console.info("[venue weekly submit] venue booking window saved");
 
   const venueForRules = await prisma.venue.findUnique({
     where: { id: venueId },
@@ -420,11 +454,14 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
     },
   });
   if (!venueForRules) return portalRedirect("/venue?venueError=venueMissing");
+  console.info("[venue weekly submit] venue rules snapshot loaded");
 
   const allVenueTemplates = await prisma.eventTemplate.findMany({
-    where: { venueId },
+    // Keep generation bounded to the weekdays touched by this save.
+    where: { venueId, weekday: { in: weekdays } },
     orderBy: { updatedAt: "desc" },
   });
+  console.info("[venue weekly submit] templates fetched for generation", { count: allVenueTemplates.length });
   /** One template per weekday for bulk sync: newest `updatedAt` wins (matches weekly upsert target). */
   const seenWeekday = new Set<Weekday>();
   const templates = allVenueTemplates.filter((t) => {
@@ -432,13 +469,24 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
     seenWeekday.add(t.weekday);
     return true;
   });
+  console.info("[venue weekly submit] deduped templates", { count: templates.length });
 
+  let generatedInstanceCount = 0;
+  let transactionCount = 0;
   for (const template of templates) {
+    console.info("[venue weekly submit] generating template start", {
+      templateId: template.id,
+      weekday: template.weekday,
+    });
     const specs = generateSlotsForWindow({
       startTimeMin: template.startTimeMin,
       endTimeMin: template.endTimeMin,
       slotMinutes: template.slotMinutes,
       breakMinutes: template.breakMinutes,
+    });
+    console.info("[venue weekly submit] slot specs ready", {
+      templateId: template.id,
+      slotsPerNight: specs.length,
     });
 
     for (const { storageDate, weekday } of iterStorageDatesInVenueSeries(
@@ -450,7 +498,20 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
       if (!isDateInSeriesRange(venueForRules, storageDate)) continue;
       if (!isWithinBookingWindow(venueForRules, storageDate)) continue;
 
+      transactionCount += 1;
+      if (transactionCount % 25 === 0) {
+        console.info("[venue weekly submit] generation progress", {
+          transactionCount,
+          generatedInstanceCount,
+          templateId: template.id,
+          storageDate: storageDate.toISOString(),
+        });
+      }
       await prisma.$transaction(async (tx) => {
+        console.info("[venue weekly submit] tx start", {
+          templateId: template.id,
+          storageDate: storageDate.toISOString(),
+        });
         const inst =
           (await tx.eventInstance.findUnique({
             where: { templateId_date: { templateId: template.id, date: storageDate } },
@@ -462,9 +523,22 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
         if (inst.isCancelled) return;
 
         await syncSlotsForInstance(tx, inst.id, specs);
+        generatedInstanceCount += 1;
+        console.info("[venue weekly submit] tx done", {
+          templateId: template.id,
+          instanceId: inst.id,
+          generatedInstanceCount,
+        });
       });
     }
+    console.info("[venue weekly submit] generating template done", {
+      templateId: template.id,
+    });
   }
+  console.info("[venue weekly submit] generation complete", {
+    transactionCount,
+    generatedInstanceCount,
+  });
 
   revalidatePath("/venue");
   revalidatePath(`/venues/${venue.slug}`);

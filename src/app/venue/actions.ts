@@ -114,6 +114,21 @@ const ALLOWED_BOOKING_MODES = new Set<string>(BOOKING_RESTRICTION_OPTIONS.map((o
  * Comparing them to "today" using UTC midnight wrongly rejects same-calendar-day picks for
  * venues behind UTC (evening local while UTC is already the next day).
  */
+type VenueScheduleBoundsOk = {
+  ok: true;
+  /** Stored window start/end YMD (raw from this save before clamping). */
+  storedBookingWindowStartYmd: string;
+  storedBookingWindowEndYmd: string;
+  /** Window used for validation, DB persist, and generation (start clamped up to venue today when needed). */
+  effectiveBookingWindowStartYmd: string;
+  effectiveBookingWindowEndYmd: string;
+  storedBookingWindowStartClampedToVenueToday: boolean;
+};
+
+type VenueScheduleBoundsFail = { ok: false; redirect: VenuePortalActionResult };
+
+type VenueScheduleBoundsResult = VenueScheduleBoundsOk | VenueScheduleBoundsFail;
+
 function assertVenueYmdRangeWithinHorizon(opts: {
   venueTz: string;
   now: Date;
@@ -124,7 +139,7 @@ function assertVenueYmdRangeWithinHorizon(opts: {
   /** Widened venue window written to DB (may span beyond this save for one_event). */
   storedWindowStartYmd: string;
   storedWindowEndYmd: string;
-}): VenuePortalActionResult | null {
+}): VenueScheduleBoundsResult {
   let diagStep = "enter";
   let effectiveTzForDiag = "America/Chicago";
   try {
@@ -237,7 +252,7 @@ function assertVenueYmdRangeWithinHorizon(opts: {
         horizonEndYmd,
         effectiveTz,
       });
-      return portalRedirect("/venue?scheduleError=badRange");
+      return { ok: false, redirect: portalRedirect("/venue?scheduleError=badRange") };
     }
     const horizonMaxYmd = horizonEndYmd;
 
@@ -252,7 +267,7 @@ function assertVenueYmdRangeWithinHorizon(opts: {
       seriesEndYmd: opts.seriesEndYmd,
     });
 
-    function checkPair(label: string, a: string, b: string): VenuePortalActionResult | null {
+    function checkSeriesPair(label: string, a: string, b: string): VenuePortalActionResult | null {
       if (!isValidLineupYmd(a) || !isValidLineupYmd(b)) {
         console.error("[venue weekly submit] bounds fail: invalid ymd", { label, a, b });
         console.info("[venue weekly submit] bounds step: validation branch", { branch: "invalid_ymd", label });
@@ -282,20 +297,80 @@ function assertVenueYmdRangeWithinHorizon(opts: {
       return null;
     }
 
-    const seriesFail = checkPair("series", opts.seriesStartYmd, opts.seriesEndYmd);
-    if (seriesFail) return seriesFail;
-    const windowFail = checkPair("storedWindow", opts.storedWindowStartYmd, opts.storedWindowEndYmd);
-    if (windowFail) return windowFail;
+    const seriesFail = checkSeriesPair("series", opts.seriesStartYmd, opts.seriesEndYmd);
+    if (seriesFail) return { ok: false, redirect: seriesFail };
+
+    const sws = opts.storedWindowStartYmd;
+    const swe = opts.storedWindowEndYmd;
+    if (!isValidLineupYmd(sws) || !isValidLineupYmd(swe)) {
+      console.error("[venue weekly submit] bounds fail: invalid stored window ymd", { sws, swe });
+      console.info("[venue weekly submit] bounds step: validation branch", { branch: "invalid_ymd", label: "storedWindow" });
+      return { ok: false, redirect: portalRedirect("/venue?scheduleError=badRange") };
+    }
+
+    const effectiveBookingWindowStartYmd = sws < venueTodayYmd ? venueTodayYmd : sws;
+    const effectiveBookingWindowEndYmd = swe;
+    const storedBookingWindowStartClampedToVenueToday = effectiveBookingWindowStartYmd !== sws;
+
+    console.info("[venue weekly submit] bounds step: stored vs effective booking window start", {
+      storedBookingWindowStartYmd: sws,
+      effectiveBookingWindowStartYmd,
+      storedBookingWindowStartClampedToVenueToday,
+      venueTodayYmd,
+      storedBookingWindowEndYmd: swe,
+      effectiveBookingWindowEndYmd,
+    });
+
+    if (effectiveBookingWindowStartYmd > effectiveBookingWindowEndYmd) {
+      console.info("[venue weekly submit] bounds step: validation branch", {
+        branch: "effective_window_inverted",
+        effectiveBookingWindowStartYmd,
+        effectiveBookingWindowEndYmd,
+        venueTodayYmd,
+      });
+      return { ok: false, redirect: portalRedirect("/venue?scheduleError=badRange") };
+    }
+
+    if (effectiveBookingWindowEndYmd < venueTodayYmd) {
+      console.info("[venue weekly submit] bounds step: validation branch", {
+        branch: "stored_window_end_before_venue_today",
+        effectiveBookingWindowEndYmd,
+        venueTodayYmd,
+      });
+      return { ok: false, redirect: portalRedirect("/venue?scheduleError=badRange") };
+    }
+
+    if (effectiveBookingWindowStartYmd > horizonMaxYmd || effectiveBookingWindowEndYmd > horizonMaxYmd) {
+      console.info("[venue weekly submit] bounds step: validation branch", {
+        branch: "past_horizon",
+        label: "storedWindow_effective",
+        effectiveBookingWindowStartYmd,
+        effectiveBookingWindowEndYmd,
+        horizonMaxYmd,
+        maxHorizonDays: opts.maxHorizonDays,
+      });
+      return { ok: false, redirect: portalRedirect("/venue?scheduleError=badRange") };
+    }
 
     console.info("[venue weekly submit] bounds step: validation branch", {
       branch: "within_horizon",
       venueTodayYmd,
       horizonEndYmd: horizonMaxYmd,
-      bookingWindowStartYmd: opts.storedWindowStartYmd,
-      bookingWindowEndYmd: opts.storedWindowEndYmd,
+      storedBookingWindowStartYmd: sws,
+      effectiveBookingWindowStartYmd,
+      storedBookingWindowEndYmd: swe,
+      effectiveBookingWindowEndYmd,
+      storedBookingWindowStartClampedToVenueToday,
     });
     console.info("[venue weekly submit] bounds step: all pairs ok");
-    return null;
+    return {
+      ok: true,
+      storedBookingWindowStartYmd: sws,
+      storedBookingWindowEndYmd: swe,
+      effectiveBookingWindowStartYmd,
+      effectiveBookingWindowEndYmd,
+      storedBookingWindowStartClampedToVenueToday,
+    };
   } catch (e) {
     const stack = e instanceof Error ? e.stack : undefined;
     console.error("[venue weekly submit] assertVenueYmdRangeWithinHorizon threw", {
@@ -305,7 +380,7 @@ function assertVenueYmdRangeWithinHorizon(opts: {
       error: e,
       stack,
     });
-    return portalRedirect("/venue?scheduleError=boundsCalc");
+    return { ok: false, redirect: portalRedirect("/venue?scheduleError=boundsCalc") };
   }
 }
 
@@ -575,7 +650,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
       storedWindowEndYmd,
     });
 
-    const boundsRedirect = assertVenueYmdRangeWithinHorizon({
+    const bounds = assertVenueYmdRangeWithinHorizon({
       venueTz: timeZone,
       now: nowForBounds,
       maxHorizonDays,
@@ -584,11 +659,23 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
       storedWindowStartYmd,
       storedWindowEndYmd,
     });
-    if (boundsRedirect) {
+    if (!bounds.ok) {
       console.info("[venue weekly submit] booking window bounds returned redirect");
-      return boundsRedirect;
+      return bounds.redirect;
     }
-    console.info("[venue weekly submit] booking window bounds done");
+
+    if (bounds.storedBookingWindowStartClampedToVenueToday) {
+      venueSeriesStartForDb = new Date(`${bounds.effectiveBookingWindowStartYmd}T00:00:00.000Z`);
+      console.info("[venue weekly submit] booking window start clamped for DB + generation", {
+        storedBookingWindowStartYmd: bounds.storedBookingWindowStartYmd,
+        effectiveBookingWindowStartYmd: bounds.effectiveBookingWindowStartYmd,
+      });
+    }
+    console.info("[venue weekly submit] booking window bounds done", {
+      storedBookingWindowStartYmd: bounds.storedBookingWindowStartYmd,
+      effectiveBookingWindowStartYmd: bounds.effectiveBookingWindowStartYmd,
+      storedBookingWindowStartClampedToVenueToday: bounds.storedBookingWindowStartClampedToVenueToday,
+    });
 
     let tzForDays = typeof timeZone === "string" ? timeZone.trim() : "";
     if (!tzForDays) {

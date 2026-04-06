@@ -23,8 +23,13 @@ import {
   isWithinBookingWindow,
   slotStartInstant,
 } from "@/lib/venueBookingRules";
-import { isValidLineupYmd, storageYmdUtc, venueCalendarIsoDate } from "@/lib/venuePublicLineup";
-import { DateTime } from "luxon";
+import { isValidLineupYmd, storageYmdUtc } from "@/lib/venuePublicLineup";
+import {
+  addDaysToYmd,
+  isValidIanaTimeZone,
+  venueTodayYmdFromIanaZone,
+  wholeDaysBetweenYmd,
+} from "@/lib/venueBookingWindowYmd";
 import { BookingRestrictionMode, VenuePerformerHistoryKind, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { isLineupRuleTier, prismaOverridesForLineupRuleTierSelection } from "@/lib/lineupRuleTiers";
@@ -120,56 +125,188 @@ function assertVenueYmdRangeWithinHorizon(opts: {
   storedWindowStartYmd: string;
   storedWindowEndYmd: string;
 }): VenuePortalActionResult | null {
-  const tz = opts.venueTz?.trim() || "America/Chicago";
-  console.info("[venue weekly submit] bounds step: venue today + horizon end");
-  const todayVenue = venueCalendarIsoDate(tz, opts.now);
-  const horizonEndDt = DateTime.fromISO(todayVenue, { zone: tz }).plus({ days: opts.maxHorizonDays });
-  const horizonEndYmd = horizonEndDt.toISODate();
-  if (!horizonEndYmd) {
-    console.error("[venue weekly submit] bounds fail: invalid horizon end", { todayVenue, tz });
-    return portalRedirect("/venue?scheduleError=badRange");
-  }
-  const horizonMaxYmd = horizonEndYmd;
-  console.info("[venue weekly submit] bounds step: compare series ymds", {
-    todayVenue,
-    horizonMaxYmd,
-    seriesStartYmd: opts.seriesStartYmd,
-    seriesEndYmd: opts.seriesEndYmd,
-  });
+  let diagStep = "enter";
+  let effectiveTzForDiag = "America/Chicago";
+  try {
+    console.info("[venue weekly submit] bounds step: venue today + horizon end");
 
-  function checkPair(label: string, a: string, b: string): VenuePortalActionResult | null {
-    if (!isValidLineupYmd(a) || !isValidLineupYmd(b)) {
-      console.error("[venue weekly submit] bounds fail: invalid ymd", { label, a, b });
-      return portalRedirect("/venue?scheduleError=badRange");
+    diagStep = "pre_read_raw_venueTz";
+    console.info("[venue weekly submit] bounds isolation: before reading opts.venueTz");
+    const rawVenueTz = opts.venueTz;
+    diagStep = "post_read_raw_venueTz";
+    console.info("[venue weekly submit] bounds isolation: rawVenueTz value", { rawVenueTz });
+
+    diagStep = "pre_trim_venueTz";
+    const trimmedVenueTz = typeof rawVenueTz === "string" ? rawVenueTz.trim() : "";
+    diagStep = "post_trim_venueTz";
+    console.info("[venue weekly submit] bounds isolation: trimmedVenueTz", { trimmedVenueTz });
+
+    diagStep = "pre_blank_fallback";
+    let effectiveTz = trimmedVenueTz;
+    let usedBlankTimezoneFallback = false;
+    if (!effectiveTz) {
+      usedBlankTimezoneFallback = true;
+      effectiveTz = "America/Chicago";
+      console.info("[venue weekly submit] bounds isolation: missing/blank timezone fallback", {
+        effectiveTz,
+        usedBlankTimezoneFallback,
+      });
+    } else {
+      console.info("[venue weekly submit] bounds isolation: no blank timezone fallback", {
+        trimmedVenueTz,
+      });
     }
-    if (a < todayVenue || b < todayVenue) {
-      console.info("[venue weekly submit] bounds return badRange (before venue today)", {
-        label,
-        a,
-        b,
-        todayVenue,
+
+    diagStep = "pre_isValidIanaTimeZone";
+    console.info("[venue weekly submit] bounds isolation: before isValidIanaTimeZone", { candidateTz: effectiveTz });
+    const tzIanaOk = isValidIanaTimeZone(effectiveTz);
+    diagStep = "post_isValidIanaTimeZone";
+    console.info("[venue weekly submit] bounds isolation: after isValidIanaTimeZone", { tzIanaOk, candidateTz: effectiveTz });
+
+    /** TEMPORARY isolation: if ICU rejects the venue zone, derive YMD from a fixed zone only (remove after root cause confirmed). */
+    const debugTz = "America/Chicago";
+    if (!tzIanaOk) {
+      console.info("[venue weekly submit] invalid timezone fallback", { rejectedTz: effectiveTz, debugTz });
+      effectiveTz = debugTz;
+    }
+    effectiveTzForDiag = effectiveTz;
+    console.info("[venue weekly submit] bounds isolation: effectiveTz final", {
+      effectiveTz,
+      usedBlankTimezoneFallback,
+    });
+
+    diagStep = "pre_Intl_DateTimeFormat_ctor";
+    console.info("[venue weekly submit] bounds isolation: before new Intl.DateTimeFormat(en-CA)", { effectiveTz });
+    const boundsDtf = new Intl.DateTimeFormat("en-CA", {
+      timeZone: effectiveTz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    diagStep = "post_Intl_DateTimeFormat_ctor";
+    console.info("[venue weekly submit] bounds isolation: after new Intl.DateTimeFormat(en-CA)");
+
+    diagStep = "pre_formatToParts";
+    console.info("[venue weekly submit] bounds isolation: before formatToParts(now)");
+    const boundsParts = boundsDtf.formatToParts(opts.now);
+    diagStep = "post_formatToParts";
+    console.info("[venue weekly submit] bounds isolation: after formatToParts(now)", { partCount: boundsParts.length });
+
+    diagStep = "pre_find_year_part";
+    const yPart = boundsParts.find((p) => p.type === "year")?.value;
+    diagStep = "post_find_year_part";
+    console.info("[venue weekly submit] bounds isolation: year part", { yPart });
+
+    diagStep = "pre_find_month_part";
+    const moPart = boundsParts.find((p) => p.type === "month")?.value;
+    diagStep = "post_find_month_part";
+    console.info("[venue weekly submit] bounds isolation: month part", { moPart });
+
+    diagStep = "pre_find_day_part";
+    const dPart = boundsParts.find((p) => p.type === "day")?.value;
+    diagStep = "post_find_day_part";
+    console.info("[venue weekly submit] bounds isolation: day part", { dPart });
+
+    diagStep = "pre_assemble_venueTodayYmd";
+    let venueTodayYmd: string;
+    if (yPart && moPart && dPart) {
+      venueTodayYmd = `${yPart.padStart(4, "0")}-${moPart.padStart(2, "0")}-${dPart.padStart(2, "0")}`;
+    } else {
+      venueTodayYmd = opts.now.toISOString().slice(0, 10);
+      console.warn("[venue weekly submit] bounds isolation: venueTodayYmd fallback (UTC ISO slice)", {
+        venueTodayYmd,
+      });
+    }
+    diagStep = "post_assemble_venueTodayYmd";
+    console.info("[venue weekly submit] bounds step: computed venueTodayYmd", { venueTodayYmd });
+
+    diagStep = "pre_addDaysToYmd_horizon";
+    console.info("[venue weekly submit] bounds isolation: before addDaysToYmd", {
+      venueTodayYmd,
+      maxHorizonDays: opts.maxHorizonDays,
+    });
+    const horizonEndYmd = addDaysToYmd(venueTodayYmd, opts.maxHorizonDays);
+    diagStep = "post_addDaysToYmd_horizon";
+    console.info("[venue weekly submit] bounds step: computed horizonEndYmd", {
+      horizonEndYmd,
+      maxHorizonDays: opts.maxHorizonDays,
+    });
+    if (!isValidLineupYmd(horizonEndYmd)) {
+      console.error("[venue weekly submit] bounds fail: invalid horizon end ymd", {
+        venueTodayYmd,
+        horizonEndYmd,
+        effectiveTz,
       });
       return portalRedirect("/venue?scheduleError=badRange");
     }
-    if (a > horizonMaxYmd || b > horizonMaxYmd) {
-      console.info("[venue weekly submit] bounds return badRange (past horizon)", {
-        label,
-        a,
-        b,
-        horizonMaxYmd,
-        maxHorizonDays: opts.maxHorizonDays,
-      });
-      return portalRedirect("/venue?scheduleError=badRange");
+    const horizonMaxYmd = horizonEndYmd;
+
+    console.info("[venue weekly submit] bounds step: final booking window ymds (stored)", {
+      bookingWindowStartYmd: opts.storedWindowStartYmd,
+      bookingWindowEndYmd: opts.storedWindowEndYmd,
+    });
+    console.info("[venue weekly submit] bounds step: compare series ymds", {
+      venueTodayYmd,
+      horizonMaxYmd,
+      seriesStartYmd: opts.seriesStartYmd,
+      seriesEndYmd: opts.seriesEndYmd,
+    });
+
+    function checkPair(label: string, a: string, b: string): VenuePortalActionResult | null {
+      if (!isValidLineupYmd(a) || !isValidLineupYmd(b)) {
+        console.error("[venue weekly submit] bounds fail: invalid ymd", { label, a, b });
+        console.info("[venue weekly submit] bounds step: validation branch", { branch: "invalid_ymd", label });
+        return portalRedirect("/venue?scheduleError=badRange");
+      }
+      if (a < venueTodayYmd || b < venueTodayYmd) {
+        console.info("[venue weekly submit] bounds step: validation branch", {
+          branch: "before_venue_today",
+          label,
+          a,
+          b,
+          venueTodayYmd,
+        });
+        return portalRedirect("/venue?scheduleError=badRange");
+      }
+      if (a > horizonMaxYmd || b > horizonMaxYmd) {
+        console.info("[venue weekly submit] bounds step: validation branch", {
+          branch: "past_horizon",
+          label,
+          a,
+          b,
+          horizonMaxYmd,
+          maxHorizonDays: opts.maxHorizonDays,
+        });
+        return portalRedirect("/venue?scheduleError=badRange");
+      }
+      return null;
     }
+
+    const seriesFail = checkPair("series", opts.seriesStartYmd, opts.seriesEndYmd);
+    if (seriesFail) return seriesFail;
+    const windowFail = checkPair("storedWindow", opts.storedWindowStartYmd, opts.storedWindowEndYmd);
+    if (windowFail) return windowFail;
+
+    console.info("[venue weekly submit] bounds step: validation branch", {
+      branch: "within_horizon",
+      venueTodayYmd,
+      horizonEndYmd: horizonMaxYmd,
+      bookingWindowStartYmd: opts.storedWindowStartYmd,
+      bookingWindowEndYmd: opts.storedWindowEndYmd,
+    });
+    console.info("[venue weekly submit] bounds step: all pairs ok");
     return null;
+  } catch (e) {
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error("[venue weekly submit] assertVenueYmdRangeWithinHorizon threw", {
+      failedStep: diagStep,
+      rawVenueTimezone: opts.venueTz,
+      effectiveTimezoneUsed: effectiveTzForDiag,
+      error: e,
+      stack,
+    });
+    return portalRedirect("/venue?scheduleError=boundsCalc");
   }
-
-  const seriesFail = checkPair("series", opts.seriesStartYmd, opts.seriesEndYmd);
-  if (seriesFail) return seriesFail;
-  const windowFail = checkPair("storedWindow", opts.storedWindowStartYmd, opts.storedWindowEndYmd);
-  if (windowFail) return windowFail;
-  console.info("[venue weekly submit] bounds step: all pairs ok");
-  return null;
 }
 
 function normalizeOpenMicDescription(raw: string | undefined | null): string | null {
@@ -196,8 +333,8 @@ function scheduleTimeMinutesFromForm(formData: FormData, field: string): number 
 }
 
 export async function createEventTemplate(formData: FormData): Promise<VenuePortalActionResult> {
-  try {
   const session = await requireVenueSession();
+  try {
   const venueId = reqString(formData, "venueId");
 
   const allowed = await venueIdsForSession(session);
@@ -423,46 +560,76 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
   const maxHorizonDays = venue.subscriptionTier === "FREE" ? 60 : 90;
 
   console.info("[venue weekly submit] booking window bounds start");
-  const nowForBounds = new Date();
-  const seriesStartYmd = storageYmdUtc(seriesStartDate);
-  const seriesEndYmd = storageYmdUtc(seriesEndDate);
-  const storedWindowStartYmd = storageYmdUtc(venueSeriesStartForDb);
-  const storedWindowEndYmd = storageYmdUtc(venueSeriesEndForDb);
-  console.info("[venue weekly submit] bounds step: ymd keys", {
-    isOneEvent,
-    seriesStartYmd,
-    seriesEndYmd,
-    storedWindowStartYmd,
-    storedWindowEndYmd,
-  });
+  let bookingOpensDaysAhead = 1;
+  try {
+    const nowForBounds = new Date();
+    const seriesStartYmd = storageYmdUtc(seriesStartDate);
+    const seriesEndYmd = storageYmdUtc(seriesEndDate);
+    const storedWindowStartYmd = storageYmdUtc(venueSeriesStartForDb);
+    const storedWindowEndYmd = storageYmdUtc(venueSeriesEndForDb);
+    console.info("[venue weekly submit] bounds step: ymd keys", {
+      isOneEvent,
+      seriesStartYmd,
+      seriesEndYmd,
+      storedWindowStartYmd,
+      storedWindowEndYmd,
+    });
 
-  const boundsRedirect = assertVenueYmdRangeWithinHorizon({
-    venueTz: timeZone,
-    now: nowForBounds,
-    maxHorizonDays,
-    seriesStartYmd,
-    seriesEndYmd,
-    storedWindowStartYmd,
-    storedWindowEndYmd,
-  });
-  if (boundsRedirect) {
-    console.info("[venue weekly submit] booking window bounds returned redirect");
-    return boundsRedirect;
+    const boundsRedirect = assertVenueYmdRangeWithinHorizon({
+      venueTz: timeZone,
+      now: nowForBounds,
+      maxHorizonDays,
+      seriesStartYmd,
+      seriesEndYmd,
+      storedWindowStartYmd,
+      storedWindowEndYmd,
+    });
+    if (boundsRedirect) {
+      console.info("[venue weekly submit] booking window bounds returned redirect");
+      return boundsRedirect;
+    }
+    console.info("[venue weekly submit] booking window bounds done");
+
+    let tzForDays = typeof timeZone === "string" ? timeZone.trim() : "";
+    if (!tzForDays) {
+      tzForDays = "America/Chicago";
+      console.info("[venue weekly submit] bookingOpens: blank venue timezone fallback", { tzForDays });
+    } else if (!isValidIanaTimeZone(tzForDays)) {
+      console.info("[venue weekly submit] bookingOpens: invalid timezone fallback", { rejected: tzForDays });
+      tzForDays = "America/Chicago";
+    }
+    const todayVenueYmdForBooking = venueTodayYmdFromIanaZone(tzForDays, nowForBounds);
+    console.info("[venue weekly submit] bounds step: bookingOpens base todayVenueYmd", {
+      todayVenueYmdForBooking,
+    });
+    const diffDays = wholeDaysBetweenYmd(todayVenueYmdForBooking, storedWindowEndYmd);
+    console.info("[venue weekly submit] bounds step: wholeDaysBetween venue today and stored end", {
+      diffDays,
+      storedWindowEndYmd,
+    });
+    if (!Number.isFinite(diffDays)) {
+      console.error("[venue weekly submit] bounds fail: non-finite day diff", {
+        todayVenueYmdForBooking,
+        storedWindowEndYmd,
+      });
+      return portalRedirect("/venue?scheduleError=boundsCalc");
+    }
+    bookingOpensDaysAhead = Math.max(1, Math.min(maxHorizonDays, Math.round(diffDays)));
+    console.info("[venue weekly submit] booking window computed", {
+      maxHorizonDays,
+      bookingOpensDaysAhead,
+      venueSeriesStartForDb: venueSeriesStartForDb.toISOString(),
+      venueSeriesEndForDb: venueSeriesEndForDb.toISOString(),
+    });
+  } catch (e) {
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error("[venue weekly submit] booking window bounds block error", {
+      error: e,
+      stack,
+      venueTimeZoneRaw: timeZone,
+    });
+    return portalRedirect("/venue?scheduleError=boundsCalc");
   }
-  console.info("[venue weekly submit] booking window bounds done");
-
-  const tzForDays = timeZone?.trim() || "America/Chicago";
-  const todayVenueYmd = venueCalendarIsoDate(tzForDays, nowForBounds);
-  const startLux = DateTime.fromISO(todayVenueYmd, { zone: tzForDays }).startOf("day");
-  const endLux = DateTime.fromISO(storedWindowEndYmd, { zone: tzForDays }).startOf("day");
-  const diffDays = endLux.diff(startLux, "days").days;
-  const bookingOpensDaysAhead = Math.max(1, Math.min(maxHorizonDays, Math.round(diffDays)));
-  console.info("[venue weekly submit] booking window computed", {
-    maxHorizonDays,
-    bookingOpensDaysAhead,
-    venueSeriesStartForDb: venueSeriesStartForDb.toISOString(),
-    venueSeriesEndForDb: venueSeriesEndForDb.toISOString(),
-  });
 
   console.info("[venue weekly submit] restriction parsing start");
   const bookingRestrictionModeStr =

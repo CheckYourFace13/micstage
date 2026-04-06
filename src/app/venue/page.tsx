@@ -382,6 +382,12 @@ export default async function VenuePortalPage({
             Schedule save failed before MicStage received a complete response. Please try again.
           </div>
         ) : null}
+        {q.scheduleError === "boundsCalc" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            MicStage could not validate your booking window dates on the server. Hard refresh the page (Ctrl+Shift+R) and try
+            again; if it persists, contact support with your venue timezone.
+          </div>
+        ) : null}
         {q.scheduleSuccess === "weekly" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
             <span className="font-semibold text-emerald-100/95">Schedule saved.</span> Future open slots are updated;

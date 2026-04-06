@@ -82,6 +82,14 @@ if (production) {
   }
   ok("EMAIL_FROM is set");
 
+  if (!process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY?.trim()) {
+    warn(
+      "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY not set — set a stable secret in production so server actions stay valid across deploys; users may need a hard refresh after deploy until this is set.",
+    );
+  } else {
+    ok("NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is set");
+  }
+
   if (!process.env.EMAIL_FROM_TRANSACTIONAL?.trim()) {
     warn(
       "EMAIL_FROM_TRANSACTIONAL not set — transactional mail falls back to EMAIL_FROM (OK if same identity).",

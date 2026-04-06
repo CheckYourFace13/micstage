@@ -7,6 +7,7 @@ import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
 import { ALL_WEEKDAYS, computeWeeklySchedulePreview, weekdayFromIsoDateInTimeZone } from "@/lib/weeklySchedule";
 import { weekdayToLabel } from "@/lib/time";
+import { DateSelectField } from "@/components/forms/DateSelectField";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 import { saveWeeklyScheduleAndGenerateSlots } from "./actions";
@@ -208,18 +209,15 @@ export function WeeklyScheduleForm({
         <>
           <input type="hidden" name="seriesStartDate" value={oneEventDate} />
           <input type="hidden" name="seriesEndDate" value={oneEventDate} />
-          <label className="grid gap-1 text-sm">
-            <span className="text-white/80">Open mic date</span>
-            <input
-              type="date"
-              min={todayIso}
-              max={plusDaysIso(horizonDays)}
-              value={oneEventDate}
-              onChange={(e) => setOneEventDate(e.target.value)}
-              required
-              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-            />
-          </label>
+          <DateSelectField
+            key="weekly-one-event-date"
+            label="Open mic date"
+            value={oneEventDate}
+            onChange={setOneEventDate}
+            min={todayIso}
+            max={plusDaysIso(horizonDays)}
+            required
+          />
         </>
       ) : (
         <>
@@ -251,32 +249,26 @@ export function WeeklyScheduleForm({
           </fieldset>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm">
-              <span className="text-white/80">Booking window start</span>
-              <input
-                name="seriesStartDate"
-                type="date"
-                min={todayIso}
-                max={plusDaysIso(horizonDays)}
-                value={seriesStart}
-                onChange={(e) => setSeriesStart(e.target.value)}
-                required
-                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-              />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="text-white/80">Booking window end (max {horizonDays} days)</span>
-              <input
-                name="seriesEndDate"
-                type="date"
-                min={todayIso}
-                max={plusDaysIso(horizonDays)}
-                value={seriesEnd}
-                onChange={(e) => setSeriesEnd(e.target.value)}
-                required
-                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-              />
-            </label>
+            <DateSelectField
+              key="weekly-series-start"
+              label="Booking window start"
+              name="seriesStartDate"
+              value={seriesStart}
+              onChange={setSeriesStart}
+              min={todayIso}
+              max={plusDaysIso(horizonDays)}
+              required
+            />
+            <DateSelectField
+              key="weekly-series-end"
+              label={`Booking window end (max ${horizonDays} days)`}
+              name="seriesEndDate"
+              value={seriesEnd}
+              onChange={setSeriesEnd}
+              min={todayIso}
+              max={plusDaysIso(horizonDays)}
+              required
+            />
           </div>
         </>
       )}

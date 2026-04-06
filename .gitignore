@@ -17,3 +17,5 @@ out
 # Local profile uploads (dev / MICSTAGE_LOCAL_UPLOADS); keep directory with .gitkeep
 public/uploads/micstage-profiles/*
 !public/uploads/micstage-profiles/.gitkeep
+
+openmic/

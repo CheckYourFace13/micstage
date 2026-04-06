@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { Venue, VenuePerformanceFormat } from "@/generated/prisma/client";
+import { DateSelectField } from "@/components/forms/DateSelectField";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 import { createEventTemplate } from "./actions";
@@ -38,6 +40,8 @@ export function VenueAddRecurringNightFormFields({
   formClassName = "mt-6 grid gap-3",
 }: Props) {
   const go = useVenuePortalRedirect();
+  const [seriesStart, setSeriesStart] = useState(todayIso);
+  const [seriesEnd, setSeriesEnd] = useState(bookingWindowMaxIso);
   return (
     <form action={async (fd) => go(await createEventTemplate(fd))} className={formClassName}>
       <input type="hidden" name="venueId" value={v.id} />
@@ -63,30 +67,24 @@ export function VenueAddRecurringNightFormFields({
       </label>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Booking window start (today onward)</span>
-          <input
-            name="seriesStartDate"
-            type="date"
-            min={todayIso}
-            max={bookingWindowMaxIso}
-            defaultValue={todayIso}
-            required
-            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Booking window end (max {horizonDays} days out)</span>
-          <input
-            name="seriesEndDate"
-            type="date"
-            min={todayIso}
-            max={bookingWindowMaxIso}
-            defaultValue={bookingWindowMaxIso}
-            required
-            className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
-          />
-        </label>
+        <DateSelectField
+          label="Booking window start (today onward)"
+          name="seriesStartDate"
+          value={seriesStart}
+          onChange={setSeriesStart}
+          min={todayIso}
+          max={bookingWindowMaxIso}
+          required
+        />
+        <DateSelectField
+          label={`Booking window end (max ${horizonDays} days out)`}
+          name="seriesEndDate"
+          value={seriesEnd}
+          onChange={setSeriesEnd}
+          min={todayIso}
+          max={bookingWindowMaxIso}
+          required
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

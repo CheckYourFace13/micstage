@@ -245,8 +245,10 @@ export async function createEventTemplate(formData: FormData): Promise<VenuePort
  */
 export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Promise<VenuePortalActionResult> {
   try {
+  console.info("[venue weekly submit] server action start");
   const session = await getSession();
   if (!session || session.kind !== "venue") {
+    console.warn("[venue weekly submit] no venue session");
     return portalRedirect("/login/venue?next=%2Fvenue");
   }
   const venueId = reqString(formData, "venueId");
@@ -466,10 +468,12 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
 
   revalidatePath("/venue");
   revalidatePath(`/venues/${venue.slug}`);
+  console.info("[venue weekly submit] server action success");
   return portalRedirect("/venue?scheduleSuccess=weekly");
   } catch (e) {
     if (e instanceof VenuePortalRedirectSignal) return e.result;
-    throw e;
+    console.error("[venue weekly submit] server action unexpected error", e);
+    return portalRedirect("/venue?scheduleError=submitFailed");
   }
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import type { VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
@@ -128,11 +129,15 @@ export function WeeklyScheduleForm({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  async function onSubmit(fd: FormData) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setSubmitting(true);
     setSubmitError(null);
+    const fd = new FormData(e.currentTarget);
+    console.info("[venue weekly submit] client onSubmit fired");
     try {
       const result = await saveWeeklyScheduleAndGenerateSlots(fd);
+      console.info("[venue weekly submit] client received result", result.redirect);
       go(result);
     } catch (e) {
       console.error("[WeeklyScheduleForm] saveWeeklyScheduleAndGenerateSlots failed", e);
@@ -144,7 +149,7 @@ export function WeeklyScheduleForm({
   }
 
   return (
-    <form action={onSubmit} className={formClassName}>
+    <form onSubmit={onSubmit} className={formClassName}>
       <input type="hidden" name="venueId" value={venueId} />
       <input type="hidden" name="scheduleMode" value={scheduleMode} />
 

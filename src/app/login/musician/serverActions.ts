@@ -50,7 +50,10 @@ export async function loginMusician(formData: FormData) {
 
   let user;
   try {
-    user = await prisma.musicianUser.findUnique({ where: { email } });
+    user = await prisma.musicianUser.findUnique({
+      where: { email },
+      select: { id: true, email: true, passwordHash: true },
+    });
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginMusician] findUnique", e);

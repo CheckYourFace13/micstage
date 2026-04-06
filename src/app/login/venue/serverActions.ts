@@ -46,7 +46,10 @@ export async function loginVenue(formData: FormData) {
 
   let owner;
   try {
-    owner = await prisma.venueOwner.findUnique({ where: { email } });
+    owner = await prisma.venueOwner.findUnique({
+      where: { email },
+      select: { id: true, email: true, passwordHash: true },
+    });
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginVenue] venueOwner findUnique", e);
@@ -76,7 +79,10 @@ export async function loginVenue(formData: FormData) {
 
   let manager;
   try {
-    manager = await prisma.venueManager.findUnique({ where: { email } });
+    manager = await prisma.venueManager.findUnique({
+      where: { email },
+      select: { id: true, email: true, passwordHash: true },
+    });
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginVenue] venueManager findUnique", e);

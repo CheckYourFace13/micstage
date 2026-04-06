@@ -23,7 +23,8 @@ import {
   isWithinBookingWindow,
   slotStartInstant,
 } from "@/lib/venueBookingRules";
-import { isValidLineupYmd, storageYmdUtc } from "@/lib/venuePublicLineup";
+import { isValidLineupYmd, storageYmdUtc, venueCalendarIsoDate } from "@/lib/venuePublicLineup";
+import { DateTime } from "luxon";
 import { BookingRestrictionMode, VenuePerformerHistoryKind, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { isLineupRuleTier, prismaOverridesForLineupRuleTierSelection } from "@/lib/lineupRuleTiers";
@@ -102,6 +103,74 @@ function normalizeUrl(v?: string): string | null {
 }
 
 const ALLOWED_BOOKING_MODES = new Set<string>(BOOKING_RESTRICTION_OPTIONS.map((o) => o.value));
+
+/**
+ * Schedule form dates are stored as `YYYY-MM-DDT00:00:00.000Z` (civil date keys).
+ * Comparing them to "today" using UTC midnight wrongly rejects same-calendar-day picks for
+ * venues behind UTC (evening local while UTC is already the next day).
+ */
+function assertVenueYmdRangeWithinHorizon(opts: {
+  venueTz: string;
+  now: Date;
+  maxHorizonDays: number;
+  /** Inclusive YYYY-MM-DD range for this save (series or one-event). */
+  seriesStartYmd: string;
+  seriesEndYmd: string;
+  /** Widened venue window written to DB (may span beyond this save for one_event). */
+  storedWindowStartYmd: string;
+  storedWindowEndYmd: string;
+}): VenuePortalActionResult | null {
+  const tz = opts.venueTz?.trim() || "America/Chicago";
+  console.info("[venue weekly submit] bounds step: venue today + horizon end");
+  const todayVenue = venueCalendarIsoDate(tz, opts.now);
+  const horizonEndDt = DateTime.fromISO(todayVenue, { zone: tz }).plus({ days: opts.maxHorizonDays });
+  const horizonEndYmd = horizonEndDt.toISODate();
+  if (!horizonEndYmd) {
+    console.error("[venue weekly submit] bounds fail: invalid horizon end", { todayVenue, tz });
+    return portalRedirect("/venue?scheduleError=badRange");
+  }
+  const horizonMaxYmd = horizonEndYmd;
+  console.info("[venue weekly submit] bounds step: compare series ymds", {
+    todayVenue,
+    horizonMaxYmd,
+    seriesStartYmd: opts.seriesStartYmd,
+    seriesEndYmd: opts.seriesEndYmd,
+  });
+
+  function checkPair(label: string, a: string, b: string): VenuePortalActionResult | null {
+    if (!isValidLineupYmd(a) || !isValidLineupYmd(b)) {
+      console.error("[venue weekly submit] bounds fail: invalid ymd", { label, a, b });
+      return portalRedirect("/venue?scheduleError=badRange");
+    }
+    if (a < todayVenue || b < todayVenue) {
+      console.info("[venue weekly submit] bounds return badRange (before venue today)", {
+        label,
+        a,
+        b,
+        todayVenue,
+      });
+      return portalRedirect("/venue?scheduleError=badRange");
+    }
+    if (a > horizonMaxYmd || b > horizonMaxYmd) {
+      console.info("[venue weekly submit] bounds return badRange (past horizon)", {
+        label,
+        a,
+        b,
+        horizonMaxYmd,
+        maxHorizonDays: opts.maxHorizonDays,
+      });
+      return portalRedirect("/venue?scheduleError=badRange");
+    }
+    return null;
+  }
+
+  const seriesFail = checkPair("series", opts.seriesStartYmd, opts.seriesEndYmd);
+  if (seriesFail) return seriesFail;
+  const windowFail = checkPair("storedWindow", opts.storedWindowStartYmd, opts.storedWindowEndYmd);
+  if (windowFail) return windowFail;
+  console.info("[venue weekly submit] bounds step: all pairs ok");
+  return null;
+}
 
 function normalizeOpenMicDescription(raw: string | undefined | null): string | null {
   if (raw == null) return null;
@@ -354,31 +423,40 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
   const maxHorizonDays = venue.subscriptionTier === "FREE" ? 60 : 90;
 
   console.info("[venue weekly submit] booking window bounds start");
-  const today = new Date();
-  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  const horizonEndUtc = new Date(todayUtc.getTime() + maxHorizonDays * 24 * 60 * 60 * 1000);
+  const nowForBounds = new Date();
+  const seriesStartYmd = storageYmdUtc(seriesStartDate);
+  const seriesEndYmd = storageYmdUtc(seriesEndDate);
+  const storedWindowStartYmd = storageYmdUtc(venueSeriesStartForDb);
+  const storedWindowEndYmd = storageYmdUtc(venueSeriesEndForDb);
+  console.info("[venue weekly submit] bounds step: ymd keys", {
+    isOneEvent,
+    seriesStartYmd,
+    seriesEndYmd,
+    storedWindowStartYmd,
+    storedWindowEndYmd,
+  });
 
-  if (seriesStartDate.getTime() < todayUtc.getTime() || seriesStartDate.getTime() > horizonEndUtc.getTime()) {
-    return portalRedirect("/venue?scheduleError=badRange");
-  }
-  if (seriesEndDate.getTime() < todayUtc.getTime() || seriesEndDate.getTime() > horizonEndUtc.getTime()) {
-    return portalRedirect("/venue?scheduleError=badRange");
-  }
-
-  if (
-    venueSeriesStartForDb.getTime() < todayUtc.getTime() ||
-    venueSeriesStartForDb.getTime() > horizonEndUtc.getTime() ||
-    venueSeriesEndForDb.getTime() < todayUtc.getTime() ||
-    venueSeriesEndForDb.getTime() > horizonEndUtc.getTime()
-  ) {
-    return portalRedirect("/venue?scheduleError=badRange");
+  const boundsRedirect = assertVenueYmdRangeWithinHorizon({
+    venueTz: timeZone,
+    now: nowForBounds,
+    maxHorizonDays,
+    seriesStartYmd,
+    seriesEndYmd,
+    storedWindowStartYmd,
+    storedWindowEndYmd,
+  });
+  if (boundsRedirect) {
+    console.info("[venue weekly submit] booking window bounds returned redirect");
+    return boundsRedirect;
   }
   console.info("[venue weekly submit] booking window bounds done");
 
-  const bookingOpensDaysAhead = Math.max(
-    1,
-    Math.min(maxHorizonDays, Math.round((venueSeriesEndForDb.getTime() - todayUtc.getTime()) / (24 * 60 * 60 * 1000))),
-  );
+  const tzForDays = timeZone?.trim() || "America/Chicago";
+  const todayVenueYmd = venueCalendarIsoDate(tzForDays, nowForBounds);
+  const startLux = DateTime.fromISO(todayVenueYmd, { zone: tzForDays }).startOf("day");
+  const endLux = DateTime.fromISO(storedWindowEndYmd, { zone: tzForDays }).startOf("day");
+  const diffDays = endLux.diff(startLux, "days").days;
+  const bookingOpensDaysAhead = Math.max(1, Math.min(maxHorizonDays, Math.round(diffDays)));
   console.info("[venue weekly submit] booking window computed", {
     maxHorizonDays,
     bookingOpensDaysAhead,

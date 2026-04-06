@@ -9,7 +9,7 @@ import {
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { requirePrisma } from "@/lib/prisma";
-import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
+import { requireVenueSession, venueIdsForSession, venueIdsForVenueSession } from "@/lib/authz";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
 import { syncSlotsForInstance } from "@/lib/slotSync";
 import {
@@ -38,6 +38,7 @@ import {
   runVenueLineupTestCleanup,
 } from "@/lib/venueTestLineupCleanup";
 import { storeProfileImage } from "@/lib/profileAssetStorage";
+import { getSession } from "@/lib/session";
 
 /** Missing/tampered fields → friendly portal message instead of generic error UI. */
 function reqString(formData: FormData, key: string): string {
@@ -244,9 +245,12 @@ export async function createEventTemplate(formData: FormData): Promise<VenuePort
  */
 export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Promise<VenuePortalActionResult> {
   try {
-  const session = await requireVenueSession();
+  const session = await getSession();
+  if (!session || session.kind !== "venue") {
+    return portalRedirect("/login/venue?next=%2Fvenue");
+  }
   const venueId = reqString(formData, "venueId");
-  const allowed = await venueIdsForSession(session);
+  const allowed = await venueIdsForVenueSession(session);
   if (!allowed.includes(venueId)) return portalRedirect("/venue?venueError=forbidden");
 
   const scheduleMode = optString(formData, "scheduleMode") ?? "recurring";

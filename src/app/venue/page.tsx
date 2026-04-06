@@ -377,6 +377,11 @@ export default async function VenuePortalPage({
             That schedule template is no longer available. Refresh the page and try again.
           </div>
         ) : null}
+        {q.scheduleError === "submitFailed" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            Schedule save failed before MicStage received a complete response. Please try again.
+          </div>
+        ) : null}
         {q.scheduleSuccess === "weekly" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
             <span className="font-semibold text-emerald-100/95">Schedule saved.</span> Future open slots are updated;

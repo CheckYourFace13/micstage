@@ -6,7 +6,6 @@ import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
 import { ALL_WEEKDAYS, computeWeeklySchedulePreview, weekdayFromIsoDateInTimeZone } from "@/lib/weeklySchedule";
 import { weekdayToLabel } from "@/lib/time";
-import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 import { useVenuePortalRedirect } from "@/lib/venuePortalClient";
 import { saveWeeklyScheduleAndGenerateSlots } from "./actions";
@@ -126,8 +125,26 @@ export function WeeklyScheduleForm({
     scheduleMode === "one_event" ? effectiveWeekdays.length > 0 : weekdays.size > 0;
 
   const go = useVenuePortalRedirect();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  async function onSubmit(fd: FormData) {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const result = await saveWeeklyScheduleAndGenerateSlots(fd);
+      go(result);
+    } catch (e) {
+      console.error("[WeeklyScheduleForm] saveWeeklyScheduleAndGenerateSlots failed", e);
+      setSubmitError("We could not save this schedule. Check your connection and try again.");
+      go({ redirect: "/venue?scheduleError=submitFailed" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <form action={async (fd) => go(await saveWeeklyScheduleAndGenerateSlots(fd))} className={formClassName}>
+    <form action={onSubmit} className={formClassName}>
       <input type="hidden" name="venueId" value={venueId} />
       <input type="hidden" name="scheduleMode" value={scheduleMode} />
 
@@ -403,11 +420,14 @@ export function WeeklyScheduleForm({
         )}
       </div>
 
-      <FormSubmitButton
-        label="Save schedule & generate slots"
-        pendingLabel="Saving & generating…"
+      <button
+        type="submit"
+        disabled={submitting}
         className="h-12 rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
-      />
+      >
+        {submitting ? "Saving & generating…" : "Save schedule & generate slots"}
+      </button>
+      {submitError ? <p className="-mt-2 text-xs text-amber-200/90">{submitError}</p> : null}
       <p className="text-xs text-white/50">
         {scheduleMode === "one_event" ? (
           <>

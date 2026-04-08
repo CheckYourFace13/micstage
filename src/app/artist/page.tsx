@@ -434,9 +434,12 @@ export default async function ArtistPortalPage({
                           {tpl.description ? (
                             <p className="mt-2 max-w-xl text-xs leading-relaxed text-white/55">{tpl.description}</p>
                           ) : null}
-                          <div className="mt-2 text-xs text-white/60">
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/60">
                             <Link className="underline" href={`/venues/${v.slug}`}>
                               View venue page
+                            </Link>
+                            <Link className="underline text-[rgb(var(--om-neon))]" href={`/messages/new?venueId=${v.id}`}>
+                              Message venue
                             </Link>
                           </div>
                         </div>

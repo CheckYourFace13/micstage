@@ -429,6 +429,26 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
           </div>
         </div>
 
+        <div className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="text-sm font-semibold text-white">Email from MicStage</div>
+          <label className="flex cursor-pointer items-start gap-3 text-sm text-white/80">
+            <input
+              type="checkbox"
+              name="weeklyNearbyOpenMicAlerts"
+              defaultChecked={Boolean(musician.weeklyNearbyOpenMicAlerts)}
+              className="mt-1 h-4 w-4 shrink-0 accent-[rgb(var(--om-neon))]"
+            />
+            <span>
+              <span className="font-medium text-white/90">Weekly nearby open mic digest</span>
+              <span className="mt-1 block text-xs text-white/55">
+                Opt in to a weekly email listing upcoming open mics near your home area on your profile (within your travel
+                radius, or same city/region when coordinates aren’t set). You can turn this off anytime. Marketing and
+                outreach emails use separate preferences where applicable.
+              </span>
+            </span>
+          </label>
+        </div>
+
         <FormSubmitButton
           label="Save profile"
           pendingLabel="Saving…"

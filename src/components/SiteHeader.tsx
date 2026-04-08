@@ -3,6 +3,9 @@ import { ADMIN_LOGOUT_PATH } from "@/lib/adminEdge";
 import { getAuthUiState } from "@/lib/authUiState";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { VenueChangeRequestForm } from "@/app/venue/VenueChangeRequestForm";
+import { countUnreadThreads } from "@/lib/messaging/inboxQueries";
+import { getPrismaOrNull } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 
 function roleBadgeLink(text: string, tone: "admin", href: string) {
   const cls = "border-amber-400/40 bg-amber-500/15 text-amber-100";
@@ -18,6 +21,19 @@ function roleBadgeLink(text: string, tone: "admin", href: string) {
 
 export async function SiteHeader() {
   const { role: auth, signedInLine, signedInHref, venueSessionEmail } = await getAuthUiState();
+
+  let messageUnread = 0;
+  if (auth === "artist" || auth === "venue") {
+    const session = await getSession();
+    const prisma = getPrismaOrNull();
+    if (session && prisma && (session.kind === "musician" || session.kind === "venue")) {
+      try {
+        messageUnread = await countUnreadThreads(prisma, session);
+      } catch {
+        messageUnread = 0;
+      }
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/15 bg-black/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
@@ -111,6 +127,19 @@ export async function SiteHeader() {
               >
                 By area
               </Link>
+              {auth === "artist" || auth === "venue" ? (
+                <Link
+                  className="inline-flex min-h-11 items-center rounded-md border border-white/25 bg-white/[0.07] px-3 py-2 font-medium text-white hover:border-white/40 hover:bg-white/12 sm:min-h-0 sm:px-3 sm:py-1.5"
+                  href="/messages"
+                >
+                  Messages
+                  {messageUnread > 0 ? (
+                    <span className="ml-1.5 rounded-full bg-[rgb(var(--om-neon))] px-1.5 py-0.5 text-[10px] font-bold text-black">
+                      {messageUnread > 99 ? "99+" : messageUnread}
+                    </span>
+                  ) : null}
+                </Link>
+              ) : null}
             </nav>
             {auth === "public" ? (
               <nav

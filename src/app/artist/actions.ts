@@ -136,6 +136,7 @@ export async function updateMusicianProfile(formData: FormData) {
   }
 
   const openToHire = formData.get("openToHire") === "on";
+  const weeklyNearbyOpenMicAlerts = formData.get("weeklyNearbyOpenMicAlerts") === "on";
   const hireRateDescription = optString(formData, "hireRateDescription");
   const collaborationsText = optString(formData, "collaborationsText");
 
@@ -178,6 +179,7 @@ export async function updateMusicianProfile(formData: FormData) {
         instruments: instruments.length ? instruments : Prisma.JsonNull,
         yearsPlaying,
         openToHire,
+        weeklyNearbyOpenMicAlerts,
         hireRateDescription,
         setLengthMinutes,
         collaborationsText,

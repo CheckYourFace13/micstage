@@ -17,6 +17,7 @@ import {
 } from "@/lib/venuePerformerHistory";
 import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
 import { VenueOpenMicQrCode } from "@/components/venues/VenueOpenMicQrCode";
+import { VenueBulkMessagePanel } from "@/components/venue/VenueBulkMessagePanel";
 import { VenueTestLineupCleanupPanel } from "@/components/venue/VenueTestLineupCleanupPanel";
 import { VenueDeleteOpenMicDayPanel } from "@/components/venue/VenueDeleteOpenMicDayPanel";
 import { VenuePerformerHistoryPanel } from "@/components/venue/VenuePerformerHistoryPanel";
@@ -220,6 +221,9 @@ export default async function VenuePortalPage({
     ltcHistDec?: string;
     ltcInst?: string;
     ltcSlots?: string;
+    bulkMsg?: string;
+    sent?: string;
+    failed?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -568,6 +572,30 @@ export default async function VenuePortalPage({
             That night was already removed or isn&apos;t on your dashboard. Refresh if this looks wrong.
           </div>
         ) : null}
+        {q.bulkMsg === "sent" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            <span className="font-semibold text-emerald-100/95">Bulk message sent.</span> Delivered to{" "}
+            <span className="font-mono text-white/90">{q.sent ?? "0"}</span> artist
+            {q.sent === "1" ? "" : "s"} with MicStage accounts (each has a thread + email).
+          </div>
+        ) : null}
+        {q.bulkMsg === "partial" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            <span className="font-semibold text-amber-100/95">Partial send.</span> Sent:{" "}
+            <span className="font-mono">{q.sent ?? "0"}</span>, failed:{" "}
+            <span className="font-mono">{q.failed ?? "?"}</span>. Check logs or retry for missing recipients.
+          </div>
+        ) : null}
+        {q.bulkMsg === "norecipients" ? (
+          <div className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/80">
+            No booked artists with MicStage accounts on that date.
+          </div>
+        ) : null}
+        {q.bulkMsg === "invalid" || q.bulkMsg === "forbidden" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            Could not send bulk message ({q.bulkMsg}). Refresh and try again.
+          </div>
+        ) : null}
 
         {venues.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-8">
@@ -758,6 +786,11 @@ export default async function VenuePortalPage({
                         <p className="mt-3 text-xs text-white/45">
                           Links and API target this night only. Switch nights with the chips above.
                         </p>
+                        <VenueBulkMessagePanel
+                          venueId={v.id}
+                          dateYmds={generatedDayYmds}
+                          defaultYmd={selectedYmd}
+                        />
                       </>
                     ) : (
                       <p className="mt-6 text-sm text-white/65">

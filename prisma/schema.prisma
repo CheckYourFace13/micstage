@@ -70,6 +70,12 @@ enum VenuePerformerHistoryKind {
   MANUAL
 }
 
+/// Who sent a row in an artist–venue message thread.
+enum MessageSenderSide {
+  VENUE
+  MUSICIAN
+}
+
 model VenueOwner {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -166,6 +172,7 @@ model Venue {
   marketingContacts       MarketingContact[]
   marketingEmailSends     MarketingEmailSend[]
   marketingOutreachDrafts MarketingOutreachDraft[]
+  messageThreads        MessageThread[]
 }
 
 model VenueManager {
@@ -255,11 +262,17 @@ model MusicianUser {
   secondaryRegion            String?
   secondaryRadiusMiles       Int?
 
+  /// Opt-in: weekly email listing nearby open mics (see digest cron). Off by default.
+  weeklyNearbyOpenMicAlerts      Boolean   @default(false)
+  /// Last successful weekly digest send (idempotency / spacing).
+  weeklyNearbyDigestLastSentAt   DateTime?
+
   bookings          Booking[]
   pastVenues        MusicianPastVenue[]
   interestedVenues  MusicianVenueInterest[]
   venuePerformerHistory            VenuePerformerHistory[] @relation("VenuePerformerHistoryMusician")
   venuePerformerHistoryManualLinks VenuePerformerHistory[] @relation("VenuePerformerHistoryManualLink")
+  messageThreads                   MessageThread[]
 }
 
 /// Deduplicated performers who have appeared (or been typed) on a venue lineup — for autocomplete, dashboard review, and optional public “past performers”.
@@ -431,6 +444,42 @@ model Booking {
   @@index([musicianId])
   @@index([cancelledAt, reminderEmail24hSentAt])
   @@index([cancelledAt, reminderEmail2hSentAt])
+}
+
+/// One thread per venue + musician pair (direct messaging).
+model MessageThread {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  venueId String
+  venue   Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  musicianId String
+  musician   MusicianUser @relation(fields: [musicianId], references: [id], onDelete: Cascade)
+
+  lastMessageAt        DateTime?
+  lastReadByMusicianAt DateTime?
+  lastReadByVenueAt    DateTime?
+
+  messages Message[]
+
+  @@unique([venueId, musicianId])
+  @@index([musicianId, lastMessageAt(sort: Desc)])
+  @@index([venueId, lastMessageAt(sort: Desc)])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  threadId String
+  thread   MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  body       String            @db.Text
+  senderSide MessageSenderSide
+
+  @@index([threadId, createdAt])
 }
 
 model PasswordResetToken {

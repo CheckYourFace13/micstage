@@ -50,12 +50,12 @@ export default async function LocationsPage() {
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-5xl px-6 py-12">
+      <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
         {rows.length > 0 ? (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }} />
         ) : null}
-        <h1 className="om-heading text-4xl tracking-wide">Open mic discovery by market</h1>
+        <h1 className="om-heading text-3xl tracking-wide sm:text-4xl">Open mic discovery by market</h1>
         <p className="mt-2 max-w-2xl text-sm text-white/70">
           Browse metro and regional hubs—not every small town gets its own directory page yet. When a place has fewer than{" "}
           <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> MicStage venues, we group it into a

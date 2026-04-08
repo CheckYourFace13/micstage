@@ -20,8 +20,8 @@ export async function SiteHeader() {
   const { role: auth, signedInLine, signedInHref, venueSessionEmail } = await getAuthUiState();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/15 bg-black/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+    <header className="sticky top-0 z-50 border-b border-white/15 bg-black/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-3 py-3 sm:px-4 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <Link
           href="/"
           className="group flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:gap-x-3 lg:flex-1"
@@ -94,19 +94,19 @@ export async function SiteHeader() {
               aria-label="Discover"
             >
               <Link
-                className="rounded-md px-2 py-1.5 font-semibold text-[rgb(var(--om-neon))] hover:bg-white/10 hover:brightness-110 sm:px-3"
+                className="inline-flex min-h-11 items-center rounded-md px-3 py-2 font-semibold text-[rgb(var(--om-neon))] hover:bg-white/10 hover:brightness-110 sm:min-h-0 sm:px-3 sm:py-1.5"
                 href="/find-open-mics"
               >
                 Find Local Open Mic&apos;s
               </Link>
               <Link
-                className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
+                className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
                 href="/performers"
               >
                 Find Artists
               </Link>
               <Link
-                className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
+                className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
                 href="/locations"
               >
                 By area
@@ -118,13 +118,13 @@ export async function SiteHeader() {
                 aria-label="Account"
               >
                 <Link
-                  className="rounded-md px-2 py-1.5 text-white/75 hover:bg-white/10 hover:text-white sm:px-3"
+                  className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
                   href="/login/musician"
                 >
                   Artist login
                 </Link>
                 <Link
-                  className="rounded-md border border-white/20 bg-white/5 px-2 py-1.5 text-white hover:bg-white/10 sm:px-3"
+                  className="inline-flex min-h-11 items-center rounded-md border border-white/20 bg-white/5 px-3 py-2 text-white hover:bg-white/10 sm:min-h-0 sm:px-3 sm:py-1.5"
                   href="/login/venue"
                 >
                   Venue login

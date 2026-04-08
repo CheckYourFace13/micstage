@@ -34,6 +34,7 @@ import {
   lineupPrimaryActionClass,
   lineupSecondaryActionClass,
 } from "@/components/venue/lineupActionStyles";
+import { VenueOpenMicQrCode } from "@/components/venues/VenueOpenMicQrCode";
 
 export const dynamic = "force-dynamic";
 
@@ -218,11 +219,11 @@ export default async function VenuePublicPage(props: {
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-3xl px-5 py-10 sm:max-w-5xl sm:px-6 sm:py-12">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-8">
-          <div>
+      <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:max-w-5xl sm:px-6 sm:py-12">
+        <div className="flex flex-col gap-6 border-b border-white/10 pb-8 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
             <div className="text-xs font-medium uppercase tracking-widest text-white/55">Open mic</div>
-            <h1 className="mt-2 text-3xl font-bold leading-tight sm:text-4xl">{venue.name}</h1>
+            <h1 className="mt-2 text-[1.65rem] font-bold leading-tight sm:text-3xl md:text-4xl">{venue.name}</h1>
             <div className="mt-2 text-sm text-white/70">{venue.formattedAddress}</div>
             {heroYmd ? (
               <div className="mt-4">
@@ -247,25 +248,40 @@ export default async function VenuePublicPage(props: {
               </p>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <nav
+            className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:shrink-0 sm:items-end sm:gap-2"
+            aria-label="Page shortcuts"
+          >
             {session?.kind === "venue" && isStaffForThisVenue ? (
-              <Link className="text-white/70 hover:text-white" href="/venue">
+              <Link
+                className="inline-flex min-h-11 items-center rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white sm:justify-end sm:px-3"
+                href="/venue"
+              >
                 Venue portal
               </Link>
             ) : null}
             {isMusician ? (
-              <Link className="text-white/70 hover:text-white" href={ARTIST_DASHBOARD_HREF}>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white sm:justify-end sm:px-3"
+                href={ARTIST_DASHBOARD_HREF}
+              >
                 Artist portal
               </Link>
             ) : (
-              <Link className="text-white/70 hover:text-white" href="/login/musician">
+              <Link
+                className="inline-flex min-h-11 items-center rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white sm:justify-end sm:px-3"
+                href="/login/musician"
+              >
                 Artist login
               </Link>
             )}
-            <Link className="text-white/70 hover:text-white" href="/">
+            <Link
+              className="inline-flex min-h-11 items-center rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white sm:justify-end sm:px-3"
+              href="/"
+            >
               Home
             </Link>
-          </div>
+          </nav>
         </div>
 
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -286,6 +302,19 @@ export default async function VenuePublicPage(props: {
             Finish booking: tap <span className="font-semibold">Confirm</span> on the slot you chose.
           </div>
         ) : null}
+
+        <div className="mt-8">
+          <VenueOpenMicQrCode
+            variant="public"
+            venueName={venue.name}
+            publicPageUrl={absoluteUrl(`/venues/${venue.slug}`)}
+            hint={
+              venue.eventTemplates.length === 0
+                ? "A full bookable lineup appears on this page once the venue publishes open mic nights on MicStage."
+                : null
+            }
+          />
+        </div>
 
         {venue.eventTemplates.length === 0 ? (
           <div className="mt-6 rounded-2xl border border-dashed border-white/20 bg-white/[0.03] p-6 text-sm text-white/70">

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
@@ -25,6 +25,12 @@ const origin = siteOrigin();
 const siteTagline = "Find open mics · Book slots · Grow your room";
 const defaultDescription =
   "MicStage helps you find local open mics and helps venues run bookable schedules—public pages that make discovery and marketing easier for rooms and artists.";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(origin),
@@ -83,7 +89,7 @@ export default async function RootLayout({
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
       </head>
-      <body className="min-h-full bg-black font-[var(--font-body)] text-white">
+      <body className="min-h-dvh overflow-x-hidden bg-black pb-[env(safe-area-inset-bottom)] font-[var(--font-body)] text-white">
         {!embed ? <SiteHeader /> : null}
         {children}
         {!embed ? <SiteFooter /> : null}

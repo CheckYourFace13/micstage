@@ -144,7 +144,7 @@ export function FindOpenMicsClient(props: {
         <button
           type="button"
           onClick={() => setMode("nearby")}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+          className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:min-h-0 sm:flex-none ${
             mode === "nearby" ? "bg-[rgb(var(--om-neon))] text-black" : "text-white/75 hover:bg-white/10"
           }`}
         >
@@ -153,7 +153,7 @@ export function FindOpenMicsClient(props: {
         <button
           type="button"
           onClick={() => setMode("metro")}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+          className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:min-h-0 sm:flex-none ${
             mode === "metro" ? "bg-[rgb(var(--om-neon))] text-black" : "text-white/75 hover:bg-white/10"
           }`}
         >
@@ -162,7 +162,7 @@ export function FindOpenMicsClient(props: {
       </div>
 
       {mode === "nearby" ? (
-        <section className="grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <section className="grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
           <div>
             <h2 className="text-lg font-semibold text-white">Search near a location</h2>
             <p className="mt-1 text-sm text-white/65">
@@ -282,7 +282,7 @@ export function FindOpenMicsClient(props: {
           ) : null}
         </section>
       ) : (
-        <section className="grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <section className="grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
           <div>
             <h2 className="text-lg font-semibold text-white">Browse by metropolitan area</h2>
             <p className="mt-1 text-sm text-white/65">

@@ -154,7 +154,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-5xl px-6 py-12">
+      <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }} />
         {bookings.length > 0 ? (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList) }} />

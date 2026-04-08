@@ -16,6 +16,7 @@ import {
   loadVenuePerformerSuggestions,
 } from "@/lib/venuePerformerHistory";
 import { VenueDashboardShareBar } from "@/components/venue/VenueDashboardShareBar";
+import { VenueOpenMicQrCode } from "@/components/venues/VenueOpenMicQrCode";
 import { VenueTestLineupCleanupPanel } from "@/components/venue/VenueTestLineupCleanupPanel";
 import { VenueDeleteOpenMicDayPanel } from "@/components/venue/VenueDeleteOpenMicDayPanel";
 import { VenuePerformerHistoryPanel } from "@/components/venue/VenuePerformerHistoryPanel";
@@ -232,7 +233,7 @@ export default async function VenuePortalPage({
   if (loadError === "requirePrisma" || loadError === "venueList") {
     return (
       <div className="min-h-dvh bg-black text-white">
-        <main className="mx-auto w-full max-w-3xl px-6 py-16">
+        <main className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
           <h1 className="om-heading text-2xl tracking-wide text-white">Venue dashboard</h1>
           <p className="mt-3 text-sm text-white/75">
             We couldn&apos;t load your dashboard right now (connection or server issue). Your account is still signed in.
@@ -269,10 +270,10 @@ export default async function VenuePortalPage({
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-6xl px-6 py-14">
+      <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="max-w-3xl">
           <div className="text-xs font-medium uppercase tracking-widest text-white/60">Venue portal</div>
-          <h1 className="om-heading mt-2 text-4xl tracking-wide">Venue dashboard</h1>
+          <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">Venue dashboard</h1>
           <p className="mt-2 text-sm text-white/70">
             {anyVenueOperational ? (
               <>
@@ -627,7 +628,7 @@ export default async function VenuePortalPage({
                       .filter((row) => row.instances.length > 0);
 
               return (
-              <section key={v.id} className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <section key={v.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -657,8 +658,21 @@ export default async function VenuePortalPage({
                   </div>
                 </div>
 
+                <div className="mt-6">
+                  <VenueOpenMicQrCode
+                    variant="dashboard"
+                    venueName={v.name}
+                    publicPageUrl={absoluteUrl(`/venues/${v.slug}`)}
+                    hint={
+                      v.eventTemplates.length === 0
+                        ? "Publish at least one weekly open mic night so this page shows a bookable lineup; the QR still opens your public MicStage venue hub."
+                        : null
+                    }
+                  />
+                </div>
+
                 {operational ? (
-                  <div className="mt-8 rounded-2xl border border-[rgba(var(--om-neon),0.55)] bg-gradient-to-b from-[rgba(var(--om-neon),0.12)] to-black/35 p-6 sm:p-7">
+                  <div className="mt-8 rounded-2xl border border-[rgba(var(--om-neon),0.55)] bg-gradient-to-b from-[rgba(var(--om-neon),0.12)] to-black/35 p-4 sm:p-7">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <h3 className="om-heading text-2xl font-bold tracking-wide text-white">Lineup & sharing</h3>
@@ -692,7 +706,7 @@ export default async function VenuePortalPage({
                                 scroll={false}
                                 role="tab"
                                 aria-selected={isSelected}
-                                className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                                className={`rounded-full border px-3 py-2 text-xs transition-colors min-h-10 sm:min-h-0 sm:py-1.5 ${
                                   isSelected
                                     ? "border-[rgb(var(--om-neon))] bg-[rgb(var(--om-neon))]/22 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(var(--om-neon),0.4)]"
                                     : "border-white/15 bg-black/30 font-medium text-white/80 hover:border-white/25 hover:bg-black/40"

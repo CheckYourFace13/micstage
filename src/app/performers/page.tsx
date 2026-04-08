@@ -86,23 +86,26 @@ export default async function PerformersPage({
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-3xl px-6 py-14">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Artists</div>
-            <h1 className="om-heading mt-2 text-4xl tracking-wide">Search by stage name</h1>
+            <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">Search by stage name</h1>
             <p className="mt-2 max-w-xl text-sm text-white/65">
               MicStage lists <span className="text-white/85">stage names only</span>. First and last names
               from artist accounts are private and never appear here.
             </p>
           </div>
-          <Link href="/locations" className="text-sm text-white/70 hover:text-white">
+          <Link
+            href="/locations"
+            className="inline-flex min-h-11 shrink-0 items-center text-sm text-white/70 hover:text-white sm:min-h-0"
+          >
             By area
           </Link>
         </div>
 
-        <form method="get" className="mt-8 flex flex-wrap gap-3">
-          <label className="grid min-w-[200px] flex-1 gap-1 text-sm">
+        <form method="get" className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <label className="grid min-w-0 flex-1 gap-1 text-sm sm:min-w-[200px]">
             <span className="text-white/80">Stage name contains</span>
             <input
               name="q"
@@ -114,7 +117,7 @@ export default async function PerformersPage({
           </label>
           <button
             type="submit"
-            className="mt-6 h-11 self-end rounded-md border border-white/15 bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 sm:mt-0"
+            className="h-11 w-full rounded-md border border-white/15 bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 sm:mt-0 sm:w-auto sm:self-end"
           >
             Search
           </button>

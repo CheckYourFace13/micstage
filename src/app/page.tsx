@@ -26,7 +26,7 @@ export default function Home() {
         <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:18px_18px]" />
       </div>
 
-      <main className="relative mx-auto w-full max-w-6xl px-6 py-12 sm:py-16">
+      <main className="relative mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
         <header className="grid gap-10 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
             <div className="flex flex-wrap items-center gap-2">
@@ -38,12 +38,12 @@ export default function Home() {
                 Free · Built for venues &amp; artists
               </div>
             </div>
-            <h1 className="om-heading mt-4 text-5xl leading-[0.95] tracking-wide sm:text-6xl">
+            <h1 className="om-heading mt-4 text-4xl leading-[0.95] tracking-wide sm:text-5xl md:text-6xl">
               Find open mics.
               <br />
               Fill the room.
             </h1>
-            <p className="mt-4 max-w-xl text-lg font-medium leading-snug text-white/85">
+            <p className="mt-4 max-w-xl text-base font-medium leading-snug text-white/85 sm:text-lg">
               MicStage helps people discover local open mics and helps venues run a clear schedule with bookable slots.
             </p>
 

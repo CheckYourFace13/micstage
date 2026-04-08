@@ -8,7 +8,7 @@ export async function SiteFooter() {
 
   return (
     <footer className="border-t border-white/10 bg-black">
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-5">
         <BetaNote className="mb-5 max-w-xl border-l border-[rgba(var(--om-neon),0.22)] pl-3" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <nav className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-white/65" aria-label="Site">

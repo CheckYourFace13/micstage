@@ -34,9 +34,9 @@ export default async function FindOpenMicsPage() {
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-5xl px-6 py-12">
+      <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
         <p className="text-xs font-medium uppercase tracking-widest text-white/55">Discovery</p>
-        <h1 className="om-heading mt-2 text-4xl tracking-wide">Find Local Open Mic&apos;s</h1>
+        <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">Find Local Open Mic&apos;s</h1>
         <p className="mt-3 max-w-2xl text-sm text-white/70">
           Start from where you are, a ZIP code, a city, or a metro. Open any venue to see its public open mic page,
           schedule, and booking board.

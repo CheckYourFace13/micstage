@@ -25,7 +25,7 @@ export default async function MusicianLoginPage(props: {
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-xl px-6 py-16">
+      <main className="mx-auto w-full max-w-xl px-4 py-12 sm:px-6 sm:py-16">
         <a className="text-sm text-white/70 hover:text-white" href="/">
           ← Back
         </a>

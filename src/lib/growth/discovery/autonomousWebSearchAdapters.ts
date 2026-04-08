@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { isPrimaryLaunchDiscoveryMarket, primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import {
-  growthDiscoveryAutonomousEnabled,
   growthDiscoveryAutonomousMaxPageFetchesPerRun,
   growthDiscoveryAutonomousSearchCallsPerRun,
+  growthDiscoveryAutonomousWebSearchEnabled,
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
@@ -128,7 +128,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
     id: ADAPTER_ID,
     leadType: "VENUE",
     async discover(ctx: GrowthLeadDiscoveryContext) {
-      if (!growthDiscoveryAutonomousEnabled()) return [];
+      if (!growthDiscoveryAutonomousWebSearchEnabled()) return [];
       if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) return [];
       const provider = discoverySearchProvider();
       if (!provider || !ctx.prisma) return [];

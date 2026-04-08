@@ -69,6 +69,32 @@ type SerpOrganic = {
   redirect_link?: string;
 };
 
+type SerpLocalPlace = {
+  title?: string;
+  link?: string;
+  website?: string;
+  description?: string;
+  links?: { website?: string };
+};
+
+type SerpEventResult = {
+  title?: string;
+  link?: string;
+  snippet?: string;
+  description?: string;
+  venue?: { name?: string; link?: string };
+};
+
+function serpLocalPlaceRows(raw: unknown): SerpLocalPlace[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as SerpLocalPlace[];
+  if (typeof raw === "object" && raw !== null && "places" in raw) {
+    const places = (raw as { places?: unknown }).places;
+    if (Array.isArray(places)) return places as SerpLocalPlace[];
+  }
+  return [];
+}
+
 export async function runSerpApiSearch(
   query: string,
   start0Based: number,
@@ -100,6 +126,9 @@ export async function runSerpApiSearch(
       error?: string;
       search_metadata?: { status?: string };
       organic_results?: SerpOrganic[];
+      local_results?: unknown;
+      events_results?: unknown;
+      answer_box?: { link?: string; title?: string; snippet?: string; answer?: string };
     };
     try {
       data = JSON.parse(text) as typeof data;
@@ -116,11 +145,44 @@ export async function runSerpApiSearch(
       return null;
     }
     const items: SearchHit[] = [];
+    const seen = new Set<string>();
+
+    const pushHit = (link: string | undefined, title: string | undefined, snippet?: string) => {
+      const L = link?.trim();
+      const T = title?.trim();
+      if (!L || !T) return;
+      const key = L.split("#")[0]!.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      items.push({ link: L, title: T, snippet: snippet?.trim() });
+    };
+
     for (const it of data.organic_results ?? []) {
       const link = (it.link ?? it.redirect_link)?.trim();
-      const title = it.title?.trim();
-      if (link && title) items.push({ link, title, snippet: it.snippet });
+      pushHit(link, it.title?.trim(), it.snippet);
     }
+
+    const ab = data.answer_box;
+    if (ab) {
+      const snippet = ab.snippet ?? ab.answer;
+      pushHit(ab.link?.trim(), ab.title?.trim(), snippet);
+    }
+
+    for (const it of serpLocalPlaceRows(data.local_results)) {
+      const link = (it.website ?? it.links?.website ?? it.link)?.trim();
+      pushHit(link, it.title?.trim(), it.description);
+    }
+
+    const evRaw = data.events_results;
+    if (Array.isArray(evRaw)) {
+      for (const raw of evRaw) {
+        const it = raw as SerpEventResult;
+        const link = it.link?.trim() || it.venue?.link?.trim();
+        const title = it.title?.trim() || it.venue?.name?.trim();
+        pushHit(link, title, it.snippet ?? it.description);
+      }
+    }
+
     return { items, rawNextStart: start0Based + items.length };
   } catch (e) {
     lastSearchAt = Date.now();

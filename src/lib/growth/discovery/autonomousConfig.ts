@@ -6,6 +6,11 @@ function envTruthy(v: string | undefined): boolean {
   return s === "true" || s === "1" || s === "yes" || s === "on";
 }
 
+function envAutonomousExplicitlyDisabled(): boolean {
+  const s = process.env.GROWTH_DISCOVERY_AUTONOMOUS_ENABLED?.trim().toLowerCase();
+  return s === "false" || s === "0" || s === "no" || s === "off";
+}
+
 /** Master switch for paid / high-volume web discovery (CSE, SerpAPI, crawl, Eventbrite). */
 export function growthDiscoveryAutonomousEnabled(): boolean {
   return envTruthy(process.env.GROWTH_DISCOVERY_AUTONOMOUS_ENABLED);
@@ -45,6 +50,18 @@ export function serpApiKeyForDiscovery(): string {
 
 export function hasSerpApi(): boolean {
   return Boolean(serpApiKeyForDiscovery());
+}
+
+/**
+ * Venue-only SerpAPI/CSE web search: also allowed when search keys are configured and the master switch is
+ * not explicitly off. Curated adapters ignore `GROWTH_DISCOVERY_AUTONOMOUS_ENABLED`; operators often set SerpAPI
+ * but omit the flag, which previously zeroed this adapter while curated seeds still ran.
+ * Eventbrite and seed crawl still require {@link growthDiscoveryAutonomousEnabled} only.
+ */
+export function growthDiscoveryAutonomousWebSearchEnabled(): boolean {
+  if (growthDiscoveryAutonomousEnabled()) return true;
+  if (envAutonomousExplicitlyDisabled()) return false;
+  return hasSerpApi() || hasGoogleProgrammableSearch();
 }
 
 /** Comma-separated root URLs to fetch and mine for contacts (same-host links optional). */

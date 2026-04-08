@@ -46,7 +46,22 @@ export default async function AdminGrowthHubPage(props: {
 
   const marketEq = { discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" as const } };
 
-  const [metrics, funnel, overallFunnel, daily, byType, total, launchRows, venueSignalBreakdown, venueAcqBreakdown] =
+  const [
+    metrics,
+    funnel,
+    overallFunnel,
+    daily,
+    byType,
+    total,
+    launchRows,
+    venueSignalBreakdown,
+    venueAcqBreakdown,
+    venueContactBreakdown,
+    autoVenueDrafted,
+    autoVenueSent,
+    pendingVenuePathTasks,
+    storedVenueContacts,
+  ] =
     await Promise.all([
       loadGrowthMarketMetrics(prisma, marketSlug),
       loadGrowthFunnelMetrics(prisma, marketSlug),
@@ -71,6 +86,37 @@ export default async function AdminGrowthHubPage(props: {
         where: { ...marketEq, leadType: "VENUE" },
         _count: { _all: true },
       }),
+      prisma.growthLead.groupBy({
+        by: ["contactQuality"],
+        where: { ...marketEq, leadType: "VENUE" },
+        _count: { _all: true },
+      }),
+      prisma.growthLeadOutreachDraft.count({
+        where: {
+          lead: { leadType: "VENUE", discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" } },
+          approvedByEmail: "auto-venue-priority",
+        },
+      }),
+      prisma.growthLeadOutreachDraft.count({
+        where: {
+          lead: { leadType: "VENUE", discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" } },
+          approvedByEmail: "auto-venue-priority",
+          status: "SENT",
+        },
+      }),
+      prisma.marketingJob.count({
+        where: {
+          kind: "SOCIAL_PAYLOAD_RENDER",
+          status: "PENDING",
+          discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" },
+        },
+      }),
+      prisma.marketingContact.count({
+        where: {
+          discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" },
+          source: { contains: "growth-lead", mode: "insensitive" },
+        },
+      }),
     ]);
 
   const counts = Object.fromEntries(byType.map((g) => [g.leadType, g._count._all])) as Record<string, number>;
@@ -88,10 +134,9 @@ export default async function AdminGrowthHubPage(props: {
       <h1 className="text-xl font-semibold text-white">Growth &amp; outbound</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-400">
         Market-by-market launch. Default is <strong className="text-zinc-200">{defaultGrowthMetro().label}</strong>. Leads:
-        manual, CSV, and optional scheduled discovery jobs (adapters). Cold outreach stays{" "}
-        <span className="text-zinc-300">draft → approve → send</span> — never mass auto-send. Only{" "}
-        <strong className="text-zinc-200">ACTIVE</strong> launch markets may send; queued markets can accumulate leads and
-        drafts. Follow-up automation:{" "}
+        manual, CSV, and optional scheduled discovery jobs (adapters). Top venue leads in ACTIVE launch markets now
+        auto-advance through draft → approval → send under existing send protections. Artists/promoters stay manual-first.
+        Follow-up automation:{" "}
         <span className="text-zinc-300">{growthFollowUpAutomationEnabled() ? "ON" : "OFF"}</span> (default off).
       </p>
       <p className="mt-2 max-w-2xl text-xs text-zinc-500">
@@ -182,6 +227,26 @@ export default async function AdminGrowthHubPage(props: {
                 </li>
               ))}
               {venueAcqBreakdown.length === 0 ? <li>—</li> : null}
+            </ul>
+          </div>
+          <div>
+            <p className="font-medium text-zinc-300">Venue contact quality</p>
+            <ul className="mt-1 space-y-0.5 font-mono text-[11px]">
+              {venueContactBreakdown.map((row) => (
+                <li key={String(row.contactQuality)}>
+                  {(row.contactQuality ?? "null") + ": " + row._count._all}
+                </li>
+              ))}
+              {venueContactBreakdown.length === 0 ? <li>—</li> : null}
+            </ul>
+          </div>
+          <div>
+            <p className="font-medium text-zinc-300">Venue automation</p>
+            <ul className="mt-1 space-y-0.5 font-mono text-[11px]">
+              <li>auto drafted/approved: {autoVenueDrafted}</li>
+              <li>auto sent: {autoVenueSent}</li>
+              <li>non-email path tasks pending: {pendingVenuePathTasks}</li>
+              <li>stored reusable venue contacts: {storedVenueContacts}</li>
             </ul>
           </div>
         </div>

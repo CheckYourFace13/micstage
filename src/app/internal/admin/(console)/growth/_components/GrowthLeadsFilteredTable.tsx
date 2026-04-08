@@ -37,8 +37,8 @@ export async function GrowthLeadsFilteredTable(props: { filters: GrowthLeadListF
     <div className="mt-4 overflow-x-auto">
       {props.title ? <h2 className="text-base font-medium text-white">{props.title}</h2> : null}
       <p className="mt-1 text-xs text-zinc-500">
-        {rows.length} row{rows.length === 1 ? "" : "s"} (max {MAX_ROWS}). Cold outreach stays approval-required; sends remain
-        throttled via existing marketing caps.
+        {rows.length} row{rows.length === 1 ? "" : "s"} (max {MAX_ROWS}). Venue priority leads may auto-advance to send in
+        ACTIVE markets; all sends remain throttled via existing marketing caps.
       </p>
       <table className="mt-3 w-full min-w-[1040px] text-left text-xs text-zinc-400">
         <thead>

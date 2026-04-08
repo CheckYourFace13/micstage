@@ -12,6 +12,8 @@ export type GrowthLeadCandidate = {
   leadType: GrowthLeadType;
   name: string;
   contactEmailNormalized?: string | null;
+  /** Additional discovered emails for durable reuse (first-class contacts), venue-first. */
+  additionalContactEmails?: string[];
   contactUrl?: string | null;
   websiteUrl?: string | null;
   instagramUrl?: string | null;

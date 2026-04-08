@@ -293,7 +293,8 @@ export default async function AdminGrowthLeadDetailPage(props: {
       <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <h2 className="text-sm font-medium text-white">Outreach drafts</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Generate a draft (requires email), then approve and send. No auto-send.{" "}
+          Generate a draft (requires email), then approve and send. Venue priority leads may be auto-approved/sent by cron
+          in ACTIVE markets under existing caps/cooldowns.{" "}
           {launchMarket?.coldApprovalRelaxed ? (
             <span className="text-amber-200/90">
               This launch market allows one-click send from PENDING_REVIEW (still manual — not auto).

@@ -1,5 +1,9 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
+import {
+  enqueueGrowthVenuePathTasks,
+  persistGrowthLeadEmailContacts,
+} from "@/lib/growth/growthLeadContactAutomation";
 import { findExistingGrowthLeadForDedupe } from "@/lib/growth/growthLeadDedupe";
 import {
   normalizeInstagramHandle,
@@ -38,6 +42,30 @@ export async function ingestGrowthLeadCandidate(
     nameCityKey,
   });
   if (dup) {
+    if (raw.leadType === "VENUE") {
+      await persistGrowthLeadEmailContacts(prisma, {
+        leadId: dup.id,
+        leadName: name,
+        discoveryMarketSlug,
+        source: raw.source ?? null,
+        websiteUrl: raw.websiteUrl ?? null,
+        confidence: raw.discoveryConfidence ?? null,
+        primaryEmail: email,
+        additionalEmails: raw.additionalContactEmails ?? [],
+      });
+      await enqueueGrowthVenuePathTasks(prisma, {
+        leadId: dup.id,
+        discoveryMarketSlug,
+        leadName: name,
+        source: raw.source ?? null,
+        confidence: raw.discoveryConfidence ?? null,
+        contactUrl: raw.contactUrl ?? null,
+        websiteUrl: raw.websiteUrl ?? null,
+        instagramUrl: raw.instagramUrl ?? null,
+        facebookUrl: raw.facebookUrl ?? null,
+        hasAnyEmail: Boolean(email || raw.additionalContactEmails?.length),
+      });
+    }
     return { status: "duplicate", existingId: dup.id, reason: dup.reason };
   }
 
@@ -71,6 +99,31 @@ export async function ingestGrowthLeadCandidate(
       instagramHandleNormalized,
     },
   });
+
+  if (raw.leadType === "VENUE") {
+    await persistGrowthLeadEmailContacts(prisma, {
+      leadId: row.id,
+      leadName: name,
+      discoveryMarketSlug,
+      source: raw.source ?? null,
+      websiteUrl: raw.websiteUrl ?? null,
+      confidence: raw.discoveryConfidence ?? null,
+      primaryEmail: email,
+      additionalEmails: raw.additionalContactEmails ?? [],
+    });
+    await enqueueGrowthVenuePathTasks(prisma, {
+      leadId: row.id,
+      discoveryMarketSlug,
+      leadName: name,
+      source: raw.source ?? null,
+      confidence: raw.discoveryConfidence ?? null,
+      contactUrl: raw.contactUrl ?? null,
+      websiteUrl: raw.websiteUrl ?? null,
+      instagramUrl: raw.instagramUrl ?? null,
+      facebookUrl: raw.facebookUrl ?? null,
+      hasAnyEmail: Boolean(email || raw.additionalContactEmails?.length),
+    });
+  }
 
   return { status: "created", id: row.id };
 }

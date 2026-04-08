@@ -45,6 +45,8 @@ import {
 } from "@/lib/venueTestLineupCleanup";
 import { storeProfileImage } from "@/lib/profileAssetStorage";
 import { getSession } from "@/lib/session";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 
 /** Missing/tampered fields → friendly portal message instead of generic error UI. */
 function reqString(formData: FormData, key: string): string {
@@ -108,6 +110,23 @@ function normalizeUrl(v?: string): string | null {
 }
 
 const ALLOWED_BOOKING_MODES = new Set<string>(BOOKING_RESTRICTION_OPTIONS.map((o) => o.value));
+
+async function advanceVenueGrowthListingLive(venueId: string): Promise<void> {
+  const prisma = requirePrisma();
+  const venue = await prisma.venue.findUnique({
+    where: { id: venueId },
+    select: { owner: { select: { email: true } } },
+  });
+  const ownerEmail = normalizeMarketingEmail(venue?.owner?.email ?? "");
+  if (!ownerEmail) return;
+  const lead = await prisma.growthLead.findFirst({
+    where: { leadType: "VENUE", contactEmailNormalized: ownerEmail },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true },
+  });
+  if (!lead) return;
+  await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "LISTING_LIVE", { leadType: "VENUE" });
+}
 
 /**
  * Schedule form dates are stored as `YYYY-MM-DDT00:00:00.000Z` (civil date keys).
@@ -510,6 +529,7 @@ export async function createEventTemplate(formData: FormData): Promise<VenuePort
   });
 
   revalidatePath("/venue");
+  await advanceVenueGrowthListingLive(venueId);
   return portalRedirect("/venue?scheduleSuccess=template");
   } catch (e) {
     if (e instanceof VenuePortalRedirectSignal) return e.result;
@@ -939,6 +959,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
 
   revalidatePath("/venue");
   revalidatePath(`/venues/${venue.slug}`);
+  await advanceVenueGrowthListingLive(venueId);
   console.info("[venue weekly submit] server action success");
   return portalRedirect("/venue?scheduleSuccess=weekly");
   } catch (e) {

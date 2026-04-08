@@ -182,6 +182,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         fetches++;
 
         let email: string | null = null;
+        let allEmails: string[] = [];
         let ig: string | null = null;
         let fb: string | null = null;
         let contactPick: string | null = null;
@@ -193,6 +194,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         if (html) {
           const ex = extractFromHtml(pageUrl, html);
           email = ex.emails[0] ?? null;
+          allEmails = ex.emails;
           ig = ex.instagramUrls[0] ?? null;
           fb = ex.facebookUrls[0] ?? null;
           contactPick =
@@ -234,6 +236,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           leadType: "VENUE",
           name,
           contactEmailNormalized: email,
+          additionalContactEmails: allEmails.length > 1 ? allEmails.slice(1, 6) : [],
           websiteUrl: pageUrl,
           contactUrl: contactPick ?? ig ?? fb ?? null,
           instagramUrl: ig,

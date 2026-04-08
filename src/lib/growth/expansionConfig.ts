@@ -26,7 +26,7 @@ export function growthDiscoveryMaxCandidatesPerAdapterPerMarket(): number {
   return parseIntEnv("GROWTH_DISCOVERY_MAX_CANDIDATES_PER_ADAPTER", 250);
 }
 
-/** When true, cron may auto-create PENDING_REVIEW outreach drafts (never auto-send). */
+/** When true, cron may auto-create drafts; top VENUE leads may auto-approve/send in ACTIVE launch markets. */
 export function growthAutoDraftCronEnabled(): boolean {
   return process.env.GROWTH_AUTO_DRAFT_CRON_ENABLED === "true";
 }

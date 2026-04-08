@@ -25,6 +25,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
     const prisma = getPrismaOrNull();
     if (prisma) {
       await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: "VENUE" });
+      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "SIGNUP_STARTED", { leadType: "VENUE" });
     }
   }
 
@@ -42,7 +43,8 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Venue registration</h1>
         <p className="mt-2 text-sm text-white/70">
-          Create your venue account. Next step will be creating your open mic schedule and publishing your page.
+          Create your venue account, set your open mic schedule, optionally require on-premises signups, then share your
+          signup link on social media so performers can discover your venue.
         </p>
         {traceId ? (
           <div className="mt-4 rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">

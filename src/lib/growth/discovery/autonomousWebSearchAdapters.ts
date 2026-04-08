@@ -129,50 +129,51 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
     id: ADAPTER_ID,
     leadType: "VENUE",
     async discover(ctx: GrowthLeadDiscoveryContext) {
-      if (!growthDiscoveryAutonomousWebSearchEnabled()) {
-        console.info("[growth discovery] autonomous_web_search_venue skipped: web-search gate disabled", {
-          market: ctx.discoveryMarketSlug,
-          autonomousEnabled: growthDiscoveryAutonomousEnabled(),
-        });
-        return [];
-      }
-      if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) {
-        console.info("[growth discovery] autonomous_web_search_venue skipped: non-primary market", {
-          market: ctx.discoveryMarketSlug,
-          primary: primaryLaunchDiscoveryMarketSlug(),
-        });
-        return [];
-      }
-      const provider = discoverySearchProvider();
-      if (!provider || !ctx.prisma) {
-        console.info("[growth discovery] autonomous_web_search_venue skipped: provider/prisma missing", {
+      try {
+        if (!growthDiscoveryAutonomousWebSearchEnabled()) {
+          console.info("[growth discovery] autonomous_web_search_venue skipped: web-search gate disabled", {
+            market: ctx.discoveryMarketSlug,
+            autonomousEnabled: growthDiscoveryAutonomousEnabled(),
+          });
+          return [];
+        }
+        if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) {
+          console.info("[growth discovery] autonomous_web_search_venue skipped: non-primary market", {
+            market: ctx.discoveryMarketSlug,
+            primary: primaryLaunchDiscoveryMarketSlug(),
+          });
+          return [];
+        }
+        const provider = discoverySearchProvider();
+        if (!provider || !ctx.prisma) {
+          console.info("[growth discovery] autonomous_web_search_venue skipped: provider/prisma missing", {
+            provider,
+            hasPrisma: Boolean(ctx.prisma),
+            market: ctx.discoveryMarketSlug,
+          });
+          return [];
+        }
+
+        const prisma = ctx.prisma;
+        const mult = Math.max(0.02, ctx.autonomousWebSearchBudgetMultiplier ?? 1);
+        const searchCalls = Math.max(1, Math.round(growthDiscoveryAutonomousSearchCallsPerRun() * mult));
+        const maxFetches = Math.max(2, Math.round(growthDiscoveryAutonomousMaxPageFetchesPerRun() * mult));
+        const queries = VENUE_QUERIES;
+
+        let cur = parseCursor(await readDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY), provider);
+        if (cur.prov !== provider) {
+          cur = { qi: cur.qi, start: provider === "google_cse" ? 1 : 0, prov: provider };
+        }
+
+        type TaggedHit = { hit: SearchHit; searchQuery: string };
+        const hits: TaggedHit[] = [];
+        console.info("[growth discovery] autonomous_web_search_venue run start", {
           provider,
-          hasPrisma: Boolean(ctx.prisma),
           market: ctx.discoveryMarketSlug,
+          searchCalls,
+          maxFetches,
         });
-        return [];
-      }
-
-      const prisma = ctx.prisma;
-      const mult = Math.max(0.02, ctx.autonomousWebSearchBudgetMultiplier ?? 1);
-      const searchCalls = Math.max(1, Math.round(growthDiscoveryAutonomousSearchCallsPerRun() * mult));
-      const maxFetches = Math.max(2, Math.round(growthDiscoveryAutonomousMaxPageFetchesPerRun() * mult));
-      const queries = VENUE_QUERIES;
-
-      let cur = parseCursor(await readDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY), provider);
-      if (cur.prov !== provider) {
-        cur = { qi: cur.qi, start: provider === "google_cse" ? 1 : 0, prov: provider };
-      }
-
-      type TaggedHit = { hit: SearchHit; searchQuery: string };
-      const hits: TaggedHit[] = [];
-      console.info("[growth discovery] autonomous_web_search_venue run start", {
-        provider,
-        market: ctx.discoveryMarketSlug,
-        searchCalls,
-        maxFetches,
-      });
-      for (let i = 0; i < searchCalls; i++) {
+        for (let i = 0; i < searchCalls; i++) {
         const q = queries[cur.qi % queries.length]!;
         const res = await runWebSearch(q, { provider: cur.prov, start: cur.start });
         if (!res || res.items.length === 0) {
@@ -190,19 +191,19 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           cur.qi = (cur.qi + 1) % queries.length;
           cur.start = provider === "google_cse" ? 1 : 0;
         }
-      }
+        }
 
-      await writeDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY, JSON.stringify(cur));
-      console.info("[growth discovery] autonomous_web_search_venue search phase done", {
-        provider,
-        hitCount: hits.length,
-      });
+        await writeDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY, JSON.stringify(cur));
+        console.info("[growth discovery] autonomous_web_search_venue search phase done", {
+          provider,
+          hitCount: hits.length,
+        });
 
-      const seenUrl = new Set<string>();
-      const candidates: GrowthLeadCandidate[] = [];
-      let fetches = 0;
+        const seenUrl = new Set<string>();
+        const candidates: GrowthLeadCandidate[] = [];
+        let fetches = 0;
 
-      for (const { hit, searchQuery: qUsed } of hits) {
+        for (const { hit, searchQuery: qUsed } of hits) {
         if (fetches >= maxFetches) break;
         const pageUrl = hit.link.split("#")[0]!;
         if (seenUrl.has(pageUrl)) continue;
@@ -286,13 +287,21 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           importKey: hashImport(pageUrl),
           internalNotes: `Open-mic–targeted venue discovery. Tier ${om.tier}. Query context: ${qUsed.slice(0, 120)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
         });
-      }
+        }
 
-      console.info("[growth discovery] autonomous_web_search_venue emit", {
-        provider,
-        candidates: candidates.length,
-      });
-      return candidates;
+        console.info("[growth discovery] autonomous_web_search_venue emit", {
+          provider,
+          candidates: candidates.length,
+        });
+        return candidates;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        console.error("[growth discovery] autonomous_web_search_venue fatal error", {
+          market: ctx.discoveryMarketSlug,
+          reason: message.slice(0, 400),
+        });
+        return [];
+      }
     },
   };
 }

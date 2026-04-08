@@ -21,7 +21,7 @@ export type GrowthDiscoveryRunResult = {
   /** Candidates passed to ingest per adapter (after per-market cap), pre-dedupe. */
   candidatesEmittedByAdapter: Record<string, number>;
   discoveryAllocationSummary: string;
-  /** Effective per-adapter ingest cap this run (venue-first 90/5/5 for web search). */
+  /** Effective per-adapter ingest cap this run (same env cap per adapter; autonomous web search is venue-only). */
   effectiveCapsByAdapter: Record<string, number>;
 };
 

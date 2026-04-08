@@ -144,7 +144,7 @@ export default async function AdminGrowthHubPage(props: {
       </p>
 
       <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-        <h2 className="text-sm font-medium text-white">Venue-first discovery &amp; funnel visibility</h2>
+        <h2 className="text-sm font-medium text-white">Autonomous discovery (venue-only web search) &amp; funnel</h2>
         <p className="mt-1 text-xs text-zinc-500">{growthDiscoveryAllocationSummary()}</p>
         <p className="mt-2 text-xs text-zinc-500">
           Cron JSON includes <code className="text-zinc-400">discoveryAllocationSummary</code> and{" "}

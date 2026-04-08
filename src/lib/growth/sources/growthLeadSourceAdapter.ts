@@ -8,8 +8,8 @@ export type GrowthLeadDiscoveryContext = {
   /** Present for autonomous adapters (cursors, pagination). Static/stub adapters may ignore. */
   prisma: PrismaClient;
   /**
-   * Multiplier for autonomous web search only (≈1 venue, ≈0.056 artist/promoter for 90/5/5).
-   * Other adapters should ignore (default 1).
+   * Budget multiplier for autonomous web search (venue-only this phase; always 1 from runner).
+   * Seed crawl / Eventbrite ignore.
    */
   autonomousWebSearchBudgetMultiplier?: number;
 };

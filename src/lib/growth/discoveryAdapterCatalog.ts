@@ -22,11 +22,9 @@ export const CHICAGOLAND_STATIC_REAL_ADAPTER_IDS = [
   "chicagoland_promoter_social_profile",
 ] as const;
 
-/** High-volume autonomous adapter ids (search + crawl + listings API). */
+/** High-volume autonomous adapter ids (venue web search + crawl + listings API; no artist/promoter web search this phase). */
 export const AUTONOMOUS_DISCOVERY_ADAPTER_IDS = [
   "autonomous_web_search_venue",
-  "autonomous_web_search_artist",
-  "autonomous_web_search_promoter",
   "autonomous_seed_url_crawl_venue",
   "autonomous_eventbrite_chicago",
 ] as const;
@@ -60,17 +58,7 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
       id: "autonomous_web_search_venue",
       tier: "autonomous",
       description:
-        "CSE/SerpAPI → open-mic–first venue queries → page fetch → signal tier + contact quality → Chicagoland (~90% web budget)",
-    },
-    {
-      id: "autonomous_web_search_artist",
-      tier: "autonomous",
-      description: "Same stack → open-mic–adjacent artist queries (~5% web budget vs venue)",
-    },
-    {
-      id: "autonomous_web_search_promoter",
-      tier: "autonomous",
-      description: "Same stack → open-mic host/producer queries (~5% web budget vs venue)",
+        "SerpAPI/CSE → open-mic–intent venue queries only → page fetch → signal tier + contact quality → Chicagoland (100% of autonomous web search)",
     },
     {
       id: "autonomous_seed_url_crawl_venue",

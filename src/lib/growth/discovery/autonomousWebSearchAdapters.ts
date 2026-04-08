@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import type { GrowthLeadType } from "@/generated/prisma/client";
 import { CHICAGOLAND_SLUG } from "@/lib/growth/data/chicagolandDiscoverySeeds";
 import {
   growthDiscoveryAutonomousEnabled,
@@ -15,6 +14,7 @@ import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/
 import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
 import { discoverySearchProvider, runWebSearch, type SearchHit } from "@/lib/growth/discovery/webSearch";
 
+const ADAPTER_ID = "autonomous_web_search_venue";
 const CURSOR_KEY = "search_rotation";
 const REGION = "IL";
 
@@ -38,22 +38,19 @@ function parseCursor(raw: string | null, prov: "google_cse" | "serpapi"): Search
   }
 }
 
-function hashImport(adapterId: string, url: string): string {
-  const h = createHash("sha256").update(`${adapterId}|${url}`).digest("hex").slice(0, 24);
-  return `auto:${adapterId}:${h}`;
+function hashImport(url: string): string {
+  const h = createHash("sha256").update(`${ADAPTER_ID}|${url}`).digest("hex").slice(0, 24);
+  return `auto:${ADAPTER_ID}:${h}`;
 }
 
-function allowHitUrl(url: string, leadType: GrowthLeadType): boolean {
+/** Venue-only crawl: allow Facebook pages; skip pure social feeds and aggregators. */
+function allowHitUrl(url: string): boolean {
   try {
     const h = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
     if (h.includes("google.") || h === "gstatic.com") return false;
-    if (leadType !== "ARTIST") {
-      if (h.includes("instagram.com") || h.includes("tiktok.com")) return false;
-    }
-    if (h.includes("facebook.com") || h.includes("fb.com")) {
-      return leadType === "VENUE";
-    }
-    if (leadType !== "ARTIST" && (h.includes("youtube.com") || h.includes("youtu.be"))) return false;
+    if (h.includes("instagram.com") || h.includes("tiktok.com")) return false;
+    if (h.includes("facebook.com") || h.includes("fb.com")) return true;
+    if (h.includes("youtube.com") || h.includes("youtu.be")) return false;
     if (h.includes("linkedin.com")) return false;
     if (h.includes("yelp.com") || h.includes("tripadvisor.")) return false;
     return true;
@@ -68,7 +65,7 @@ function cleanHitTitle(title: string): string {
   return first.slice(0, 180) || "Discovered prospect";
 }
 
-/** All queries skew toward open-mic hosts, listings, and recurring live programming — not generic “venue booking”. */
+/** Open-mic–intent queries only — not generic venue booking. */
 const VENUE_QUERIES = [
   '"open mic" Chicago IL',
   '"open mic night" Chicago Illinois',
@@ -89,87 +86,14 @@ const VENUE_QUERIES = [
   'Chicago "open stage" OR "amateur night" venue',
 ];
 
-const ARTIST_QUERIES = [
-  'Chicago "open mic" comedian OR comic booking contact',
-  'Chicago IL "open mic" musician OR songwriter instagram',
-  'Chicagoland poetry slam OR "open mic" performer',
-  'Chicago "open mic" host OR featured artist',
-  'Naperville Aurora "open mic" performer booking',
-];
-
-const PROMOTER_QUERIES = [
-  'Chicago "open mic" producer OR organizer',
-  'Chicagoland live show producer "open mic"',
-  'Chicago talent buyer "open mic" OR showcase',
-  'Chicago event series "mic night" OR "open mic"',
-  'Chicago IL booking "open mic" community',
-];
-
-function queriesFor(leadType: GrowthLeadType): string[] {
-  if (leadType === "VENUE") return VENUE_QUERIES;
-  if (leadType === "ARTIST") return ARTIST_QUERIES;
-  return PROMOTER_QUERIES;
-}
-
-function adapterIdFor(leadType: GrowthLeadType): string {
-  if (leadType === "VENUE") return "autonomous_web_search_venue";
-  if (leadType === "ARTIST") return "autonomous_web_search_artist";
-  return "autonomous_web_search_promoter";
-}
-
-function nonVenueCandidate(
-  leadType: GrowthLeadType,
-  id: string,
-  hit: SearchHit,
-  ex: ReturnType<typeof extractFromHtml>,
-): GrowthLeadCandidate | null {
-  const name = ex.nameGuess.length > 2 ? ex.nameGuess : cleanHitTitle(hit.title);
-  const email = ex.emails[0] ?? null;
-  const ig = ex.instagramUrls[0] ?? null;
-  const yt = ex.youtubeUrls[0] ?? null;
-  const tt = ex.tiktokUrls[0] ?? null;
-  const fb = ex.facebookUrls[0] ?? null;
-  const contactPick =
-    pickPrimaryVenueContactUrl(ex.sameHostPaths) ??
-    ex.sameHostPaths.find((u) => /contact|book|about/i.test(u)) ??
-    null;
-  if (!email && !ig && !yt && !tt && !fb && !contactPick) return null;
-
-  const contactQuality = deriveVenueContactQuality({
-    email,
-    contactUrl: contactPick,
-    instagramUrl: ig,
-    facebookUrl: fb,
-  });
-
+/**
+ * SerpAPI / Google CSE → open-mic venue queries → page fetch → signal tier + contacts (Chicagoland only).
+ * This phase: only autonomous web-search path registered (no artist/promoter web search).
+ */
+export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter {
   return {
-    leadType,
-    name,
-    contactEmailNormalized: email,
-    websiteUrl: hit.link.split("#")[0]!,
-    contactUrl: contactPick,
-    instagramUrl: ig,
-    youtubeUrl: yt,
-    tiktokUrl: tt,
-    facebookUrl: fb,
-    city: "Chicago",
-    region: REGION,
-    discoveryMarketSlug: CHICAGOLAND_SLUG,
-    source: `${id}_crawl`,
-    sourceKind: "WEBSITE_CONTACT",
-    fitScore: email ? 6 : ig ? 5 : contactPick ? 5 : 4,
-    discoveryConfidence: email ? 52 : ig ? 45 : 36,
-    importKey: hashImport(id, hit.link),
-    contactQuality,
-    internalNotes: `Autonomous web search (${leadType}). Open-mic–adjacent query rotation. Snippet: ${(hit.snippet ?? "").slice(0, 240)}`,
-  };
-}
-
-export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): GrowthLeadSourceAdapter {
-  const id = adapterIdFor(leadType);
-  return {
-    id,
-    leadType,
+    id: ADAPTER_ID,
+    leadType: "VENUE",
     async discover(ctx: GrowthLeadDiscoveryContext) {
       if (!growthDiscoveryAutonomousEnabled()) return [];
       if (ctx.discoveryMarketSlug.trim().toLowerCase() !== CHICAGOLAND_SLUG) return [];
@@ -180,9 +104,9 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
       const mult = Math.max(0.02, ctx.autonomousWebSearchBudgetMultiplier ?? 1);
       const searchCalls = Math.max(1, Math.round(growthDiscoveryAutonomousSearchCallsPerRun() * mult));
       const maxFetches = Math.max(2, Math.round(growthDiscoveryAutonomousMaxPageFetchesPerRun() * mult));
-      const queries = queriesFor(leadType);
+      const queries = VENUE_QUERIES;
 
-      let cur = parseCursor(await readDiscoveryCursor(prisma, id, ctx.discoveryMarketSlug, CURSOR_KEY), provider);
+      let cur = parseCursor(await readDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY), provider);
       if (cur.prov !== provider) {
         cur = { qi: cur.qi, start: provider === "google_cse" ? 1 : 0, prov: provider };
       }
@@ -198,7 +122,7 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
           continue;
         }
         for (const it of res.items) {
-          if (allowHitUrl(it.link, leadType)) hits.push({ hit: it, searchQuery: q });
+          if (allowHitUrl(it.link)) hits.push({ hit: it, searchQuery: q });
         }
         cur.start = res.nextCursor.start;
         if (res.items.length < 8 || (provider === "google_cse" && cur.start > 90)) {
@@ -207,7 +131,7 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
         }
       }
 
-      await writeDiscoveryCursor(prisma, id, ctx.discoveryMarketSlug, CURSOR_KEY, JSON.stringify(cur));
+      await writeDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY, JSON.stringify(cur));
 
       const seenUrl = new Set<string>();
       const candidates: GrowthLeadCandidate[] = [];
@@ -223,12 +147,6 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
         if (!html) continue;
 
         const ex = extractFromHtml(hit.link, html);
-
-        if (leadType !== "VENUE") {
-          const cand = nonVenueCandidate(leadType, id, hit, ex);
-          if (cand) candidates.push(cand);
-          continue;
-        }
 
         const email = ex.emails[0] ?? null;
         const ig = ex.instagramUrls[0] ?? null;
@@ -276,14 +194,14 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
           city: "Chicago",
           region: REGION,
           discoveryMarketSlug: CHICAGOLAND_SLUG,
-          source: `${id}_crawl`,
+          source: `${ADAPTER_ID}_crawl`,
           sourceKind: "WEBSITE_CONTACT",
           fitScore: om.fitScore,
           discoveryConfidence: om.confidence,
           performanceTags: om.performanceTags.length ? om.performanceTags : [],
           openMicSignalTier: om.tier,
           contactQuality,
-          importKey: hashImport(id, hit.link),
+          importKey: hashImport(hit.link),
           internalNotes: `Open-mic–targeted venue discovery. Tier ${om.tier}. Query context: ${qUsed.slice(0, 120)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}`,
         });
       }

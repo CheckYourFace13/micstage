@@ -1,7 +1,7 @@
 import type { GrowthLeadType } from "@/generated/prisma/client";
 import { createAutonomousEventbriteVenueAdapter } from "@/lib/growth/discovery/autonomousEventbriteAdapter";
 import { createAutonomousSeedCrawlVenueAdapter } from "@/lib/growth/discovery/autonomousSeedCrawlAdapter";
-import { createAutonomousWebSearchAdapter } from "@/lib/growth/discovery/autonomousWebSearchAdapters";
+import { createAutonomousVenueWebSearchAdapter } from "@/lib/growth/discovery/autonomousWebSearchAdapters";
 import { allChicagolandStaticAdapters } from "@/lib/growth/sources/chicagolandStaticAdapters";
 import type { GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
 import { createStubJsonAdapter } from "@/lib/growth/sources/stubJsonAdapters";
@@ -10,9 +10,7 @@ const TYPES: GrowthLeadType[] = ["VENUE", "ARTIST", "PROMOTER_ACCOUNT"];
 
 function allAutonomousDiscoveryAdapters(): GrowthLeadSourceAdapter[] {
   return [
-    createAutonomousWebSearchAdapter("VENUE"),
-    createAutonomousWebSearchAdapter("ARTIST"),
-    createAutonomousWebSearchAdapter("PROMOTER_ACCOUNT"),
+    createAutonomousVenueWebSearchAdapter(),
     createAutonomousSeedCrawlVenueAdapter(),
     createAutonomousEventbriteVenueAdapter(),
   ];

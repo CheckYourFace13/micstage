@@ -16,12 +16,24 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   errors: string[];
 }> {
   const fitMin = growthAutoDraftFitMin();
+  const venueAutoFitMin = Math.max(6, fitMin - 1);
   const limit = growthAutoDraftBatchLimit();
 
   const candidates = await prisma.growthLead.findMany({
     where: {
       contactEmailNormalized: { not: null },
-      OR: [{ status: "APPROVED" }, { status: "REVIEWED", fitScore: { gte: fitMin } }],
+      OR: [
+        // Keep existing non-venue behavior.
+        { status: "APPROVED" },
+        { status: "REVIEWED", fitScore: { gte: fitMin } },
+        // Venue-first: allow strong newly discovered autonomous venues into draft automation.
+        {
+          leadType: "VENUE",
+          status: "DISCOVERED",
+          fitScore: { gte: venueAutoFitMin },
+          openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] },
+        },
+      ],
       outreachDrafts: { none: { status: { in: ["PENDING_REVIEW", "APPROVED", "SENT"] } } },
     },
     select: { id: true },
@@ -59,7 +71,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       lead: {
         leadType: "VENUE",
         OR: [{ status: "DISCOVERED" }, { status: "REVIEWED" }, { status: "APPROVED" }],
-        fitScore: { gte: fitMin },
+        fitScore: { gte: venueAutoFitMin },
         openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] },
       },
     },
@@ -91,6 +103,18 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   nonEmailVenuePathsQueued = await prisma.marketingJob.count({
     where: { kind: "SOCIAL_PAYLOAD_RENDER", status: "PENDING" },
   });
+
+  if (autoApprovedVenue === 0 || autoSentVenue === 0) {
+    console.info("[growth drafts] venue auto-send diagnostics", {
+      fitMin,
+      venueAutoFitMin,
+      createdDrafts: created,
+      autoApprovedVenue,
+      autoSentVenue,
+      activeMarketCount: activeMarketSet.size,
+      errorCount: errors.length,
+    });
+  }
 
   return { created, autoApprovedVenue, autoSentVenue, nonEmailVenuePathsQueued, skipped, errors };
 }

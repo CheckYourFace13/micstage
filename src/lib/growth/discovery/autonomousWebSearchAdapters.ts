@@ -43,6 +43,39 @@ function hashImport(url: string): string {
   return `auto:${ADAPTER_ID}:${h}`;
 }
 
+/**
+ * SerpAPI / CSE sometimes return `google.com/url?...` wrappers; unwrap so we fetch the real site and
+ * `allowHitUrl` does not drop every result as a google host.
+ */
+function resolveOutboundUrlFromSearchHit(raw: string, depth = 0): string | null {
+  if (depth > 5) return null;
+  try {
+    const noHash = raw.trim().split("#")[0]!;
+    if (!/^https?:\/\//i.test(noHash)) return null;
+    const u = new URL(noHash);
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    const isGoogleHost = host === "google.com" || host.endsWith(".google.com");
+    if (isGoogleHost && (u.pathname === "/url" || u.pathname.startsWith("/url/"))) {
+      const innerRaw =
+        u.searchParams.get("url") || u.searchParams.get("q") || u.searchParams.get("rurl") || "";
+      if (!innerRaw.trim()) return null;
+      let inner = innerRaw.trim();
+      try {
+        inner = decodeURIComponent(inner);
+      } catch {
+        /* use as-is */
+      }
+      if (/^https?:\/\//i.test(inner)) {
+        return resolveOutboundUrlFromSearchHit(inner, depth + 1);
+      }
+      return null;
+    }
+    return noHash;
+  } catch {
+    return null;
+  }
+}
+
 /** Venue-only crawl: allow Facebook pages; skip pure social feeds and aggregators. */
 function allowHitUrl(url: string): boolean {
   try {
@@ -122,7 +155,9 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           continue;
         }
         for (const it of res.items) {
-          if (allowHitUrl(it.link)) hits.push({ hit: it, searchQuery: q });
+          const resolved = resolveOutboundUrlFromSearchHit(it.link);
+          if (!resolved || !allowHitUrl(resolved)) continue;
+          hits.push({ hit: { ...it, link: resolved }, searchQuery: q });
         }
         cur.start = res.nextCursor.start;
         if (res.items.length < 8 || (provider === "google_cse" && cur.start > 90)) {
@@ -139,28 +174,43 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
       for (const { hit, searchQuery: qUsed } of hits) {
         if (fetches >= maxFetches) break;
-        if (seenUrl.has(hit.link)) continue;
-        seenUrl.add(hit.link);
+        const pageUrl = hit.link.split("#")[0]!;
+        if (seenUrl.has(pageUrl)) continue;
+        seenUrl.add(pageUrl);
 
-        const html = await discoveryFetchText(hit.link);
+        const html = await discoveryFetchText(pageUrl);
         fetches++;
-        if (!html) continue;
 
-        const ex = extractFromHtml(hit.link, html);
+        let email: string | null = null;
+        let ig: string | null = null;
+        let fb: string | null = null;
+        let contactPick: string | null = null;
+        let bodySample = "";
+        let nameGuess = "";
+        let yt: string | null = null;
+        let tt: string | null = null;
 
-        const email = ex.emails[0] ?? null;
-        const ig = ex.instagramUrls[0] ?? null;
-        const fb = ex.facebookUrls[0] ?? null;
-        const contactPick =
-          pickPrimaryVenueContactUrl(ex.sameHostPaths) ??
-          ex.sameHostPaths.find((u) => /contact|book|events|calendar|open|mic/i.test(u)) ??
-          null;
+        if (html) {
+          const ex = extractFromHtml(pageUrl, html);
+          email = ex.emails[0] ?? null;
+          ig = ex.instagramUrls[0] ?? null;
+          fb = ex.facebookUrls[0] ?? null;
+          contactPick =
+            pickPrimaryVenueContactUrl(ex.sameHostPaths) ??
+            ex.sameHostPaths.find((u) => /contact|book|events|calendar|open|mic/i.test(u)) ??
+            null;
+          bodySample = ex.bodyTextSample;
+          nameGuess = ex.nameGuess;
+          yt = ex.youtubeUrls[0] ?? null;
+          tt = ex.tiktokUrls[0] ?? null;
+        }
+
         const hasContactPath = Boolean(contactPick);
         const hasSocial = Boolean(ig || fb);
 
         const om = scoreOpenMicVenueProspect({
           snippet: hit.snippet ?? "",
-          pageTextSample: ex.bodyTextSample,
+          pageTextSample: bodySample,
           title: cleanHitTitle(hit.title),
           searchQuery: qUsed,
           hasEmail: Boolean(email),
@@ -170,7 +220,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
         if (!om.shouldIngest) continue;
 
-        const name = ex.nameGuess.length > 2 ? ex.nameGuess : cleanHitTitle(hit.title);
+        const name = nameGuess.length > 2 ? nameGuess : cleanHitTitle(hit.title);
         const contactQuality = deriveVenueContactQuality({
           email,
           contactUrl: contactPick ?? (hasSocial ? ig || fb : null),
@@ -178,14 +228,13 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           facebookUrl: fb,
         });
 
-        const yt = ex.youtubeUrls[0] ?? null;
-        const tt = ex.tiktokUrls[0] ?? null;
+        const fetchNote = html ? "" : " Page fetch failed or non-HTML; scored from SERP only.";
 
         candidates.push({
           leadType: "VENUE",
           name,
           contactEmailNormalized: email,
-          websiteUrl: hit.link.split("#")[0]!,
+          websiteUrl: pageUrl,
           contactUrl: contactPick ?? ig ?? fb ?? null,
           instagramUrl: ig,
           youtubeUrl: yt,
@@ -201,8 +250,8 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           performanceTags: om.performanceTags.length ? om.performanceTags : [],
           openMicSignalTier: om.tier,
           contactQuality,
-          importKey: hashImport(hit.link),
-          internalNotes: `Open-mic–targeted venue discovery. Tier ${om.tier}. Query context: ${qUsed.slice(0, 120)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}`,
+          importKey: hashImport(pageUrl),
+          internalNotes: `Open-mic–targeted venue discovery. Tier ${om.tier}. Query context: ${qUsed.slice(0, 120)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
         });
       }
 

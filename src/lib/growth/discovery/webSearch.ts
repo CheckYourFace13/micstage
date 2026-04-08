@@ -2,6 +2,7 @@ import {
   growthDiscoveryHttpDelayMs,
   hasGoogleProgrammableSearch,
   hasSerpApi,
+  serpApiKeySourceForDiscovery,
   serpApiKeyForDiscovery,
 } from "@/lib/growth/discovery/autonomousConfig";
 
@@ -99,9 +100,22 @@ export async function runSerpApiSearch(
   query: string,
   start0Based: number,
 ): Promise<{ items: SearchHit[]; rawNextStart: number } | null> {
-  if (!hasSerpApi()) return null;
+  if (!hasSerpApi()) {
+    console.info("[growth discovery] SerpAPI skipped: no resolved key");
+    return null;
+  }
   const apiKey = serpApiKeyForDiscovery();
-  if (!apiKey) return null;
+  const keySource = serpApiKeySourceForDiscovery();
+  if (!apiKey) {
+    console.info("[growth discovery] SerpAPI skipped: resolved key empty", { keySource });
+    return null;
+  }
+  console.info("[growth discovery] SerpAPI request start", {
+    keySource: keySource ?? "unknown",
+    keyLength: apiKey.length,
+    start0Based,
+    queryPreview: query.slice(0, 120),
+  });
   const u = new URL("https://serpapi.com/search.json");
   u.searchParams.set("engine", "google");
   u.searchParams.set("q", query);

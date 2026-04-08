@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { isPrimaryLaunchDiscoveryMarket, primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import {
+  growthDiscoveryAutonomousEnabled,
   growthDiscoveryAutonomousMaxPageFetchesPerRun,
   growthDiscoveryAutonomousSearchCallsPerRun,
   growthDiscoveryAutonomousWebSearchEnabled,
@@ -128,10 +129,29 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
     id: ADAPTER_ID,
     leadType: "VENUE",
     async discover(ctx: GrowthLeadDiscoveryContext) {
-      if (!growthDiscoveryAutonomousWebSearchEnabled()) return [];
-      if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) return [];
+      if (!growthDiscoveryAutonomousWebSearchEnabled()) {
+        console.info("[growth discovery] autonomous_web_search_venue skipped: web-search gate disabled", {
+          market: ctx.discoveryMarketSlug,
+          autonomousEnabled: growthDiscoveryAutonomousEnabled(),
+        });
+        return [];
+      }
+      if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) {
+        console.info("[growth discovery] autonomous_web_search_venue skipped: non-primary market", {
+          market: ctx.discoveryMarketSlug,
+          primary: primaryLaunchDiscoveryMarketSlug(),
+        });
+        return [];
+      }
       const provider = discoverySearchProvider();
-      if (!provider || !ctx.prisma) return [];
+      if (!provider || !ctx.prisma) {
+        console.info("[growth discovery] autonomous_web_search_venue skipped: provider/prisma missing", {
+          provider,
+          hasPrisma: Boolean(ctx.prisma),
+          market: ctx.discoveryMarketSlug,
+        });
+        return [];
+      }
 
       const prisma = ctx.prisma;
       const mult = Math.max(0.02, ctx.autonomousWebSearchBudgetMultiplier ?? 1);
@@ -146,6 +166,12 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
       type TaggedHit = { hit: SearchHit; searchQuery: string };
       const hits: TaggedHit[] = [];
+      console.info("[growth discovery] autonomous_web_search_venue run start", {
+        provider,
+        market: ctx.discoveryMarketSlug,
+        searchCalls,
+        maxFetches,
+      });
       for (let i = 0; i < searchCalls; i++) {
         const q = queries[cur.qi % queries.length]!;
         const res = await runWebSearch(q, { provider: cur.prov, start: cur.start });
@@ -167,6 +193,10 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
       }
 
       await writeDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY, JSON.stringify(cur));
+      console.info("[growth discovery] autonomous_web_search_venue search phase done", {
+        provider,
+        hitCount: hits.length,
+      });
 
       const seenUrl = new Set<string>();
       const candidates: GrowthLeadCandidate[] = [];
@@ -258,6 +288,10 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         });
       }
 
+      console.info("[growth discovery] autonomous_web_search_venue emit", {
+        provider,
+        candidates: candidates.length,
+      });
       return candidates;
     },
   };

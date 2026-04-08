@@ -42,10 +42,24 @@ export function hasGoogleProgrammableSearch(): boolean {
 export function serpApiKeyForDiscovery(): string {
   return (
     process.env.GROWTH_SERPAPI_KEY?.trim() ||
+    process.env.GROWTH_SERPAPI_API_KEY?.trim() ||
     process.env.SERPAPI_KEY?.trim() ||
     process.env.SERPAPI_API_KEY?.trim() ||
     ""
   );
+}
+
+export function serpApiKeySourceForDiscovery():
+  | "GROWTH_SERPAPI_KEY"
+  | "GROWTH_SERPAPI_API_KEY"
+  | "SERPAPI_KEY"
+  | "SERPAPI_API_KEY"
+  | null {
+  if (process.env.GROWTH_SERPAPI_KEY?.trim()) return "GROWTH_SERPAPI_KEY";
+  if (process.env.GROWTH_SERPAPI_API_KEY?.trim()) return "GROWTH_SERPAPI_API_KEY";
+  if (process.env.SERPAPI_KEY?.trim()) return "SERPAPI_KEY";
+  if (process.env.SERPAPI_API_KEY?.trim()) return "SERPAPI_API_KEY";
+  return null;
 }
 
 export function hasSerpApi(): boolean {

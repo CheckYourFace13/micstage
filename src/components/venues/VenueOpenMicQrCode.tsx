@@ -1,6 +1,7 @@
 "use client";
 
 import QRCode from "react-qr-code";
+import type { MouseEvent } from "react";
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { isCanonicalVenueOpenMicPublicUrl } from "@/lib/venueOpenMicQrUrl";
 import { lineupPrimaryActionClass, lineupSecondaryActionClass } from "@/components/venue/lineupActionStyles";
@@ -51,7 +52,9 @@ export function VenueOpenMicQrCode({ publicPageUrl, venueName, variant = "public
 
   const getSvgEl = (): SVGSVGElement | null => wrapRef.current?.querySelector("svg") ?? null;
 
-  const downloadSvg = useCallback(() => {
+  const downloadSvg = useCallback((e?: MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (!urlOk) return;
     const svg = getSvgEl();
     if (!svg) {
@@ -68,7 +71,9 @@ export function VenueOpenMicQrCode({ publicPageUrl, venueName, variant = "public
     flash("Downloaded SVG");
   }, [flash, slug, urlOk]);
 
-  const downloadPng = useCallback(async () => {
+  const downloadPng = useCallback(async (e?: MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (!urlOk) return;
     const svg = getSvgEl();
     if (!svg) {
@@ -120,7 +125,9 @@ export function VenueOpenMicQrCode({ publicPageUrl, venueName, variant = "public
     }
   }, [flash, slug, urlOk]);
 
-  const copyLink = useCallback(async () => {
+  const copyLink = useCallback(async (e?: MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (!urlOk) return;
     try {
       await navigator.clipboard.writeText(publicPageUrl);
@@ -130,20 +137,39 @@ export function VenueOpenMicQrCode({ publicPageUrl, venueName, variant = "public
     }
   }, [flash, publicPageUrl, urlOk]);
 
-  const printSheet = useCallback(() => {
-    if (!urlOk) return;
-    const svg = getSvgEl();
-    if (!svg) {
-      flash("Could not open print view");
-      return;
-    }
-    const svgHtml = new XMLSerializer().serializeToString(svg);
-    const w = window.open("", "_blank", "noopener,noreferrer");
-    if (!w) {
-      flash("Pop-up blocked — allow pop-ups to print");
-      return;
-    }
-    w.document.write(`<!DOCTYPE html>
+  const printSheet = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!urlOk) return;
+
+      console.log("[venue qr] print clicked");
+
+      /** Must open synchronously in the click handler (popup rules). Do not use `noopener` here — it makes `window.open` return `null` in modern browsers, so we cannot call `document.write`. */
+      const w = window.open("about:blank", "_blank");
+
+      if (!w) {
+        console.warn("[venue qr] print blocked");
+        flash("Pop-up blocked — allow pop-ups for this site to print the poster.");
+        return;
+      }
+
+      console.log("[venue qr] print window opened");
+
+      const svg = getSvgEl();
+      if (!svg) {
+        try {
+          w.close();
+        } catch {
+          /* ignore */
+        }
+        flash("Could not open print view");
+        return;
+      }
+
+      const svgHtml = new XMLSerializer().serializeToString(svg);
+      const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -167,11 +193,32 @@ export function VenueOpenMicQrCode({ publicPageUrl, venueName, variant = "public
   <p>Scan to view or book this open mic on MicStage</p>
   <div class="url">${escapeHtml(publicPageUrl)}</div>
 </body>
-</html>`);
-    w.document.close();
-    w.focus();
-    w.print();
-  }, [flash, publicPageUrl, urlOk, venueName]);
+</html>`;
+
+      try {
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        console.log("[venue qr] print html written");
+        try {
+          w.opener = null;
+        } catch {
+          /* ignore cross-origin restrictions */
+        }
+        w.focus();
+        w.print();
+      } catch (err) {
+        console.error("[venue qr] print write failed", err);
+        try {
+          w.close();
+        } catch {
+          /* ignore */
+        }
+        flash("Could not prepare print view. Try again or use Download QR.");
+      }
+    },
+    [flash, publicPageUrl, urlOk, venueName],
+  );
 
   if (!urlOk) {
     return null;
@@ -215,13 +262,13 @@ export function VenueOpenMicQrCode({ publicPageUrl, venueName, variant = "public
           </div>
           {notice ? <p className="text-sm text-emerald-300/95">{notice}</p> : null}
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <button type="button" onClick={() => void copyLink()} className={lineupPrimaryActionClass}>
+            <button type="button" onClick={(ev) => void copyLink(ev)} className={lineupPrimaryActionClass}>
               Copy page link
             </button>
-            <button type="button" onClick={downloadSvg} className={lineupSecondaryActionClass}>
+            <button type="button" onClick={(ev) => downloadSvg(ev)} className={lineupSecondaryActionClass}>
               Download QR (SVG)
             </button>
-            <button type="button" onClick={() => void downloadPng()} className={lineupSecondaryActionClass}>
+            <button type="button" onClick={(ev) => void downloadPng(ev)} className={lineupSecondaryActionClass}>
               Download QR (PNG)
             </button>
             <button type="button" onClick={printSheet} className={lineupSecondaryActionClass}>

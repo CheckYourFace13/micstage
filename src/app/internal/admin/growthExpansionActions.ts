@@ -2,6 +2,7 @@
 
 import { assertAdminSession } from "@/lib/adminAuth";
 import { evaluateAndActivateNextQueuedMarket } from "@/lib/growth/expansionHealth";
+import { primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import { requirePrisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -48,7 +49,7 @@ export async function addQueuedGrowthLaunchMarketAction(formData: FormData) {
 export async function duplicateGrowthLaunchFromTemplateAction(formData: FormData) {
   await assertAdminSession();
   const prisma = requirePrisma();
-  const templateSlug = normalizeSlug(String(formData.get("templateSlug") ?? "chicagoland-il"));
+  const templateSlug = normalizeSlug(String(formData.get("templateSlug") ?? primaryLaunchDiscoveryMarketSlug()));
   const newSlug = normalizeSlug(String(formData.get("newDiscoveryMarketSlug") ?? ""));
   const label = String(formData.get("label") ?? "").trim();
   const regionDefault = String(formData.get("regionDefault") ?? "").trim() || null;

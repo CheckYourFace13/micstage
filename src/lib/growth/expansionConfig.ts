@@ -12,7 +12,7 @@ export function growthAutoExpansionCronEnabled(): boolean {
   return process.env.GROWTH_AUTO_EXPANSION_ENABLED === "true";
 }
 
-/** When true, POST /api/cron/growth-pipeline may run discovery adapters (still Chicagoland-first via GROWTH_DISCOVERY_MARKET_SLUGS). */
+/** When true, POST /api/cron/growth-pipeline may run discovery adapters (market list: `GROWTH_DISCOVERY_MARKET_SLUGS` or primary launch slug from `marketsConfig`). */
 export function growthLeadDiscoveryCronEnabled(): boolean {
   return process.env.GROWTH_LEAD_DISCOVERY_CRON_ENABLED === "true";
 }

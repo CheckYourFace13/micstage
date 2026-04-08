@@ -1,6 +1,14 @@
 /**
- * Market-first growth ops. Add a row per metro you launch; set `DEFAULT_GROWTH_METRO_ID` for the active default.
- * `discoveryMarketSlug` must match `/locations/[slug]` slugs (see `discoveryMarket.ts`).
+ * Market-first growth ops — **single source of truth for launch scope** (code):
+ *
+ * - **`DEFAULT_GROWTH_METRO_ID`** + **`GROWTH_METROS[].discoveryMarketSlug`** define the primary launch market slug
+ *   (`primaryLaunchDiscoveryMarketSlug()`). Autonomous geo discovery, curated Chicagoland seed adapters, and default
+ *   admin views all use this slug unless the cron iteration context is a different market (see below).
+ * - **`GROWTH_DISCOVERY_MARKET_SLUGS`** (optional env, comma-separated): which discovery slugs the growth-pipeline cron
+ *   iterates. If unset, defaults to `[primaryLaunchDiscoveryMarketSlug()]`. Does not rename the primary slug; add new
+ *   slugs here when running multi-market cron before autonomous adapters support those metros.
+ *
+ * `discoveryMarketSlug` values must match `/locations/[slug]` rollups (see `discoveryMarket.ts`).
  */
 export type GrowthMetroConfig = {
   /** Stable id for URLs (?metro=) and saved views */
@@ -32,6 +40,19 @@ export function defaultGrowthMetro(): GrowthMetroConfig {
   return m ?? GROWTH_METROS[0];
 }
 
+/**
+ * Primary launch discovery slug — use for tagging leads from geo-scoped autonomous discovery and curated primary-metro
+ * seeds, and for matching `ctx.discoveryMarketSlug` before emitting candidates.
+ */
+export function primaryLaunchDiscoveryMarketSlug(): string {
+  return defaultGrowthMetro().discoveryMarketSlug;
+}
+
+export function isPrimaryLaunchDiscoveryMarket(slug: string | null | undefined): boolean {
+  if (!slug?.trim()) return false;
+  return slug.trim().toLowerCase() === primaryLaunchDiscoveryMarketSlug().toLowerCase();
+}
+
 export function growthMetroById(id: string | undefined | null): GrowthMetroConfig | undefined {
   if (!id?.trim()) return undefined;
   return GROWTH_METROS.find((m) => m.id === id.trim().toLowerCase());
@@ -52,12 +73,21 @@ export function resolveGrowthMarketSlug(params: { market?: string | null; metro?
   return defaultGrowthMetro().discoveryMarketSlug;
 }
 
+/** Map env/list slugs to canonical `GROWTH_METROS` discovery slugs when they match case-insensitively. */
+function canonicalDiscoveryMarketSlug(segment: string): string {
+  const t = segment.trim();
+  if (!t) return "";
+  const metro = growthMetroByDiscoverySlug(t);
+  return metro ? metro.discoveryMarketSlug : t;
+}
+
 /**
  * Markets where scheduled discovery may insert DISCOVERED leads (comma-separated slugs).
- * Defaults to Chicagoland only so jobs never run “nationwide” unless you expand this list.
+ * Defaults to `[primaryLaunchDiscoveryMarketSlug()]` so jobs never run “nationwide” unless you expand this list.
+ * Segments are canonicalized when they match a known metro (fixes casing / minor mismatch vs `isPrimaryLaunchDiscoveryMarket`).
  */
 export function growthDiscoveryMarketSlugs(): string[] {
   const raw = process.env.GROWTH_DISCOVERY_MARKET_SLUGS?.trim();
-  if (!raw) return [defaultGrowthMetro().discoveryMarketSlug];
-  return [...new Set(raw.split(",").map((s) => s.trim()).filter(Boolean))];
+  if (!raw) return [primaryLaunchDiscoveryMarketSlug()];
+  return [...new Set(raw.split(",").map((s) => canonicalDiscoveryMarketSlug(s)).filter(Boolean))];
 }

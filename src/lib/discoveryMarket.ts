@@ -9,7 +9,11 @@ import { slugify } from "@/lib/slug";
  */
 export const MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY = 10;
 
-/** Fixed discovery slugs for metro & regional hubs (not derived from a single city name). */
+/**
+ * Fixed discovery slugs for metro & regional hubs (not derived from a single city name).
+ * Chicago rollup aligns with `primaryLaunchDiscoveryMarketSlug()` when Chicagoland is the default launch metro
+ * (`marketsConfig` / `GROWTH_METROS`).
+ */
 export const ROLLUP_DISCOVERY_SLUGS = [
   "chicagoland-il",
   "central-illinois-il",

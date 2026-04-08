@@ -1,8 +1,14 @@
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
 
+/** Accepts common production truthy forms (not only lowercase `true`). */
+function envTruthy(v: string | undefined): boolean {
+  const s = v?.trim().toLowerCase();
+  return s === "true" || s === "1" || s === "yes" || s === "on";
+}
+
 /** Master switch for paid / high-volume web discovery (CSE, SerpAPI, crawl, Eventbrite). */
 export function growthDiscoveryAutonomousEnabled(): boolean {
-  return process.env.GROWTH_DISCOVERY_AUTONOMOUS_ENABLED === "true";
+  return envTruthy(process.env.GROWTH_DISCOVERY_AUTONOMOUS_ENABLED);
 }
 
 /** Google CSE or SerpAPI search calls per adapter per cron invocation (each returns up to ~10 organic links). */
@@ -24,8 +30,21 @@ export function hasGoogleProgrammableSearch(): boolean {
   return Boolean(process.env.GROWTH_GOOGLE_CSE_API_KEY?.trim() && process.env.GROWTH_GOOGLE_CSE_CX?.trim());
 }
 
+/**
+ * SerpAPI key: prefer MicStage-prefixed env, then names SerpAPI/snippets often use (no new vars required).
+ * `hasSerpApi` and `runSerpApiSearch` must use the same resolution.
+ */
+export function serpApiKeyForDiscovery(): string {
+  return (
+    process.env.GROWTH_SERPAPI_KEY?.trim() ||
+    process.env.SERPAPI_KEY?.trim() ||
+    process.env.SERPAPI_API_KEY?.trim() ||
+    ""
+  );
+}
+
 export function hasSerpApi(): boolean {
-  return Boolean(process.env.GROWTH_SERPAPI_KEY?.trim());
+  return Boolean(serpApiKeyForDiscovery());
 }
 
 /** Comma-separated root URLs to fetch and mine for contacts (same-host links optional). */

@@ -2,6 +2,7 @@ import {
   growthDiscoveryHttpDelayMs,
   hasGoogleProgrammableSearch,
   hasSerpApi,
+  serpApiKeyForDiscovery,
 } from "@/lib/growth/discovery/autonomousConfig";
 
 export type SearchHit = { link: string; title: string; snippet?: string };
@@ -61,18 +62,28 @@ export async function runProgrammableSearch(
   }
 }
 
+type SerpOrganic = {
+  link?: string;
+  title?: string;
+  snippet?: string;
+  redirect_link?: string;
+};
+
 export async function runSerpApiSearch(
   query: string,
   start0Based: number,
 ): Promise<{ items: SearchHit[]; rawNextStart: number } | null> {
   if (!hasSerpApi()) return null;
-  const apiKey = process.env.GROWTH_SERPAPI_KEY!.trim();
+  const apiKey = serpApiKeyForDiscovery();
+  if (!apiKey) return null;
   const u = new URL("https://serpapi.com/search.json");
   u.searchParams.set("engine", "google");
   u.searchParams.set("q", query);
   u.searchParams.set("start", String(start0Based));
   u.searchParams.set("api_key", apiKey);
   u.searchParams.set("num", "10");
+  u.searchParams.set("hl", "en");
+  u.searchParams.set("gl", "us");
 
   await throttleSearch();
   const ac = new AbortController();
@@ -80,16 +91,35 @@ export async function runSerpApiSearch(
   try {
     const res = await fetch(u.toString(), { signal: ac.signal });
     lastSearchAt = Date.now();
+    const text = await res.text();
     if (!res.ok) {
-      console.warn("[growth discovery] SerpAPI HTTP", res.status);
+      console.warn("[growth discovery] SerpAPI HTTP", res.status, text.slice(0, 400));
       return null;
     }
-    const data = (await res.json()) as {
-      organic_results?: { link?: string; title?: string; snippet?: string }[];
+    let data: {
+      error?: string;
+      search_metadata?: { status?: string };
+      organic_results?: SerpOrganic[];
     };
+    try {
+      data = JSON.parse(text) as typeof data;
+    } catch {
+      console.warn("[growth discovery] SerpAPI invalid JSON", text.slice(0, 200));
+      return null;
+    }
+    if (typeof data.error === "string" && data.error.trim()) {
+      console.warn("[growth discovery] SerpAPI error field:", data.error.slice(0, 300));
+      return null;
+    }
+    if (data.search_metadata?.status === "Error") {
+      console.warn("[growth discovery] SerpAPI search_metadata.status Error");
+      return null;
+    }
     const items: SearchHit[] = [];
     for (const it of data.organic_results ?? []) {
-      if (it.link && it.title) items.push({ link: it.link, title: it.title, snippet: it.snippet });
+      const link = (it.link ?? it.redirect_link)?.trim();
+      const title = it.title?.trim();
+      if (link && title) items.push({ link, title, snippet: it.snippet });
     }
     return { items, rawNextStart: start0Based + items.length };
   } catch (e) {

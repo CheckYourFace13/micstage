@@ -10,6 +10,7 @@ import {
   toggleGrowthLaunchColdRelaxAction,
 } from "@/app/internal/admin/growthExpansionActions";
 import { growthAutoExpansionCronEnabled, loadExpansionThresholdsFromEnv } from "@/lib/growth/expansionConfig";
+import { primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import { countGlobalComplaintLikeWebhookSignals, loadMarketHealthForExpansion } from "@/lib/growth/expansionHealth";
 import type { GrowthLaunchMarket } from "@/generated/prisma/client";
 import { requirePrisma } from "@/lib/prisma";
@@ -182,7 +183,7 @@ export default async function GrowthLaunchExpansionPage(props: {
               <span className="text-zinc-400">Template slug</span>
               <input
                 name="templateSlug"
-                defaultValue="chicagoland-il"
+                defaultValue={primaryLaunchDiscoveryMarketSlug()}
                 className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 font-mono text-xs text-white"
               />
             </label>

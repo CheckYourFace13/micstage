@@ -1,4 +1,4 @@
-import { CHICAGOLAND_SLUG } from "@/lib/growth/data/chicagolandDiscoverySeeds";
+import { isPrimaryLaunchDiscoveryMarket, primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import {
   growthDiscoveryAutonomousEnabled,
   growthDiscoveryHttpDelayMs,
@@ -45,7 +45,7 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
     leadType: "VENUE",
     async discover(ctx: GrowthLeadDiscoveryContext) {
       if (!growthDiscoveryAutonomousEnabled()) return [];
-      if (ctx.discoveryMarketSlug.trim().toLowerCase() !== CHICAGOLAND_SLUG) return [];
+      if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) return [];
       if (!hasEventbriteToken() || !ctx.prisma) return [];
 
       const token = growthEventbriteToken();
@@ -124,7 +124,7 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
           contactUrl: ev.url ?? null,
           city,
           region,
-          discoveryMarketSlug: CHICAGOLAND_SLUG,
+          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
           source: ADAPTER_ID,
           sourceKind: "EVENT_LISTING",
           fitScore: Math.max(om.fitScore, 6),

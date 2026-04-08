@@ -8,7 +8,12 @@ import { loadGrowthDailyActivityStats } from "@/lib/growth/growthDailyActivity";
 import { loadGrowthFunnelMetrics, loadGrowthMarketMetrics } from "@/lib/growth/marketMetrics";
 import { growthDiscoveryAllocationSummary } from "@/lib/growth/growthDiscoveryAllocation";
 import { listGrowthDiscoveryAdapterRegistry } from "@/lib/growth/discoveryAdapterCatalog";
-import { defaultGrowthMetro, GROWTH_METROS, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
+import {
+  defaultGrowthMetro,
+  GROWTH_METROS,
+  primaryLaunchDiscoveryMarketSlug,
+  resolveGrowthMarketSlug,
+} from "@/lib/growth/marketsConfig";
 import {
   growthFollowUpAutomationEnabled,
   marketingContactCooldownHours,
@@ -92,8 +97,10 @@ export default async function AdminGrowthHubPage(props: {
       <p className="mt-2 max-w-2xl text-xs text-zinc-500">
         Cron: <code className="text-zinc-400">POST /api/cron/growth-pipeline</code> with{" "}
         <code className="text-zinc-400">GROWTH_LEAD_DISCOVERY_CRON_ENABLED</code> /{" "}
-        <code className="text-zinc-400">GROWTH_AUTO_DRAFT_CRON_ENABLED</code>. Discovery markets default to Chicagoland via{" "}
-        <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>. Caps: outreach{" "}
+        <code className="text-zinc-400">GROWTH_AUTO_DRAFT_CRON_ENABLED</code>. Primary launch slug{" "}
+        <code className="text-zinc-400">{primaryLaunchDiscoveryMarketSlug()}</code> from{" "}
+        <code className="text-zinc-400">marketsConfig</code> (override list:{" "}
+        <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>). Caps: outreach{" "}
         {marketingDailyCap("outreach")}/day · per-domain {marketingPerDomainDailyCap()}/day · contact cooldown{" "}
         {marketingContactCooldownHours()}h.
       </p>

@@ -3,16 +3,16 @@ import {
   CHICAGOLAND_ARTIST_SOCIAL_SEEDS,
   CHICAGOLAND_EVENT_LISTING_VENUE_SEEDS,
   CHICAGOLAND_PROMOTER_SOCIAL_SEEDS,
-  CHICAGOLAND_SLUG,
   CHICAGOLAND_VENUE_SOCIAL_SEEDS,
   CHICAGOLAND_VENUE_WEBSITE_SEEDS,
 } from "@/lib/growth/data/chicagolandDiscoverySeeds";
+import { isPrimaryLaunchDiscoveryMarket, primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import type { GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
 
 const REGION = "IL";
 
-function isChicagoland(ctxSlug: string): boolean {
-  return ctxSlug.trim().toLowerCase() === CHICAGOLAND_SLUG;
+function matchesPrimaryLaunchMarket(ctxSlug: string): boolean {
+  return isPrimaryLaunchDiscoveryMarket(ctxSlug);
 }
 
 export function createChicagolandVenueWebsiteAdapter(): GrowthLeadSourceAdapter {
@@ -20,7 +20,7 @@ export function createChicagolandVenueWebsiteAdapter(): GrowthLeadSourceAdapter 
     id: "chicagoland_venue_website_contact",
     leadType: "VENUE",
     async discover(ctx) {
-      if (!isChicagoland(ctx.discoveryMarketSlug)) return [];
+      if (!matchesPrimaryLaunchMarket(ctx.discoveryMarketSlug)) return [];
       const out: GrowthLeadCandidate[] = [];
       for (const s of CHICAGOLAND_VENUE_WEBSITE_SEEDS) {
         out.push({
@@ -31,7 +31,7 @@ export function createChicagolandVenueWebsiteAdapter(): GrowthLeadSourceAdapter 
           city: s.city,
           suburb: s.suburb ?? null,
           region: REGION,
-          discoveryMarketSlug: CHICAGOLAND_SLUG,
+          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
           source: s.source,
           sourceKind: "WEBSITE_CONTACT",
           fitScore: s.fitScore ?? null,
@@ -50,7 +50,7 @@ export function createChicagolandVenueSocialAdapter(): GrowthLeadSourceAdapter {
     id: "chicagoland_venue_social_profile",
     leadType: "VENUE",
     async discover(ctx) {
-      if (!isChicagoland(ctx.discoveryMarketSlug)) return [];
+      if (!matchesPrimaryLaunchMarket(ctx.discoveryMarketSlug)) return [];
       const out: GrowthLeadCandidate[] = [];
       for (const s of CHICAGOLAND_VENUE_SOCIAL_SEEDS) {
         out.push({
@@ -61,7 +61,7 @@ export function createChicagolandVenueSocialAdapter(): GrowthLeadSourceAdapter {
           city: s.city,
           suburb: s.suburb ?? null,
           region: REGION,
-          discoveryMarketSlug: CHICAGOLAND_SLUG,
+          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
           source: s.source,
           sourceKind: "SOCIAL_PROFILE",
           fitScore: s.fitScore ?? null,
@@ -80,7 +80,7 @@ export function createChicagolandEventListingVenueAdapter(): GrowthLeadSourceAda
     id: "chicagoland_event_listing_venue",
     leadType: "VENUE",
     async discover(ctx) {
-      if (!isChicagoland(ctx.discoveryMarketSlug)) return [];
+      if (!matchesPrimaryLaunchMarket(ctx.discoveryMarketSlug)) return [];
       const out: GrowthLeadCandidate[] = [];
       for (const s of CHICAGOLAND_EVENT_LISTING_VENUE_SEEDS) {
         out.push({
@@ -91,7 +91,7 @@ export function createChicagolandEventListingVenueAdapter(): GrowthLeadSourceAda
           city: s.city,
           suburb: s.suburb ?? null,
           region: REGION,
-          discoveryMarketSlug: CHICAGOLAND_SLUG,
+          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
           source: s.source,
           sourceKind: "EVENT_LISTING",
           fitScore: s.fitScore ?? null,
@@ -110,7 +110,7 @@ export function createChicagolandArtistSocialAdapter(): GrowthLeadSourceAdapter 
     id: "chicagoland_artist_social_profile",
     leadType: "ARTIST",
     async discover(ctx) {
-      if (!isChicagoland(ctx.discoveryMarketSlug)) return [];
+      if (!matchesPrimaryLaunchMarket(ctx.discoveryMarketSlug)) return [];
       const out: GrowthLeadCandidate[] = [];
       for (const s of CHICAGOLAND_ARTIST_SOCIAL_SEEDS) {
         out.push({
@@ -122,7 +122,7 @@ export function createChicagolandArtistSocialAdapter(): GrowthLeadSourceAdapter 
           city: s.city,
           suburb: s.suburb ?? null,
           region: REGION,
-          discoveryMarketSlug: CHICAGOLAND_SLUG,
+          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
           source: s.source,
           sourceKind: s.instagramUrl || s.youtubeUrl ? "SOCIAL_PROFILE" : "WEBSITE_CONTACT",
           fitScore: s.fitScore ?? null,
@@ -141,7 +141,7 @@ export function createChicagolandPromoterSocialAdapter(): GrowthLeadSourceAdapte
     id: "chicagoland_promoter_social_profile",
     leadType: "PROMOTER_ACCOUNT",
     async discover(ctx) {
-      if (!isChicagoland(ctx.discoveryMarketSlug)) return [];
+      if (!matchesPrimaryLaunchMarket(ctx.discoveryMarketSlug)) return [];
       const out: GrowthLeadCandidate[] = [];
       for (const s of CHICAGOLAND_PROMOTER_SOCIAL_SEEDS) {
         out.push({
@@ -152,7 +152,7 @@ export function createChicagolandPromoterSocialAdapter(): GrowthLeadSourceAdapte
           contactUrl: s.contactUrl ?? null,
           city: s.city,
           region: REGION,
-          discoveryMarketSlug: CHICAGOLAND_SLUG,
+          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
           source: s.source,
           sourceKind: s.instagramUrl ? "SOCIAL_PROFILE" : "WEBSITE_CONTACT",
           fitScore: s.fitScore ?? null,

@@ -1,8 +1,8 @@
 /**
- * Curated Chicagoland-first discovery seeds (public URLs / names for outreach research).
- * Not exhaustive; extend this file as you validate contacts. Dedupe via stable `importKey`.
+ * Curated discovery seeds for the primary launch metro (today: Chicagoland data).
+ * Lead rows use `discoveryMarketSlug` from `primaryLaunchDiscoveryMarketSlug()` in adapters — not hardcoded here.
+ * Not exhaustive; extend as you validate contacts. Dedupe via stable `importKey`.
  */
-export const CHICAGOLAND_SLUG = "chicagoland-il";
 
 export type VenueWebsiteSeed = {
   importKey: string;

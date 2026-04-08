@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { assertAdminSession } from "@/lib/adminAuth";
 import { GrowthLeadsFilteredTable } from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
-import { defaultGrowthMetro, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
+import { defaultGrowthMetro, primaryLaunchDiscoveryMarketSlug, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +35,7 @@ export default async function AdminGrowthVenuesPage(props: {
           <input
             name="market"
             defaultValue={market}
-            placeholder="chicagoland-il"
+            placeholder={primaryLaunchDiscoveryMarketSlug()}
             className="h-9 min-w-[12rem] rounded border border-zinc-700 bg-black/40 px-2 font-mono text-xs text-white"
           />
         </label>

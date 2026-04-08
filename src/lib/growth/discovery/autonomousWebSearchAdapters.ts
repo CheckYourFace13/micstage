@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { CHICAGOLAND_SLUG } from "@/lib/growth/data/chicagolandDiscoverySeeds";
+import { isPrimaryLaunchDiscoveryMarket, primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import {
   growthDiscoveryAutonomousEnabled,
   growthDiscoveryAutonomousMaxPageFetchesPerRun,
@@ -96,7 +96,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
     leadType: "VENUE",
     async discover(ctx: GrowthLeadDiscoveryContext) {
       if (!growthDiscoveryAutonomousEnabled()) return [];
-      if (ctx.discoveryMarketSlug.trim().toLowerCase() !== CHICAGOLAND_SLUG) return [];
+      if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) return [];
       const provider = discoverySearchProvider();
       if (!provider || !ctx.prisma) return [];
 
@@ -193,7 +193,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           facebookUrl: fb,
           city: "Chicago",
           region: REGION,
-          discoveryMarketSlug: CHICAGOLAND_SLUG,
+          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
           source: `${ADAPTER_ID}_crawl`,
           sourceKind: "WEBSITE_CONTACT",
           fitScore: om.fitScore,

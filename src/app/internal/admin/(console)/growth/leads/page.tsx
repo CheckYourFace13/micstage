@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { assertAdminSession } from "@/lib/adminAuth";
 import { GrowthLeadsFilteredTable } from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
-import type { GrowthLeadPerformanceTag, GrowthLeadStatus, GrowthLeadType } from "@/generated/prisma/client";
+import type {
+  GrowthLeadAcquisitionStage,
+  GrowthLeadContactQuality,
+  GrowthLeadOpenMicSignalTier,
+  GrowthLeadPerformanceTag,
+  GrowthLeadStatus,
+  GrowthLeadType,
+} from "@/generated/prisma/client";
 import { buildGrowthLeadWhere } from "@/lib/growth/growthLeadFilters";
 import type { GrowthLeadListFilters } from "@/lib/growth/growthLeadFilters";
 import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
@@ -46,6 +53,35 @@ function parseIntOpt(raw: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseOpenMicTier(raw: string | undefined): GrowthLeadOpenMicSignalTier | null {
+  if (!raw?.trim()) return null;
+  const u = raw.trim();
+  if (u === "EXPLICIT_OPEN_MIC" || u === "STRONG_LIVE_EVENT" || u === "WEAK_INFERRED") return u;
+  return null;
+}
+
+function parseContactQuality(raw: string | undefined): GrowthLeadContactQuality | null {
+  if (!raw?.trim()) return null;
+  const u = raw.trim();
+  if (u === "EMAIL" || u === "CONTACT_PAGE" || u === "SOCIAL_OR_CALENDAR" || u === "WEBSITE_ONLY") return u;
+  return null;
+}
+
+function parseAcquisitionStage(raw: string | undefined): GrowthLeadAcquisitionStage | null {
+  if (!raw?.trim()) return null;
+  const u = raw.trim();
+  const allowed: GrowthLeadAcquisitionStage[] = [
+    "DISCOVERED",
+    "OUTREACH_DRAFTED",
+    "OUTREACH_SENT",
+    "CLICKED",
+    "SIGNUP_STARTED",
+    "ACCOUNT_CREATED",
+    "LISTING_LIVE",
+  ];
+  return allowed.includes(u as GrowthLeadAcquisitionStage) ? (u as GrowthLeadAcquisitionStage) : null;
+}
+
 export default async function AdminGrowthLeadsPage(props: {
   searchParams: Promise<{
     market?: string;
@@ -60,6 +96,9 @@ export default async function AdminGrowthLeadsPage(props: {
     q?: string;
     pipeline?: string;
     draftPending?: string;
+    omTier?: string;
+    contactQ?: string;
+    acquisition?: string;
   }>;
 }) {
   await assertAdminSession();
@@ -79,6 +118,9 @@ export default async function AdminGrowthLeadsPage(props: {
     nameContains: p.q,
     pipelineOnly: p.pipeline === "1",
     draftPending: p.draftPending === "1",
+    openMicSignalTier: parseOpenMicTier(p.omTier),
+    contactQuality: parseContactQuality(p.contactQ),
+    acquisitionStage: parseAcquisitionStage(p.acquisition),
   };
 
   const where = buildGrowthLeadWhere(filters);
@@ -125,6 +167,14 @@ export default async function AdminGrowthLeadsPage(props: {
               href={`/internal/admin/growth/leads?market=${encodeURIComponent(defaultGrowthMetro().discoveryMarketSlug)}&type=VENUE&pipeline=1`}
             >
               Chicagoland venues (pipeline)
+            </Link>
+          </li>
+          <li>
+            <Link
+              className="text-emerald-400 hover:text-emerald-300"
+              href={`/internal/admin/growth/leads?market=${encodeURIComponent(defaultGrowthMetro().discoveryMarketSlug)}&type=VENUE&omTier=EXPLICIT_OPEN_MIC`}
+            >
+              Venues — explicit open-mic signal
             </Link>
           </li>
           <li>
@@ -211,6 +261,38 @@ export default async function AdminGrowthLeadsPage(props: {
           <label className="grid gap-1">
             <span className="text-xs text-zinc-500">Fit max</span>
             <input name="fitMax" type="number" defaultValue={p.fitMax ?? ""} className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 text-white" />
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs text-zinc-500">Open-mic signal tier</span>
+            <select name="omTier" defaultValue={p.omTier ?? ""} className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 font-mono text-[11px] text-white">
+              <option value="">Any</option>
+              <option value="EXPLICIT_OPEN_MIC">EXPLICIT_OPEN_MIC</option>
+              <option value="STRONG_LIVE_EVENT">STRONG_LIVE_EVENT</option>
+              <option value="WEAK_INFERRED">WEAK_INFERRED</option>
+            </select>
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs text-zinc-500">Contact quality</span>
+            <select name="contactQ" defaultValue={p.contactQ ?? ""} className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 font-mono text-[11px] text-white">
+              <option value="">Any</option>
+              <option value="EMAIL">EMAIL</option>
+              <option value="CONTACT_PAGE">CONTACT_PAGE</option>
+              <option value="SOCIAL_OR_CALENDAR">SOCIAL_OR_CALENDAR</option>
+              <option value="WEBSITE_ONLY">WEBSITE_ONLY</option>
+            </select>
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs text-zinc-500">Acquisition stage</span>
+            <select name="acquisition" defaultValue={p.acquisition ?? ""} className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 font-mono text-[11px] text-white">
+              <option value="">Any</option>
+              <option value="DISCOVERED">DISCOVERED</option>
+              <option value="OUTREACH_DRAFTED">OUTREACH_DRAFTED</option>
+              <option value="OUTREACH_SENT">OUTREACH_SENT</option>
+              <option value="CLICKED">CLICKED</option>
+              <option value="SIGNUP_STARTED">SIGNUP_STARTED</option>
+              <option value="ACCOUNT_CREATED">ACCOUNT_CREATED</option>
+              <option value="LISTING_LIVE">LISTING_LIVE</option>
+            </select>
           </label>
         </div>
         <button type="submit" className="rounded-md bg-zinc-700 px-4 py-2 text-sm text-white hover:bg-zinc-600">

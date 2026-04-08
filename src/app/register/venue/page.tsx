@@ -3,6 +3,8 @@ export const metadata = {
 };
 
 import { redirect } from "next/navigation";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { registerVenue } from "./actions";
 import { BetaNote } from "@/components/BetaNote";
@@ -11,10 +13,20 @@ import { VenuePlaceFields } from "./venuePlaceFields";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
 
-export default async function VenueRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await props.searchParams;
+const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
+
+export default async function VenueRegisterPage(props: { searchParams: Promise<{ error?: string; growthLead?: string }> }) {
+  const { error, growthLead } = await props.searchParams;
   const session = await getSession();
   if (session?.kind === "venue") redirect("/venue");
+
+  const traceId = typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim()) ? growthLead.trim() : "";
+  if (traceId) {
+    const prisma = getPrismaOrNull();
+    if (prisma) {
+      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: "VENUE" });
+    }
+  }
 
   const showRate = error === "rate";
   const showPlace = error === "place";
@@ -32,9 +44,19 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
         <p className="mt-2 text-sm text-white/70">
           Create your venue account. Next step will be creating your open mic schedule and publishing your page.
         </p>
+        {traceId ? (
+          <div className="mt-4 rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
+            <p className="font-medium text-white">You’re joining from MicStage outreach</p>
+            <p className="mt-1 text-white/80">
+              Claim your venue here so we can list your open mic, help performers find you, and give you tools to grow the
+              night — free to get started.
+            </p>
+          </div>
+        ) : null}
         <BetaNote className="mt-3" />
 
         <form action={registerVenue} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+          {traceId ? <input type="hidden" name="growthTraceLeadId" value={traceId} /> : null}
           {showPlace ? (
             <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white">
               Choose your venue from the Google suggestions dropdown before creating your account. If the map search

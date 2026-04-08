@@ -6,6 +6,7 @@ import {
 } from "@/app/internal/admin/growthActions";
 import { loadGrowthDailyActivityStats } from "@/lib/growth/growthDailyActivity";
 import { loadGrowthFunnelMetrics, loadGrowthMarketMetrics } from "@/lib/growth/marketMetrics";
+import { growthDiscoveryAllocationSummary } from "@/lib/growth/growthDiscoveryAllocation";
 import { listGrowthDiscoveryAdapterRegistry } from "@/lib/growth/discoveryAdapterCatalog";
 import { defaultGrowthMetro, GROWTH_METROS, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
 import {
@@ -38,23 +39,41 @@ export default async function AdminGrowthHubPage(props: {
   const metroConfig =
     GROWTH_METROS.find((m) => m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase()) ?? defaultGrowthMetro();
 
-  const [metrics, funnel, overallFunnel, daily, byType, total, launchRows] = await Promise.all([
-    loadGrowthMarketMetrics(prisma, marketSlug),
-    loadGrowthFunnelMetrics(prisma, marketSlug),
-    loadGrowthFunnelMetrics(prisma, null),
-    loadGrowthDailyActivityStats(prisma),
-    prisma.growthLead.groupBy({
-      by: ["leadType"],
-      where: { discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" } },
-      _count: { _all: true },
-    }),
-    prisma.growthLead.count({
-      where: { discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" } },
-    }),
-    prisma.growthLaunchMarket.findMany({ orderBy: { sortOrder: "asc" } }),
-  ]);
+  const marketEq = { discoveryMarketSlug: { equals: marketSlug, mode: "insensitive" as const } };
+
+  const [metrics, funnel, overallFunnel, daily, byType, total, launchRows, venueSignalBreakdown, venueAcqBreakdown] =
+    await Promise.all([
+      loadGrowthMarketMetrics(prisma, marketSlug),
+      loadGrowthFunnelMetrics(prisma, marketSlug),
+      loadGrowthFunnelMetrics(prisma, null),
+      loadGrowthDailyActivityStats(prisma),
+      prisma.growthLead.groupBy({
+        by: ["leadType"],
+        where: marketEq,
+        _count: { _all: true },
+      }),
+      prisma.growthLead.count({
+        where: marketEq,
+      }),
+      prisma.growthLaunchMarket.findMany({ orderBy: { sortOrder: "asc" } }),
+      prisma.growthLead.groupBy({
+        by: ["openMicSignalTier"],
+        where: { ...marketEq, leadType: "VENUE" },
+        _count: { _all: true },
+      }),
+      prisma.growthLead.groupBy({
+        by: ["acquisitionStage"],
+        where: { ...marketEq, leadType: "VENUE" },
+        _count: { _all: true },
+      }),
+    ]);
 
   const counts = Object.fromEntries(byType.map((g) => [g.leadType, g._count._all])) as Record<string, number>;
+  const venueN = counts.VENUE ?? 0;
+  const artistN = counts.ARTIST ?? 0;
+  const promoterN = counts.PROMOTER_ACCOUNT ?? 0;
+  const typedSum = venueN + artistN + promoterN;
+  const venuePctOfTyped = typedSum > 0 ? Math.round((venueN / typedSum) * 100) : null;
   const chiSlug = defaultGrowthMetro().discoveryMarketSlug;
   const curatedDiscoveryAdapters = listGrowthDiscoveryAdapterRegistry().filter((a) => a.tier === "curated");
   const autonomousDiscoveryAdapters = listGrowthDiscoveryAdapterRegistry().filter((a) => a.tier === "autonomous");
@@ -123,6 +142,43 @@ export default async function AdminGrowthHubPage(props: {
         Viewing metrics for <code className="text-zinc-400">{marketSlug}</code>
         {metroConfig.label !== marketSlug ? ` (${metroConfig.label})` : ""}.
       </p>
+
+      <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h2 className="text-sm font-medium text-white">Venue-first discovery &amp; funnel visibility</h2>
+        <p className="mt-1 text-xs text-zinc-500">{growthDiscoveryAllocationSummary()}</p>
+        <p className="mt-2 text-xs text-zinc-500">
+          Cron JSON includes <code className="text-zinc-400">discoveryAllocationSummary</code> and{" "}
+          <code className="text-zinc-400">effectiveCapsByAdapter</code> per run.
+        </p>
+        <p className="mt-2 text-xs text-zinc-400">
+          Leads in this market by type: VENUE {venueN}, ARTIST {artistN}, PROMOTER_ACCOUNT {promoterN}
+          {venuePctOfTyped != null ? ` → venues ${venuePctOfTyped}% of typed leads (curated + autonomous; not a hard cap).` : "."}
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 text-xs text-zinc-400">
+          <div>
+            <p className="font-medium text-zinc-300">Venue open-mic signal tier</p>
+            <ul className="mt-1 space-y-0.5 font-mono text-[11px]">
+              {venueSignalBreakdown.map((row) => (
+                <li key={String(row.openMicSignalTier)}>
+                  {(row.openMicSignalTier ?? "null") + ": " + row._count._all}
+                </li>
+              ))}
+              {venueSignalBreakdown.length === 0 ? <li>—</li> : null}
+            </ul>
+          </div>
+          <div>
+            <p className="font-medium text-zinc-300">Venue acquisition stage</p>
+            <ul className="mt-1 space-y-0.5 font-mono text-[11px]">
+              {venueAcqBreakdown.map((row) => (
+                <li key={row.acquisitionStage}>
+                  {row.acquisitionStage}: {row._count._all}
+                </li>
+              ))}
+              {venueAcqBreakdown.length === 0 ? <li>—</li> : null}
+            </ul>
+          </div>
+        </div>
+      </section>
 
       {params.err ? (
         <p className="mt-3 rounded border border-red-600/40 bg-red-950/40 px-3 py-2 text-sm text-red-100">

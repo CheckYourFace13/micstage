@@ -7,9 +7,11 @@ import {
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
-import { extractFromHtml } from "@/lib/growth/discovery/extractFromHtml";
+import { extractFromHtml, pickPrimaryVenueContactUrl } from "@/lib/growth/discovery/extractFromHtml";
+import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
+import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
 
 const ADAPTER_ID = "autonomous_seed_url_crawl_venue";
 const CURSOR_KEY = "seed_offset";
@@ -49,22 +51,59 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
         const ex = extractFromHtml(seed, html, { maxSameHostLinks: 25 });
         const email = ex.emails[0] ?? null;
         const ig = ex.instagramUrls[0] ?? null;
+        const fb = ex.facebookUrls[0] ?? null;
+        const contactPick =
+          pickPrimaryVenueContactUrl(ex.sameHostPaths) ??
+          ex.sameHostPaths.find((u) => /contact|book|about|events/i.test(u)) ??
+          null;
+
+        let om = scoreOpenMicVenueProspect({
+          snippet: "",
+          pageTextSample: ex.bodyTextSample,
+          title: ex.nameGuess,
+          searchQuery: "operator seed (open-mic discovery)",
+          hasEmail: Boolean(email),
+          hasContactPath: Boolean(contactPick),
+          hasSocial: Boolean(ig || fb),
+        });
+
+        if (!om.shouldIngest) {
+          om = {
+            ...om,
+            tier: "WEAK_INFERRED",
+            fitScore: Math.max(3, om.fitScore - 1),
+            confidence: Math.max(om.confidence, 34),
+            shouldIngest: true,
+          };
+        }
+
+        const contactQuality = deriveVenueContactQuality({
+          email,
+          contactUrl: contactPick ?? ig ?? fb,
+          instagramUrl: ig,
+          facebookUrl: fb,
+        });
+
         out.push({
           leadType: "VENUE",
           name: ex.nameGuess.slice(0, 180),
           contactEmailNormalized: email,
           websiteUrl: seed.split("#")[0]!,
-          contactUrl: ex.sameHostPaths.find((u) => /contact|book|about|events/i.test(u)) ?? null,
+          contactUrl: contactPick ?? ig ?? fb ?? null,
           instagramUrl: ig,
+          facebookUrl: fb,
           city: "Chicago",
           region: REGION,
           discoveryMarketSlug: CHICAGOLAND_SLUG,
           source: ADAPTER_ID,
           sourceKind: "WEBSITE_CONTACT",
-          fitScore: email ? 7 : 5,
-          discoveryConfidence: email ? 58 : 42,
+          fitScore: om.fitScore,
+          discoveryConfidence: om.confidence,
+          performanceTags: om.performanceTags.length ? om.performanceTags : [],
+          openMicSignalTier: om.tier,
+          contactQuality,
           importKey: hashKey(seed),
-          internalNotes: `Seed URL crawl. Extra paths found: ${ex.sameHostPaths.length}.`,
+          internalNotes: `Seed URL crawl (venue-first). Tier ${om.tier}. Paths: ${ex.sameHostPaths.length}.`,
         });
       }
       return out;

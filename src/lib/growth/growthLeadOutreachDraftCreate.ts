@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { MarketingContactStatus } from "@/generated/prisma/client";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { buildGrowthLeadOutreachPayload } from "@/lib/growth/outreachEmailBodies";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 
@@ -33,6 +34,7 @@ export async function createPendingGrowthLeadOutreachDraft(
     discoveryMarketSlug: lead.discoveryMarketSlug,
     contactUrl: lead.contactUrl,
     websiteUrl: lead.websiteUrl,
+    leadId: lead.id,
   });
 
   const contact = await prisma.marketingContact.upsert({
@@ -62,6 +64,10 @@ export async function createPendingGrowthLeadOutreachDraft(
       discoveryMarketSlug: lead.discoveryMarketSlug,
     },
   });
+
+  if (lead.leadType === "VENUE") {
+    await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "OUTREACH_DRAFTED", { leadType: "VENUE" });
+  }
 
   return { ok: true, draftId: draft.id };
 }

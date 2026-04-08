@@ -1,7 +1,11 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { GrowthDiscoveryAdapterInfo } from "@/lib/growth/discoveryAdapterCatalog";
 import { listGrowthDiscoveryAdapterRegistry } from "@/lib/growth/discoveryAdapterCatalog";
-import { growthDiscoveryMaxCandidatesPerAdapterPerMarket } from "@/lib/growth/expansionConfig";
+import {
+  autonomousWebSearchBudgetMultiplier,
+  discoveryIngestCapForAdapter,
+  growthDiscoveryAllocationSummary,
+} from "@/lib/growth/growthDiscoveryAllocation";
 import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
 import { growthDiscoveryMarketSlugs } from "@/lib/growth/marketsConfig";
 import { allGrowthDiscoveryAdapters } from "@/lib/growth/sources/growthDiscoveryAdapters";
@@ -16,6 +20,9 @@ export type GrowthDiscoveryRunResult = {
   adapterRegistry: GrowthDiscoveryAdapterInfo[];
   /** Candidates passed to ingest per adapter (after per-market cap), pre-dedupe. */
   candidatesEmittedByAdapter: Record<string, number>;
+  discoveryAllocationSummary: string;
+  /** Effective per-adapter ingest cap this run (venue-first 90/5/5 for web search). */
+  effectiveCapsByAdapter: Record<string, number>;
 };
 
 /**
@@ -24,9 +31,9 @@ export type GrowthDiscoveryRunResult = {
 export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<GrowthDiscoveryRunResult> {
   const markets = growthDiscoveryMarketSlugs();
   const adapters = allGrowthDiscoveryAdapters();
-  const cap = growthDiscoveryMaxCandidatesPerAdapterPerMarket();
   const byAdapter: Record<string, { created: number; duplicates: number; skipped: number }> = {};
   const candidatesEmittedByAdapter: Record<string, number> = {};
+  const effectiveCapsByAdapter: Record<string, number> = {};
   let created = 0;
   let duplicates = 0;
   let skipped = 0;
@@ -34,14 +41,17 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
   for (const adapter of adapters) {
     byAdapter[adapter.id] = { created: 0, duplicates: 0, skipped: 0 };
     candidatesEmittedByAdapter[adapter.id] = 0;
+    effectiveCapsByAdapter[adapter.id] = discoveryIngestCapForAdapter(adapter);
   }
 
   for (const slug of markets) {
     for (const adapter of adapters) {
+      const cap = discoveryIngestCapForAdapter(adapter);
       let candidates = await adapter.discover({
         discoveryMarketSlug: slug,
         leadType: adapter.leadType,
         prisma,
+        autonomousWebSearchBudgetMultiplier: autonomousWebSearchBudgetMultiplier(adapter.id),
       });
       if (candidates.length > cap) {
         candidates = candidates.slice(0, cap);
@@ -86,5 +96,7 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
     byAdapter,
     adapterRegistry,
     candidatesEmittedByAdapter,
+    discoveryAllocationSummary: growthDiscoveryAllocationSummary(),
+    effectiveCapsByAdapter,
   };
 }

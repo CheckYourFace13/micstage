@@ -796,6 +796,31 @@ enum GrowthLeadFollowUpStatus {
   COMPLETED
 }
 
+/// Autonomous venue discovery: explicit open-mic language vs inferred live-event fit.
+enum GrowthLeadOpenMicSignalTier {
+  EXPLICIT_OPEN_MIC
+  STRONG_LIVE_EVENT
+  WEAK_INFERRED
+}
+
+enum GrowthLeadContactQuality {
+  EMAIL
+  CONTACT_PAGE
+  SOCIAL_OR_CALENDAR
+  WEBSITE_ONLY
+}
+
+/// Lightweight venue outreach funnel (advance-only in code; admin can set manually).
+enum GrowthLeadAcquisitionStage {
+  DISCOVERED
+  OUTREACH_DRAFTED
+  OUTREACH_SENT
+  CLICKED
+  SIGNUP_STARTED
+  ACCOUNT_CREATED
+  LISTING_LIVE
+}
+
 /// Imported or hand-entered prospect; outreach is draft → approve → send only.
 model GrowthLead {
   id        String   @id @default(cuid())
@@ -816,6 +841,7 @@ model GrowthLead {
   instagramUrl String?
   youtubeUrl   String?
   tiktokUrl    String?
+  facebookUrl  String?
 
   city                String?
   /// Suburb or neighborhood within the metro (e.g. Evanston under Chicagoland).
@@ -831,6 +857,10 @@ model GrowthLead {
   discoveryConfidence Int?
 
   fitScore Int?
+
+  openMicSignalTier GrowthLeadOpenMicSignalTier?
+  contactQuality    GrowthLeadContactQuality?
+  acquisitionStage  GrowthLeadAcquisitionStage @default(DISCOVERED)
 
   /// Optional stable key for import dedupe (e.g. CSV row id or domain).
   importKey String? @unique
@@ -853,6 +883,10 @@ model GrowthLead {
   @@index([contactEmailNormalized])
   @@index([websiteHostNormalized, leadType])
   @@index([instagramHandleNormalized, leadType])
+  @@index([openMicSignalTier])
+  @@index([contactQuality])
+  @@index([acquisitionStage])
+  @@index([leadType, openMicSignalTier])
 }
 
 /// Pagination / rotation state for autonomous discovery adapters (per adapter + market).

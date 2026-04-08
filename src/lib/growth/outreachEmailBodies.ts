@@ -10,6 +10,7 @@ import {
   OUTREACH_DRAFT_FOOTER_TEXT,
   outreachPlainLeanHtml,
 } from "@/lib/marketing/outreachTemplates";
+import { appBaseUrl } from "@/lib/marketing/emailConfig";
 
 /** Draft outreach bodies for imported / manual growth leads (not venue-claim cold). */
 export function buildGrowthLeadOutreachPayload(input: {
@@ -19,6 +20,8 @@ export function buildGrowthLeadOutreachPayload(input: {
   discoveryMarketSlug: string | null;
   contactUrl: string | null;
   websiteUrl: string | null;
+  /** When set on VENUE leads, adds a tracked link to venue registration. */
+  leadId?: string | null;
 }): MarketingEmailPayload {
   const subjectByType: Record<GrowthLeadType, string> = {
     VENUE: GROWTH_VENUE_OUTREACH_SUBJECT,
@@ -26,13 +29,22 @@ export function buildGrowthLeadOutreachPayload(input: {
     PROMOTER_ACCOUNT: GROWTH_PROMOTER_OUTREACH_SUBJECT,
   };
 
-  const letterByType: Record<GrowthLeadType, { textBody: string }> = {
-    VENUE: buildVenueOutreachLetter(input.name),
-    ARTIST: buildArtistOutreachLetter(input.name),
-    PROMOTER_ACCOUNT: buildPromoterOutreachLetter(input.name),
-  };
+  const baseUrl = appBaseUrl().replace(/\/$/, "");
+  const claimVenueUrl =
+    input.leadType === "VENUE" && input.leadId?.trim()
+      ? `${baseUrl}/register/venue?growthLead=${encodeURIComponent(input.leadId.trim())}`
+      : undefined;
 
-  const { textBody: coreText } = letterByType[input.leadType];
+  const venueLetter = buildVenueOutreachLetter(input.name, claimVenueUrl ? { claimVenueUrl } : undefined);
+  const artistLetter = buildArtistOutreachLetter(input.name);
+  const promoterLetter = buildPromoterOutreachLetter(input.name);
+
+  const coreText =
+    input.leadType === "VENUE"
+      ? venueLetter.textBody
+      : input.leadType === "ARTIST"
+        ? artistLetter.textBody
+        : promoterLetter.textBody;
 
   let textBody = coreText;
   if (input.websiteUrl || input.contactUrl) {
@@ -42,7 +54,18 @@ export function buildGrowthLeadOutreachPayload(input: {
   }
   textBody += `\n\n— ${OUTREACH_DRAFT_FOOTER_TEXT}`;
 
-  const htmlBody = outreachPlainLeanHtml(textBody);
+  const metaTail = [
+    input.websiteUrl ? `Site: ${input.websiteUrl}` : "",
+    input.contactUrl ? `Contact: ${input.contactUrl}` : "",
+    `— ${OUTREACH_DRAFT_FOOTER_TEXT}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const htmlBody =
+    input.leadType === "VENUE"
+      ? venueLetter.htmlBody + outreachPlainLeanHtml(metaTail)
+      : outreachPlainLeanHtml(textBody);
 
   return {
     subject: subjectByType[input.leadType],

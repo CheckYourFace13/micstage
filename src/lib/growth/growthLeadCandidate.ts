@@ -1,4 +1,11 @@
-import type { GrowthLeadPerformanceTag, GrowthLeadSourceKind, GrowthLeadType } from "@/generated/prisma/client";
+import type {
+  GrowthLeadAcquisitionStage,
+  GrowthLeadContactQuality,
+  GrowthLeadOpenMicSignalTier,
+  GrowthLeadPerformanceTag,
+  GrowthLeadSourceKind,
+  GrowthLeadType,
+} from "@/generated/prisma/client";
 
 /** Normalized shape produced by source adapters and fed into ingestion. */
 export type GrowthLeadCandidate = {
@@ -10,6 +17,10 @@ export type GrowthLeadCandidate = {
   instagramUrl?: string | null;
   youtubeUrl?: string | null;
   tiktokUrl?: string | null;
+  facebookUrl?: string | null;
+  openMicSignalTier?: GrowthLeadOpenMicSignalTier | null;
+  contactQuality?: GrowthLeadContactQuality | null;
+  acquisitionStage?: GrowthLeadAcquisitionStage | null;
   city?: string | null;
   suburb?: string | null;
   region?: string | null;

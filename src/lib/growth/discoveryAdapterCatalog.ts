@@ -60,17 +60,17 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
       id: "autonomous_web_search_venue",
       tier: "autonomous",
       description:
-        "Google Programmable Search or SerpAPI → venue-oriented queries → fetch pages → extract emails/socials (Chicagoland)",
+        "CSE/SerpAPI → open-mic–first venue queries → page fetch → signal tier + contact quality → Chicagoland (~90% web budget)",
     },
     {
       id: "autonomous_web_search_artist",
       tier: "autonomous",
-      description: "Same search stack → artist/booking-oriented queries",
+      description: "Same stack → open-mic–adjacent artist queries (~5% web budget vs venue)",
     },
     {
       id: "autonomous_web_search_promoter",
       tier: "autonomous",
-      description: "Same search stack → promoter / talent-buyer queries",
+      description: "Same stack → open-mic host/producer queries (~5% web budget vs venue)",
     },
     {
       id: "autonomous_seed_url_crawl_venue",
@@ -80,7 +80,7 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
     {
       id: "autonomous_eventbrite_chicago",
       tier: "autonomous",
-      description: "Eventbrite API event search (Chicago radius) → venue-style listing rows",
+      description: "Eventbrite API (Chicago radius, q=open mic) → open-mic event rows → venue leads + signal tier",
     },
     {
       id: "chicagoland_venue_website_contact",

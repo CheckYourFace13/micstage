@@ -27,6 +27,9 @@ export async function GrowthLeadsFilteredTable(props: { filters: GrowthLeadListF
       performanceTags: true,
       source: true,
       createdAt: true,
+      openMicSignalTier: true,
+      contactQuality: true,
+      acquisitionStage: true,
     },
   });
 
@@ -37,7 +40,7 @@ export async function GrowthLeadsFilteredTable(props: { filters: GrowthLeadListF
         {rows.length} row{rows.length === 1 ? "" : "s"} (max {MAX_ROWS}). Cold outreach stays approval-required; sends remain
         throttled via existing marketing caps.
       </p>
-      <table className="mt-3 w-full min-w-[800px] text-left text-xs text-zinc-400">
+      <table className="mt-3 w-full min-w-[1040px] text-left text-xs text-zinc-400">
         <thead>
           <tr className="border-b border-zinc-800 text-[10px] uppercase tracking-wide text-zinc-500">
             <th className="py-2 pr-2">Name</th>
@@ -47,6 +50,9 @@ export async function GrowthLeadsFilteredTable(props: { filters: GrowthLeadListF
             <th className="py-2 pr-2">Market</th>
             <th className="py-2 pr-2">Contact</th>
             <th className="py-2 pr-2">Fit</th>
+            <th className="py-2 pr-2">OM tier</th>
+            <th className="py-2 pr-2">Contact Q</th>
+            <th className="py-2 pr-2">Acq.</th>
             <th className="py-2 pr-2">Tags</th>
             <th className="py-2">Source</th>
           </tr>
@@ -69,6 +75,9 @@ export async function GrowthLeadsFilteredTable(props: { filters: GrowthLeadListF
                 {r.contactEmailNormalized ?? r.contactUrl ?? "—"}
               </td>
               <td className="py-2 pr-2">{r.fitScore ?? "—"}</td>
+              <td className="py-2 pr-2 font-mono text-[10px]">{r.openMicSignalTier ?? "—"}</td>
+              <td className="py-2 pr-2 font-mono text-[10px]">{r.contactQuality ?? "—"}</td>
+              <td className="py-2 pr-2 font-mono text-[10px]">{r.acquisitionStage}</td>
               <td className="py-2 pr-2">{r.performanceTags.join(", ") || "—"}</td>
               <td className="py-2">{r.source ?? "—"}</td>
             </tr>

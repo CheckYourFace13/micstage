@@ -8,9 +8,11 @@ import {
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
-import { extractFromHtml } from "@/lib/growth/discovery/extractFromHtml";
+import { extractFromHtml, pickPrimaryVenueContactUrl } from "@/lib/growth/discovery/extractFromHtml";
+import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
+import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
 import { discoverySearchProvider, runWebSearch, type SearchHit } from "@/lib/growth/discovery/webSearch";
 
 const CURSOR_KEY = "search_rotation";
@@ -48,7 +50,9 @@ function allowHitUrl(url: string, leadType: GrowthLeadType): boolean {
     if (leadType !== "ARTIST") {
       if (h.includes("instagram.com") || h.includes("tiktok.com")) return false;
     }
-    if (h.includes("facebook.com") || h.includes("fb.com")) return false;
+    if (h.includes("facebook.com") || h.includes("fb.com")) {
+      return leadType === "VENUE";
+    }
     if (leadType !== "ARTIST" && (h.includes("youtube.com") || h.includes("youtu.be"))) return false;
     if (h.includes("linkedin.com")) return false;
     if (h.includes("yelp.com") || h.includes("tripadvisor.")) return false;
@@ -64,38 +68,41 @@ function cleanHitTitle(title: string): string {
   return first.slice(0, 180) || "Discovered prospect";
 }
 
+/** All queries skew toward open-mic hosts, listings, and recurring live programming — not generic “venue booking”. */
 const VENUE_QUERIES = [
-  "Chicago IL live music venue book a show contact",
-  "open mic night Chicago Illinois venue",
-  "Chicago comedy club book talent contact",
-  "Wicker Park Logan Square Chicago music venue events",
-  "Evanston Skokie IL live music venue",
-  "Berwyn Oak Park IL concert venue booking",
-  "Chicago IL private event venue live entertainment",
-  "Chicago rooftop bar live music booking",
-  "Chicago IL jazz club calendar contact",
-  "Chicago IL acoustic showcase venue",
+  '"open mic" Chicago IL',
+  '"open mic night" Chicago Illinois',
+  '"comedy open mic" Chicago',
+  '"poetry open mic" Chicago',
+  '"acoustic open mic" Chicago',
+  '"mic night" Chicago bar OR venue',
+  '"jam night" Chicago IL live music',
+  '"singer songwriter night" Chicago',
+  'site:eventbrite.com "open mic" Chicago',
+  'Chicago IL "open mic" events calendar',
+  'Evanston OR Skokie "open mic" night',
+  'Logan Square OR Wicker Park "open mic"',
+  'Chicago brewery "open mic" OR "mic night"',
+  'Chicagoland coffeehouse OR cafe "open mic"',
+  'Chicago IL comedy club "open mic" OR showcase',
+  'Oak Park Berwyn "open mic" night',
+  'Chicago "open stage" OR "amateur night" venue',
 ];
 
 const ARTIST_QUERIES = [
-  "Chicago singer songwriter booking contact",
-  "Chicago IL band for hire wedding corporate",
-  "Chicago musician instagram portfolio",
-  "Chicagoland cover band booking",
-  "Chicago IL hip hop artist booking email",
-  "Chicago folk artist listen booking",
-  "Chicago blues musician hire",
-  "Chicago IL wedding band contact",
-  "Naperville Aurora IL musician booking",
+  'Chicago "open mic" comedian OR comic booking contact',
+  'Chicago IL "open mic" musician OR songwriter instagram',
+  'Chicagoland poetry slam OR "open mic" performer',
+  'Chicago "open mic" host OR featured artist',
+  'Naperville Aurora "open mic" performer booking',
 ];
 
 const PROMOTER_QUERIES = [
-  "Chicago event promoter live music",
-  "Chicago IL talent buyer booking agency",
-  "Chicago concert promoter contact",
-  "Chicagoland music festival organizer",
-  "Chicago IL booking agent live entertainment",
-  "Chicago corporate event entertainment agency",
+  'Chicago "open mic" producer OR organizer',
+  'Chicagoland live show producer "open mic"',
+  'Chicago talent buyer "open mic" OR showcase',
+  'Chicago event series "mic night" OR "open mic"',
+  'Chicago IL booking "open mic" community',
 ];
 
 function queriesFor(leadType: GrowthLeadType): string[] {
@@ -110,6 +117,54 @@ function adapterIdFor(leadType: GrowthLeadType): string {
   return "autonomous_web_search_promoter";
 }
 
+function nonVenueCandidate(
+  leadType: GrowthLeadType,
+  id: string,
+  hit: SearchHit,
+  ex: ReturnType<typeof extractFromHtml>,
+): GrowthLeadCandidate | null {
+  const name = ex.nameGuess.length > 2 ? ex.nameGuess : cleanHitTitle(hit.title);
+  const email = ex.emails[0] ?? null;
+  const ig = ex.instagramUrls[0] ?? null;
+  const yt = ex.youtubeUrls[0] ?? null;
+  const tt = ex.tiktokUrls[0] ?? null;
+  const fb = ex.facebookUrls[0] ?? null;
+  const contactPick =
+    pickPrimaryVenueContactUrl(ex.sameHostPaths) ??
+    ex.sameHostPaths.find((u) => /contact|book|about/i.test(u)) ??
+    null;
+  if (!email && !ig && !yt && !tt && !fb && !contactPick) return null;
+
+  const contactQuality = deriveVenueContactQuality({
+    email,
+    contactUrl: contactPick,
+    instagramUrl: ig,
+    facebookUrl: fb,
+  });
+
+  return {
+    leadType,
+    name,
+    contactEmailNormalized: email,
+    websiteUrl: hit.link.split("#")[0]!,
+    contactUrl: contactPick,
+    instagramUrl: ig,
+    youtubeUrl: yt,
+    tiktokUrl: tt,
+    facebookUrl: fb,
+    city: "Chicago",
+    region: REGION,
+    discoveryMarketSlug: CHICAGOLAND_SLUG,
+    source: `${id}_crawl`,
+    sourceKind: "WEBSITE_CONTACT",
+    fitScore: email ? 6 : ig ? 5 : contactPick ? 5 : 4,
+    discoveryConfidence: email ? 52 : ig ? 45 : 36,
+    importKey: hashImport(id, hit.link),
+    contactQuality,
+    internalNotes: `Autonomous web search (${leadType}). Open-mic–adjacent query rotation. Snippet: ${(hit.snippet ?? "").slice(0, 240)}`,
+  };
+}
+
 export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): GrowthLeadSourceAdapter {
   const id = adapterIdFor(leadType);
   return {
@@ -122,8 +177,9 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
       if (!provider || !ctx.prisma) return [];
 
       const prisma = ctx.prisma;
-      const searchCalls = growthDiscoveryAutonomousSearchCallsPerRun();
-      const maxFetches = growthDiscoveryAutonomousMaxPageFetchesPerRun();
+      const mult = Math.max(0.02, ctx.autonomousWebSearchBudgetMultiplier ?? 1);
+      const searchCalls = Math.max(1, Math.round(growthDiscoveryAutonomousSearchCallsPerRun() * mult));
+      const maxFetches = Math.max(2, Math.round(growthDiscoveryAutonomousMaxPageFetchesPerRun() * mult));
       const queries = queriesFor(leadType);
 
       let cur = parseCursor(await readDiscoveryCursor(prisma, id, ctx.discoveryMarketSlug, CURSOR_KEY), provider);
@@ -131,7 +187,8 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
         cur = { qi: cur.qi, start: provider === "google_cse" ? 1 : 0, prov: provider };
       }
 
-      const hits: SearchHit[] = [];
+      type TaggedHit = { hit: SearchHit; searchQuery: string };
+      const hits: TaggedHit[] = [];
       for (let i = 0; i < searchCalls; i++) {
         const q = queries[cur.qi % queries.length]!;
         const res = await runWebSearch(q, { provider: cur.prov, start: cur.start });
@@ -141,7 +198,7 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
           continue;
         }
         for (const it of res.items) {
-          if (allowHitUrl(it.link, leadType)) hits.push(it);
+          if (allowHitUrl(it.link, leadType)) hits.push({ hit: it, searchQuery: q });
         }
         cur.start = res.nextCursor.start;
         if (res.items.length < 8 || (provider === "google_cse" && cur.start > 90)) {
@@ -156,7 +213,7 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
       const candidates: GrowthLeadCandidate[] = [];
       let fetches = 0;
 
-      for (const hit of hits) {
+      for (const { hit, searchQuery: qUsed } of hits) {
         if (fetches >= maxFetches) break;
         if (seenUrl.has(hit.link)) continue;
         seenUrl.add(hit.link);
@@ -166,30 +223,68 @@ export function createAutonomousWebSearchAdapter(leadType: GrowthLeadType): Grow
         if (!html) continue;
 
         const ex = extractFromHtml(hit.link, html);
-        const name = ex.nameGuess.length > 2 ? ex.nameGuess : cleanHitTitle(hit.title);
+
+        if (leadType !== "VENUE") {
+          const cand = nonVenueCandidate(leadType, id, hit, ex);
+          if (cand) candidates.push(cand);
+          continue;
+        }
+
         const email = ex.emails[0] ?? null;
         const ig = ex.instagramUrls[0] ?? null;
+        const fb = ex.facebookUrls[0] ?? null;
+        const contactPick =
+          pickPrimaryVenueContactUrl(ex.sameHostPaths) ??
+          ex.sameHostPaths.find((u) => /contact|book|events|calendar|open|mic/i.test(u)) ??
+          null;
+        const hasContactPath = Boolean(contactPick);
+        const hasSocial = Boolean(ig || fb);
+
+        const om = scoreOpenMicVenueProspect({
+          snippet: hit.snippet ?? "",
+          pageTextSample: ex.bodyTextSample,
+          title: cleanHitTitle(hit.title),
+          searchQuery: qUsed,
+          hasEmail: Boolean(email),
+          hasContactPath,
+          hasSocial,
+        });
+
+        if (!om.shouldIngest) continue;
+
+        const name = ex.nameGuess.length > 2 ? ex.nameGuess : cleanHitTitle(hit.title);
+        const contactQuality = deriveVenueContactQuality({
+          email,
+          contactUrl: contactPick ?? (hasSocial ? ig || fb : null),
+          instagramUrl: ig,
+          facebookUrl: fb,
+        });
+
         const yt = ex.youtubeUrls[0] ?? null;
         const tt = ex.tiktokUrls[0] ?? null;
 
         candidates.push({
-          leadType,
+          leadType: "VENUE",
           name,
           contactEmailNormalized: email,
           websiteUrl: hit.link.split("#")[0]!,
-          contactUrl: ex.sameHostPaths.find((u) => /contact|book|about/i.test(u)) ?? null,
+          contactUrl: contactPick ?? ig ?? fb ?? null,
           instagramUrl: ig,
           youtubeUrl: yt,
           tiktokUrl: tt,
+          facebookUrl: fb,
           city: "Chicago",
           region: REGION,
           discoveryMarketSlug: CHICAGOLAND_SLUG,
           source: `${id}_crawl`,
           sourceKind: "WEBSITE_CONTACT",
-          fitScore: email ? 6 : ig ? 5 : 4,
-          discoveryConfidence: email ? 55 : ig ? 48 : 38,
+          fitScore: om.fitScore,
+          discoveryConfidence: om.confidence,
+          performanceTags: om.performanceTags.length ? om.performanceTags : [],
+          openMicSignalTier: om.tier,
+          contactQuality,
           importKey: hashImport(id, hit.link),
-          internalNotes: `Autonomous web search hit. Query rotation + HTML extract. Snippet: ${(hit.snippet ?? "").slice(0, 280)}`,
+          internalNotes: `Open-mic–targeted venue discovery. Tier ${om.tier}. Query context: ${qUsed.slice(0, 120)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}`,
         });
       }
 

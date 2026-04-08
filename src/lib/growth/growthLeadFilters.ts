@@ -1,4 +1,11 @@
-import type { GrowthLeadPerformanceTag, GrowthLeadStatus, GrowthLeadType } from "@/generated/prisma/client";
+import type {
+  GrowthLeadAcquisitionStage,
+  GrowthLeadContactQuality,
+  GrowthLeadOpenMicSignalTier,
+  GrowthLeadPerformanceTag,
+  GrowthLeadStatus,
+  GrowthLeadType,
+} from "@/generated/prisma/client";
 import type { Prisma } from "@/generated/prisma/client";
 
 export type GrowthLeadListFilters = {
@@ -11,6 +18,9 @@ export type GrowthLeadListFilters = {
   fitMin?: number | null;
   fitMax?: number | null;
   nameContains?: string | null;
+  openMicSignalTier?: GrowthLeadOpenMicSignalTier | null;
+  contactQuality?: GrowthLeadContactQuality | null;
+  acquisitionStage?: GrowthLeadAcquisitionStage | null;
   /** When true, restricts to DISCOVERED | REVIEWED | APPROVED (ignores `statuses`). */
   pipelineOnly?: boolean;
   /** When true, only leads with at least one PENDING_REVIEW outreach draft. */
@@ -61,6 +71,18 @@ export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLea
 
   if (f.draftPending) {
     w.outreachDrafts = { some: { status: "PENDING_REVIEW" } };
+  }
+
+  if (f.openMicSignalTier) {
+    w.openMicSignalTier = f.openMicSignalTier;
+  }
+
+  if (f.contactQuality) {
+    w.contactQuality = f.contactQuality;
+  }
+
+  if (f.acquisitionStage) {
+    w.acquisitionStage = f.acquisitionStage;
   }
 
   return w;

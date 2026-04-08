@@ -3,7 +3,9 @@
 import bcrypt from "bcryptjs";
 import tzLookup from "tz-lookup";
 import { isNextRedirectError } from "@/lib/nextRedirect";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { getPrismaOrNull } from "@/lib/prisma";
+import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { slugify } from "@/lib/slug";
 import { setSession } from "@/lib/session";
 import { redirect } from "next/navigation";
@@ -46,6 +48,7 @@ export async function registerVenue(formData: FormData) {
   const city = optString(formData, "city");
   const region = optString(formData, "region");
   const country = optString(formData, "country");
+  const growthTraceLeadId = optString(formData, "growthTraceLeadId");
   const latRaw = formData.get("lat");
   const lngRaw = formData.get("lng");
   const lat =
@@ -131,6 +134,24 @@ export async function registerVenue(formData: FormData) {
 
     if (newVenueId) {
       await sendVenueWelcomeEmailAfterRegistration(prisma, newVenueId, email);
+    }
+
+    if (growthTraceLeadId) {
+      const lead = await prisma.growthLead.findFirst({
+        where: { id: growthTraceLeadId, leadType: "VENUE" },
+        select: { id: true, contactEmailNormalized: true },
+      });
+      if (lead) {
+        await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "ACCOUNT_CREATED", { leadType: "VENUE" });
+        const regEmail = normalizeMarketingEmail(email);
+        const leadEmail = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
+        if (leadEmail && leadEmail === regEmail) {
+          await prisma.growthLead.update({
+            where: { id: lead.id },
+            data: { status: "JOINED" },
+          });
+        }
+      }
     }
 
     redirect(`/venue?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_VENUE}`);

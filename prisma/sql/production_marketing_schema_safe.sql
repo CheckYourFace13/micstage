@@ -348,4 +348,50 @@ CREATE UNIQUE INDEX IF NOT EXISTS "GrowthDiscoveryCursor_adapterId_marketSlug_cu
 CREATE INDEX IF NOT EXISTS "GrowthDiscoveryCursor_adapterId_marketSlug_idx"
   ON "GrowthDiscoveryCursor"("adapterId", "marketSlug");
 
+-- ---------------------------------------------------------------------------
+-- GrowthLead: venue-first discovery + acquisition funnel (optional; table may be app-only)
+-- ---------------------------------------------------------------------------
+
+DO $g$
+BEGIN
+  IF to_regclass('public."GrowthLead"') IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF to_regtype('public."GrowthLeadOpenMicSignalTier"') IS NULL THEN
+    CREATE TYPE "GrowthLeadOpenMicSignalTier" AS ENUM ('EXPLICIT_OPEN_MIC', 'STRONG_LIVE_EVENT', 'WEAK_INFERRED');
+  END IF;
+  IF to_regtype('public."GrowthLeadContactQuality"') IS NULL THEN
+    CREATE TYPE "GrowthLeadContactQuality" AS ENUM ('EMAIL', 'CONTACT_PAGE', 'SOCIAL_OR_CALENDAR', 'WEBSITE_ONLY');
+  END IF;
+  IF to_regtype('public."GrowthLeadAcquisitionStage"') IS NULL THEN
+    CREATE TYPE "GrowthLeadAcquisitionStage" AS ENUM (
+      'DISCOVERED', 'OUTREACH_DRAFTED', 'OUTREACH_SENT', 'CLICKED', 'SIGNUP_STARTED', 'ACCOUNT_CREATED', 'LISTING_LIVE'
+    );
+  END IF;
+
+  BEGIN
+    ALTER TABLE "GrowthLead" ADD COLUMN "facebookUrl" TEXT;
+  EXCEPTION WHEN duplicate_column THEN NULL;
+  END;
+  BEGIN
+    ALTER TABLE "GrowthLead" ADD COLUMN "openMicSignalTier" "GrowthLeadOpenMicSignalTier";
+  EXCEPTION WHEN duplicate_column THEN NULL;
+  END;
+  BEGIN
+    ALTER TABLE "GrowthLead" ADD COLUMN "contactQuality" "GrowthLeadContactQuality";
+  EXCEPTION WHEN duplicate_column THEN NULL;
+  END;
+  BEGIN
+    ALTER TABLE "GrowthLead" ADD COLUMN "acquisitionStage" "GrowthLeadAcquisitionStage" NOT NULL DEFAULT 'DISCOVERED';
+  EXCEPTION WHEN duplicate_column THEN NULL;
+  END;
+
+  CREATE INDEX IF NOT EXISTS "GrowthLead_openMicSignalTier_idx" ON "GrowthLead"("openMicSignalTier");
+  CREATE INDEX IF NOT EXISTS "GrowthLead_contactQuality_idx" ON "GrowthLead"("contactQuality");
+  CREATE INDEX IF NOT EXISTS "GrowthLead_acquisitionStage_idx" ON "GrowthLead"("acquisitionStage");
+  CREATE INDEX IF NOT EXISTS "GrowthLead_leadType_openMicSignalTier_idx" ON "GrowthLead"("leadType", "openMicSignalTier");
+END
+$g$;
+
 -- Done.

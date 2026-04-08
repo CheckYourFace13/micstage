@@ -7,6 +7,11 @@ export type GrowthLeadDiscoveryContext = {
   leadType: GrowthLeadType;
   /** Present for autonomous adapters (cursors, pagination). Static/stub adapters may ignore. */
   prisma: PrismaClient;
+  /**
+   * Multiplier for autonomous web search only (≈1 venue, ≈0.056 artist/promoter for 90/5/5).
+   * Other adapters should ignore (default 1).
+   */
+  autonomousWebSearchBudgetMultiplier?: number;
 };
 
 /**

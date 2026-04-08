@@ -8,7 +8,13 @@ import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
 import { sendGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadDraftSend";
-import type { GrowthLeadPerformanceTag, GrowthLeadStatus, GrowthLeadType } from "@/generated/prisma/client";
+import type {
+  GrowthLeadAcquisitionStage,
+  GrowthLeadPerformanceTag,
+  GrowthLeadStatus,
+  GrowthLeadType,
+} from "@/generated/prisma/client";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { requirePrisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -103,10 +109,44 @@ export async function updateGrowthLeadStatusAction(formData: FormData) {
     data: { status },
   });
 
+  if (status === "JOINED") {
+    const row = await prisma.growthLead.findUnique({ where: { id }, select: { leadType: true } });
+    if (row?.leadType === "VENUE") {
+      await advanceGrowthLeadAcquisitionStage(prisma, id, "ACCOUNT_CREATED", { leadType: "VENUE" });
+    }
+  }
+
   revalidatePath("/internal/admin/growth");
   revalidatePath("/internal/admin/growth/leads");
   revalidatePath(`/internal/admin/growth/leads/${id}`);
   redirect(q(`/internal/admin/growth/leads/${id}`, "ok", "status"));
+}
+
+const ACQUISITION_STAGES = new Set<GrowthLeadAcquisitionStage>([
+  "DISCOVERED",
+  "OUTREACH_DRAFTED",
+  "OUTREACH_SENT",
+  "CLICKED",
+  "SIGNUP_STARTED",
+  "ACCOUNT_CREATED",
+  "LISTING_LIVE",
+]);
+
+export async function updateGrowthLeadAcquisitionStageAction(formData: FormData) {
+  await assertAdminSession();
+  const prisma = requirePrisma();
+  const id = String(formData.get("leadId") ?? "").trim();
+  const stage = String(formData.get("acquisitionStage") ?? "").trim() as GrowthLeadAcquisitionStage;
+  if (!id || !ACQUISITION_STAGES.has(stage)) redirect(q("/internal/admin/growth", "err", "badStage"));
+
+  await prisma.growthLead.update({
+    where: { id },
+    data: { acquisitionStage: stage },
+  });
+
+  revalidatePath("/internal/admin/growth/leads");
+  revalidatePath(`/internal/admin/growth/leads/${id}`);
+  redirect(q(`/internal/admin/growth/leads/${id}`, "ok", "acquisition"));
 }
 
 export async function updateGrowthLeadLocalityAction(formData: FormData) {

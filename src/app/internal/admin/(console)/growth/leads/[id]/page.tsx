@@ -8,10 +8,11 @@ import {
   generateGrowthLeadDraftAction,
   rejectGrowthLeadDraftAction,
   sendGrowthLeadDraftAction,
+  updateGrowthLeadAcquisitionStageAction,
   updateGrowthLeadLocalityAction,
   updateGrowthLeadStatusAction,
 } from "@/app/internal/admin/growthActions";
-import type { GrowthLeadStatus } from "@/generated/prisma/client";
+import type { GrowthLeadAcquisitionStage, GrowthLeadStatus } from "@/generated/prisma/client";
 import { explainGrowthLeadOutreachBlock } from "@/lib/growth/growthLeadBlock";
 import { growthFollowUpAutomationEnabled } from "@/lib/marketing/emailConfig";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
@@ -29,6 +30,16 @@ const STATUSES: GrowthLeadStatus[] = [
   "BOUNCED",
   "UNSUBSCRIBED",
   "REJECTED",
+];
+
+const ACQUISITION_STAGES: GrowthLeadAcquisitionStage[] = [
+  "DISCOVERED",
+  "OUTREACH_DRAFTED",
+  "OUTREACH_SENT",
+  "CLICKED",
+  "SIGNUP_STARTED",
+  "ACCOUNT_CREATED",
+  "LISTING_LIVE",
 ];
 
 export default async function AdminGrowthLeadDetailPage(props: {
@@ -111,7 +122,13 @@ export default async function AdminGrowthLeadDetailPage(props: {
       ) : null}
       {flash.ok ? (
         <p className="mt-3 rounded border border-emerald-600/40 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-100">
-          Updated ({flash.ok}).
+          {flash.ok === "acquisition"
+            ? "Acquisition stage updated."
+            : flash.ok === "draft"
+              ? "Draft created."
+              : flash.ok === "sent"
+                ? "Draft sent."
+                : `Updated (${flash.ok}).`}
         </p>
       ) : null}
 
@@ -133,7 +150,13 @@ export default async function AdminGrowthLeadDetailPage(props: {
           <div>
             <dt className="text-zinc-500">Socials</dt>
             <dd className="break-all text-zinc-200">
-              {[lead.instagramUrl, lead.youtubeUrl, lead.tiktokUrl].filter(Boolean).join(" · ") || "—"}
+              {[lead.instagramUrl, lead.facebookUrl, lead.youtubeUrl, lead.tiktokUrl].filter(Boolean).join(" · ") || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Open-mic signal / contact / acquisition</dt>
+            <dd className="font-mono text-[11px] text-zinc-200">
+              {lead.openMicSignalTier ?? "—"} · {lead.contactQuality ?? "—"} · {lead.acquisitionStage}
             </dd>
           </div>
           <div>
@@ -235,6 +258,36 @@ export default async function AdminGrowthLeadDetailPage(props: {
             Save status
           </button>
         </form>
+
+        <form action={updateGrowthLeadAcquisitionStageAction} className="mt-3 flex flex-wrap items-end gap-2 border-t border-zinc-800/80 pt-3">
+          <input type="hidden" name="leadId" value={lead.id} />
+          <label className="grid gap-1 text-sm">
+            <span className="text-zinc-400">Venue acquisition stage (manual override)</span>
+            <select
+              name="acquisitionStage"
+              defaultValue={lead.acquisitionStage}
+              className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 font-mono text-[11px] text-white"
+            >
+              {ACQUISITION_STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="rounded-md bg-zinc-700 px-3 py-2 text-sm text-white hover:bg-zinc-600">
+            Save acquisition stage
+          </button>
+        </form>
+        {lead.leadType === "VENUE" ? (
+          <p className="mt-2 text-xs text-zinc-500">
+            Outreach drafts auto-advance <span className="font-mono text-zinc-400">OUTREACH_DRAFTED</span> →{" "}
+            <span className="font-mono text-zinc-400">OUTREACH_SENT</span>; registration links with{" "}
+            <span className="font-mono text-zinc-400">?growthLead=…</span> advance{" "}
+            <span className="font-mono text-zinc-400">CLICKED</span> and (on success){" "}
+            <span className="font-mono text-zinc-400">ACCOUNT_CREATED</span>.
+          </p>
+        ) : null}
       </section>
 
       <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">

@@ -14,7 +14,10 @@ export type ExtractedContactHints = {
   instagramUrls: string[];
   youtubeUrls: string[];
   tiktokUrls: string[];
+  facebookUrls: string[];
   sameHostPaths: string[];
+  /** Whitespace-collapsed body text for open-mic / live-event signal scoring. */
+  bodyTextSample: string;
 };
 
 function hostOf(url: string): string | null {
@@ -37,6 +40,7 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
   const instagramUrls = new Set<string>();
   const youtubeUrls = new Set<string>();
   const tiktokUrls = new Set<string>();
+  const facebookUrls = new Set<string>();
   const sameHostPaths = new Set<string>();
 
   $("a[href]").each((_, el) => {
@@ -75,13 +79,26 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
       }
       return;
     }
+    if (lower.includes("facebook.com/") || lower.includes("fb.com/")) {
+      try {
+        const u = new URL(href.startsWith("http") ? href : `https:${href}`);
+        const path = u.pathname.toLowerCase();
+        if (path.includes("/share") || path.includes("/sharer")) return;
+        facebookUrls.add(u.toString().split("?")[0]!);
+      } catch {
+        /* skip */
+      }
+      return;
+    }
     if (pageHost && (href.startsWith("/") || lower.includes(pageHost))) {
       try {
         const abs = new URL(href, pageUrl);
         if (hostOf(abs.toString()) === pageHost && sameHostPaths.size < maxSame) {
           const p = abs.pathname.toLowerCase();
           if (
-            /contact|book|booking|rental|private|events|calendar|about|team|staff|press/i.test(p) ||
+            /contact|book|booking|rental|private|events?|calendar|about|team|staff|press|open[\s-]?mic|mic[\s-]?night|talent|perform|entertain|host|venue|faq/i.test(
+              p,
+            ) ||
             p === "/" ||
             p.length < 80
           ) {
@@ -95,6 +112,7 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
   });
 
   const bodyText = $("body").text();
+  const bodyTextSample = bodyText.replace(/\s+/g, " ").trim().slice(0, 18_000);
   const found = bodyText.match(EMAIL_RE);
   if (found) {
     for (const e of found) {
@@ -109,6 +127,43 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
     instagramUrls: [...instagramUrls].slice(0, 5),
     youtubeUrls: [...youtubeUrls].slice(0, 3),
     tiktokUrls: [...tiktokUrls].slice(0, 3),
+    facebookUrls: [...facebookUrls].slice(0, 4),
     sameHostPaths: [...sameHostPaths].slice(0, maxSame),
+    bodyTextSample,
   };
+}
+
+const CONTACT_PATH_PRIORITY: { re: RegExp; w: number }[] = [
+  { re: /contact|inquir/i, w: 100 },
+  { re: /book|booking|rental|private/i, w: 95 },
+  { re: /events?|calendar|schedule/i, w: 90 },
+  { re: /open[\s-]?mic|mic[\s-]?night/i, w: 88 },
+  { re: /talent|perform|entertain|host/i, w: 82 },
+  { re: /about|team|staff/i, w: 70 },
+  { re: /faq|press/i, w: 55 },
+];
+
+/**
+ * Best same-host path for venue outreach when no email (contact form / events page).
+ */
+export function pickPrimaryVenueContactUrl(paths: string[]): string | null {
+  if (!paths.length) return null;
+  let best: string | null = null;
+  let bestScore = -1;
+  for (const raw of paths) {
+    try {
+      const p = new URL(raw).pathname.toLowerCase();
+      let s = 10;
+      for (const { re, w } of CONTACT_PATH_PRIORITY) {
+        if (re.test(p)) s = Math.max(s, w);
+      }
+      if (s > bestScore) {
+        bestScore = s;
+        best = raw.split("#")[0] ?? raw;
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  return best;
 }

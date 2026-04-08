@@ -1,23 +1,28 @@
 import type { GrowthLeadType } from "@/generated/prisma/client";
-import { createEmptyAdapter } from "@/lib/growth/sources/placeholderAdapters";
+import { createAutonomousEventbriteVenueAdapter } from "@/lib/growth/discovery/autonomousEventbriteAdapter";
+import { createAutonomousSeedCrawlVenueAdapter } from "@/lib/growth/discovery/autonomousSeedCrawlAdapter";
+import { createAutonomousWebSearchAdapter } from "@/lib/growth/discovery/autonomousWebSearchAdapters";
+import { allChicagolandStaticAdapters } from "@/lib/growth/sources/chicagolandStaticAdapters";
 import type { GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
 import { createStubJsonAdapter } from "@/lib/growth/sources/stubJsonAdapters";
 
 const TYPES: GrowthLeadType[] = ["VENUE", "ARTIST", "PROMOTER_ACCOUNT"];
 
-/** All registered discovery adapters (cron iterates by market + lead type). */
+function allAutonomousDiscoveryAdapters(): GrowthLeadSourceAdapter[] {
+  return [
+    createAutonomousWebSearchAdapter("VENUE"),
+    createAutonomousWebSearchAdapter("ARTIST"),
+    createAutonomousWebSearchAdapter("PROMOTER_ACCOUNT"),
+    createAutonomousSeedCrawlVenueAdapter(),
+    createAutonomousEventbriteVenueAdapter(),
+  ];
+}
+
+/** All registered discovery adapters (cron iterates by market + adapter). */
 export function allGrowthDiscoveryAdapters(): GrowthLeadSourceAdapter[] {
   const stubs = TYPES.map((t) => createStubJsonAdapter(t));
-  const placeholders: GrowthLeadSourceAdapter[] = [
-    createEmptyAdapter("website_contact_venue", "VENUE"),
-    createEmptyAdapter("website_contact_artist", "ARTIST"),
-    createEmptyAdapter("website_contact_promoter", "PROMOTER_ACCOUNT"),
-    createEmptyAdapter("social_profile_venue", "VENUE"),
-    createEmptyAdapter("social_profile_artist", "ARTIST"),
-    createEmptyAdapter("social_profile_promoter", "PROMOTER_ACCOUNT"),
-    createEmptyAdapter("event_listing_venue", "VENUE"),
-    createEmptyAdapter("event_listing_artist", "ARTIST"),
-    createEmptyAdapter("event_listing_promoter", "PROMOTER_ACCOUNT"),
-  ];
-  return [...stubs, ...placeholders];
+  const autonomous = allAutonomousDiscoveryAdapters();
+  const chicagolandCurated = allChicagolandStaticAdapters();
+  /** Stubs first; autonomous (high volume); curated static last (fills gaps, dedupes against earlier). */
+  return [...stubs, ...autonomous, ...chicagolandCurated];
 }

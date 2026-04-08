@@ -855,6 +855,19 @@ model GrowthLead {
   @@index([instagramHandleNormalized, leadType])
 }
 
+/// Pagination / rotation state for autonomous discovery adapters (per adapter + market).
+model GrowthDiscoveryCursor {
+  id         String   @id @default(cuid())
+  updatedAt  DateTime @updatedAt
+  adapterId  String
+  marketSlug String
+  cursorKey  String
+  value      String   @db.Text
+
+  @@unique([adapterId, marketSlug, cursorKey])
+  @@index([adapterId, marketSlug])
+}
+
 model GrowthLeadOutreachDraft {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())

@@ -17,6 +17,15 @@ export function growthLeadDiscoveryCronEnabled(): boolean {
   return process.env.GROWTH_LEAD_DISCOVERY_CRON_ENABLED === "true";
 }
 
+/**
+ * Max candidates each adapter may emit per market per cron run (ingestion + dedupe still apply).
+ * Keeps discovery throttled on large stub JSON batches.
+ */
+export function growthDiscoveryMaxCandidatesPerAdapterPerMarket(): number {
+  /** High-volume autonomous runs: raise to 400–800; combine with frequent cron for 500+ new leads/day (dedupe reduces net). */
+  return parseIntEnv("GROWTH_DISCOVERY_MAX_CANDIDATES_PER_ADAPTER", 250);
+}
+
 /** When true, cron may auto-create PENDING_REVIEW outreach drafts (never auto-send). */
 export function growthAutoDraftCronEnabled(): boolean {
   return process.env.GROWTH_AUTO_DRAFT_CRON_ENABLED === "true";

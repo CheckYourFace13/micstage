@@ -6,6 +6,7 @@ import {
 } from "@/app/internal/admin/growthActions";
 import { loadGrowthDailyActivityStats } from "@/lib/growth/growthDailyActivity";
 import { loadGrowthFunnelMetrics, loadGrowthMarketMetrics } from "@/lib/growth/marketMetrics";
+import { listGrowthDiscoveryAdapterRegistry } from "@/lib/growth/discoveryAdapterCatalog";
 import { defaultGrowthMetro, GROWTH_METROS, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
 import {
   growthFollowUpAutomationEnabled,
@@ -55,6 +56,8 @@ export default async function AdminGrowthHubPage(props: {
 
   const counts = Object.fromEntries(byType.map((g) => [g.leadType, g._count._all])) as Record<string, number>;
   const chiSlug = defaultGrowthMetro().discoveryMarketSlug;
+  const curatedDiscoveryAdapters = listGrowthDiscoveryAdapterRegistry().filter((a) => a.tier === "curated");
+  const autonomousDiscoveryAdapters = listGrowthDiscoveryAdapterRegistry().filter((a) => a.tier === "autonomous");
 
   return (
     <main className="mx-auto max-w-5xl px-3 py-6">
@@ -74,6 +77,17 @@ export default async function AdminGrowthHubPage(props: {
         <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>. Caps: outreach{" "}
         {marketingDailyCap("outreach")}/day · per-domain {marketingPerDomainDailyCap()}/day · contact cooldown{" "}
         {marketingContactCooldownHours()}h.
+      </p>
+      <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-500">
+        <span className="font-medium text-zinc-400">Autonomous adapters</span> (search/crawl/API — requires{" "}
+        <code className="text-zinc-400">GROWTH_DISCOVERY_AUTONOMOUS_ENABLED=true</code> + keys):{" "}
+        <span className="font-mono text-zinc-400">{autonomousDiscoveryAdapters.map((a) => a.id).join(", ")}</span>.
+        <br />
+        <span className="font-medium text-zinc-400">Curated static adapters</span>:{" "}
+        <span className="font-mono text-zinc-400">{curatedDiscoveryAdapters.map((a) => a.id).join(", ")}</span>. Stub JSON:{" "}
+        <span className="font-mono text-zinc-400">stub_json_*</span> via{" "}
+        <code className="text-zinc-400">GROWTH_DISCOVERY_STUB_LEADS_JSON</code>. Cron returns{" "}
+        <code className="text-zinc-400">adapterRegistry</code> + <code className="text-zinc-400">candidatesEmittedByAdapter</code>.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">

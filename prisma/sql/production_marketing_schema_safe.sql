@@ -328,4 +328,24 @@ DO $f$ BEGIN
   ALTER TABLE "MarketingOutreachDraft" ADD CONSTRAINT "MarketingOutreachDraft_marketingEmailSendId_fkey" FOREIGN KEY ("marketingEmailSendId") REFERENCES "MarketingEmailSend"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $f$;
 
+-- ---------------------------------------------------------------------------
+-- GrowthDiscoveryCursor (autonomous lead discovery cursors; no FK)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS "GrowthDiscoveryCursor" (
+  "id" TEXT NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "adapterId" TEXT NOT NULL,
+  "marketSlug" TEXT NOT NULL,
+  "cursorKey" TEXT NOT NULL,
+  "value" TEXT NOT NULL,
+  CONSTRAINT "GrowthDiscoveryCursor_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "GrowthDiscoveryCursor_adapterId_marketSlug_cursorKey_key"
+  ON "GrowthDiscoveryCursor"("adapterId", "marketSlug", "cursorKey");
+
+CREATE INDEX IF NOT EXISTS "GrowthDiscoveryCursor_adapterId_marketSlug_idx"
+  ON "GrowthDiscoveryCursor"("adapterId", "marketSlug");
+
 -- Done.

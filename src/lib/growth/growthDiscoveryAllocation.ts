@@ -6,15 +6,26 @@ import { growthDiscoveryMaxCandidatesPerAdapterPerMarket } from "@/lib/growth/ex
  * `autonomous_web_search_venue` (multiplier 1). Same env knobs (`GROWTH_DISCOVERY_AUTONOMOUS_*`).
  */
 export function autonomousWebSearchBudgetMultiplier(_adapterId: string): number {
-  return 1;
+  if (_adapterId === "autonomous_web_search_venue") return 1;
+  return 1.15;
 }
 
 /** Per-adapter cap from `GROWTH_DISCOVERY_MAX_CANDIDATES_PER_ADAPTER` (unchanged env name). */
 export function discoveryIngestCapForAdapter(_adapter: GrowthLeadSourceAdapter): number {
-  return growthDiscoveryMaxCandidatesPerAdapterPerMarket();
+  const base = growthDiscoveryMaxCandidatesPerAdapterPerMarket();
+  if (_adapter.id === "autonomous_web_search_venue") {
+    return Math.max(50, Math.round(base * 0.5));
+  }
+  if (_adapter.id === "autonomous_seed_url_crawl_venue" || _adapter.id === "autonomous_eventbrite_chicago") {
+    return Math.max(80, Math.round(base * 1.2));
+  }
+  if (_adapter.id.startsWith("chicagoland_")) {
+    return Math.max(100, Math.round(base * 1.25));
+  }
+  return base;
 }
 
 /** Human-readable note for cron JSON / ops. */
 export function growthDiscoveryAllocationSummary(): string {
-  return "Autonomous web search: venue-only (100% of SerpAPI/CSE search + fetch budget). Artist/promoter autonomous web adapters are not registered. Caps: GROWTH_DISCOVERY_MAX_CANDIDATES_PER_ADAPTER + GROWTH_DISCOVERY_AUTONOMOUS_*.";
+  return "Discovery priority: internal/stub seeds -> curated adapters -> direct crawlers (seed crawl/Eventbrite) -> SerpAPI/CSE venue web search only when quota/state allows. SerpAPI is treated as premium, capped, and circuit-breaker guarded.";
 }

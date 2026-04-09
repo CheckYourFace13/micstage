@@ -4,7 +4,7 @@ import type { GrowthLeadType } from "@/generated/prisma/client";
  * Discovery adapter registry for ops visibility.
  * - stub: `GROWTH_DISCOVERY_STUB_LEADS_JSON` only
  * - curated: shipped static Chicagoland seeds
- * - autonomous: web search, seed crawl, Eventbrite (gated by env + `GROWTH_DISCOVERY_AUTONOMOUS_ENABLED`)
+ * - autonomous: direct crawlers + web search fallback (gated by env + runtime provider-state caps)
  */
 export type GrowthDiscoveryAdapterTier = "stub" | "curated" | "autonomous";
 
@@ -58,7 +58,7 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
       id: "autonomous_web_search_venue",
       tier: "autonomous",
       description:
-        "SerpAPI/CSE → open-mic–intent venue queries only → page fetch → signal tier + contact quality → Chicagoland (100% of autonomous web search)",
+        "Premium fallback search (SerpAPI/CSE, quota-aware with circuit breaker) → open-mic venue queries → page fetch/contact quality",
     },
     {
       id: "autonomous_seed_url_crawl_venue",

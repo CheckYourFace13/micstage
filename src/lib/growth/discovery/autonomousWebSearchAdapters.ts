@@ -13,7 +13,12 @@ import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSi
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
 import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
-import { discoverySearchProvider, runWebSearch, type SearchHit } from "@/lib/growth/discovery/webSearch";
+import {
+  discoverySearchProviderForMarket,
+  runWebSearch,
+  type SearchHit,
+} from "@/lib/growth/discovery/webSearch";
+import { markSerpApiRunStarted } from "@/lib/growth/discovery/providerState";
 
 const ADAPTER_ID = "autonomous_web_search_venue";
 const CURSOR_KEY = "search_rotation";
@@ -82,7 +87,7 @@ function allowHitUrl(url: string): boolean {
   try {
     const h = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
     if (h.includes("google.") || h === "gstatic.com") return false;
-    if (h.includes("instagram.com") || h.includes("tiktok.com")) return false;
+    if (h.includes("tiktok.com")) return false;
     if (h.includes("facebook.com") || h.includes("fb.com")) return true;
     if (h.includes("youtube.com") || h.includes("youtu.be")) return false;
     if (h.includes("linkedin.com")) return false;
@@ -118,6 +123,12 @@ const VENUE_QUERIES = [
   'Chicago IL comedy club "open mic" OR showcase',
   'Oak Park Berwyn "open mic" night',
   'Chicago "open stage" OR "amateur night" venue',
+  'site:meetup.com "open mic" Chicago',
+  'site:facebook.com/events "open mic" Chicago',
+  'site:openmikes.org Chicago',
+  'site:badslava.com "open mic" Chicago',
+  'Chicago venue events calendar "open mic"',
+  'Chicago bar calendar "open mic night"',
 ];
 
 /**
@@ -144,7 +155,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           });
           return [];
         }
-        const provider = discoverySearchProvider();
+        const provider = await discoverySearchProviderForMarket(ctx.prisma, ctx.discoveryMarketSlug);
         if (!provider || !ctx.prisma) {
           console.info("[growth discovery] autonomous_web_search_venue skipped: provider/prisma missing", {
             provider,
@@ -155,6 +166,9 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         }
 
         const prisma = ctx.prisma;
+        if (provider === "serpapi") {
+          await markSerpApiRunStarted(prisma, ctx.discoveryMarketSlug);
+        }
         const mult = Math.max(0.02, ctx.autonomousWebSearchBudgetMultiplier ?? 1);
         const searchCalls = Math.max(1, Math.round(growthDiscoveryAutonomousSearchCallsPerRun() * mult));
         const maxFetches = Math.max(2, Math.round(growthDiscoveryAutonomousMaxPageFetchesPerRun() * mult));
@@ -175,10 +189,14 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         });
         for (let i = 0; i < searchCalls; i++) {
         const q = queries[cur.qi % queries.length]!;
-        const res = await runWebSearch(q, { provider: cur.prov, start: cur.start });
+        const res = await runWebSearch(
+          q,
+          { provider: cur.prov, start: cur.start },
+          { prisma, marketSlug: ctx.discoveryMarketSlug },
+        );
         if (!res || res.items.length === 0) {
           cur.qi = (cur.qi + 1) % queries.length;
-          cur.start = provider === "google_cse" ? 1 : 0;
+          cur.start = cur.prov === "google_cse" ? 1 : 0;
           continue;
         }
         for (const it of res.items) {
@@ -186,10 +204,11 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           if (!resolved || !allowHitUrl(resolved)) continue;
           hits.push({ hit: { ...it, link: resolved }, searchQuery: q });
         }
+        cur.prov = res.nextCursor.provider;
         cur.start = res.nextCursor.start;
-        if (res.items.length < 8 || (provider === "google_cse" && cur.start > 90)) {
+        if (res.items.length < 8 || (cur.prov === "google_cse" && cur.start > 90)) {
           cur.qi = (cur.qi + 1) % queries.length;
-          cur.start = provider === "google_cse" ? 1 : 0;
+          cur.start = cur.prov === "google_cse" ? 1 : 0;
         }
         }
 

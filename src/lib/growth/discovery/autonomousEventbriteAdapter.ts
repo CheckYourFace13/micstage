@@ -13,6 +13,7 @@ import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
 
 const ADAPTER_ID = "autonomous_eventbrite_chicago";
 const CURSOR_KEY = "eb_page";
+const EVENTBRITE_QUERIES = ["open mic", "poetry open mic", "comedy open mic", "jam night"];
 
 type EbVenue = { name?: string; address?: { city?: string; region?: string } };
 type EbEvent = {
@@ -50,17 +51,27 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
 
       const token = growthEventbriteToken();
       const prisma = ctx.prisma;
-      let page = Number.parseInt((await readDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY)) ?? "1", 10) || 1;
-      if (page < 1) page = 1;
+      let page = 1;
+      let queryIndex = 0;
+      try {
+        const raw = await readDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY);
+        const parsed = raw ? (JSON.parse(raw) as { page?: number; queryIndex?: number }) : null;
+        page = Math.max(1, Number(parsed?.page ?? 1) || 1);
+        queryIndex = Math.max(0, Number(parsed?.queryIndex ?? 0) || 0) % EVENTBRITE_QUERIES.length;
+      } catch {
+        page = 1;
+        queryIndex = 0;
+      }
+      const query = EVENTBRITE_QUERIES[queryIndex]!;
 
       await sleep(growthDiscoveryHttpDelayMs());
 
       const u = new URL("https://www.eventbriteapi.com/v3/events/search/");
       u.searchParams.set("location.address", "Chicago, IL");
-      u.searchParams.set("location.within", "40km");
+      u.searchParams.set("location.within", process.env.GROWTH_EVENTBRITE_RADIUS_KM?.trim() || "70km");
       u.searchParams.set("page", String(page));
       u.searchParams.set("expand", "venue");
-      u.searchParams.set("q", "open mic");
+      u.searchParams.set("q", query);
 
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(), 25_000);
@@ -84,8 +95,16 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
 
       const events = data.events ?? [];
       const pageCount = data.pagination?.page_count ?? page;
-      const nextPage = page >= pageCount ? 1 : page + 1;
-      await writeDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY, String(nextPage));
+      const wrapped = page >= pageCount;
+      const nextPage = wrapped ? 1 : page + 1;
+      const nextQueryIndex = wrapped ? (queryIndex + 1) % EVENTBRITE_QUERIES.length : queryIndex;
+      await writeDiscoveryCursor(
+        prisma,
+        ADAPTER_ID,
+        ctx.discoveryMarketSlug,
+        CURSOR_KEY,
+        JSON.stringify({ page: nextPage, queryIndex: nextQueryIndex }),
+      );
 
       const out: GrowthLeadCandidate[] = [];
       for (const ev of events) {
@@ -133,7 +152,7 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
           contactQuality,
           performanceTags: om.performanceTags.length ? om.performanceTags : [],
           importKey: `eb_evt:${ev.id}`,
-          internalNotes: "Eventbrite search (Chicago radius, open-mic query). Verify venue before outreach.",
+          internalNotes: `Eventbrite search (${query}, radius ${u.searchParams.get("location.within")}). Verify venue before outreach.`,
         });
       }
       return out;

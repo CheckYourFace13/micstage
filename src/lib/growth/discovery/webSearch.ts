@@ -5,6 +5,13 @@ import {
   serpApiKeySourceForDiscovery,
   serpApiKeyForDiscovery,
 } from "@/lib/growth/discovery/autonomousConfig";
+import type { PrismaClient } from "@/generated/prisma/client";
+import {
+  disableSerpApiOnQuota429,
+  markSerpApiCall,
+  readSerpApiProviderState,
+  serpApiAvailabilityNow,
+} from "@/lib/growth/discovery/providerState";
 
 export type SearchHit = { link: string; title: string; snippet?: string };
 
@@ -99,6 +106,7 @@ function serpLocalPlaceRows(raw: unknown): SerpLocalPlace[] {
 export async function runSerpApiSearch(
   query: string,
   start0Based: number,
+  opts?: { prisma?: PrismaClient; marketSlug?: string },
 ): Promise<{ items: SearchHit[]; rawNextStart: number } | null> {
   if (!hasSerpApi()) {
     console.info("[growth discovery] SerpAPI skipped: no resolved key");
@@ -109,6 +117,19 @@ export async function runSerpApiSearch(
   if (!apiKey) {
     console.info("[growth discovery] SerpAPI skipped: resolved key empty", { keySource });
     return null;
+  }
+  if (opts?.prisma && opts.marketSlug) {
+    const avail = await serpApiAvailabilityNow(opts.prisma, opts.marketSlug);
+    if (!avail.enabled) {
+      console.info("[growth discovery] SerpAPI skipped by provider-state gate", {
+        market: opts.marketSlug,
+        reason: avail.reason ?? "state_gate",
+        callsToday: avail.state.callsToday,
+        callsMonth: avail.state.callsMonth,
+        disabledUntil: avail.state.disabledUntilIso,
+      });
+      return null;
+    }
   }
   console.info("[growth discovery] SerpAPI request start", {
     keySource: keySource ?? "unknown",
@@ -129,10 +150,28 @@ export async function runSerpApiSearch(
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), 25_000);
   try {
+    if (opts?.prisma && opts.marketSlug) {
+      await markSerpApiCall(opts.prisma, opts.marketSlug);
+    }
     const res = await fetch(u.toString(), { signal: ac.signal });
     lastSearchAt = Date.now();
     const text = await res.text();
     if (!res.ok) {
+      const tLower = text.toLowerCase();
+      const quotaExhausted =
+        res.status === 429 &&
+        (tLower.includes("run out of searches") ||
+          tLower.includes("out of searches") ||
+          tLower.includes("quota"));
+      if (quotaExhausted && opts?.prisma && opts.marketSlug) {
+        const state = await disableSerpApiOnQuota429(opts.prisma, opts.marketSlug, "serpapi_429_quota");
+        console.error("[growth discovery] SerpAPI circuit breaker engaged", {
+          market: opts.marketSlug,
+          disabledUntil: state.disabledUntilIso,
+          last429At: state.last429AtIso,
+          reason: state.reason,
+        });
+      }
       console.warn("[growth discovery] SerpAPI HTTP", res.status, text.slice(0, 400));
       return null;
     }
@@ -210,16 +249,28 @@ export async function runSerpApiSearch(
 export async function runWebSearch(
   query: string,
   cursor: { provider: "google_cse" | "serpapi"; start: number },
+  opts?: { prisma?: PrismaClient; marketSlug?: string },
 ): Promise<{ items: SearchHit[]; nextCursor: { provider: "google_cse" | "serpapi"; start: number } } | null> {
   if (hasSerpApi()) {
-    const r = await runSerpApiSearch(query, cursor.provider === "serpapi" ? cursor.start : 0);
-    if (!r) return null;
-    const next = r.rawNextStart;
-    const exhausted = r.items.length === 0;
-    return {
-      items: r.items,
-      nextCursor: { provider: "serpapi", start: exhausted ? 0 : next },
-    };
+    const r = await runSerpApiSearch(query, cursor.provider === "serpapi" ? cursor.start : 0, opts);
+    if (r) {
+      const next = r.rawNextStart;
+      const exhausted = r.items.length === 0;
+      return {
+        items: r.items,
+        nextCursor: { provider: "serpapi", start: exhausted ? 0 : next },
+      };
+    }
+    if (hasGoogleProgrammableSearch()) {
+      const fallback = await runProgrammableSearch(query, 1);
+      if (!fallback) return null;
+      const exhausted = fallback.items.length === 0 || fallback.rawNextStart > 81;
+      return {
+        items: fallback.items,
+        nextCursor: { provider: "google_cse", start: exhausted ? 1 : fallback.rawNextStart },
+      };
+    }
+    return null;
   }
   if (hasGoogleProgrammableSearch()) {
     const start1 = cursor.provider === "google_cse" ? Math.max(1, cursor.start || 1) : 1;
@@ -238,4 +289,40 @@ export function discoverySearchProvider(): "serpapi" | "google_cse" | null {
   if (hasSerpApi()) return "serpapi";
   if (hasGoogleProgrammableSearch()) return "google_cse";
   return null;
+}
+
+export async function discoverySearchProviderForMarket(
+  prisma: PrismaClient | null | undefined,
+  marketSlug: string,
+): Promise<"serpapi" | "google_cse" | null> {
+  if (hasSerpApi() && prisma) {
+    const avail = await serpApiAvailabilityNow(prisma, marketSlug);
+    if (avail.enabled) return "serpapi";
+  }
+  if (hasGoogleProgrammableSearch()) return "google_cse";
+  if (hasSerpApi()) return "serpapi";
+  return null;
+}
+
+export async function readSerpApiMetricsForMarket(
+  prisma: PrismaClient | null | undefined,
+  marketSlug: string,
+): Promise<{
+  callsToday: number;
+  callsMonth: number;
+  disabledUntil: string | null;
+  last429At: string | null;
+  reason: string | null;
+}> {
+  if (!prisma) {
+    return { callsToday: 0, callsMonth: 0, disabledUntil: null, last429At: null, reason: null };
+  }
+  const s = await readSerpApiProviderState(prisma, marketSlug);
+  return {
+    callsToday: s.callsToday,
+    callsMonth: s.callsMonth,
+    disabledUntil: s.disabledUntilIso,
+    last429At: s.last429AtIso,
+    reason: s.reason,
+  };
 }

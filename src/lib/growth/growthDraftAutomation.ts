@@ -14,6 +14,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   nonEmailVenuePathsQueued: number;
   skipped: number;
   errors: string[];
+  rejectionReasonsByCount: Record<string, number>;
 }> {
   const fitMin = growthAutoDraftFitMin();
   const venueAutoFitMin = Math.max(6, fitMin - 1);
@@ -47,6 +48,11 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   let nonEmailVenuePathsQueued = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const rejectionReasonsByCount: Record<string, number> = {};
+  const bumpReason = (reason: string) => {
+    const k = reason.trim().slice(0, 220);
+    rejectionReasonsByCount[k] = (rejectionReasonsByCount[k] ?? 0) + 1;
+  };
   const activeMarkets = await prisma.growthLaunchMarket.findMany({
     where: { status: "ACTIVE" },
     select: { discoveryMarketSlug: true },
@@ -59,6 +65,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       created++;
     } else {
       skipped++;
+      bumpReason(r.reason);
       if (!r.reason.includes("already has")) {
         errors.push(`${c.id}: ${r.reason}`);
       }
@@ -96,7 +103,12 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     autoApprovedVenue++;
     const sent = await sendApprovedGrowthLeadDraft(prisma, d.id);
     if (sent.ok) autoSentVenue++;
-    else errors.push(`${d.id}: auto send blocked (${sent.reasons.join(" | ").slice(0, 300)})`);
+    else {
+      for (const reason of sent.reasons) {
+        bumpReason(`send_blocked: ${reason}`);
+      }
+      errors.push(`${d.id}: auto send blocked (${sent.reasons.join(" | ").slice(0, 300)})`);
+    }
   }
 
   // Non-email venue path tasks are queued during ingest via MarketingJob; expose dashboard count.
@@ -116,5 +128,13 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     });
   }
 
-  return { created, autoApprovedVenue, autoSentVenue, nonEmailVenuePathsQueued, skipped, errors };
+  return {
+    created,
+    autoApprovedVenue,
+    autoSentVenue,
+    nonEmailVenuePathsQueued,
+    skipped,
+    errors,
+    rejectionReasonsByCount,
+  };
 }

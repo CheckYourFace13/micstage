@@ -10,9 +10,9 @@ const TYPES: GrowthLeadType[] = ["VENUE", "ARTIST", "PROMOTER_ACCOUNT"];
 
 function allAutonomousDiscoveryAdapters(): GrowthLeadSourceAdapter[] {
   return [
-    createAutonomousVenueWebSearchAdapter(),
-    createAutonomousSeedCrawlVenueAdapter(),
     createAutonomousEventbriteVenueAdapter(),
+    createAutonomousSeedCrawlVenueAdapter(),
+    createAutonomousVenueWebSearchAdapter(),
   ];
 }
 
@@ -21,6 +21,6 @@ export function allGrowthDiscoveryAdapters(): GrowthLeadSourceAdapter[] {
   const stubs = TYPES.map((t) => createStubJsonAdapter(t));
   const autonomous = allAutonomousDiscoveryAdapters();
   const chicagolandCurated = allChicagolandStaticAdapters();
-  /** Stubs first; autonomous (high volume); curated static last (fills gaps, dedupes against earlier). */
-  return [...stubs, ...autonomous, ...chicagolandCurated];
+  /** Priority: internal seeds -> curated -> direct crawlers -> web search (Serp/CSE) last. */
+  return [...stubs, ...chicagolandCurated, ...autonomous];
 }

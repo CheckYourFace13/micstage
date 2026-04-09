@@ -9,6 +9,13 @@ import { loadGrowthFunnelMetrics, loadGrowthMarketMetrics } from "@/lib/growth/m
 import { growthDiscoveryAllocationSummary } from "@/lib/growth/growthDiscoveryAllocation";
 import { listGrowthDiscoveryAdapterRegistry } from "@/lib/growth/discoveryAdapterCatalog";
 import {
+  growthSerpApiCostPerCallUsd,
+  growthSerpApiDailyMax,
+  growthSerpApiEnabled,
+  growthSerpApiMonthlySoftMax,
+} from "@/lib/growth/discovery/autonomousConfig";
+import { readSerpApiMetricsForMarket } from "@/lib/growth/discovery/webSearch";
+import {
   defaultGrowthMetro,
   GROWTH_METROS,
   primaryLaunchDiscoveryMarketSlug,
@@ -61,6 +68,13 @@ export default async function AdminGrowthHubPage(props: {
     autoVenueSent,
     pendingVenuePathTasks,
     storedVenueContacts,
+    leadSourceBreakdown,
+    draftSourceBreakdown,
+    sentSourceBreakdown,
+    leadSourceFitBreakdown,
+    leadSourceWithEmailBreakdown,
+    leadSourceWithoutEmailBreakdown,
+    draftErrorRows,
   ] =
     await Promise.all([
       loadGrowthMarketMetrics(prisma, marketSlug),
@@ -117,7 +131,75 @@ export default async function AdminGrowthHubPage(props: {
           source: { contains: "growth-lead", mode: "insensitive" },
         },
       }),
+      prisma.growthLead.groupBy({
+        by: ["source"],
+        where: marketEq,
+        _count: { _all: true },
+      }),
+      prisma.growthLeadOutreachDraft.findMany({
+        where: { lead: marketEq },
+        select: { status: true, lead: { select: { source: true } } },
+      }),
+      prisma.growthLeadOutreachDraft.findMany({
+        where: { status: "SENT", lead: marketEq },
+        select: { lead: { select: { source: true } } },
+      }),
+      prisma.growthLead.groupBy({
+        by: ["source"],
+        where: marketEq,
+        _avg: { fitScore: true },
+      }),
+      prisma.growthLead.groupBy({
+        by: ["source"],
+        where: { ...marketEq, contactEmailNormalized: { not: null } },
+        _count: { _all: true },
+      }),
+      prisma.growthLead.groupBy({
+        by: ["source"],
+        where: { ...marketEq, contactEmailNormalized: null },
+        _count: { _all: true },
+      }),
+      prisma.growthLeadOutreachDraft.findMany({
+        where: { lead: marketEq, lastError: { not: null } },
+        select: { lastError: true },
+        orderBy: { updatedAt: "desc" },
+        take: 500,
+      }),
     ]);
+  const serpMetrics = await readSerpApiMetricsForMarket(prisma, marketSlug);
+  const draftBySource: Record<string, number> = {};
+  for (const row of draftSourceBreakdown) {
+    const k = row.lead.source || "unknown";
+    draftBySource[k] = (draftBySource[k] ?? 0) + 1;
+  }
+  const sentBySource: Record<string, number> = {};
+  for (const row of sentSourceBreakdown) {
+    const k = row.lead.source || "unknown";
+    sentBySource[k] = (sentBySource[k] ?? 0) + 1;
+  }
+  const avgFitBySource: Record<string, number> = {};
+  for (const row of leadSourceFitBreakdown) {
+    avgFitBySource[row.source || "unknown"] = Number((row._avg.fitScore ?? 0).toFixed(2));
+  }
+  const withEmailBySource: Record<string, number> = {};
+  for (const row of leadSourceWithEmailBreakdown) {
+    withEmailBySource[row.source || "unknown"] = row._count._all;
+  }
+  const withoutEmailBySource: Record<string, number> = {};
+  for (const row of leadSourceWithoutEmailBreakdown) {
+    withoutEmailBySource[row.source || "unknown"] = row._count._all;
+  }
+  const rejectionReasonsByCount: Record<string, number> = {};
+  for (const row of draftErrorRows) {
+    const raw = (row.lastError || "").trim();
+    if (!raw) continue;
+    const reason = raw
+      .split("|")[0]!
+      .replace(/\s+/g, " ")
+      .slice(0, 180);
+    rejectionReasonsByCount[reason] = (rejectionReasonsByCount[reason] ?? 0) + 1;
+  }
+  const topRejectionReasons = Object.entries(rejectionReasonsByCount).sort((a, b) => b[1] - a[1]).slice(0, 12);
 
   const counts = Object.fromEntries(byType.map((g) => [g.leadType, g._count._all])) as Record<string, number>;
   const venueN = counts.VENUE ?? 0;
@@ -249,6 +331,81 @@ export default async function AdminGrowthHubPage(props: {
               <li>stored reusable venue contacts: {storedVenueContacts}</li>
             </ul>
           </div>
+        </div>
+      </section>
+
+      <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h2 className="text-sm font-medium text-white">Discovery source &amp; SerpAPI quota metrics</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          SerpAPI premium mode: {growthSerpApiEnabled() ? "enabled" : "disabled"} · daily max {growthSerpApiDailyMax()} ·
+          monthly soft max {growthSerpApiMonthlySoftMax()} · cost/call $
+          {growthSerpApiCostPerCallUsd().toFixed(4)}.
+        </p>
+        <p className="mt-1 text-xs text-zinc-400">
+          serpapi_calls_today {serpMetrics.callsToday} · serpapi_calls_month {serpMetrics.callsMonth} ·
+          serpapi_disabled_until {serpMetrics.disabledUntil ?? "null"} · serpapi_last_429_at{" "}
+          {serpMetrics.last429At ?? "null"}
+        </p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[860px] text-left text-xs text-zinc-400">
+            <thead>
+              <tr className="border-b border-zinc-800 text-[10px] uppercase tracking-wide text-zinc-500">
+                <th className="py-2 pr-2">Source</th>
+                <th className="py-2 pr-2">Candidates</th>
+                <th className="py-2 pr-2">Leads w/ Email</th>
+                <th className="py-2 pr-2">Leads w/o Email</th>
+                <th className="py-2 pr-2">Avg Fit</th>
+                <th className="py-2 pr-2">Drafts</th>
+                <th className="py-2 pr-2">Sent</th>
+                <th className="py-2 pr-2">Cost/Candidate USD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leadSourceBreakdown.map((row) => {
+                const src = row.source || "unknown";
+                const candidates = row._count._all;
+                const costPerCandidate =
+                  src === "autonomous_web_search_venue"
+                    ? Number(
+                        (
+                          (serpMetrics.callsToday * growthSerpApiCostPerCallUsd()) /
+                          Math.max(1, candidates)
+                        ).toFixed(4),
+                      )
+                    : 0;
+                return (
+                  <tr key={src} className="border-b border-zinc-800/70">
+                    <td className="py-2 pr-2 font-mono text-[11px] text-zinc-300">{src}</td>
+                    <td className="py-2 pr-2">{candidates}</td>
+                    <td className="py-2 pr-2">{withEmailBySource[src] ?? 0}</td>
+                    <td className="py-2 pr-2">{withoutEmailBySource[src] ?? 0}</td>
+                    <td className="py-2 pr-2">{(avgFitBySource[src] ?? 0).toFixed(2)}</td>
+                    <td className="py-2 pr-2">{draftBySource[src] ?? 0}</td>
+                    <td className="py-2 pr-2">{sentBySource[src] ?? 0}</td>
+                    <td className="py-2 pr-2">{costPerCandidate.toFixed(4)}</td>
+                  </tr>
+                );
+              })}
+              {leadSourceBreakdown.length === 0 ? (
+                <tr>
+                  <td className="py-2 pr-2 text-zinc-500" colSpan={8}>
+                    No source rows yet for this market.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4">
+          <p className="text-xs font-medium text-zinc-300">rejection_reasons_by_count (from latest draft lastError rows)</p>
+          <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-zinc-400">
+            {topRejectionReasons.map(([reason, count]) => (
+              <li key={reason}>
+                {count} · {reason}
+              </li>
+            ))}
+            {topRejectionReasons.length === 0 ? <li>—</li> : null}
+          </ul>
         </div>
       </section>
 

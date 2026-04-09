@@ -63,7 +63,38 @@ export function serpApiKeySourceForDiscovery():
 }
 
 export function hasSerpApi(): boolean {
-  return Boolean(serpApiKeyForDiscovery());
+  return growthSerpApiEnabled() && Boolean(serpApiKeyForDiscovery());
+}
+
+export function growthSerpApiEnabled(): boolean {
+  const raw = process.env.GROWTH_SERPAPI_ENABLED;
+  if (raw == null || raw.trim() === "") return true;
+  return envTruthy(raw);
+}
+
+/** Hard runtime cap regardless of provider limit (e.g. 8/day). */
+export function growthSerpApiDailyMax(): number {
+  return parseIntEnv("GROWTH_SERPAPI_DAILY_MAX", 8);
+}
+
+/** Soft monthly budget to avoid exhausting paid quota before month end. */
+export function growthSerpApiMonthlySoftMax(): number {
+  return parseIntEnv("GROWTH_SERPAPI_MONTHLY_SOFT_MAX", 240);
+}
+
+/** Cooldown after provider 429 quota exhaustion. */
+export function growthSerpApiCooldownHoursOn429(): number {
+  return parseIntEnv("GROWTH_SERPAPI_COOLDOWN_HOURS_ON_429", 24);
+}
+
+/** Keep SerpAPI as premium source: max run starts per UTC day. */
+export function growthSerpApiRunsPerDay(): number {
+  return parseIntEnv("GROWTH_SERPAPI_RUNS_PER_DAY", 1);
+}
+
+/** Optional cost modeling for ops dashboards. */
+export function growthSerpApiCostPerCallUsd(): number {
+  return parseIntEnv("GROWTH_SERPAPI_COST_PER_CALL_USD", 0);
 }
 
 /**
@@ -81,8 +112,9 @@ export function growthDiscoveryAutonomousWebSearchEnabled(): boolean {
 /** Comma-separated root URLs to fetch and mine for contacts (same-host links optional). */
 export function growthDiscoveryCrawlSeedUrls(): string[] {
   const raw = process.env.GROWTH_DISCOVERY_CRAWL_SEED_URLS?.trim();
-  if (!raw) return [];
-  return [...new Set(raw.split(",").map((s) => s.trim()).filter(Boolean))];
+  const envSeeds = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const defaults = growthDiscoveryDirectListingSeedUrls();
+  return [...new Set([...defaults, ...envSeeds])];
 }
 
 export function growthDiscoveryCrawlMaxSeedsPerRun(): number {
@@ -97,4 +129,21 @@ export function growthEventbriteToken(): string {
   return (
     process.env.GROWTH_EVENTBRITE_TOKEN?.trim() || process.env.EVENTBRITE_PRIVATE_TOKEN?.trim() || ""
   );
+}
+
+/**
+ * Non-Serp direct-source listing/crawler seeds (expandable with env var).
+ * These keep autonomous lead throughput alive even when SerpAPI quota is exhausted.
+ */
+export function growthDiscoveryDirectListingSeedUrls(): string[] {
+  const defaults = [
+    "https://www.eventbrite.com/d/il--chicago/open-mic/",
+    "https://www.meetup.com/find/?keywords=open%20mic&location=us--il--Chicago",
+    "https://www.facebook.com/events/search/?q=open%20mic%20chicago",
+    "https://openmikes.org/",
+    "https://badslava.com/chicago-open-mics.php",
+    "https://www.google.com/maps/search/open+mic+chicago",
+    "https://www.google.com/maps/search/open+mic+illinois",
+  ];
+  return defaults;
 }

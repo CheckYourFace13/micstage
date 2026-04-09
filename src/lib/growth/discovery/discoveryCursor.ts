@@ -30,3 +30,28 @@ export async function writeDiscoveryCursor(
     update: { value },
   });
 }
+
+export async function readDiscoveryCursorJson<T>(
+  prisma: PrismaClient,
+  adapterId: string,
+  marketSlug: string,
+  cursorKey: string,
+): Promise<T | null> {
+  const raw = await readDiscoveryCursor(prisma, adapterId, marketSlug, cursorKey);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeDiscoveryCursorJson(
+  prisma: PrismaClient,
+  adapterId: string,
+  marketSlug: string,
+  cursorKey: string,
+  value: unknown,
+): Promise<void> {
+  await writeDiscoveryCursor(prisma, adapterId, marketSlug, cursorKey, JSON.stringify(value));
+}

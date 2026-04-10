@@ -58,7 +58,7 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
       id: "autonomous_web_search_venue",
       tier: "autonomous",
       description:
-        "Premium fallback search (SerpAPI/CSE, quota-aware with circuit breaker) → open-mic venue queries → page fetch/contact quality",
+        "Nationwide SerpAPI/CSE (national-discovery-us cron lane) → open-mic query rotation + deep page fetch → ranked emails + state rollups",
     },
     {
       id: "autonomous_seed_url_crawl_venue",

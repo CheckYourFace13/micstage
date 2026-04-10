@@ -5,8 +5,9 @@
  *   (`primaryLaunchDiscoveryMarketSlug()`). Autonomous geo discovery, curated Chicagoland seed adapters, and default
  *   admin views all use this slug unless the cron iteration context is a different market (see below).
  * - **`GROWTH_DISCOVERY_MARKET_SLUGS`** (optional env, comma-separated): which discovery slugs the growth-pipeline cron
- *   iterates. If unset, defaults to `[primaryLaunchDiscoveryMarketSlug()]`. Does not rename the primary slug; add new
- *   slugs here when running multi-market cron before autonomous adapters support those metros.
+ *   iterates. If unset, defaults to `[primaryLaunchDiscoveryMarketSlug(), nationalDiscoveryMarketSlug()]` so curated
+ *   primary-metro seeds and **nationwide** autonomous venue web search both run. Omit `national-discovery-us` only if
+ *   you intentionally disable SerpAPI/CSE nationwide collection for that environment.
  *
  * `discoveryMarketSlug` values must match `/locations/[slug]` rollups (see `discoveryMarket.ts`).
  */
@@ -48,6 +49,16 @@ export function primaryLaunchDiscoveryMarketSlug(): string {
   return defaultGrowthMetro().discoveryMarketSlug;
 }
 
+/** Nationwide autonomous venue discovery lane (`/locations/national-discovery-us`); expansion / send gating unchanged. */
+export function nationalDiscoveryMarketSlug(): string {
+  return "national-discovery-us";
+}
+
+export function isNationalDiscoveryMarket(slug: string | null | undefined): boolean {
+  if (!slug?.trim()) return false;
+  return slug.trim().toLowerCase() === nationalDiscoveryMarketSlug();
+}
+
 export function isPrimaryLaunchDiscoveryMarket(slug: string | null | undefined): boolean {
   if (!slug?.trim()) return false;
   return slug.trim().toLowerCase() === primaryLaunchDiscoveryMarketSlug().toLowerCase();
@@ -83,11 +94,13 @@ function canonicalDiscoveryMarketSlug(segment: string): string {
 
 /**
  * Markets where scheduled discovery may insert DISCOVERED leads (comma-separated slugs).
- * Defaults to `[primaryLaunchDiscoveryMarketSlug()]` so jobs never run “nationwide” unless you expand this list.
+ * Defaults to primary metro **plus** `national-discovery-us` for nationwide autonomous venue search.
  * Segments are canonicalized when they match a known metro (fixes casing / minor mismatch vs `isPrimaryLaunchDiscoveryMarket`).
  */
 export function growthDiscoveryMarketSlugs(): string[] {
   const raw = process.env.GROWTH_DISCOVERY_MARKET_SLUGS?.trim();
-  if (!raw) return [primaryLaunchDiscoveryMarketSlug()];
+  if (!raw) {
+    return [...new Set([primaryLaunchDiscoveryMarketSlug(), nationalDiscoveryMarketSlug()])];
+  }
   return [...new Set(raw.split(",").map((s) => canonicalDiscoveryMarketSlug(s)).filter(Boolean))];
 }

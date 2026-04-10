@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
-import { isPrimaryLaunchDiscoveryMarket, primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
+import {
+  isNationalDiscoveryMarket,
+  isPrimaryLaunchDiscoveryMarket,
+  nationalDiscoveryMarketSlug,
+  primaryLaunchDiscoveryMarketSlug,
+} from "@/lib/growth/marketsConfig";
 import {
   growthDiscoveryAutonomousEnabled,
   growthDiscoveryCrawlMaxSeedsPerRun,
@@ -11,12 +16,11 @@ import { extractFromHtml, pickPrimaryVenueContactUrl } from "@/lib/growth/discov
 import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
+import { pickPrimaryVenueOutreachEmail } from "@/lib/growth/discovery/venueEmailExtraction";
 import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
 
 const ADAPTER_ID = "autonomous_seed_url_crawl_venue";
 const CURSOR_KEY = "seed_offset";
-const REGION = "IL";
-
 function hashKey(url: string): string {
   const h = createHash("sha256").update(`seed|${url}`).digest("hex").slice(0, 22);
   return `crawl:${h}`;
@@ -31,7 +35,9 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
     leadType: "VENUE",
     async discover(ctx: GrowthLeadDiscoveryContext) {
       if (!growthDiscoveryAutonomousEnabled()) return [];
-      if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) return [];
+      if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug) && !isNationalDiscoveryMarket(ctx.discoveryMarketSlug)) {
+        return [];
+      }
       if (!ctx.prisma) return [];
 
       const seeds = growthDiscoveryCrawlSeedUrls();
@@ -49,7 +55,16 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
         const html = await discoveryFetchText(seed);
         if (!html) continue;
         const ex = extractFromHtml(seed, html, { maxSameHostLinks: 25 });
-        const email = ex.emails[0] ?? null;
+        const pageHost = (() => {
+          try {
+            return new URL(seed).hostname.replace(/^www\./i, "").toLowerCase();
+          } catch {
+            return null;
+          }
+        })();
+        const picked = pickPrimaryVenueOutreachEmail(ex.emailsTagged, pageHost);
+        const email = picked.primary;
+        const additionalContactEmails = picked.additional;
         const ig = ex.instagramUrls[0] ?? null;
         const fb = ex.facebookUrls[0] ?? null;
         const contactPick =
@@ -84,18 +99,24 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
           facebookUrl: fb,
         });
 
+        const discoveryMarketSlug = isNationalDiscoveryMarket(ctx.discoveryMarketSlug)
+          ? nationalDiscoveryMarketSlug()
+          : primaryLaunchDiscoveryMarketSlug();
+        const emailMeta = `[micstage_email_meta] count=${(email ? 1 : 0) + additionalContactEmails.length} primary_src=${picked.bestSource}${additionalContactEmails.length ? " multi=true" : ""}`;
+
         out.push({
           leadType: "VENUE",
           name: ex.nameGuess.slice(0, 180),
           contactEmailNormalized: email,
           emailExtractedFromNoisyText: true,
+          additionalContactEmails,
           websiteUrl: seed.split("#")[0]!,
           contactUrl: contactPick ?? ig ?? fb ?? null,
           instagramUrl: ig,
           facebookUrl: fb,
-          city: "Chicago",
-          region: REGION,
-          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
+          city: null,
+          region: null,
+          discoveryMarketSlug,
           source: ADAPTER_ID,
           sourceKind: "WEBSITE_CONTACT",
           fitScore: om.fitScore,
@@ -104,7 +125,7 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
           openMicSignalTier: om.tier,
           contactQuality,
           importKey: hashKey(seed),
-          internalNotes: `Seed URL crawl (venue-first). Tier ${om.tier}. Paths: ${ex.sameHostPaths.length}.`,
+          internalNotes: `${emailMeta}. Seed URL crawl (venue-first). Tier ${om.tier}. Paths: ${ex.sameHostPaths.length}.`,
         });
       }
       return out;

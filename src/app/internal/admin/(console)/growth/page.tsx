@@ -16,6 +16,7 @@ import { readSerpApiMetricsForMarket } from "@/lib/growth/discovery/webSearch";
 import {
   defaultGrowthMetro,
   GROWTH_METROS,
+  nationalDiscoveryMarketSlug,
   primaryLaunchDiscoveryMarketSlug,
   resolveGrowthMarketSlug,
 } from "@/lib/growth/marketsConfig";
@@ -193,7 +194,75 @@ export default async function AdminGrowthHubPage(props: {
         where: { ...marketEq, contactEmailRejectionReason: { not: null } },
       }),
     ]);
-  const serpMetrics = await readSerpApiMetricsForMarket(prisma, marketSlug);
+
+  const autoWebVenueBase = {
+    leadType: "VENUE" as const,
+    source: { contains: "autonomous_web_search_venue", mode: "insensitive" as const },
+  };
+
+  const [
+    serpMetrics,
+    serpMetricsNational,
+    autoWebVenueTotal,
+    autoWebVenueNationalBucket,
+    autoWebVenueStateRollups,
+    autoWebVenueWithEmail,
+    autoWebVenueMultiEmail,
+    autoWebVenueContactPageNoEmail,
+    autoWebVenueSocialPathNoEmail,
+    autoWebSrcMailto,
+    autoWebSrcHeaderFooter,
+    autoWebSrcSecondaryPage,
+    autoWebSrcBody,
+  ] = await Promise.all([
+    readSerpApiMetricsForMarket(prisma, marketSlug),
+    readSerpApiMetricsForMarket(prisma, nationalDiscoveryMarketSlug()),
+    prisma.growthLead.count({ where: autoWebVenueBase }),
+    prisma.growthLead.count({
+      where: {
+        ...autoWebVenueBase,
+        discoveryMarketSlug: { equals: nationalDiscoveryMarketSlug(), mode: "insensitive" },
+      },
+    }),
+    prisma.growthLead.count({
+      where: {
+        ...autoWebVenueBase,
+        discoveryMarketSlug: { startsWith: "open-mics-", mode: "insensitive" },
+      },
+    }),
+    prisma.growthLead.count({
+      where: { ...autoWebVenueBase, contactEmailNormalized: { not: null } },
+    }),
+    prisma.growthLead.count({
+      where: { ...autoWebVenueBase, internalNotes: { contains: "multi=true" } },
+    }),
+    prisma.growthLead.count({
+      where: {
+        ...autoWebVenueBase,
+        contactEmailNormalized: null,
+        contactQuality: "CONTACT_PAGE",
+      },
+    }),
+    prisma.growthLead.count({
+      where: {
+        ...autoWebVenueBase,
+        contactEmailNormalized: null,
+        contactQuality: "SOCIAL_OR_CALENDAR",
+      },
+    }),
+    prisma.growthLead.count({
+      where: { ...autoWebVenueBase, internalNotes: { contains: "primary_src=mailto" } },
+    }),
+    prisma.growthLead.count({
+      where: { ...autoWebVenueBase, internalNotes: { contains: "primary_src=header_footer" } },
+    }),
+    prisma.growthLead.count({
+      where: { ...autoWebVenueBase, internalNotes: { contains: "primary_src=secondary_page" } },
+    }),
+    prisma.growthLead.count({
+      where: { ...autoWebVenueBase, internalNotes: { contains: "primary_src=body" } },
+    }),
+  ]);
   const draftBySource: Record<string, number> = {};
   for (const row of draftSourceBreakdown) {
     const k = row.lead.source || "unknown";
@@ -261,7 +330,9 @@ export default async function AdminGrowthHubPage(props: {
         <code className="text-zinc-400">GROWTH_AUTO_DRAFT_CRON_ENABLED</code>. Primary launch slug{" "}
         <code className="text-zinc-400">{primaryLaunchDiscoveryMarketSlug()}</code> from{" "}
         <code className="text-zinc-400">marketsConfig</code> (override list:{" "}
-        <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>). Caps: outreach{" "}
+        <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>; default includes{" "}
+        <code className="text-zinc-400">{nationalDiscoveryMarketSlug()}</code> for nationwide Serp/CSE venue search). Caps:
+        outreach{" "}
         {marketingDailyCap("outreach")}/day · per-domain {marketingPerDomainDailyCap()}/day · contact cooldown{" "}
         {marketingContactCooldownHours()}h.
       </p>
@@ -341,6 +412,34 @@ export default async function AdminGrowthHubPage(props: {
           Cron JSON includes <code className="text-zinc-400">discoveryAllocationSummary</code> and{" "}
           <code className="text-zinc-400">effectiveCapsByAdapter</code> per run.
         </p>
+        <div className="mt-4 rounded border border-sky-800/60 bg-sky-950/25 px-3 py-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-sky-200/95">
+            Nationwide autonomous venue web search (global)
+          </h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-sky-100/80">
+            Source <code className="text-sky-200/90">autonomous_web_search_venue*</code>. Leads are tagged with{" "}
+            <code className="text-sky-200/90">national-discovery-us</code> until geo is inferred, or{" "}
+            <code className="text-sky-200/90">open-mics-**</code> when a state is parsed. Sends still require an ACTIVE
+            launch market for that slug; the national bucket is an expansion queue.
+          </p>
+          <ul className="mt-2 grid gap-1 font-mono text-[11px] text-sky-100/85 sm:grid-cols-2">
+            <li>Total venue leads (this source): {autoWebVenueTotal}</li>
+            <li>Still in national queue ({nationalDiscoveryMarketSlug()}): {autoWebVenueNationalBucket}</li>
+            <li>Assigned to state rollups (open-mics-*): {autoWebVenueStateRollups}</li>
+            <li>With primary email on lead: {autoWebVenueWithEmail}</li>
+            <li>Multiple emails found (multi=true): {autoWebVenueMultiEmail}</li>
+            <li>No email · contact-style URL only: {autoWebVenueContactPageNoEmail}</li>
+            <li>No email · social/contact path: {autoWebVenueSocialPathNoEmail}</li>
+            <li className="sm:col-span-2">
+              Best primary source (highest-scoring mailbox): mailto {autoWebSrcMailto} · header/footer{" "}
+              {autoWebSrcHeaderFooter} · secondary page {autoWebSrcSecondaryPage} · body {autoWebSrcBody}
+            </li>
+            <li className="sm:col-span-2">
+              SerpAPI usage (national lane): calls today {serpMetricsNational.callsToday} · month{" "}
+              {serpMetricsNational.callsMonth} · disabled_until {serpMetricsNational.disabledUntil ?? "—"}
+            </li>
+          </ul>
+        </div>
         <p className="mt-2 text-xs text-zinc-400">
           Leads in this market by type: VENUE {venueN}, ARTIST {artistN}, PROMOTER_ACCOUNT {promoterN}
           {venuePctOfTyped != null ? ` → venues ${venuePctOfTyped}% of typed leads (curated + autonomous; not a hard cap).` : "."}

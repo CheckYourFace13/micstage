@@ -18,12 +18,15 @@ export const ROLLUP_DISCOVERY_SLUGS = [
   "chicagoland-il",
   "central-illinois-il",
   "illinois-regional",
+  /** Pipeline bucket for nationwide autonomous venue discovery (not tied to an ACTIVE launch market). */
+  "national-discovery-us",
 ] as const;
 
 const ROLLUP_LABELS: Record<string, string> = {
   "chicagoland-il": "Chicagoland",
   "central-illinois-il": "Central Illinois",
   "illinois-regional": "Illinois (regional)",
+  "national-discovery-us": "United States (discovery queue)",
 };
 
 const US_STATE_NAMES: Record<string, string> = {
@@ -386,6 +389,11 @@ export function buildDiscoveryValidationData(
         validSlugs.add(bare);
       }
     }
+  }
+
+  for (const slug of ROLLUP_DISCOVERY_SLUGS) {
+    validSlugs.add(slug);
+    aliasToCanonical.set(slug, slug);
   }
 
   return { validSlugs, aliasToCanonical };

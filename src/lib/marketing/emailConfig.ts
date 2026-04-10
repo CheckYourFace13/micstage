@@ -56,7 +56,7 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
     case "transactional":
       return parseIntEnv("MARKETING_CAP_DAILY_TRANSACTIONAL", 50_000);
     case "outreach":
-      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 30);
+      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 50);
     case "marketing":
       return parseIntEnv("MARKETING_CAP_DAILY_MARKETING", 40);
     default:

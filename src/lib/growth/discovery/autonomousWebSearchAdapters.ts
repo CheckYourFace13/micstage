@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isPrimaryLaunchDiscoveryMarket, primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
+import { isNationalDiscoveryMarket } from "@/lib/growth/marketsConfig";
 import {
   growthDiscoveryAutonomousEnabled,
   growthDiscoveryAutonomousMaxPageFetchesPerRun,
@@ -8,8 +8,14 @@ import {
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
-import { extractFromHtml, pickPrimaryVenueContactUrl } from "@/lib/growth/discovery/extractFromHtml";
+import { inferDiscoveryGeoForNationwideSearch } from "@/lib/growth/discovery/discoveryGeoInference";
+import {
+  extractFromHtml,
+  pickPrimaryVenueContactUrl,
+  rankVenueInternalUrls,
+} from "@/lib/growth/discovery/extractFromHtml";
 import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
+import { pickPrimaryVenueOutreachEmail } from "@/lib/growth/discovery/venueEmailExtraction";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
 import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
@@ -22,7 +28,6 @@ import { markSerpApiRunStarted } from "@/lib/growth/discovery/providerState";
 
 const ADAPTER_ID = "autonomous_web_search_venue";
 const CURSOR_KEY = "search_rotation";
-const REGION = "IL";
 
 type SearchCursor = {
   qi: number;
@@ -49,10 +54,6 @@ function hashImport(url: string): string {
   return `auto:${ADAPTER_ID}:${h}`;
 }
 
-/**
- * SerpAPI / CSE sometimes return `google.com/url?...` wrappers; unwrap so we fetch the real site and
- * `allowHitUrl` does not drop every result as a google host.
- */
 function resolveOutboundUrlFromSearchHit(raw: string, depth = 0): string | null {
   if (depth > 5) return null;
   try {
@@ -82,7 +83,6 @@ function resolveOutboundUrlFromSearchHit(raw: string, depth = 0): string | null 
   }
 }
 
-/** Venue-only crawl: allow Facebook pages; skip pure social feeds and aggregators. */
 function allowHitUrl(url: string): boolean {
   try {
     const h = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
@@ -104,36 +104,79 @@ function cleanHitTitle(title: string): string {
   return first.slice(0, 180) || "Discovered prospect";
 }
 
-/** Open-mic–intent queries only — not generic venue booking. */
-const VENUE_QUERIES = [
-  '"open mic" Chicago IL',
-  '"open mic night" Chicago Illinois',
-  '"comedy open mic" Chicago',
-  '"poetry open mic" Chicago',
-  '"acoustic open mic" Chicago',
-  '"mic night" Chicago bar OR venue',
-  '"jam night" Chicago IL live music',
-  '"singer songwriter night" Chicago',
-  'site:eventbrite.com "open mic" Chicago',
-  'Chicago IL "open mic" events calendar',
-  'Evanston OR Skokie "open mic" night',
-  'Logan Square OR Wicker Park "open mic"',
-  'Chicago brewery "open mic" OR "mic night"',
-  'Chicagoland coffeehouse OR cafe "open mic"',
-  'Chicago IL comedy club "open mic" OR showcase',
-  'Oak Park Berwyn "open mic" night',
-  'Chicago "open stage" OR "amateur night" venue',
-  'site:meetup.com "open mic" Chicago',
-  'site:facebook.com/events "open mic" Chicago',
-  'site:openmikes.org Chicago',
-  'site:badslava.com "open mic" Chicago',
-  'Chicago venue events calendar "open mic"',
-  'Chicago bar calendar "open mic night"',
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, "").toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Open-mic–intent query cores (geo tail appended per rotation). */
+const OPEN_MIC_QUERY_CORES = [
+  '"open mic" night venue bar OR coffeehouse',
+  '"open mic" venue United States',
+  '"open mic night" live music venue',
+  '"acoustic open mic" venue',
+  '"comedy open mic" club OR venue',
+  '"poetry open mic" venue OR cafe',
+  '"jam night" live music venue bar',
+  '"songwriter open mic" OR "singer songwriter night" venue',
+  '"mic night" open stage venue',
+  '"open stage" OR "amateur night" music venue',
+  '"open mic" events calendar venue',
+  "recurring weekly open mic night venue",
+  'site:eventbrite.com "open mic" United States',
+  'site:meetup.com "open mic" United States',
+  'site:facebook.com/events "open mic"',
+  'site:openmikes.org United States',
+  'site:badslava.com "open mic"',
+  '"open mic" brewery OR taproom',
+  '"open mic" listening room OR lounge',
 ];
 
+/** Rotating metro/state tails so results are not Chicagoland-only. */
+const GEO_SCOPES = [
+  "",
+  "Nashville TN",
+  "Austin TX",
+  "Portland OR",
+  "Los Angeles CA",
+  "Denver CO",
+  "Seattle WA",
+  "Boston MA",
+  "Atlanta GA",
+  "New Orleans LA",
+  "Phoenix AZ",
+  "Philadelphia PA",
+  "Detroit MI",
+  "Minneapolis MN",
+  "Kansas City MO",
+  "San Diego CA",
+  "Miami FL",
+  "Washington DC",
+  "Dallas TX",
+  "Houston TX",
+  "Chicago IL",
+  "St Louis MO",
+  "Charlotte NC",
+  "Columbus OH",
+  "Indianapolis IN",
+  "Las Vegas NV",
+];
+
+function buildSearchQuery(cursorQi: number): string {
+  const core = OPEN_MIC_QUERY_CORES[cursorQi % OPEN_MIC_QUERY_CORES.length]!;
+  const geo = GEO_SCOPES[Math.floor(cursorQi / OPEN_MIC_QUERY_CORES.length) % GEO_SCOPES.length]!;
+  const q = geo ? `${core} ${geo}` : core;
+  return q.replace(/\s+/g, " ").trim();
+}
+
+const DEEP_PAGES_PER_HIT = 5;
+
 /**
- * SerpAPI / Google CSE → open-mic venue queries → page fetch → signal tier + contacts (Chicagoland only).
- * This phase: only autonomous web-search path registered (no artist/promoter web search).
+ * SerpAPI / Google CSE → nationwide open-mic venue queries → multi-page fetch → aggressive email extraction.
+ * Runs only when the cron market slug is `national-discovery-us` (see `growthDiscoveryMarketSlugs()` default).
  */
 export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter {
   return {
@@ -148,10 +191,10 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           });
           return [];
         }
-        if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) {
-          console.info("[growth discovery] autonomous_web_search_venue skipped: non-primary market", {
+        if (!isNationalDiscoveryMarket(ctx.discoveryMarketSlug)) {
+          console.info("[growth discovery] autonomous_web_search_venue skipped: not national discovery lane", {
             market: ctx.discoveryMarketSlug,
-            primary: primaryLaunchDiscoveryMarketSlug(),
+            expected: "national-discovery-us",
           });
           return [];
         }
@@ -172,7 +215,6 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         const mult = Math.max(0.02, ctx.autonomousWebSearchBudgetMultiplier ?? 1);
         const searchCalls = Math.max(1, Math.round(growthDiscoveryAutonomousSearchCallsPerRun() * mult));
         const maxFetches = Math.max(2, Math.round(growthDiscoveryAutonomousMaxPageFetchesPerRun() * mult));
-        const queries = VENUE_QUERIES;
 
         let cur = parseCursor(await readDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY), provider);
         if (cur.prov !== provider) {
@@ -181,35 +223,35 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
         type TaggedHit = { hit: SearchHit; searchQuery: string };
         const hits: TaggedHit[] = [];
-        console.info("[growth discovery] autonomous_web_search_venue run start", {
+        console.info("[growth discovery] autonomous_web_search_venue run start (nationwide)", {
           provider,
           market: ctx.discoveryMarketSlug,
           searchCalls,
           maxFetches,
         });
         for (let i = 0; i < searchCalls; i++) {
-        const q = queries[cur.qi % queries.length]!;
-        const res = await runWebSearch(
-          q,
-          { provider: cur.prov, start: cur.start },
-          { prisma, marketSlug: ctx.discoveryMarketSlug },
-        );
-        if (!res || res.items.length === 0) {
-          cur.qi = (cur.qi + 1) % queries.length;
-          cur.start = cur.prov === "google_cse" ? 1 : 0;
-          continue;
-        }
-        for (const it of res.items) {
-          const resolved = resolveOutboundUrlFromSearchHit(it.link);
-          if (!resolved || !allowHitUrl(resolved)) continue;
-          hits.push({ hit: { ...it, link: resolved }, searchQuery: q });
-        }
-        cur.prov = res.nextCursor.provider;
-        cur.start = res.nextCursor.start;
-        if (res.items.length < 8 || (cur.prov === "google_cse" && cur.start > 90)) {
-          cur.qi = (cur.qi + 1) % queries.length;
-          cur.start = cur.prov === "google_cse" ? 1 : 0;
-        }
+          const q = buildSearchQuery(cur.qi);
+          const res = await runWebSearch(
+            q,
+            { provider: cur.prov, start: cur.start },
+            { prisma, marketSlug: ctx.discoveryMarketSlug },
+          );
+          if (!res || res.items.length === 0) {
+            cur.qi = (cur.qi + 1) % (OPEN_MIC_QUERY_CORES.length * GEO_SCOPES.length);
+            cur.start = cur.prov === "google_cse" ? 1 : 0;
+            continue;
+          }
+          for (const it of res.items) {
+            const resolved = resolveOutboundUrlFromSearchHit(it.link);
+            if (!resolved || !allowHitUrl(resolved)) continue;
+            hits.push({ hit: { ...it, link: resolved }, searchQuery: q });
+          }
+          cur.prov = res.nextCursor.provider;
+          cur.start = res.nextCursor.start;
+          if (res.items.length < 8 || (cur.prov === "google_cse" && cur.start > 90)) {
+            cur.qi = (cur.qi + 1) % (OPEN_MIC_QUERY_CORES.length * GEO_SCOPES.length);
+            cur.start = cur.prov === "google_cse" ? 1 : 0;
+          }
         }
 
         await writeDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY, JSON.stringify(cur));
@@ -223,90 +265,139 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         let fetches = 0;
 
         for (const { hit, searchQuery: qUsed } of hits) {
-        if (fetches >= maxFetches) break;
-        const pageUrl = hit.link.split("#")[0]!;
-        if (seenUrl.has(pageUrl)) continue;
-        seenUrl.add(pageUrl);
+          if (fetches >= maxFetches) break;
+          const pageUrl = hit.link.split("#")[0]!;
+          if (seenUrl.has(pageUrl)) continue;
+          seenUrl.add(pageUrl);
 
-        const html = await discoveryFetchText(pageUrl);
-        fetches++;
+          const html = await discoveryFetchText(pageUrl);
+          fetches++;
 
-        let email: string | null = null;
-        let allEmails: string[] = [];
-        let ig: string | null = null;
-        let fb: string | null = null;
-        let contactPick: string | null = null;
-        let bodySample = "";
-        let nameGuess = "";
-        let yt: string | null = null;
-        let tt: string | null = null;
+          const pageHost = hostOf(pageUrl);
+          const emptyEx = {
+            nameGuess: "",
+            emailsTagged: [] as { email: string; source: "mailto" | "body" | "header_footer" | "secondary_page" }[],
+            emails: [] as string[],
+            instagramUrls: [] as string[],
+            youtubeUrls: [] as string[],
+            tiktokUrls: [] as string[],
+            facebookUrls: [] as string[],
+            sameHostPaths: [] as string[],
+            bodyTextSample: "",
+          };
+          let ex = html ? extractFromHtml(pageUrl, html) : emptyEx;
+          const emailsTagged = [...ex.emailsTagged];
 
-        if (html) {
-          const ex = extractFromHtml(pageUrl, html);
-          email = ex.emails[0] ?? null;
-          allEmails = ex.emails;
-          ig = ex.instagramUrls[0] ?? null;
-          fb = ex.facebookUrls[0] ?? null;
-          contactPick =
-            pickPrimaryVenueContactUrl(ex.sameHostPaths) ??
-            ex.sameHostPaths.find((u) => /contact|book|events|calendar|open|mic/i.test(u)) ??
+          const allPaths = new Set<string>(ex.sameHostPaths);
+          const bodyPieces = [ex.bodyTextSample];
+
+          if (html) {
+            const ranked = rankVenueInternalUrls(ex.sameHostPaths).filter((u) => {
+              try {
+                return new URL(u).href.split("#")[0] !== new URL(pageUrl).href.split("#")[0];
+              } catch {
+                return u !== pageUrl;
+              }
+            });
+            let deep = 0;
+            for (const subUrl of ranked) {
+              if (fetches >= maxFetches || deep >= DEEP_PAGES_PER_HIT) break;
+              const subHtml = await discoveryFetchText(subUrl);
+              fetches++;
+              deep++;
+              if (!subHtml) continue;
+              const subEx = extractFromHtml(subUrl, subHtml, { maxSameHostLinks: 32 });
+              for (const t of subEx.emailsTagged) {
+                emailsTagged.push({ email: t.email, source: "secondary_page" });
+              }
+              for (const p of subEx.sameHostPaths) allPaths.add(p);
+              bodyPieces.push(subEx.bodyTextSample.slice(0, 7000));
+              ex = {
+                ...ex,
+                instagramUrls: [...new Set([...ex.instagramUrls, ...subEx.instagramUrls])],
+                youtubeUrls: [...new Set([...ex.youtubeUrls, ...subEx.youtubeUrls])],
+                tiktokUrls: [...new Set([...ex.tiktokUrls, ...subEx.tiktokUrls])],
+                facebookUrls: [...new Set([...ex.facebookUrls, ...subEx.facebookUrls])],
+              };
+            }
+          }
+
+          const picked = pickPrimaryVenueOutreachEmail(emailsTagged, pageHost);
+          const email = picked.primary;
+          const additionalContactEmails = picked.additional;
+          const totalFound = (email ? 1 : 0) + additionalContactEmails.length;
+
+          const ig = ex.instagramUrls[0] ?? null;
+          const fb = ex.facebookUrls[0] ?? null;
+          const contactPick =
+            pickPrimaryVenueContactUrl([...allPaths]) ??
+            [...allPaths].find((u) => /contact|book|events|calendar|open|mic/i.test(u)) ??
             null;
-          bodySample = ex.bodyTextSample;
-          nameGuess = ex.nameGuess;
-          yt = ex.youtubeUrls[0] ?? null;
-          tt = ex.tiktokUrls[0] ?? null;
-        }
 
-        const hasContactPath = Boolean(contactPick);
-        const hasSocial = Boolean(ig || fb);
+          const bodySample = bodyPieces.join("\n").slice(0, 24_000);
+          const nameGuess = ex.nameGuess;
+          const yt = ex.youtubeUrls[0] ?? null;
+          const tt = ex.tiktokUrls[0] ?? null;
 
-        const om = scoreOpenMicVenueProspect({
-          snippet: hit.snippet ?? "",
-          pageTextSample: bodySample,
-          title: cleanHitTitle(hit.title),
-          searchQuery: qUsed,
-          hasEmail: Boolean(email),
-          hasContactPath,
-          hasSocial,
-        });
+          const hasContactPath = Boolean(contactPick);
+          const hasSocial = Boolean(ig || fb);
 
-        if (!om.shouldIngest) continue;
+          const om = scoreOpenMicVenueProspect({
+            snippet: hit.snippet ?? "",
+            pageTextSample: bodySample,
+            title: cleanHitTitle(hit.title),
+            searchQuery: qUsed,
+            hasEmail: Boolean(email),
+            hasContactPath,
+            hasSocial,
+          });
 
-        const name = nameGuess.length > 2 ? nameGuess : cleanHitTitle(hit.title);
-        const contactQuality = deriveVenueContactQuality({
-          email,
-          contactUrl: contactPick ?? (hasSocial ? ig || fb : null),
-          instagramUrl: ig,
-          facebookUrl: fb,
-        });
+          if (!om.shouldIngest) continue;
 
-        const fetchNote = html ? "" : " Page fetch failed or non-HTML; scored from SERP only.";
+          const name = nameGuess.length > 2 ? nameGuess : cleanHitTitle(hit.title);
+          const contactQuality = deriveVenueContactQuality({
+            email,
+            contactUrl: contactPick ?? (hasSocial ? ig || fb : null),
+            instagramUrl: ig,
+            facebookUrl: fb,
+          });
 
-        candidates.push({
-          leadType: "VENUE",
-          name,
-          contactEmailNormalized: email,
-          emailExtractedFromNoisyText: true,
-          additionalContactEmails: allEmails.length > 1 ? allEmails.slice(1, 6) : [],
-          websiteUrl: pageUrl,
-          contactUrl: contactPick ?? ig ?? fb ?? null,
-          instagramUrl: ig,
-          youtubeUrl: yt,
-          tiktokUrl: tt,
-          facebookUrl: fb,
-          city: "Chicago",
-          region: REGION,
-          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
-          source: `${ADAPTER_ID}_crawl`,
-          sourceKind: "WEBSITE_CONTACT",
-          fitScore: om.fitScore,
-          discoveryConfidence: om.confidence,
-          performanceTags: om.performanceTags.length ? om.performanceTags : [],
-          openMicSignalTier: om.tier,
-          contactQuality,
-          importKey: hashImport(pageUrl),
-          internalNotes: `Open-mic–targeted venue discovery. Tier ${om.tier}. Query context: ${qUsed.slice(0, 120)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
-        });
+          const geo = inferDiscoveryGeoForNationwideSearch({
+            title: cleanHitTitle(hit.title),
+            snippet: hit.snippet ?? "",
+            searchQuery: qUsed,
+            pageUrl,
+          });
+
+          const fetchNote = html ? "" : " Page fetch failed or non-HTML; scored from SERP only.";
+          const multiNote = additionalContactEmails.length > 0 ? " multi=true" : "";
+          const emailMeta = `[micstage_email_meta] count=${totalFound} primary_src=${picked.bestSource}${multiNote}`;
+
+          candidates.push({
+            leadType: "VENUE",
+            name,
+            contactEmailNormalized: email,
+            emailExtractedFromNoisyText: true,
+            additionalContactEmails,
+            websiteUrl: pageUrl,
+            contactUrl: contactPick ?? ig ?? fb ?? null,
+            instagramUrl: ig,
+            youtubeUrl: yt,
+            tiktokUrl: tt,
+            facebookUrl: fb,
+            city: geo.city,
+            region: geo.region,
+            discoveryMarketSlug: geo.discoveryMarketSlug,
+            source: `${ADAPTER_ID}_crawl`,
+            sourceKind: "WEBSITE_CONTACT",
+            fitScore: om.fitScore,
+            discoveryConfidence: om.confidence,
+            performanceTags: om.performanceTags.length ? om.performanceTags : [],
+            openMicSignalTier: om.tier,
+            contactQuality,
+            importKey: hashImport(pageUrl),
+            internalNotes: `${emailMeta}. Open-mic–targeted nationwide discovery. Tier ${om.tier}. Market ${geo.discoveryMarketSlug}. Query: ${qUsed.slice(0, 140)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
+          });
         }
 
         console.info("[growth discovery] autonomous_web_search_venue emit", {

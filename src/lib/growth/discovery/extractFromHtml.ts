@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import type { EmailWithSource } from "@/lib/growth/discovery/venueEmailExtraction";
 
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
@@ -10,6 +11,8 @@ function cleanTitle(raw: string): string {
 
 export type ExtractedContactHints = {
   nameGuess: string;
+  /** Emails with rough source for primary selection (mailto vs chrome/footer vs body). */
+  emailsTagged: EmailWithSource[];
   emails: string[];
   instagramUrls: string[];
   youtubeUrls: string[];
@@ -28,14 +31,41 @@ function hostOf(url: string): string | null {
   }
 }
 
+function pushEmailMatches(text: string, source: EmailWithSource["source"], into: EmailWithSource[]) {
+  const found = text.match(EMAIL_RE);
+  if (!found) return;
+  for (const e of found) {
+    const low = e.toLowerCase();
+    if (low.endsWith(".png") || low.endsWith(".jpg") || low.length > 120) continue;
+    into.push({ email: e, source });
+  }
+}
+
+function addressesFromMailtoHref(href: string): string[] {
+  const path = href.slice("mailto:".length).split("?")[0] ?? "";
+  if (!path.trim()) return [];
+  const parts: string[] = [];
+  for (const chunk of path.split(/[;,]/)) {
+    let t = chunk.trim();
+    try {
+      t = decodeURIComponent(t);
+    } catch {
+      /* keep */
+    }
+    if (t.includes("@")) parts.push(t);
+  }
+  return parts;
+}
+
 /**
- * Pull mailto links, obvious socials, and same-host anchors from HTML.
+ * Pull mailto links, obvious socials, same-host anchors, and emails from header/footer/body.
  */
 export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameHostLinks?: number }): ExtractedContactHints {
-  const maxSame = opts?.maxSameHostLinks ?? 40;
+  const maxSame = opts?.maxSameHostLinks ?? 48;
   const pageHost = hostOf(pageUrl);
   const $ = cheerio.load(html);
   const title = cleanTitle($("title").first().text() || $("h1").first().text() || "");
+  const emailsTagged: EmailWithSource[] = [];
   const emails = new Set<string>();
   const instagramUrls = new Set<string>();
   const youtubeUrls = new Set<string>();
@@ -48,8 +78,10 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
     if (!href) return;
     const lower = href.toLowerCase();
     if (lower.startsWith("mailto:")) {
-      const addr = decodeURIComponent(href.slice("mailto:".length).split("?")[0] ?? "").trim();
-      if (addr.includes("@")) emails.add(addr);
+      for (const addr of addressesFromMailtoHref(href)) {
+        emailsTagged.push({ email: addr, source: "mailto" });
+        emails.add(addr.trim().toLowerCase());
+      }
       return;
     }
     if (lower.includes("instagram.com/")) {
@@ -96,7 +128,7 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
         if (hostOf(abs.toString()) === pageHost && sameHostPaths.size < maxSame) {
           const p = abs.pathname.toLowerCase();
           if (
-            /contact|book|booking|rental|private|events?|calendar|about|team|staff|press|open[\s-]?mic|mic[\s-]?night|talent|perform|entertain|host|venue|faq/i.test(
+            /contact|book|booking|rental|private|events?|calendar|about|team|staff|press|open[\s-]?mic|mic[\s-]?night|talent|perform|entertain|host|venue|faq|music|shows?|lineup|inquir/i.test(
               p,
             ) ||
             p === "/" ||
@@ -111,19 +143,24 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
     }
   });
 
+  const chromeText = $("header, footer, nav, aside, [role='banner'], [role='contentinfo']")
+    .text()
+    .replace(/\s+/g, " ")
+    .trim();
+  if (chromeText) pushEmailMatches(chromeText, "header_footer", emailsTagged);
+
   const bodyText = $("body").text();
   const bodyTextSample = bodyText.replace(/\s+/g, " ").trim().slice(0, 18_000);
-  const found = bodyText.match(EMAIL_RE);
-  if (found) {
-    for (const e of found) {
-      const low = e.toLowerCase();
-      if (!low.endsWith(".png") && !low.endsWith(".jpg") && low.length < 120) emails.add(e);
-    }
+  pushEmailMatches(bodyTextSample, "body", emailsTagged);
+
+  for (const t of emailsTagged) {
+    emails.add(t.email.trim().toLowerCase());
   }
 
   return {
     nameGuess: title,
-    emails: [...emails].slice(0, 8),
+    emailsTagged,
+    emails: [...emails].slice(0, 24),
     instagramUrls: [...instagramUrls].slice(0, 5),
     youtubeUrls: [...youtubeUrls].slice(0, 3),
     tiktokUrls: [...tiktokUrls].slice(0, 3),
@@ -143,9 +180,25 @@ const CONTACT_PATH_PRIORITY: { re: RegExp; w: number }[] = [
   { re: /faq|press/i, w: 55 },
 ];
 
-/**
- * Best same-host path for venue outreach when no email (contact form / events page).
- */
+/** Same-host URLs most likely to hold booking/events/contact emails (for deep crawl ordering). */
+export function rankVenueInternalUrls(paths: string[]): string[] {
+  const scored = paths.map((raw) => {
+    try {
+      const p = new URL(raw).pathname.toLowerCase();
+      let s = 5;
+      for (const { re, w } of CONTACT_PATH_PRIORITY) {
+        if (re.test(p)) s = Math.max(s, w);
+      }
+      return { raw: raw.split("#")[0]!, s };
+    } catch {
+      return { raw, s: 0 };
+    }
+  });
+  scored.sort((a, b) => b.s - a.s);
+  return [...new Set(scored.map((x) => x.raw))];
+}
+
+/** Best same-host path for venue outreach when no email (contact form / events page). */
 export function pickPrimaryVenueContactUrl(paths: string[]): string | null {
   if (!paths.length) return null;
   let best: string | null = null;

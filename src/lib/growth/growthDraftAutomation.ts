@@ -2,6 +2,11 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { growthAutoDraftBatchLimit, growthAutoDraftFitMin } from "@/lib/growth/expansionConfig";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { sendApprovedGrowthLeadDraft } from "@/lib/growth/growthLeadDraftSend";
+import {
+  isOnlyTransientMarketingThrottle,
+  reasonsIncludeGlobalCategoryDailyCap,
+  remainingOutreachDailySends,
+} from "@/lib/marketing/sendCaps";
 
 /**
  * Auto-creates PENDING_REVIEW drafts for approved (or high-fit reviewed) leads with email.
@@ -11,6 +16,8 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   created: number;
   autoApprovedVenue: number;
   autoSentVenue: number;
+  /** APPROVED backlog sends completed this run (after venue auto-send), bounded by daily OUTREACH cap. */
+  approvedQueueDrained: number;
   nonEmailVenuePathsQueued: number;
   skipped: number;
   errors: string[];
@@ -111,6 +118,38 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     }
   }
 
+  let approvedQueueDrained = 0;
+  let remainingHeadroom = await remainingOutreachDailySends(prisma);
+  if (remainingHeadroom > 0) {
+    const maxBatch = Math.min(2000, Math.max(remainingHeadroom + 200, limit * 4));
+    const backlogRaw = await prisma.growthLeadOutreachDraft.findMany({
+      where: { status: "APPROVED", marketingEmailSendId: null },
+      include: { lead: true },
+      orderBy: { createdAt: "asc" },
+      take: maxBatch,
+    });
+    const backlog = backlogRaw.filter((d) => {
+      const slug = (d.discoveryMarketSlug ?? d.lead.discoveryMarketSlug ?? "").trim().toLowerCase();
+      return slug && activeMarketSet.has(slug);
+    });
+
+    for (const d of backlog) {
+      if (remainingHeadroom <= 0) break;
+      const sent = await sendApprovedGrowthLeadDraft(prisma, d.id);
+      if (sent.ok) {
+        approvedQueueDrained++;
+        remainingHeadroom--;
+      } else if (reasonsIncludeGlobalCategoryDailyCap(sent.reasons)) {
+        break;
+      } else if (!isOnlyTransientMarketingThrottle(sent.reasons)) {
+        for (const reason of sent.reasons) {
+          bumpReason(`queue_send_blocked: ${reason}`);
+        }
+        errors.push(`${d.id}: approved queue send blocked (${sent.reasons.join(" | ").slice(0, 300)})`);
+      }
+    }
+  }
+
   // Non-email venue path tasks are queued during ingest via MarketingJob; expose dashboard count.
   nonEmailVenuePathsQueued = await prisma.marketingJob.count({
     where: { kind: "SOCIAL_PAYLOAD_RENDER", status: "PENDING" },
@@ -132,6 +171,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     created,
     autoApprovedVenue,
     autoSentVenue,
+    approvedQueueDrained,
     nonEmailVenuePathsQueued,
     skipped,
     errors,

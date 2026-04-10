@@ -2,12 +2,17 @@ import { createHash } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
 import type { MarketingEmailCategory } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { deliverResendEmail } from "@/lib/mailer";
+import { deliverResendEmail, MailProviderError } from "@/lib/mailer";
 import { explainMarketingSendBlock } from "@/lib/marketing/blockReasons";
 import { marketingUnsubscribeMailto, prismaCategoryFromMicStage, type MicStageEmailCategory } from "@/lib/marketing/emailConfig";
 import { appendCommercialEmailFooter, buildListUnsubscribeHeaders } from "@/lib/marketing/emailFooter";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
-import { checkCategoryAndDomainCaps, checkContactSendSpacing } from "@/lib/marketing/sendCaps";
+import {
+  checkCategoryAndDomainCaps,
+  checkContactSendSpacing,
+  isOnlyTransientMarketingThrottle,
+  isTransientMarketingThrottleReason,
+} from "@/lib/marketing/sendCaps";
 import { marketingUnsubscribeHttpsUrl } from "@/lib/marketing/unsubscribeSigning";
 
 export function buildMarketingIdempotencyKey(
@@ -55,6 +60,19 @@ export type MarketingSendResult =
   | { ok: true; duplicate?: boolean; sendId: string; providerMessageId?: string | null }
   | { ok: false; sendId?: string; blocked: true; reasons: string[] };
 
+type SendFailureMeta = {
+  stage: "before_provider_call" | "during_provider_call" | "after_provider_acceptance";
+  provider: "resend";
+  providerErrorMessage: string;
+  httpStatus?: number | null;
+  providerMessageId?: string | null;
+  providerErrorName?: string | null;
+};
+
+function serializeFailureMeta(meta: SendFailureMeta): string {
+  return JSON.stringify(meta);
+}
+
 /**
  * Idempotent marketing/outreach/transactional send with caps, suppression, audit row, and Resend delivery.
  */
@@ -85,7 +103,7 @@ export async function sendThroughMarketingPipeline(
   const includeCompliance =
     input.includeCommercialCompliance !== false && (input.category === "outreach" || input.category === "marketing");
 
-  const existing = await prisma.marketingEmailSend.findUnique({ where: { idempotencyKey } });
+  let existing = await prisma.marketingEmailSend.findUnique({ where: { idempotencyKey } });
   if (existing?.status === "SENT") {
     return {
       ok: true,
@@ -95,12 +113,23 @@ export async function sendThroughMarketingPipeline(
     };
   }
   if (existing?.status === "BLOCKED") {
-    return {
-      ok: false,
-      blocked: true,
-      reasons: [existing.blockedReason ?? "Previously blocked (idempotent)"],
-      sendId: existing.id,
-    };
+    const parts = (existing.blockedReason ?? "")
+      .split(" | ")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const onlyThrottle =
+      parts.length > 0 && parts.every((r) => isTransientMarketingThrottleReason(r));
+    if (onlyThrottle) {
+      await prisma.marketingEmailSend.delete({ where: { id: existing.id } });
+      existing = await prisma.marketingEmailSend.findUnique({ where: { idempotencyKey } });
+    } else {
+      return {
+        ok: false,
+        blocked: true,
+        reasons: [existing.blockedReason ?? "Previously blocked (idempotent)"],
+        sendId: existing.id,
+      };
+    }
   }
 
   const contact = await upsertContactForSend(prisma, email, input.venueId, input.discoveryMarketSlug);
@@ -142,6 +171,9 @@ export async function sendThroughMarketingPipeline(
   let sendId: string;
 
   if (reasons.length > 0) {
+    if (isOnlyTransientMarketingThrottle(reasons)) {
+      return { ok: false, blocked: true, reasons };
+    }
     const row =
       existing ??
       (await prisma.marketingEmailSend.create({
@@ -181,6 +213,7 @@ export async function sendThroughMarketingPipeline(
   const row = existing ?? (await prisma.marketingEmailSend.create({ data: queuedRowData() }));
   sendId = row.id;
 
+  let providerMessageId: string | null = null;
   try {
     const { messageId, skipped } = await deliverResendEmail({
       to: email,
@@ -192,23 +225,31 @@ export async function sendThroughMarketingPipeline(
       allowDevSkipWhenNoApiKey: input.category === "transactional",
     });
 
+    providerMessageId = messageId ?? null;
     if (skipped) {
       await prisma.marketingEmailSend.update({
         where: { id: sendId },
         data: {
           status: "FAILED",
           failedAt: new Date(),
-          lastError: "RESEND skipped (no API key in dev)",
+          lastError: serializeFailureMeta({
+            stage: "before_provider_call",
+            provider: "resend",
+            providerErrorMessage: "RESEND skipped (no API key in dev)",
+            providerMessageId: null,
+            httpStatus: null,
+          }),
         },
       });
       return { ok: false, blocked: true, reasons: ["Resend skipped — no API key (dev)"], sendId };
     }
 
+    try {
     await prisma.marketingEmailSend.update({
       where: { id: sendId },
       data: {
         status: "SENT",
-        providerMessageId: messageId ?? null,
+        providerMessageId,
         sentAt: new Date(),
         blockedReason: null,
         failedAt: null,
@@ -225,21 +266,56 @@ export async function sendThroughMarketingPipeline(
         payload: {
           templateKind: input.templateKind,
           category: input.category,
-          providerMessageId: messageId,
+          providerMessageId,
         } as Prisma.InputJsonValue,
       },
     });
+    } catch (postAcceptErr) {
+      const msg = postAcceptErr instanceof Error ? postAcceptErr.message : String(postAcceptErr);
+      await prisma.marketingEmailSend.update({
+        where: { id: sendId },
+        data: {
+          status: "FAILED",
+          failedAt: new Date(),
+          providerMessageId,
+          lastError: serializeFailureMeta({
+            stage: "after_provider_acceptance",
+            provider: "resend",
+            providerErrorMessage: msg.slice(0, 2000),
+            providerMessageId,
+            httpStatus: null,
+          }),
+        },
+      });
+      return { ok: false, blocked: true, reasons: [msg], sendId };
+    }
 
     return { ok: true, sendId, providerMessageId: messageId };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[marketing sendPipeline] deliver failed", { sendId, msg, toDomain });
+    const providerErr = e instanceof MailProviderError ? e : null;
+    const lastError = serializeFailureMeta({
+      stage: providerErr?.phase ?? "during_provider_call",
+      provider: "resend",
+      providerErrorMessage: msg.slice(0, 2000),
+      httpStatus: providerErr?.httpStatus ?? null,
+      providerMessageId: providerErr?.providerMessageId ?? providerMessageId ?? null,
+      providerErrorName: providerErr?.providerErrorName ?? null,
+    });
+    console.error("[marketing sendPipeline] deliver failed", {
+      sendId,
+      msg,
+      toDomain,
+      stage: providerErr?.phase ?? "during_provider_call",
+      httpStatus: providerErr?.httpStatus,
+    });
     await prisma.marketingEmailSend.update({
       where: { id: sendId },
       data: {
         status: "FAILED",
         failedAt: new Date(),
-        lastError: msg.slice(0, 4000),
+        providerMessageId: providerErr?.providerMessageId ?? providerMessageId ?? null,
+        lastError: lastError.slice(0, 4000),
       },
     });
     await prisma.marketingEvent.create({

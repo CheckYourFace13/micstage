@@ -3,6 +3,7 @@ import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquis
 import { explainGrowthLeadOutreachBlock } from "@/lib/growth/growthLeadBlock";
 import { marketingTemplateKindForGrowthLeadType } from "@/lib/growth/templateKindForLead";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
+import { isOnlyTransientMarketingThrottle } from "@/lib/marketing/sendCaps";
 import { sendThroughMarketingPipeline, type MarketingSendResult } from "@/lib/marketing/sendPipeline";
 
 /**
@@ -114,7 +115,7 @@ export async function sendApprovedGrowthLeadDraft(prisma: PrismaClient, draftId:
     if (draft.lead.leadType === "VENUE") {
       await advanceGrowthLeadAcquisitionStage(prisma, draft.leadId, "OUTREACH_SENT", { leadType: "VENUE" });
     }
-  } else {
+  } else if (!isOnlyTransientMarketingThrottle(result.reasons)) {
     await prisma.growthLeadOutreachDraft.update({
       where: { id: draftId },
       data: { lastError: result.reasons.join(" | ").slice(0, 2000) },

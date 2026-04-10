@@ -112,3 +112,31 @@ export async function checkContactSendSpacing(
   }
   return { ok: true };
 }
+
+/** Cap / spacing only — must stay retryable (no permanent MarketingEmailSend BLOCKED for these). */
+export function isTransientMarketingThrottleReason(reason: string): boolean {
+  const r = reason.trim();
+  return (
+    r.startsWith("Daily cap reached for category") ||
+    r.startsWith("Per-domain daily cap reached for") ||
+    r.startsWith("Per-contact send spacing:") ||
+    r.startsWith("Contact cooldown (")
+  );
+}
+
+export function isOnlyTransientMarketingThrottle(reasons: string[]): boolean {
+  return reasons.length > 0 && reasons.every((x) => isTransientMarketingThrottleReason(x));
+}
+
+/** True when the global category daily cap is exhausted (no point trying more recipients this UTC day). */
+export function reasonsIncludeGlobalCategoryDailyCap(reasons: string[]): boolean {
+  return reasons.some((r) => r.trim().startsWith("Daily cap reached for category"));
+}
+
+/** Remaining OUTREACH sends allowed today (UTC day) before hitting MARKETING_CAP_DAILY_OUTREACH. */
+export async function remainingOutreachDailySends(prisma: PrismaClient): Promise<number> {
+  const since = startOfUtcDay();
+  const daily = marketingDailyCap("outreach");
+  const catCount = await countSendsToday(prisma, "OUTREACH", since);
+  return Math.max(0, daily - catCount);
+}

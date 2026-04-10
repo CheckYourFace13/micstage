@@ -13,6 +13,36 @@ function replyToEmail() {
 
 export type DeliverResendResult = { messageId?: string; skipped?: boolean };
 
+export type MailFailurePhase =
+  | "before_provider_call"
+  | "during_provider_call"
+  | "after_provider_acceptance";
+
+class MailProviderError extends Error {
+  phase: MailFailurePhase;
+  provider: "resend";
+  httpStatus?: number;
+  providerMessageId?: string;
+  providerErrorName?: string;
+  constructor(input: {
+    message: string;
+    phase: MailFailurePhase;
+    httpStatus?: number;
+    providerMessageId?: string;
+    providerErrorName?: string;
+  }) {
+    super(input.message);
+    this.name = "MailProviderError";
+    this.phase = input.phase;
+    this.provider = "resend";
+    this.httpStatus = input.httpStatus;
+    this.providerMessageId = input.providerMessageId;
+    this.providerErrorName = input.providerErrorName;
+  }
+}
+
+export { MailProviderError };
+
 /**
  * Low-level Resend send with category-based From separation. Returns Resend email id when available.
  */
@@ -37,13 +67,13 @@ export async function deliverResendEmail(input: {
     if (process.env.NODE_ENV === "production" && !allowSkip) {
       const msg = "RESEND_API_KEY is missing in production.";
       console.error("[mailer]", msg, { toDomain: input.to.split("@")[1] ?? "?" });
-      throw new Error(msg);
+      throw new MailProviderError({ message: msg, phase: "before_provider_call" });
     }
     if (process.env.NODE_ENV === "production" && allowSkip) {
       const msg =
         "RESEND_API_KEY is missing in production. Set it and EMAIL_FROM (verified domain) so password resets can send.";
       console.error("[mailer]", msg, { toDomain: input.to.split("@")[1] ?? "?" });
-      throw new Error(msg);
+      throw new MailProviderError({ message: msg, phase: "before_provider_call" });
     }
     console.log("[mailer] EMAIL_FALLBACK (no RESEND_API_KEY)", {
       to: input.to,
@@ -80,13 +110,20 @@ export async function deliverResendEmail(input: {
 
   const { data, error } = await resend.emails.send(payload);
   if (error) {
+    const status = (error as { statusCode?: number; status?: number }).statusCode ?? (error as { status?: number }).status;
     console.error("[mailer] Resend API rejected send", {
       message: error.message,
       name: error.name,
+      status,
       toDomain: input.to.split("@")[1] ?? "?",
       category,
     });
-    throw new Error(`Resend: ${error.message}`);
+    throw new MailProviderError({
+      message: `Resend: ${error.message}`,
+      phase: "during_provider_call",
+      httpStatus: typeof status === "number" ? status : undefined,
+      providerErrorName: error.name,
+    });
   }
   return { messageId: data?.id };
 }

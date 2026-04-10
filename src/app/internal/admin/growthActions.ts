@@ -1,10 +1,13 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { assertAdminSession, getOptionalAdminEmailFromLoginForm } from "@/lib/adminAuth";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { CsvImportDefaults } from "@/lib/growth/csvImport";
-import { parseGrowthLeadsFromCsv } from "@/lib/growth/csvImport";
+import { parseClaudeGrowthLeadCsv, parseGrowthLeadsFromCsv } from "@/lib/growth/csvImport";
+import { venueLeadMatchesAutoDraftHeuristic } from "@/lib/growth/growthAutoDraftEligibility";
 import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
+import { parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
 import { sendGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadDraftSend";
@@ -242,6 +245,172 @@ export async function importGrowthLeadsCsvAction(formData: FormData) {
   redirect(
     `/internal/admin/growth?importInserted=${inserted}&importFailed=${failedCreates}&importDuplicates=${importDuplicates}&parseErrs=${errors.length}`,
   );
+}
+
+function claudeRowEmailStats(row: {
+  contactEmail: string | null;
+  additionalContactEmails: string[];
+}) {
+  const primary = parseGrowthLeadEmailInput(row.contactEmail ?? "", { extractedFromNoisyText: true });
+  let additionalValid = 0;
+  for (const e of row.additionalContactEmails) {
+    const p = parseGrowthLeadEmailInput(e, { extractedFromNoisyText: true });
+    if (p.kind === "valid") additionalValid++;
+  }
+  const hasPrimary = primary.kind === "valid";
+  const hasAdditional = additionalValid > 0;
+  return { hasPrimary, hasAdditional };
+}
+
+export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
+  await assertAdminSession();
+  const prisma = requirePrisma();
+
+  const file = formData.get("claudeCsvFile");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(q("/internal/admin/growth", "err", "noFile"));
+  }
+
+  const text = await file.text();
+  const { rows, errors } = parseClaudeGrowthLeadCsv(text);
+  const batchId = randomUUID();
+  const uploadedAt = new Date().toISOString();
+  const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(0, 180);
+  const importMetaNote = `[claude_csv import ${uploadedAt} batch=${batchId} file=${safeName}]`;
+
+  const activeMarkets = await prisma.growthLaunchMarket.findMany({
+    where: { status: "ACTIVE" },
+    select: { discoveryMarketSlug: true },
+  });
+  const activeMarketSet = new Set(activeMarkets.map((m) => m.discoveryMarketSlug.trim().toLowerCase()));
+
+  let inserted = 0;
+  let updated = 0;
+  let duplicateNoChange = 0;
+  let ingestSkipped = 0;
+  const rowErrors = [...errors];
+
+  let primaryEmailRows = 0;
+  let additionalEmailRows = 0;
+  let contactPageOnlyRows = 0;
+  let venueRows = 0;
+  let artistRows = 0;
+  let promoterRows = 0;
+  const venueAutoEligibleLeadIds = new Set<string>();
+
+  for (const r of rows) {
+    const slug = r.discoveryMarketSlug?.trim();
+    if (!slug) {
+      rowErrors.push(`Row ${r.rowIndex}: missing discovery market slug`);
+      ingestSkipped++;
+      continue;
+    }
+
+    const { hasPrimary, hasAdditional } = claudeRowEmailStats(r);
+    if (hasPrimary) primaryEmailRows++;
+    if (hasAdditional) additionalEmailRows++;
+    const hasPath = !!(
+      r.contactUrl?.trim() ||
+      r.websiteUrl?.trim() ||
+      r.instagramUrl?.trim() ||
+      r.facebookUrl?.trim()
+    );
+    if (!hasPrimary && !hasAdditional && hasPath) contactPageOnlyRows++;
+
+    if (r.leadType === "VENUE") venueRows++;
+    else if (r.leadType === "ARTIST") artistRows++;
+    else if (r.leadType === "PROMOTER_ACCOUNT") promoterRows++;
+
+    const importKey = `claude_csv:${batchId}:row:${r.rowIndex}`;
+    const candidate: GrowthLeadCandidate = {
+      leadType: r.leadType,
+      name: r.name,
+      contactEmailNormalized: r.contactEmail?.trim() || null,
+      additionalContactEmails: r.additionalContactEmails,
+      emailExtractedFromNoisyText: true,
+      contactUrl: r.contactUrl,
+      websiteUrl: r.websiteUrl,
+      instagramUrl: r.instagramUrl,
+      facebookUrl: r.facebookUrl,
+      city: r.city,
+      suburb: r.suburb,
+      region: null,
+      discoveryMarketSlug: slug,
+      source: r.source?.trim() || "claude_csv",
+      sourceKind: r.sourceKind,
+      fitScore: r.fitScore,
+      discoveryConfidence: null,
+      performanceTags: [],
+      importKey,
+      internalNotes: r.internalNotes,
+      openMicSignalTier: r.openMicSignalTier,
+      contactQuality: r.contactQuality,
+    };
+
+    try {
+      const res = await ingestGrowthLeadCandidate(prisma, candidate, {
+        mergeOnDuplicate: { importMetaNote },
+      });
+      if (res.status === "created") {
+        inserted++;
+        const lead = await prisma.growthLead.findUnique({ where: { id: res.id } });
+        if (
+          lead &&
+          venueLeadMatchesAutoDraftHeuristic(lead) &&
+          lead.discoveryMarketSlug &&
+          activeMarketSet.has(lead.discoveryMarketSlug.trim().toLowerCase())
+        ) {
+          venueAutoEligibleLeadIds.add(lead.id);
+        }
+      } else if (res.status === "duplicate") {
+        if (res.merged) updated++;
+        else duplicateNoChange++;
+        const lead = await prisma.growthLead.findUnique({ where: { id: res.existingId } });
+        if (
+          lead &&
+          venueLeadMatchesAutoDraftHeuristic(lead) &&
+          lead.discoveryMarketSlug &&
+          activeMarketSet.has(lead.discoveryMarketSlug.trim().toLowerCase())
+        ) {
+          venueAutoEligibleLeadIds.add(lead.id);
+        }
+      } else {
+        ingestSkipped++;
+        rowErrors.push(`Row ${r.rowIndex}: ${res.reason}`);
+      }
+    } catch (e) {
+      ingestSkipped++;
+      const msg = e instanceof Error ? e.message : String(e);
+      rowErrors.push(`Row ${r.rowIndex}: ${msg.slice(0, 200)}`);
+    }
+  }
+
+  revalidatePath("/internal/admin/growth");
+  revalidatePath("/internal/admin/growth/leads");
+  revalidatePath("/internal/admin/growth/venues");
+  revalidatePath("/internal/admin/growth/artists");
+  revalidatePath("/internal/admin/growth/promoters");
+
+  if (rowErrors.length) console.error("[growth claude csv import]", rowErrors);
+
+  const qParams = new URLSearchParams();
+  qParams.set("claudeBatch", batchId);
+  qParams.set("claudeFile", safeName);
+  qParams.set("claudeRows", String(rows.length));
+  qParams.set("claudeInserted", String(inserted));
+  qParams.set("claudeUpdated", String(updated));
+  qParams.set("claudeDup", String(duplicateNoChange));
+  qParams.set("claudeSkipped", String(ingestSkipped));
+  qParams.set("claudeParseErrs", String(errors.length));
+  qParams.set("claudePrimaryEmailRows", String(primaryEmailRows));
+  qParams.set("claudeAdditionalEmailRows", String(additionalEmailRows));
+  qParams.set("claudeContactPageOnlyRows", String(contactPageOnlyRows));
+  qParams.set("claudeVenueRows", String(venueRows));
+  qParams.set("claudeArtistRows", String(artistRows));
+  qParams.set("claudePromoterRows", String(promoterRows));
+  qParams.set("claudeVenueAutoEligible", String(venueAutoEligibleLeadIds.size));
+
+  redirect(`/internal/admin/growth?${qParams.toString()}`);
 }
 
 export async function generateGrowthLeadDraftAction(formData: FormData) {

@@ -22,6 +22,25 @@ import { requirePrisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+type RecentSendFailureMeta = {
+  stage?: string;
+  provider?: string;
+  providerErrorMessage?: string;
+  httpStatus?: number | null;
+  providerMessageId?: string | null;
+};
+
+function parseSendFailureMeta(input: string | null): RecentSendFailureMeta | null {
+  if (!input) return null;
+  try {
+    const parsed = JSON.parse(input) as RecentSendFailureMeta;
+    if (parsed && typeof parsed === "object") return parsed;
+    return null;
+  } catch {
+    return { providerErrorMessage: input };
+  }
+}
+
 export default async function AdminMarketingPage(props: {
   searchParams: Promise<{
     venueId?: string;
@@ -61,6 +80,7 @@ export default async function AdminMarketingPage(props: {
     toEmailNormalized: string;
     blockedReason: string | null;
     providerMessageId: string | null;
+    lastError: string | null;
     sentAt: Date | null;
   }[] = [];
   let outreachDrafts: {
@@ -105,6 +125,7 @@ export default async function AdminMarketingPage(props: {
           toEmailNormalized: true,
           blockedReason: true,
           providerMessageId: true,
+          lastError: true,
           sentAt: true,
         },
       }),
@@ -424,23 +445,36 @@ export default async function AdminMarketingPage(props: {
                 <th className="py-2 pr-2">Template</th>
                 <th className="py-2 pr-2">To</th>
                 <th className="py-2 pr-2">Subject</th>
-                <th className="py-2 pr-2">Provider id</th>
+                <th className="py-2 pr-2">Resend id</th>
+                <th className="py-2 pr-2">Fail stage</th>
+                <th className="py-2 pr-2">HTTP</th>
+                <th className="py-2 pr-2">Provider error</th>
                 <th className="py-2">Blocked reason</th>
               </tr>
             </thead>
             <tbody>
-              {recentSends.map((s) => (
-                <tr key={s.id} className="border-b border-zinc-800/80">
-                  <td className="py-2 pr-2 whitespace-nowrap">{s.createdAt.toISOString().slice(0, 19)}Z</td>
-                  <td className="py-2 pr-2 text-zinc-200">{s.status}</td>
-                  <td className="py-2 pr-2">{s.category}</td>
-                  <td className="py-2 pr-2 font-mono text-[10px]">{s.templateKind}</td>
-                  <td className="py-2 pr-2 font-mono text-[10px]">{s.toEmailNormalized}</td>
-                  <td className="py-2 pr-2">{s.subject.slice(0, 40)}</td>
-                  <td className="py-2 pr-2 font-mono text-[10px]">{s.providerMessageId ?? "—"}</td>
-                  <td className="py-2 text-amber-200/80">{s.blockedReason ?? "—"}</td>
-                </tr>
-              ))}
+              {recentSends.map((s) => {
+                const meta = parseSendFailureMeta(s.lastError);
+                const providerError = meta?.providerErrorMessage || (s.status === "FAILED" ? s.lastError : null);
+                const phase = meta?.stage ?? "—";
+                const http = typeof meta?.httpStatus === "number" ? String(meta.httpStatus) : "—";
+                const resendId = s.providerMessageId ?? meta?.providerMessageId ?? "—";
+                return (
+                  <tr key={s.id} className="border-b border-zinc-800/80">
+                    <td className="py-2 pr-2 whitespace-nowrap">{s.createdAt.toISOString().slice(0, 19)}Z</td>
+                    <td className="py-2 pr-2 text-zinc-200">{s.status}</td>
+                    <td className="py-2 pr-2">{s.category}</td>
+                    <td className="py-2 pr-2 font-mono text-[10px]">{s.templateKind}</td>
+                    <td className="py-2 pr-2 font-mono text-[10px]">{s.toEmailNormalized}</td>
+                    <td className="py-2 pr-2">{s.subject.slice(0, 40)}</td>
+                    <td className="py-2 pr-2 font-mono text-[10px]">{resendId}</td>
+                    <td className="py-2 pr-2 font-mono text-[10px]">{phase}</td>
+                    <td className="py-2 pr-2 font-mono text-[10px]">{http}</td>
+                    <td className="py-2 pr-2 text-amber-200/80">{providerError?.slice(0, 180) ?? "—"}</td>
+                    <td className="py-2 text-amber-200/80">{s.blockedReason ?? "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

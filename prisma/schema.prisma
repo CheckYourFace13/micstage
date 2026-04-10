@@ -819,6 +819,8 @@ enum GrowthLeadPerformanceTag {
 enum GrowthLeadSourceKind {
   MANUAL_ADMIN
   CSV_IMPORT
+  /// Claude / LLM-generated spreadsheet imports (admin).
+  CLAUDE_CSV
   WEBSITE_CONTACT
   SOCIAL_PROFILE
   EVENT_LISTING

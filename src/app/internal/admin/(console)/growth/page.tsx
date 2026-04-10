@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { assertAdminSession } from "@/lib/adminAuth";
-import {
-  createGrowthLeadAction,
-  importGrowthLeadsCsvAction,
-} from "@/app/internal/admin/growthActions";
+import { createGrowthLeadAction, importGrowthLeadsCsvAction } from "@/app/internal/admin/growthActions";
+import { ClaudeGrowthCsvImportPanel } from "./_components/ClaudeGrowthCsvImportPanel";
 import { loadGrowthDailyActivityStats } from "@/lib/growth/growthDailyActivity";
 import { loadGrowthFunnelMetrics, loadGrowthMarketMetrics } from "@/lib/growth/marketMetrics";
 import { growthDiscoveryAllocationSummary } from "@/lib/growth/growthDiscoveryAllocation";
@@ -41,6 +39,21 @@ export default async function AdminGrowthHubPage(props: {
     importFailed?: string;
     importDuplicates?: string;
     parseErrs?: string;
+    claudeBatch?: string;
+    claudeFile?: string;
+    claudeRows?: string;
+    claudeInserted?: string;
+    claudeUpdated?: string;
+    claudeDup?: string;
+    claudeSkipped?: string;
+    claudeParseErrs?: string;
+    claudePrimaryEmailRows?: string;
+    claudeAdditionalEmailRows?: string;
+    claudeContactPageOnlyRows?: string;
+    claudeVenueRows?: string;
+    claudeArtistRows?: string;
+    claudePromoterRows?: string;
+    claudeVenueAutoEligible?: string;
   }>;
 }) {
   await assertAdminSession();
@@ -474,6 +487,38 @@ export default async function AdminGrowthHubPage(props: {
           failures &gt; 0.
         </p>
       ) : null}
+      {params.claudeRows !== undefined ? (
+        <div className="mt-3 rounded border border-teal-700/40 bg-teal-950/25 px-3 py-2 text-sm text-teal-50">
+          <p className="font-medium text-teal-100">Claude CSV import summary</p>
+          <p className="mt-1 text-xs text-teal-200/90">
+            Batch <span className="font-mono text-teal-100">{params.claudeBatch}</span>
+            {params.claudeFile ? (
+              <>
+                {" "}
+                · file <span className="font-mono text-teal-100">{params.claudeFile}</span>
+              </>
+            ) : null}
+          </p>
+          <ul className="mt-2 grid gap-1 text-xs text-teal-100/95 sm:grid-cols-2">
+            <li>Rows in file: {params.claudeRows}</li>
+            <li>New leads created: {params.claudeInserted}</li>
+            <li>Existing leads updated (merged fields): {params.claudeUpdated}</li>
+            <li>Duplicates (no field changes): {params.claudeDup}</li>
+            <li>Skipped / failed rows: {params.claudeSkipped}</li>
+            <li>CSV parse errors: {params.claudeParseErrs}</li>
+            <li>Rows with primary email (valid): {params.claudePrimaryEmailRows}</li>
+            <li>Rows with ≥1 additional email (valid): {params.claudeAdditionalEmailRows}</li>
+            <li>Rows with paths only (no valid email): {params.claudeContactPageOnlyRows}</li>
+            <li>VENUE / ARTIST / PROMOTER rows: {params.claudeVenueRows} / {params.claudeArtistRows} /{" "}
+              {params.claudePromoterRows}</li>
+            <li className="sm:col-span-2">
+              Distinct venue leads matching auto-draft heuristic in an ACTIVE launch market:{" "}
+              <span className="font-semibold text-teal-50">{params.claudeVenueAutoEligible}</span> (next cron run can
+              draft/send under existing caps)
+            </li>
+          </ul>
+        </div>
+      ) : null}
 
       <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <h2 className="text-lg font-medium text-white">Today (UTC)</h2>
@@ -594,6 +639,15 @@ export default async function AdminGrowthHubPage(props: {
       </section>
 
       <section className="mt-10 grid gap-8 lg:grid-cols-2">
+        <div className="rounded-lg border border-teal-900/50 bg-zinc-900/40 p-4">
+          <h2 className="text-lg font-medium text-white">Import Claude CSV (full column set)</h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Upload a Claude-generated spreadsheet. Preview runs in the browser; import runs on the server with batch
+            metadata in internal notes. Same dedupe, MarketingContact sidecar, and venue path jobs as the rest of growth.
+          </p>
+          <ClaudeGrowthCsvImportPanel />
+        </div>
+
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
           <h2 className="text-lg font-medium text-white">Import CSV (market defaults)</h2>
           <p className="mt-1 text-xs text-zinc-500">

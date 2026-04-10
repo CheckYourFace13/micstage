@@ -6,16 +6,23 @@ import {
   persistGrowthLeadEmailContacts,
 } from "@/lib/growth/growthLeadContactAutomation";
 import { findExistingGrowthLeadForDedupe } from "@/lib/growth/growthLeadDedupe";
+import { mergeGrowthLeadFromClaudeImport } from "@/lib/growth/growthLeadMergeFromImport";
 import { parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 import {
+  normalizeFacebookUrlForDedupe,
   normalizeInstagramHandle,
   normalizeNameCityKey,
+  normalizeNameSuburbKey,
   normalizeWebsiteHost,
 } from "@/lib/growth/leadFieldNormalization";
 
+export type IngestGrowthLeadOptions = {
+  mergeOnDuplicate?: { importMetaNote: string };
+};
+
 export type IngestGrowthLeadResult =
   | { status: "created"; id: string }
-  | { status: "duplicate"; existingId: string; reason: string }
+  | { status: "duplicate"; existingId: string; reason: string; merged?: boolean }
   | { status: "skipped"; reason: string };
 
 function parsePrimaryEmailForIngest(raw: GrowthLeadCandidate): {
@@ -53,6 +60,15 @@ function parsePrimaryEmailForIngest(raw: GrowthLeadCandidate): {
   return { normalized: null, rawExtracted: null, confidence: null, rejectionReason: null };
 }
 
+function additionalEmailsNormalizedForDedupe(raw: string[] | null | undefined): string[] {
+  const out: string[] = [];
+  for (const e of raw ?? []) {
+    const p = parseGrowthLeadEmailInput(e, { extractedFromNoisyText: true });
+    if (p.kind === "valid") out.push(p.normalized);
+  }
+  return out;
+}
+
 function hasAnyValidParsedEmail(
   primary: ReturnType<typeof parsePrimaryEmailForIngest>,
   additional: string[] | null | undefined,
@@ -68,6 +84,7 @@ function hasAnyValidParsedEmail(
 export async function ingestGrowthLeadCandidate(
   prisma: PrismaClient,
   raw: GrowthLeadCandidate,
+  opts?: IngestGrowthLeadOptions,
 ): Promise<IngestGrowthLeadResult> {
   const name = raw.name?.trim();
   if (!name) return { status: "skipped", reason: "missing name" };
@@ -80,17 +97,32 @@ export async function ingestGrowthLeadCandidate(
   const websiteHostNormalized = normalizeWebsiteHost(raw.websiteUrl ?? null);
   const instagramHandleNormalized = normalizeInstagramHandle(raw.instagramUrl ?? null);
   const nameCityKey = normalizeNameCityKey(name, raw.city ?? null);
+  const nameSuburbKey = normalizeNameSuburbKey(name, raw.suburb ?? null);
+  const facebookUrlNormalized = normalizeFacebookUrlForDedupe(raw.facebookUrl ?? null);
+  const additionalEmailsNormalized = additionalEmailsNormalizedForDedupe(raw.additionalContactEmails);
 
   const dup = await findExistingGrowthLeadForDedupe(prisma, {
     leadType: raw.leadType,
     discoveryMarketSlug,
     contactEmailNormalized: email,
+    additionalEmailsNormalized,
     importKey: raw.importKey ?? null,
     websiteHostNormalized,
     instagramHandleNormalized,
+    facebookUrlNormalized,
     nameCityKey,
+    nameSuburbKey,
   });
   if (dup) {
+    let merged = false;
+    if (opts?.mergeOnDuplicate?.importMetaNote) {
+      merged = await mergeGrowthLeadFromClaudeImport(
+        prisma,
+        dup.id,
+        raw,
+        opts.mergeOnDuplicate.importMetaNote,
+      );
+    }
     if (raw.leadType === "VENUE") {
       const sidecarPrimary =
         primary.normalized && (primary.confidence === "HIGH" || primary.confidence === "MEDIUM")
@@ -119,8 +151,25 @@ export async function ingestGrowthLeadCandidate(
         facebookUrl: raw.facebookUrl ?? null,
         hasAnyEmail: hasAnyValidParsedEmail(primary, raw.additionalContactEmails),
       });
+    } else {
+      const sidecarPrimary =
+        primary.normalized && (primary.confidence === "HIGH" || primary.confidence === "MEDIUM")
+          ? primary.normalized
+          : null;
+      if (sidecarPrimary || (raw.additionalContactEmails?.length ?? 0) > 0) {
+        await persistGrowthLeadEmailContacts(prisma, {
+          leadId: dup.id,
+          leadName: name,
+          discoveryMarketSlug,
+          source: raw.source ?? null,
+          websiteUrl: raw.websiteUrl ?? null,
+          confidence: raw.discoveryConfidence ?? null,
+          primaryEmail: sidecarPrimary,
+          additionalEmails: raw.additionalContactEmails ?? [],
+        });
+      }
     }
-    return { status: "duplicate", existingId: dup.id, reason: dup.reason };
+    return { status: "duplicate", existingId: dup.id, reason: dup.reason, merged };
   }
 
   const row = await prisma.growthLead.create({
@@ -185,6 +234,23 @@ export async function ingestGrowthLeadCandidate(
       facebookUrl: raw.facebookUrl ?? null,
       hasAnyEmail: hasAnyValidParsedEmail(primary, raw.additionalContactEmails),
     });
+  } else {
+    const sidecarPrimary =
+      primary.normalized && (primary.confidence === "HIGH" || primary.confidence === "MEDIUM")
+        ? primary.normalized
+        : null;
+    if (sidecarPrimary || (raw.additionalContactEmails?.length ?? 0) > 0) {
+      await persistGrowthLeadEmailContacts(prisma, {
+        leadId: row.id,
+        leadName: name,
+        discoveryMarketSlug,
+        source: raw.source ?? null,
+        websiteUrl: raw.websiteUrl ?? null,
+        confidence: raw.discoveryConfidence ?? null,
+        primaryEmail: sidecarPrimary,
+        additionalEmails: raw.additionalContactEmails ?? [],
+      });
+    }
   }
 
   return { status: "created", id: row.id };

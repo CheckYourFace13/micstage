@@ -75,6 +75,9 @@ export default async function AdminGrowthHubPage(props: {
     leadSourceWithEmailBreakdown,
     leadSourceWithoutEmailBreakdown,
     draftErrorRows,
+    emailRejectionReasonBreakdown,
+    lowConfidenceEmailCount,
+    invalidEmailDroppedCount,
   ] =
     await Promise.all([
       loadGrowthMarketMetrics(prisma, marketSlug),
@@ -165,6 +168,17 @@ export default async function AdminGrowthHubPage(props: {
         orderBy: { updatedAt: "desc" },
         take: 500,
       }),
+      prisma.growthLead.groupBy({
+        by: ["contactEmailRejectionReason"],
+        where: { ...marketEq, contactEmailRejectionReason: { not: null } },
+        _count: { _all: true },
+      }),
+      prisma.growthLead.count({
+        where: { ...marketEq, contactEmailConfidence: "LOW" },
+      }),
+      prisma.growthLead.count({
+        where: { ...marketEq, contactEmailRejectionReason: { not: null } },
+      }),
     ]);
   const serpMetrics = await readSerpApiMetricsForMarket(prisma, marketSlug);
   const draftBySource: Record<string, number> = {};
@@ -200,6 +214,13 @@ export default async function AdminGrowthHubPage(props: {
     rejectionReasonsByCount[reason] = (rejectionReasonsByCount[reason] ?? 0) + 1;
   }
   const topRejectionReasons = Object.entries(rejectionReasonsByCount).sort((a, b) => b[1] - a[1]).slice(0, 12);
+
+  const emailRejectCounts: Record<string, number> = {};
+  for (const row of emailRejectionReasonBreakdown) {
+    const k = (row.contactEmailRejectionReason ?? "unknown").slice(0, 120);
+    emailRejectCounts[k] = row._count._all;
+  }
+  const topEmailRejectReasons = Object.entries(emailRejectCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
 
   const counts = Object.fromEntries(byType.map((g) => [g.leadType, g._count._all])) as Record<string, number>;
   const venueN = counts.VENUE ?? 0;
@@ -276,6 +297,29 @@ export default async function AdminGrowthHubPage(props: {
         Viewing metrics for <code className="text-zinc-400">{marketSlug}</code>
         {metroConfig.label !== marketSlug ? ` (${metroConfig.label})` : ""}.
       </p>
+
+      <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h2 className="text-sm font-medium text-white">Lead email hygiene (this market)</h2>
+        <p className="mt-1 text-xs text-zinc-400">
+          LOW confidence (no auto-draft/auto-send): <span className="text-zinc-200">{lowConfidenceEmailCount}</span>
+          {" · "}
+          Invalid dropped (rejected scrape / unusable): <span className="text-zinc-200">{invalidEmailDroppedCount}</span>
+        </p>
+        {topEmailRejectReasons.length ? (
+          <div className="mt-2">
+            <p className="text-xs font-medium text-zinc-300">Rejected email reasons (counts)</p>
+            <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto font-mono text-[11px] text-zinc-400">
+              {topEmailRejectReasons.map(([k, v]) => (
+                <li key={k}>
+                  {k}: {v}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-zinc-500">No rejected-email audit rows in this market yet.</p>
+        )}
+      </section>
 
       <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <h2 className="text-sm font-medium text-white">Autonomous discovery (venue-only web search) &amp; funnel</h2>
@@ -647,7 +691,17 @@ export default async function AdminGrowthHubPage(props: {
           </label>
           <label className="grid gap-1 text-sm">
             <span className="text-zinc-400">Contact email</span>
-            <input name="contactEmail" type="email" className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 text-white" />
+            <input
+              name="contactEmail"
+              type="text"
+              autoComplete="off"
+              placeholder="venue@domain.com"
+              className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 text-white"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-zinc-400 sm:col-span-2">
+            <input type="checkbox" name="allowPlaceholderEmail" className="rounded border-zinc-600" />
+            Allow placeholder/test addresses (manual QA only; e.g. example.com)
           </label>
           <label className="grid gap-1 text-sm">
             <span className="text-zinc-400">Contact URL</span>

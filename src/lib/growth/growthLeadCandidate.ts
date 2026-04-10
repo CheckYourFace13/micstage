@@ -14,6 +14,10 @@ export type GrowthLeadCandidate = {
   contactEmailNormalized?: string | null;
   /** Additional discovered emails for durable reuse (first-class contacts), venue-first. */
   additionalContactEmails?: string[];
+  /** When true, parsed as scraped/noisy context (MEDIUM vs HIGH confidence). */
+  emailExtractedFromNoisyText?: boolean;
+  /** MANUAL_ADMIN only: allow example.com-style placeholders through validation. */
+  allowPlaceholderEmail?: boolean;
   contactUrl?: string | null;
   websiteUrl?: string | null;
   instagramUrl?: string | null;

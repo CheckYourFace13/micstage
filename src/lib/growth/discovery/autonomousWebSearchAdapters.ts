@@ -286,6 +286,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           leadType: "VENUE",
           name,
           contactEmailNormalized: email,
+          emailExtractedFromNoisyText: true,
           additionalContactEmails: allEmails.length > 1 ? allEmails.slice(1, 6) : [],
           websiteUrl: pageUrl,
           contactUrl: contactPick ?? ig ?? fb ?? null,

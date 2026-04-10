@@ -136,8 +136,19 @@ export default async function AdminGrowthLeadDetailPage(props: {
         <h2 className="text-sm font-medium text-white">Lead record</h2>
         <dl className="mt-2 grid gap-2 text-xs text-zinc-400 sm:grid-cols-2">
           <div>
-            <dt className="text-zinc-500">Email</dt>
+            <dt className="text-zinc-500">Email (normalized)</dt>
             <dd className="font-mono text-zinc-200">{lead.contactEmailNormalized ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Email raw / confidence</dt>
+            <dd className="font-mono text-[11px] text-zinc-200">
+              {lead.contactEmailRaw ?? "—"}
+              {lead.contactEmailConfidence ? ` · ${lead.contactEmailConfidence}` : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Email rejection</dt>
+            <dd className="text-amber-200/90">{lead.contactEmailRejectionReason ?? "—"}</dd>
           </div>
           <div>
             <dt className="text-zinc-500">Contact URL</dt>

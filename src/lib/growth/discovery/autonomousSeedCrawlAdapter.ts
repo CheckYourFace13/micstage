@@ -88,6 +88,7 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
           leadType: "VENUE",
           name: ex.nameGuess.slice(0, 180),
           contactEmailNormalized: email,
+          emailExtractedFromNoisyText: true,
           websiteUrl: seed.split("#")[0]!,
           contactUrl: contactPick ?? ig ?? fb ?? null,
           instagramUrl: ig,

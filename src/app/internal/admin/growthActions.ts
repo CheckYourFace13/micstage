@@ -15,7 +15,6 @@ import type {
   GrowthLeadType,
 } from "@/generated/prisma/client";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
-import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { requirePrisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -52,7 +51,7 @@ export async function createGrowthLeadAction(formData: FormData) {
   const leadType = parseLeadTypeForm(String(formData.get("leadType") ?? ""));
   if (!name || !leadType) redirect(q("/internal/admin/growth", "err", "badLead"));
 
-  const email = normalizeMarketingEmail(String(formData.get("contactEmail") ?? ""));
+  const emailRaw = String(formData.get("contactEmail") ?? "").trim();
   const contactUrl = String(formData.get("contactUrl") ?? "").trim() || null;
   const fitRaw = String(formData.get("fitScore") ?? "").trim();
   const fitScore = fitRaw ? Number.parseInt(fitRaw, 10) : null;
@@ -62,7 +61,8 @@ export async function createGrowthLeadAction(formData: FormData) {
   const candidate: GrowthLeadCandidate = {
     leadType,
     name,
-    contactEmailNormalized: email || null,
+    contactEmailNormalized: emailRaw || null,
+    allowPlaceholderEmail: String(formData.get("allowPlaceholderEmail") ?? "") === "on",
     contactUrl,
     websiteUrl: String(formData.get("websiteUrl") ?? "").trim() || null,
     instagramUrl: String(formData.get("instagramUrl") ?? "").trim() || null,
@@ -250,7 +250,7 @@ export async function generateGrowthLeadDraftAction(formData: FormData) {
   const leadId = String(formData.get("leadId") ?? "").trim();
   if (!leadId) redirect(q("/internal/admin/growth", "err", "noLead"));
 
-  const r = await createPendingGrowthLeadOutreachDraft(prisma, leadId);
+  const r = await createPendingGrowthLeadOutreachDraft(prisma, leadId, { allowLowConfidenceEmail: true });
   if (!r.ok) {
     const key =
       r.reason === "Lead not found"
@@ -312,7 +312,10 @@ export async function sendGrowthLeadDraftAction(formData: FormData) {
   const leadId = String(formData.get("leadId") ?? "").trim();
   if (!id || !leadId) redirect(q("/internal/admin/growth", "err", "noDraft"));
 
-  const r = await sendGrowthLeadOutreachDraft(prisma, id, { actorEmail: actor });
+  const r = await sendGrowthLeadOutreachDraft(prisma, id, {
+    actorEmail: actor,
+    allowLowConfidenceEmail: true,
+  });
   revalidatePath("/internal/admin/growth/leads");
   revalidatePath(`/internal/admin/growth/leads/${leadId}`);
 

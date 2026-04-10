@@ -13,7 +13,7 @@ import { sendThroughMarketingPipeline, type MarketingSendResult } from "@/lib/ma
 export async function sendGrowthLeadOutreachDraft(
   prisma: PrismaClient,
   draftId: string,
-  opts?: { actorEmail?: string | null },
+  opts?: { actorEmail?: string | null; allowLowConfidenceEmail?: boolean },
 ): Promise<MarketingSendResult> {
   const draft = await prisma.growthLeadOutreachDraft.findUnique({
     where: { id: draftId },
@@ -50,10 +50,16 @@ export async function sendGrowthLeadOutreachDraft(
     });
   }
 
-  return sendApprovedGrowthLeadDraft(prisma, draftId);
+  return sendApprovedGrowthLeadDraft(prisma, draftId, {
+    allowLowConfidenceEmail: opts?.allowLowConfidenceEmail === true,
+  });
 }
 
-export async function sendApprovedGrowthLeadDraft(prisma: PrismaClient, draftId: string): Promise<MarketingSendResult> {
+export async function sendApprovedGrowthLeadDraft(
+  prisma: PrismaClient,
+  draftId: string,
+  opts?: { allowLowConfidenceEmail?: boolean },
+): Promise<MarketingSendResult> {
   const draft = await prisma.growthLeadOutreachDraft.findUnique({
     where: { id: draftId },
     include: { lead: true },
@@ -63,6 +69,14 @@ export async function sendApprovedGrowthLeadDraft(prisma: PrismaClient, draftId:
   }
   if (draft.status !== "APPROVED") {
     return { ok: false, blocked: true, reasons: [`Draft status is ${draft.status}, expected APPROVED`] };
+  }
+
+  if (draft.lead.contactEmailConfidence === "LOW" && !opts?.allowLowConfidenceEmail) {
+    return {
+      ok: false,
+      blocked: true,
+      reasons: ["LOW confidence email — blocked for automated sends"],
+    };
   }
 
   const email = normalizeMarketingEmail(draft.toEmailNormalized);

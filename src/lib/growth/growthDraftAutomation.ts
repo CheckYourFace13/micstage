@@ -30,6 +30,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const candidates = await prisma.growthLead.findMany({
     where: {
       contactEmailNormalized: { not: null },
+      NOT: { contactEmailConfidence: "LOW" },
       OR: [
         // Keep existing non-venue behavior.
         { status: "APPROVED" },

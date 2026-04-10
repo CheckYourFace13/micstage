@@ -11,12 +11,17 @@ import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 export async function createPendingGrowthLeadOutreachDraft(
   prisma: PrismaClient,
   leadId: string,
+  opts?: { allowLowConfidenceEmail?: boolean },
 ): Promise<{ ok: true; draftId: string } | { ok: false; reason: string }> {
   const lead = await prisma.growthLead.findUnique({ where: { id: leadId } });
   if (!lead) return { ok: false, reason: "Lead not found" };
 
   const email = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
   if (!email) return { ok: false, reason: "Lead has no contact email" };
+
+  if (lead.contactEmailConfidence === "LOW" && !opts?.allowLowConfidenceEmail) {
+    return { ok: false, reason: "Lead email is LOW confidence (skipped for automation)" };
+  }
 
   const existing = await prisma.growthLeadOutreachDraft.findFirst({
     where: {

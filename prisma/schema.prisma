@@ -870,6 +870,13 @@ enum GrowthLeadAcquisitionStage {
   LISTING_LIVE
 }
 
+/// Scraped / ingested contact email quality (automation uses HIGH + MEDIUM only).
+enum GrowthLeadEmailConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
 /// Imported or hand-entered prospect; outreach is draft → approve → send only.
 model GrowthLead {
   id        String   @id @default(cuid())
@@ -883,6 +890,12 @@ model GrowthLead {
 
   /// Normalized email when available (outreach sends require this).
   contactEmailNormalized String?
+  /// Raw scraped or entered string before cleaning (audit / debugging).
+  contactEmailRaw String?
+  /// Parsed deliverability tier; LOW = no auto-draft / no auto-send.
+  contactEmailConfidence GrowthLeadEmailConfidence?
+  /// Set when the address was rejected (junk, merged phone, placeholder, etc.).
+  contactEmailRejectionReason String?
   /// Booking / contact page when no email yet.
   contactUrl             String?
 
@@ -930,6 +943,7 @@ model GrowthLead {
   @@index([suburb])
   @@index([status, createdAt])
   @@index([contactEmailNormalized])
+  @@index([contactEmailConfidence])
   @@index([websiteHostNormalized, leadType])
   @@index([instagramHandleNormalized, leadType])
   @@index([openMicSignalTier])

@@ -1,5 +1,4 @@
 import type { GrowthLeadPerformanceTag, GrowthLeadType } from "@/generated/prisma/client";
-import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 
 export type ParsedGrowthLeadRow = {
   rowIndex: number;
@@ -106,7 +105,7 @@ export function parseGrowthLeadsFromCsv(
     };
 
     const emailRaw = pick("contactemail", "contact_email");
-    const contactEmailNormalized = emailRaw ? normalizeMarketingEmail(emailRaw) : null;
+    const contactEmailNormalized = emailRaw ? emailRaw.trim() : null;
 
     const fitRaw = pick("fitscore", "fit_score");
     let fitScore: number | null = null;

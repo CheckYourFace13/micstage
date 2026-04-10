@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { MarketingContactStatus, MarketingJobKind } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
+import { growthLeadEmailOkForMarketingSidecar, parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 
 function normUrl(v: string | null | undefined): string | null {
   const t = v?.trim();
@@ -9,12 +9,14 @@ function normUrl(v: string | null | undefined): string | null {
   return t;
 }
 
-function uniqueEmails(raw: Array<string | null | undefined>): string[] {
+function uniqueMarketingSafeEmails(raw: Array<string | null | undefined>): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const r of raw) {
-    const n = normalizeMarketingEmail(r ?? "");
-    if (!n || seen.has(n)) continue;
+    const parsed = parseGrowthLeadEmailInput(r ?? "", { extractedFromNoisyText: true });
+    if (!growthLeadEmailOkForMarketingSidecar(parsed)) continue;
+    const n = parsed.normalized;
+    if (seen.has(n)) continue;
     seen.add(n);
     out.push(n);
   }
@@ -47,7 +49,7 @@ export async function persistGrowthLeadEmailContacts(
     additionalEmails?: string[] | null | undefined;
   },
 ): Promise<string[]> {
-  const emails = uniqueEmails([input.primaryEmail, ...(input.additionalEmails ?? [])]);
+  const emails = uniqueMarketingSafeEmails([input.primaryEmail, ...(input.additionalEmails ?? [])]);
   const linked: string[] = [];
   for (const email of emails) {
     const row = await prisma.marketingContact.upsert({

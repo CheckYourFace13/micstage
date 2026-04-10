@@ -1,3 +1,4 @@
+import type { GrowthLeadEmailConfidence } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import {
@@ -5,17 +6,64 @@ import {
   persistGrowthLeadEmailContacts,
 } from "@/lib/growth/growthLeadContactAutomation";
 import { findExistingGrowthLeadForDedupe } from "@/lib/growth/growthLeadDedupe";
+import { parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 import {
   normalizeInstagramHandle,
   normalizeNameCityKey,
   normalizeWebsiteHost,
 } from "@/lib/growth/leadFieldNormalization";
-import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 
 export type IngestGrowthLeadResult =
   | { status: "created"; id: string }
   | { status: "duplicate"; existingId: string; reason: string }
   | { status: "skipped"; reason: string };
+
+function parsePrimaryEmailForIngest(raw: GrowthLeadCandidate): {
+  normalized: string | null;
+  rawExtracted: string | null;
+  confidence: GrowthLeadEmailConfidence | null;
+  rejectionReason: string | null;
+} {
+  const rawStr = raw.contactEmailNormalized?.trim() ?? "";
+  if (!rawStr) {
+    return { normalized: null, rawExtracted: null, confidence: null, rejectionReason: null };
+  }
+  const allowPh =
+    raw.sourceKind === "MANUAL_ADMIN" && raw.allowPlaceholderEmail === true;
+  const parsed = parseGrowthLeadEmailInput(rawStr, {
+    allowPlaceholderEmail: allowPh,
+    extractedFromNoisyText: raw.emailExtractedFromNoisyText === true,
+  });
+  if (parsed.kind === "valid") {
+    return {
+      normalized: parsed.normalized,
+      rawExtracted: parsed.rawExtracted,
+      confidence: parsed.confidence,
+      rejectionReason: null,
+    };
+  }
+  if (parsed.kind === "rejected") {
+    return {
+      normalized: null,
+      rawExtracted: parsed.rawExtracted,
+      confidence: null,
+      rejectionReason: parsed.rejectionReason,
+    };
+  }
+  return { normalized: null, rawExtracted: null, confidence: null, rejectionReason: null };
+}
+
+function hasAnyValidParsedEmail(
+  primary: ReturnType<typeof parsePrimaryEmailForIngest>,
+  additional: string[] | null | undefined,
+): boolean {
+  if (primary.normalized) return true;
+  for (const e of additional ?? []) {
+    const p = parseGrowthLeadEmailInput(e, { extractedFromNoisyText: true });
+    if (p.kind === "valid") return true;
+  }
+  return false;
+}
 
 export async function ingestGrowthLeadCandidate(
   prisma: PrismaClient,
@@ -27,7 +75,8 @@ export async function ingestGrowthLeadCandidate(
   const discoveryMarketSlug = raw.discoveryMarketSlug?.trim();
   if (!discoveryMarketSlug) return { status: "skipped", reason: "missing discoveryMarketSlug" };
 
-  const email = raw.contactEmailNormalized ? normalizeMarketingEmail(raw.contactEmailNormalized) : null;
+  const primary = parsePrimaryEmailForIngest(raw);
+  const email = primary.normalized;
   const websiteHostNormalized = normalizeWebsiteHost(raw.websiteUrl ?? null);
   const instagramHandleNormalized = normalizeInstagramHandle(raw.instagramUrl ?? null);
   const nameCityKey = normalizeNameCityKey(name, raw.city ?? null);
@@ -43,6 +92,11 @@ export async function ingestGrowthLeadCandidate(
   });
   if (dup) {
     if (raw.leadType === "VENUE") {
+      const sidecarPrimary =
+        primary.normalized && (primary.confidence === "HIGH" || primary.confidence === "MEDIUM")
+          ? primary.normalized
+          : null;
+
       await persistGrowthLeadEmailContacts(prisma, {
         leadId: dup.id,
         leadName: name,
@@ -50,7 +104,7 @@ export async function ingestGrowthLeadCandidate(
         source: raw.source ?? null,
         websiteUrl: raw.websiteUrl ?? null,
         confidence: raw.discoveryConfidence ?? null,
-        primaryEmail: email,
+        primaryEmail: sidecarPrimary,
         additionalEmails: raw.additionalContactEmails ?? [],
       });
       await enqueueGrowthVenuePathTasks(prisma, {
@@ -63,7 +117,7 @@ export async function ingestGrowthLeadCandidate(
         websiteUrl: raw.websiteUrl ?? null,
         instagramUrl: raw.instagramUrl ?? null,
         facebookUrl: raw.facebookUrl ?? null,
-        hasAnyEmail: Boolean(email || raw.additionalContactEmails?.length),
+        hasAnyEmail: hasAnyValidParsedEmail(primary, raw.additionalContactEmails),
       });
     }
     return { status: "duplicate", existingId: dup.id, reason: dup.reason };
@@ -75,6 +129,9 @@ export async function ingestGrowthLeadCandidate(
       leadType: raw.leadType,
       status: "DISCOVERED",
       contactEmailNormalized: email || null,
+      contactEmailRaw: primary.rawExtracted,
+      contactEmailConfidence: primary.confidence,
+      contactEmailRejectionReason: primary.rejectionReason,
       contactUrl: raw.contactUrl?.trim() || null,
       websiteUrl: raw.websiteUrl?.trim() || null,
       instagramUrl: raw.instagramUrl?.trim() || null,
@@ -101,6 +158,11 @@ export async function ingestGrowthLeadCandidate(
   });
 
   if (raw.leadType === "VENUE") {
+    const sidecarPrimary =
+      primary.normalized && (primary.confidence === "HIGH" || primary.confidence === "MEDIUM")
+        ? primary.normalized
+        : null;
+
     await persistGrowthLeadEmailContacts(prisma, {
       leadId: row.id,
       leadName: name,
@@ -108,7 +170,7 @@ export async function ingestGrowthLeadCandidate(
       source: raw.source ?? null,
       websiteUrl: raw.websiteUrl ?? null,
       confidence: raw.discoveryConfidence ?? null,
-      primaryEmail: email,
+      primaryEmail: sidecarPrimary,
       additionalEmails: raw.additionalContactEmails ?? [],
     });
     await enqueueGrowthVenuePathTasks(prisma, {
@@ -121,7 +183,7 @@ export async function ingestGrowthLeadCandidate(
       websiteUrl: raw.websiteUrl ?? null,
       instagramUrl: raw.instagramUrl ?? null,
       facebookUrl: raw.facebookUrl ?? null,
-      hasAnyEmail: Boolean(email || raw.additionalContactEmails?.length),
+      hasAnyEmail: hasAnyValidParsedEmail(primary, raw.additionalContactEmails),
     });
   }
 

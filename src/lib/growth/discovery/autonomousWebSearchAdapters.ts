@@ -200,10 +200,13 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         }
         const provider = await discoverySearchProviderForMarket(ctx.prisma, ctx.discoveryMarketSlug);
         if (!provider || !ctx.prisma) {
-          console.info("[growth discovery] autonomous_web_search_venue skipped: provider/prisma missing", {
+          const reason = !ctx.prisma
+            ? "missing_prisma"
+            : "no_search_provider (configure SerpAPI key and/or Google CSE; check per-market Serp state)";
+          console.warn(`[growth discovery] autonomous_web_search_venue NO_SERP_REQUESTS: ${reason}`, {
+            market: ctx.discoveryMarketSlug,
             provider,
             hasPrisma: Boolean(ctx.prisma),
-            market: ctx.discoveryMarketSlug,
           });
           return [];
         }

@@ -136,10 +136,17 @@ export type SerpApiAvailability = {
   state: SerpApiProviderState;
 };
 
+/**
+ * @param opts.forSearchApiCall When true, skip `runsPerDay` / `markSerpApiRunStarted` gating. That gate must only apply
+ * when **choosing** whether Serp may run for an adapter invocation (`discoverySearchProviderForMarket`). Otherwise
+ * `markSerpApiRunStarted` increments `runsToday` before the first HTTP call and `runSerpApiSearch` would always see
+ * `runsToday >= runsPerDay` and return null without requesting SerpAPI (silent zero calls).
+ */
 export async function serpApiAvailabilityNow(
   prisma: PrismaClient,
   marketSlug: string,
   now: Date = new Date(),
+  opts?: { forSearchApiCall?: boolean },
 ): Promise<SerpApiAvailability> {
   const s = await readSerpApiProviderState(prisma, marketSlug, now);
   if (s.disabledUntilIso) {
@@ -158,7 +165,7 @@ export async function serpApiAvailabilityNow(
   if (s.callsMonth >= growthSerpApiMonthlySoftMax()) {
     return { enabled: false, reason: "monthly_soft_cap", state: s };
   }
-  if (s.runsToday >= growthSerpApiRunsPerDay()) {
+  if (!opts?.forSearchApiCall && s.runsToday >= growthSerpApiRunsPerDay()) {
     return { enabled: false, reason: "run_frequency_cap", state: s };
   }
   return { enabled: true, state: s };

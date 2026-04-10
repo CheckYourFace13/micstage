@@ -119,12 +119,15 @@ export async function runSerpApiSearch(
     return null;
   }
   if (opts?.prisma && opts.marketSlug) {
-    const avail = await serpApiAvailabilityNow(opts.prisma, opts.marketSlug);
+    const avail = await serpApiAvailabilityNow(opts.prisma, opts.marketSlug, new Date(), {
+      forSearchApiCall: true,
+    });
     if (!avail.enabled) {
-      console.info("[growth discovery] SerpAPI skipped by provider-state gate", {
+      console.warn("[growth discovery] SerpAPI skipped by provider-state gate (per-call caps)", {
         market: opts.marketSlug,
         reason: avail.reason ?? "state_gate",
         callsToday: avail.state.callsToday,
+        runsToday: avail.state.runsToday,
         callsMonth: avail.state.callsMonth,
         disabledUntil: avail.state.disabledUntilIso,
       });

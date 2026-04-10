@@ -5,6 +5,7 @@ import {
   growthDiscoveryAutonomousMaxPageFetchesPerRun,
   growthDiscoveryAutonomousSearchCallsPerRun,
   growthDiscoveryAutonomousWebSearchEnabled,
+  hasSerpApi,
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
@@ -24,7 +25,7 @@ import {
   runWebSearch,
   type SearchHit,
 } from "@/lib/growth/discovery/webSearch";
-import { markSerpApiRunStarted } from "@/lib/growth/discovery/providerState";
+import { markSerpApiRunStarted, readSerpApiProviderState, serpApiAvailabilityNow } from "@/lib/growth/discovery/providerState";
 
 const ADAPTER_ID = "autonomous_web_search_venue";
 const CURSOR_KEY = "search_rotation";
@@ -224,6 +225,9 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           cur = { qi: cur.qi, start: provider === "google_cse" ? 1 : 0, prov: provider };
         }
 
+        const serpCallsBefore =
+          provider === "serpapi" ? (await readSerpApiProviderState(prisma, ctx.discoveryMarketSlug)).callsToday : -1;
+
         type TaggedHit = { hit: SearchHit; searchQuery: string };
         const hits: TaggedHit[] = [];
         console.info("[growth discovery] autonomous_web_search_venue run start (nationwide)", {
@@ -254,6 +258,16 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           if (res.items.length < 8 || (cur.prov === "google_cse" && cur.start > 90)) {
             cur.qi = (cur.qi + 1) % (OPEN_MIC_QUERY_CORES.length * GEO_SCOPES.length);
             cur.start = cur.prov === "google_cse" ? 1 : 0;
+          }
+        }
+
+        if (provider === "serpapi" && hasSerpApi()) {
+          const serpCallsAfter = (await readSerpApiProviderState(prisma, ctx.discoveryMarketSlug)).callsToday;
+          if (serpCallsAfter === serpCallsBefore) {
+            const avail = await serpApiAvailabilityNow(prisma, ctx.discoveryMarketSlug);
+            console.warn(
+              `[growth discovery] autonomous_web_search_venue NO_SERP_REQUESTS: after ${searchCalls} search iteration(s) SerpAPI call counter did not increase (market=${ctx.discoveryMarketSlug}; provider=serpapi; likely runSerpApiSearch returned before HTTP — gateNow=${avail.enabled ? "would_allow" : avail.reason}; callsToday=${avail.state.callsToday}; runsToday=${avail.state.runsToday}; month=${avail.state.callsMonth}; disabledUntil=${avail.state.disabledUntilIso ?? "—"})`,
+            );
           }
         }
 

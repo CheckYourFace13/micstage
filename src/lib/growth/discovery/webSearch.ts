@@ -119,18 +119,11 @@ export async function runSerpApiSearch(
     return null;
   }
   if (opts?.prisma && opts.marketSlug) {
-    const avail = await serpApiAvailabilityNow(opts.prisma, opts.marketSlug, new Date(), {
-      forSearchApiCall: true,
-    });
+    const avail = await serpApiAvailabilityNow(opts.prisma, opts.marketSlug);
     if (!avail.enabled) {
-      console.warn("[growth discovery] SerpAPI skipped by provider-state gate (per-call caps)", {
-        market: opts.marketSlug,
-        reason: avail.reason ?? "state_gate",
-        callsToday: avail.state.callsToday,
-        runsToday: avail.state.runsToday,
-        callsMonth: avail.state.callsMonth,
-        disabledUntil: avail.state.disabledUntilIso,
-      });
+      console.warn(
+        `[growth discovery] SerpAPI NO_REQUEST: ${avail.reason ?? "state_gate"} (market=${opts.marketSlug} callsToday=${avail.state.callsToday} runsToday=${avail.state.runsToday} month=${avail.state.callsMonth} disabledUntil=${avail.state.disabledUntilIso ?? "—"})`,
+      );
       return null;
     }
   }
@@ -299,8 +292,11 @@ export async function discoverySearchProviderForMarket(
   marketSlug: string,
 ): Promise<"serpapi" | "google_cse" | null> {
   if (hasSerpApi() && prisma) {
-    const avail = await serpApiAvailabilityNow(prisma, marketSlug);
+    const avail = await serpApiAvailabilityNow(prisma, marketSlug, new Date(), { forAdapterRunStart: true });
     if (avail.enabled) return "serpapi";
+    console.warn(
+      `[growth discovery] SerpAPI NO_REQUEST: ${avail.reason ?? "gate"} (market=${marketSlug} provider_pick; callsToday=${avail.state.callsToday} runsToday=${avail.state.runsToday})`,
+    );
   }
   if (hasGoogleProgrammableSearch()) return "google_cse";
   if (hasSerpApi()) return "serpapi";

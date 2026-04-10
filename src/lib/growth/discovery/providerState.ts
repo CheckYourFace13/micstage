@@ -137,16 +137,20 @@ export type SerpApiAvailability = {
 };
 
 /**
- * @param opts.forSearchApiCall When true, skip `runsPerDay` / `markSerpApiRunStarted` gating. That gate must only apply
- * when **choosing** whether Serp may run for an adapter invocation (`discoverySearchProviderForMarket`). Otherwise
- * `markSerpApiRunStarted` increments `runsToday` before the first HTTP call and `runSerpApiSearch` would always see
- * `runsToday >= runsPerDay` and return null without requesting SerpAPI (silent zero calls).
+ * Serp availability for a market. Caps only apply when the configured limit is **> 0**.
+ *
+ * If `GROWTH_SERPAPI_DAILY_MAX=0` (or monthly / runs-per-day = 0), treating `callsToday >= 0` as "over cap" would
+ * block **every** request forever with `serpapi_calls_today` stuck at 0 and `reason` unset — a silent production skip.
+ *
+ * `runsPerDay` gates **adapter run starts** only (`discoverySearchProviderForMarket`). Individual HTTP calls use
+ * `markSerpApiCall` + daily/monthly caps above; we do **not** re-check `runsToday` inside `runSerpApiSearch` so
+ * `markSerpApiRunStarted` cannot block the first request in the same run.
  */
 export async function serpApiAvailabilityNow(
   prisma: PrismaClient,
   marketSlug: string,
   now: Date = new Date(),
-  opts?: { forSearchApiCall?: boolean },
+  opts?: { forAdapterRunStart?: boolean },
 ): Promise<SerpApiAvailability> {
   const s = await readSerpApiProviderState(prisma, marketSlug, now);
   if (s.disabledUntilIso) {
@@ -159,13 +163,16 @@ export async function serpApiAvailabilityNow(
       };
     }
   }
-  if (s.callsToday >= growthSerpApiDailyMax()) {
+  const dailyMax = growthSerpApiDailyMax();
+  if (dailyMax > 0 && s.callsToday >= dailyMax) {
     return { enabled: false, reason: "daily_cap", state: s };
   }
-  if (s.callsMonth >= growthSerpApiMonthlySoftMax()) {
+  const monthMax = growthSerpApiMonthlySoftMax();
+  if (monthMax > 0 && s.callsMonth >= monthMax) {
     return { enabled: false, reason: "monthly_soft_cap", state: s };
   }
-  if (!opts?.forSearchApiCall && s.runsToday >= growthSerpApiRunsPerDay()) {
+  const runsMax = growthSerpApiRunsPerDay();
+  if (opts?.forAdapterRunStart && runsMax > 0 && s.runsToday >= runsMax) {
     return { enabled: false, reason: "run_frequency_cap", state: s };
   }
   return { enabled: true, state: s };

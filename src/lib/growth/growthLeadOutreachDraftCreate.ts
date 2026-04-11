@@ -2,6 +2,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { MarketingContactStatus } from "@/generated/prisma/client";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { buildGrowthLeadOutreachPayload } from "@/lib/growth/outreachEmailBodies";
+import { venueLeadMailboxForOutreach } from "@/lib/growth/leadEmailValidation";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 
 /**
@@ -16,7 +17,22 @@ export async function createPendingGrowthLeadOutreachDraft(
   const lead = await prisma.growthLead.findUnique({ where: { id: leadId } });
   if (!lead) return { ok: false, reason: "Lead not found" };
 
-  const email = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
+  let email: string | null = null;
+  if (lead.leadType === "VENUE") {
+    const mb = venueLeadMailboxForOutreach(lead.contactEmailNormalized, lead.contactEmailConfidence);
+    if (!mb.ok) {
+      return {
+        ok: false,
+        reason:
+          mb.reason === "low_confidence_or_ineligible"
+            ? "Lead email is LOW confidence or ineligible (skipped for automation)"
+            : `Venue contact email invalid or not safe to mail: ${mb.reason}`,
+      };
+    }
+    email = mb.normalized;
+  } else {
+    email = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
+  }
   if (!email) return { ok: false, reason: "Lead has no contact email" };
 
   if (lead.contactEmailConfidence === "LOW" && !opts?.allowLowConfidenceEmail) {

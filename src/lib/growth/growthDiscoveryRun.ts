@@ -14,7 +14,7 @@ import {
   growthSerpApiEnabled,
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readSerpApiMetricsForMarket } from "@/lib/growth/discovery/webSearch";
-import { growthDiscoveryMarketSlugs } from "@/lib/growth/marketsConfig";
+import { growthDiscoveryMarketSlugs, nationalDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import { allGrowthDiscoveryAdapters } from "@/lib/growth/sources/growthDiscoveryAdapters";
 
 export type GrowthDiscoveryRunResult = {
@@ -44,6 +44,8 @@ export type GrowthDiscoveryRunResult = {
   search_provider_status: {
     serpapi_configured: boolean;
     serpapi_enabled: boolean;
+    /** Which `discoveryMarketSlug` row supplies `serpapi_calls_*` (nationwide search uses `national-discovery-us`). */
+    serpapi_state_market: string;
     google_cse_configured: boolean;
     fallback_ready: boolean;
     warning: string | null;
@@ -146,8 +148,11 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
     });
   }
 
-  const primaryMarket = markets[0] ?? "chicagoland-il";
-  const serpMetrics = await readSerpApiMetricsForMarket(prisma, primaryMarket);
+  const nationalSlug = nationalDiscoveryMarketSlug();
+  const marketSet = new Set(markets.map((m) => m.trim().toLowerCase()));
+  /** Serp quota/state is per market; venue web search only increments counters on the nationwide lane. */
+  const serpMetricsMarketSlug = marketSet.has(nationalSlug.toLowerCase()) ? nationalSlug : (markets[0] ?? nationalSlug);
+  const serpMetrics = await readSerpApiMetricsForMarket(prisma, serpMetricsMarketSlug);
   const candidatesBySource: Record<string, number> = { ...candidatesEmittedByAdapter };
   const draftsCreatedBySource: Record<string, number> = {};
   const sentBySource: Record<string, number> = {};
@@ -201,6 +206,7 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
     search_provider_status: {
       serpapi_configured: hasSerpApi(),
       serpapi_enabled: growthSerpApiEnabled(),
+      serpapi_state_market: serpMetricsMarketSlug,
       google_cse_configured: hasGoogleProgrammableSearch(),
       fallback_ready: hasGoogleProgrammableSearch(),
       warning: !hasGoogleProgrammableSearch()

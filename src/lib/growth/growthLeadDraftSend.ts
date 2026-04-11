@@ -2,6 +2,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { explainGrowthLeadOutreachBlock } from "@/lib/growth/growthLeadBlock";
 import { marketingTemplateKindForGrowthLeadType } from "@/lib/growth/templateKindForLead";
+import { venueLeadMailboxForOutreach } from "@/lib/growth/leadEmailValidation";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { isOnlyTransientMarketingThrottle } from "@/lib/marketing/sendCaps";
 import { sendThroughMarketingPipeline, type MarketingSendResult } from "@/lib/marketing/sendPipeline";
@@ -79,9 +80,23 @@ export async function sendApprovedGrowthLeadDraft(
     };
   }
 
-  const email = normalizeMarketingEmail(draft.toEmailNormalized);
-  if (!email) {
-    return { ok: false, blocked: true, reasons: ["Invalid draft recipient email"] };
+  let email: string;
+  if (draft.lead.leadType === "VENUE") {
+    const mb = venueLeadMailboxForOutreach(draft.toEmailNormalized, draft.lead.contactEmailConfidence);
+    if (!mb.ok) {
+      const detail =
+        mb.reason === "low_confidence_or_ineligible"
+          ? "LOW confidence email — blocked for automated sends"
+          : `Invalid or non-mailable venue recipient (${mb.reason})`;
+      return { ok: false, blocked: true, reasons: [detail] };
+    }
+    email = mb.normalized;
+  } else {
+    const n = normalizeMarketingEmail(draft.toEmailNormalized);
+    if (!n) {
+      return { ok: false, blocked: true, reasons: ["Invalid draft recipient email"] };
+    }
+    email = n;
   }
 
   const contact = await prisma.marketingContact.findUnique({ where: { emailNormalized: email } });

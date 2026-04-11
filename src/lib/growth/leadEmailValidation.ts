@@ -334,3 +334,23 @@ export function growthLeadEmailOkForMarketingSidecar(parsed: ParsedGrowthLeadEma
 export function growthLeadEmailEligibleForAutoOutreach(parsed: ParsedGrowthLeadEmail): boolean {
   return parsed.kind === "valid" && (parsed.confidence === "HIGH" || parsed.confidence === "MEDIUM");
 }
+
+/**
+ * Venue outreach automation: canonical mailbox for drafts/sends (strict parse + HIGH/MEDIUM only).
+ * Avoids `normalizeMarketingEmail`-only paths that let malformed addresses reach Resend.
+ */
+export function venueLeadMailboxForOutreach(
+  raw: string | null | undefined,
+  contactEmailConfidence: GrowthLeadEmailConfidence | null | undefined,
+):
+  | { ok: true; normalized: string }
+  | { ok: false; reason: string } {
+  const noisy = contactEmailConfidence !== "HIGH";
+  const parsed = parseGrowthLeadEmailInput(raw ?? "", { extractedFromNoisyText: noisy });
+  if (parsed.kind === "valid" && growthLeadEmailEligibleForAutoOutreach(parsed)) {
+    return { ok: true, normalized: parsed.normalized };
+  }
+  if (parsed.kind === "rejected") return { ok: false, reason: parsed.rejectionReason };
+  if (parsed.kind === "empty") return { ok: false, reason: "empty" };
+  return { ok: false, reason: "low_confidence_or_ineligible" };
+}

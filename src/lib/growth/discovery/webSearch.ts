@@ -247,6 +247,8 @@ export async function runWebSearch(
   cursor: { provider: "google_cse" | "serpapi"; start: number },
   opts?: { prisma?: PrismaClient; marketSlug?: string },
 ): Promise<{ items: SearchHit[]; nextCursor: { provider: "google_cse" | "serpapi"; start: number } } | null> {
+  const marketTag = opts?.marketSlug ?? "—";
+  const qPrev = query.replace(/\s+/g, " ").trim().slice(0, 120);
   if (hasSerpApi()) {
     const r = await runSerpApiSearch(query, cursor.provider === "serpapi" ? cursor.start : 0, opts);
     if (r) {
@@ -259,25 +261,41 @@ export async function runWebSearch(
     }
     if (hasGoogleProgrammableSearch()) {
       const fallback = await runProgrammableSearch(query, 1);
-      if (!fallback) return null;
+      if (!fallback) {
+        console.warn(
+          `[growth discovery] SerpAPI NO_REQUEST_CHAIN: skip_reason=serp_unavailable_or_empty_then_cse_http_failed market=${marketTag} query="${qPrev}"`,
+        );
+        return null;
+      }
       const exhausted = fallback.items.length === 0 || fallback.rawNextStart > 81;
       return {
         items: fallback.items,
         nextCursor: { provider: "google_cse", start: exhausted ? 1 : fallback.rawNextStart },
       };
     }
+    console.warn(
+      `[growth discovery] SerpAPI NO_REQUEST_CHAIN: skip_reason=serp_unavailable_or_empty_and_no_cse_fallback market=${marketTag} query="${qPrev}"`,
+    );
     return null;
   }
   if (hasGoogleProgrammableSearch()) {
     const start1 = cursor.provider === "google_cse" ? Math.max(1, cursor.start || 1) : 1;
     const r = await runProgrammableSearch(query, start1);
-    if (!r) return null;
+    if (!r) {
+      console.warn(
+        `[growth discovery] web_search SKIPPED: skip_reason=google_cse_http_failed market=${marketTag} query="${qPrev}" start=${start1}`,
+      );
+      return null;
+    }
     const exhausted = r.items.length === 0 || start1 > 81;
     return {
       items: r.items,
       nextCursor: { provider: "google_cse", start: exhausted ? 1 : r.rawNextStart },
     };
   }
+  console.warn(
+    `[growth discovery] web_search SKIPPED: skip_reason=no_serp_or_cse_providers_configured market=${marketTag} query="${qPrev}"`,
+  );
   return null;
 }
 

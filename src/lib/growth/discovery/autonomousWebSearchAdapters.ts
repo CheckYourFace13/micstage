@@ -226,7 +226,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         }
 
         const serpCallsBefore =
-          provider === "serpapi" ? (await readSerpApiProviderState(prisma, ctx.discoveryMarketSlug)).callsToday : -1;
+          hasSerpApi() && prisma ? (await readSerpApiProviderState(prisma, ctx.discoveryMarketSlug)).callsToday : -1;
 
         type TaggedHit = { hit: SearchHit; searchQuery: string };
         const hits: TaggedHit[] = [];
@@ -261,12 +261,12 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           }
         }
 
-        if (provider === "serpapi" && hasSerpApi()) {
+        if (hasSerpApi() && prisma && serpCallsBefore >= 0) {
           const serpCallsAfter = (await readSerpApiProviderState(prisma, ctx.discoveryMarketSlug)).callsToday;
           if (serpCallsAfter === serpCallsBefore) {
             const avail = await serpApiAvailabilityNow(prisma, ctx.discoveryMarketSlug);
             console.warn(
-              `[growth discovery] autonomous_web_search_venue NO_SERP_REQUESTS: after ${searchCalls} search iteration(s) SerpAPI call counter did not increase (market=${ctx.discoveryMarketSlug}; provider=serpapi; likely runSerpApiSearch returned before HTTP — gateNow=${avail.enabled ? "would_allow" : avail.reason}; callsToday=${avail.state.callsToday}; runsToday=${avail.state.runsToday}; month=${avail.state.callsMonth}; disabledUntil=${avail.state.disabledUntilIso ?? "—"})`,
+              `[growth discovery] autonomous_web_search_venue NO_SERP_REQUESTS: skip_reason=no_serpapi_http_after_iterations (market=${ctx.discoveryMarketSlug}; provider_pick=${provider}; iterations=${searchCalls}; gateNow=${avail.enabled ? "would_allow" : avail.reason ?? "unknown"}; callsToday=${avail.state.callsToday}; runsToday=${avail.state.runsToday}; month=${avail.state.callsMonth}; disabledUntil=${avail.state.disabledUntilIso ?? "—"})`,
             );
           }
         }

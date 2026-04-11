@@ -3,6 +3,8 @@
  * Prefer role-based locals on the venue domain; deprioritize noreply/newsletter hosts.
  */
 
+import { growthLeadEmailEligibleForAutoOutreach, parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
+
 function localPart(mailbox: string): string {
   const i = mailbox.indexOf("@");
   return (i >= 0 ? mailbox.slice(0, i) : mailbox).toLowerCase().trim();
@@ -56,11 +58,12 @@ export function pickPrimaryVenueOutreachEmail(
   tagged: EmailWithSource[],
   pageHost: string | null,
 ): { primary: string | null; additional: string[]; bestSource: string } {
-  const norm = (e: string) => e.trim().toLowerCase();
   const uniq = new Map<string, { email: string; source: string; score: number }>();
   for (const { email, source } of tagged) {
-    const n = norm(email);
-    if (!n.includes("@") || n.length > 90) continue;
+    const parsed = parseGrowthLeadEmailInput(email, { extractedFromNoisyText: true });
+    if (parsed.kind !== "valid" || !growthLeadEmailEligibleForAutoOutreach(parsed)) continue;
+    const n = parsed.normalized;
+    if (n.length > 90) continue;
     const sc = scoreMailbox(n, pageHost, source);
     const prev = uniq.get(n);
     if (!prev || sc > prev.score) uniq.set(n, { email: n, source, score: sc });

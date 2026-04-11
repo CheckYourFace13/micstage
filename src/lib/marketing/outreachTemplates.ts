@@ -3,6 +3,7 @@
  * Keep HTML/text bodies aligned; escape all interpolated names/URLs in HTML builders.
  */
 
+import { resolveArtistOutreachSalutationParts } from "@/lib/marketing/artistOutreachGreeting";
 import { resolveVenueOutreachSalutationParts } from "@/lib/marketing/venueOutreachGreeting";
 
 function escapeHtml(s: string): string {
@@ -14,7 +15,7 @@ function escapeHtml(s: string): string {
 }
 
 export const GROWTH_VENUE_OUTREACH_SUBJECT = "A free, easier way to run your open mic";
-export const GROWTH_ARTIST_OUTREACH_SUBJECT = "New free way to find open mics and get more opportunities";
+export const GROWTH_ARTIST_OUTREACH_SUBJECT = "Be one of the first to use MicStage";
 export const GROWTH_PROMOTER_OUTREACH_SUBJECT = "MicStage is launching in Chicagoland";
 
 const SIGN_OFF_TEXT = ["Thanks,", "Chris", "MicStage"].join("\n");
@@ -96,22 +97,74 @@ export function buildVenueOutreachLetter(
   return { textBody, htmlBody };
 }
 
-function artistBodyParagraphs(): string[] {
-  return [
-    "We're launching MicStage, a new free platform to help musicians, comedians, and other performers find open mics more easily and get more visibility for what they do.",
-    "The goal is not just to list venues, but to help market artists too — so performers can get discovered more easily, find more open mics, and create more chances for gigs and future opportunities.",
-    "We're starting with Chicagoland and nearby suburbs, and since it's still new, we're actively improving it and open to feedback from performers as we grow.",
-    "If you want, I can send you the link and a quick overview.",
-  ];
+function artistSalutationLines(
+  displayName: string,
+  contactEmail: string | null | undefined,
+): { text: string; html: string } {
+  const parts = resolveArtistOutreachSalutationParts(displayName, contactEmail);
+  if (parts.kind === "neutral") {
+    return { text: "Hey there,", html: "<p>Hey there,</p>" };
+  }
+  return {
+    text: `Hi ${parts.label},`,
+    html: `<p>Hi ${escapeHtml(parts.label)},</p>`,
+  };
 }
 
-export function buildArtistOutreachLetter(firstName: string): { textBody: string; htmlBody: string } {
-  const textBody = [`Hi ${firstName},`, "", ...artistBodyParagraphs(), "", SIGN_OFF_TEXT].join("\n");
+function artistCoreParagraphsText(claimArtistUrl?: string): string[] {
+  const lines: string[] = [
+    "We just launched MicStage, a new free platform built to help artists find local open mics faster and sign up more easily.",
+    "You'd be one of the first to use it — which means you can get in early, find nearby opportunities, and register for open mics before they fill up.",
+    "It's simple:",
+    "- create your free account",
+    "- find local open mics",
+    "- sign up quickly",
+    "- keep up with new opportunities as they're added",
+  ];
+  if (claimArtistUrl?.trim()) {
+    lines.push("Get started here:", claimArtistUrl.trim());
+  } else {
+    lines.push("Get started here — reply to this email and I'll send you the artist signup link.");
+  }
+  lines.push("If you want, just reply and I can help get you set up.");
+  return lines;
+}
+
+export function buildArtistOutreachLetter(
+  displayName: string,
+  opts?: { contactEmail?: string | null; claimArtistUrl?: string },
+): { textBody: string; htmlBody: string } {
+  const claimArtistUrl = opts?.claimArtistUrl?.trim();
+  const { text: salText, html: salHtml } = artistSalutationLines(displayName, opts?.contactEmail);
+  const coreText = artistCoreParagraphsText(claimArtistUrl);
+  const textBody = [salText, "", ...coreText, "", SIGN_OFF_TEXT].join("\n");
+
+  const htmlCoreParas = [
+    "We just launched MicStage, a new free platform built to help artists find local open mics faster and sign up more easily.",
+    "You'd be one of the first to use it — which means you can get in early, find nearby opportunities, and register for open mics before they fill up.",
+    "It's simple:",
+  ];
+  const bullets = [
+    "create your free account",
+    "find local open mics",
+    "sign up quickly",
+    "keep up with new opportunities as they're added",
+  ];
+  const ctaHtml = claimArtistUrl
+    ? [
+        "<p>Get started here:</p>",
+        `<p><a href="${escapeHtml(claimArtistUrl)}">${escapeHtml(claimArtistUrl)}</a></p>`,
+      ]
+    : ["<p>Get started here — reply to this email and I'll send you the artist signup link.</p>"];
   const htmlBody = [
-    `<p>Hi ${escapeHtml(firstName)},</p>`,
-    ...artistBodyParagraphs().map((p) => `<p>${escapeHtml(p)}</p>`),
+    salHtml,
+    ...htmlCoreParas.map((p) => `<p>${escapeHtml(p)}</p>`),
+    `<ul style="margin:0 0 1em 1.2em;padding:0;">${bullets.map((b) => `<li style="margin:0.25em 0;">${escapeHtml(b)}</li>`).join("")}</ul>`,
+    ...ctaHtml,
+    "<p>If you want, just reply and I can help get you set up.</p>",
     SIGN_OFF_HTML,
   ].join("");
+
   return { textBody, htmlBody };
 }
 

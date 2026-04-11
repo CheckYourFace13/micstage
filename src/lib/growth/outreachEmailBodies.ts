@@ -22,7 +22,7 @@ export function buildGrowthLeadOutreachPayload(input: {
   websiteUrl: string | null;
   /** When set on VENUE leads, adds a tracked link to venue registration. */
   leadId?: string | null;
-  /** VENUE only: used to prefer "Hi {first}," from mailbox local part in salutation. */
+  /** VENUE / ARTIST: mailbox used for "Hi {first}," salutation heuristic when applicable. */
   contactEmailForSalutation?: string | null;
 }): MarketingEmailPayload {
   const subjectByType: Record<GrowthLeadType, string> = {
@@ -36,12 +36,19 @@ export function buildGrowthLeadOutreachPayload(input: {
     input.leadType === "VENUE" && input.leadId?.trim()
       ? `${baseUrl}/register/venue?growthLead=${encodeURIComponent(input.leadId.trim())}`
       : undefined;
+  const claimArtistUrl =
+    input.leadType === "ARTIST" && input.leadId?.trim()
+      ? `${baseUrl}/register/musician?growthLead=${encodeURIComponent(input.leadId.trim())}`
+      : undefined;
 
   const venueLetter = buildVenueOutreachLetter(input.name, {
     claimVenueUrl,
     contactEmail: input.leadType === "VENUE" ? input.contactEmailForSalutation : undefined,
   });
-  const artistLetter = buildArtistOutreachLetter(input.name);
+  const artistLetter = buildArtistOutreachLetter(input.name, {
+    claimArtistUrl,
+    contactEmail: input.leadType === "ARTIST" ? input.contactEmailForSalutation : undefined,
+  });
   const promoterLetter = buildPromoterOutreachLetter(input.name);
 
   const coreText =

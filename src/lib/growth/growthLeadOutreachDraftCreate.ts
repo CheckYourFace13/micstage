@@ -56,7 +56,7 @@ export async function createPendingGrowthLeadOutreachDraft(
     contactUrl: lead.contactUrl,
     websiteUrl: lead.websiteUrl,
     leadId: lead.id,
-    contactEmailForSalutation: lead.leadType === "VENUE" ? email : undefined,
+    contactEmailForSalutation: lead.leadType === "VENUE" || lead.leadType === "ARTIST" ? email : undefined,
   });
 
   const contact = await prisma.marketingContact.upsert({

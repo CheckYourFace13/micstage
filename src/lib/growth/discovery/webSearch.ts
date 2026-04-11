@@ -28,10 +28,22 @@ async function throttleSearch() {
   if (wait > 0) await sleep(wait);
 }
 
+/**
+ * Custom Search engines are often scoped to one site or a small allowlist. Queries like `site:eventbrite.com`
+ * then return **zero** hits even when the engine is "search the web" (API can still behave oddly). SerpAPI
+ * uses the raw query; CSE should not rely on cross-site `site:` operators for nationwide venue discovery.
+ */
+function queryForGoogleProgrammableSearch(rawQuery: string): string {
+  return rawQuery
+    .replace(/\bsite:[^\s]+\s*/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function runProgrammableSearch(
   query: string,
   start1Based: number,
-  log?: { market?: string; afterBlockedSerp: boolean },
+  log?: { market?: string; afterBlockedSerp: boolean; strippedSiteOperators?: boolean },
 ): Promise<{ items: SearchHit[]; rawNextStart: number } | null> {
   if (!hasGoogleProgrammableSearch()) return null;
   const key = process.env.GROWTH_GOOGLE_CSE_API_KEY!.trim();
@@ -49,6 +61,7 @@ export async function runProgrammableSearch(
       market,
       start1Based,
       queryPreview: qPrev,
+      strippedSiteOperators: Boolean(log.strippedSiteOperators),
     });
   }
 
@@ -80,7 +93,22 @@ export async function runProgrammableSearch(
     }
     const items: SearchHit[] = [];
     for (const it of data.items ?? []) {
-      if (it.link && it.title) items.push({ link: it.link, title: it.title, snippet: it.snippet });
+      const row = it as {
+        link?: string;
+        formattedUrl?: string;
+        title?: string;
+        htmlTitle?: string;
+        snippet?: string;
+      };
+      let link = (row.link || row.formattedUrl)?.trim() ?? "";
+      if (link && !/^https?:\/\//i.test(link) && /^[\w.-]+\.\w{2,}/.test(link)) {
+        link = `https://${link}`;
+      }
+      const titleRaw = (row.title || row.htmlTitle)?.trim() ?? "";
+      const title = titleRaw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      if (link && title && /^https?:\/\//i.test(link)) {
+        items.push({ link, title, snippet: row.snippet });
+      }
     }
     if (log?.afterBlockedSerp) {
       console.info("[growth discovery] Google CSE fallback result count", {
@@ -303,9 +331,11 @@ export async function runWebSearch(
     }
     if (hasGoogleProgrammableSearch()) {
       const cseStart = cursor.provider === "google_cse" ? Math.max(1, cursor.start || 1) : 1;
-      const fallback = await runProgrammableSearch(query, cseStart, {
+      const cseQuery = queryForGoogleProgrammableSearch(query);
+      const fallback = await runProgrammableSearch(cseQuery, cseStart, {
         market: marketTag,
         afterBlockedSerp: true,
+        strippedSiteOperators: /\bsite:/i.test(query),
       });
       if (!fallback) {
         console.warn(
@@ -326,7 +356,12 @@ export async function runWebSearch(
   }
   if (hasGoogleProgrammableSearch()) {
     const start1 = cursor.provider === "google_cse" ? Math.max(1, cursor.start || 1) : 1;
-    const r = await runProgrammableSearch(query, start1, { market: marketTag, afterBlockedSerp: false });
+    const cseQuery = queryForGoogleProgrammableSearch(query);
+    const r = await runProgrammableSearch(cseQuery, start1, {
+      market: marketTag,
+      afterBlockedSerp: false,
+      strippedSiteOperators: /\bsite:/i.test(query),
+    });
     if (!r) {
       console.warn(
         `[growth discovery] web_search SKIPPED: skip_reason=google_cse_http_failed market=${marketTag} query="${qPrev}" start=${start1}`,

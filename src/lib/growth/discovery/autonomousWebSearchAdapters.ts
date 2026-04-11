@@ -84,10 +84,27 @@ function resolveOutboundUrlFromSearchHit(raw: string, depth = 0): string | null 
   }
 }
 
+/** Google CSE often returns Maps / Business Profile URLs; Serp organic skews to direct venue sites. */
+function isAllowedGoogleDiscoveryUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    const path = u.pathname.toLowerCase();
+    if (host === "maps.google.com" || host.endsWith(".maps.google.com")) return true;
+    if ((host === "www.google.com" || host === "google.com") && path.startsWith("/maps")) return true;
+    if (host === "business.google.com" || host.endsWith(".business.google.com")) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function allowHitUrl(url: string): boolean {
   try {
-    const h = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
-    if (h.includes("google.") || h === "gstatic.com") return false;
+    const fullHost = new URL(url).hostname.toLowerCase();
+    const h = fullHost.replace(/^www\./, "");
+    if (isAllowedGoogleDiscoveryUrl(url)) return true;
+    if (fullHost.includes("google.") || h === "gstatic.com") return false;
     if (h.includes("tiktok.com")) return false;
     if (h.includes("facebook.com") || h.includes("fb.com")) return true;
     if (h.includes("youtube.com") || h.includes("youtu.be")) return false;
@@ -230,6 +247,9 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
         type TaggedHit = { hit: SearchHit; searchQuery: string };
         const hits: TaggedHit[] = [];
+        let rawSearchItemsThisRun = 0;
+        let droppedAfterResolve = 0;
+        let droppedAllowHitUrl = 0;
         console.info("[growth discovery] autonomous_web_search_venue run start (nationwide)", {
           provider,
           market: ctx.discoveryMarketSlug,
@@ -248,9 +268,17 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             cur.start = cur.prov === "google_cse" ? 1 : 0;
             continue;
           }
+          rawSearchItemsThisRun += res.items.length;
           for (const it of res.items) {
             const resolved = resolveOutboundUrlFromSearchHit(it.link);
-            if (!resolved || !allowHitUrl(resolved)) continue;
+            if (!resolved) {
+              droppedAfterResolve++;
+              continue;
+            }
+            if (!allowHitUrl(resolved)) {
+              droppedAllowHitUrl++;
+              continue;
+            }
             hits.push({ hit: { ...it, link: resolved }, searchQuery: q });
           }
           cur.prov = res.nextCursor.provider;
@@ -275,16 +303,28 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         console.info("[growth discovery] autonomous_web_search_venue search phase done", {
           provider,
           hitCount: hits.length,
+          rawSearchItemsThisRun,
+          droppedAfterResolve,
+          droppedAllowHitUrl,
         });
 
         const seenUrl = new Set<string>();
         const candidates: GrowthLeadCandidate[] = [];
         let fetches = 0;
+        let skippedShouldIngest = 0;
+        let skippedMaxFetches = 0;
+        let skippedDupUrl = 0;
 
         for (const { hit, searchQuery: qUsed } of hits) {
-          if (fetches >= maxFetches) break;
+          if (fetches >= maxFetches) {
+            skippedMaxFetches++;
+            break;
+          }
           const pageUrl = hit.link.split("#")[0]!;
-          if (seenUrl.has(pageUrl)) continue;
+          if (seenUrl.has(pageUrl)) {
+            skippedDupUrl++;
+            continue;
+          }
           seenUrl.add(pageUrl);
 
           const html = await discoveryFetchText(pageUrl);
@@ -369,7 +409,10 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             hasSocial,
           });
 
-          if (!om.shouldIngest) continue;
+          if (!om.shouldIngest) {
+            skippedShouldIngest++;
+            continue;
+          }
 
           const name = nameGuess.length > 2 ? nameGuess : cleanHitTitle(hit.title);
           const contactQuality = deriveVenueContactQuality({
@@ -421,6 +464,21 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           provider,
           candidates: candidates.length,
         });
+        if (candidates.length === 0) {
+          const reason =
+            hits.length === 0
+              ? rawSearchItemsThisRun === 0
+                ? "no_search_engine_items_this_run"
+                : "all_results_filtered_before_fetch (resolve_or_allowHitUrl)"
+              : skippedShouldIngest > 0
+                ? "all_hits_failed_shouldIngest_gate"
+                : skippedMaxFetches > 0
+                  ? "stopped_at_maxFetches_before_emit"
+                  : "unknown";
+          console.warn(
+            `[growth discovery] autonomous_web_search_venue Google/CSE pipeline zero candidates: reason=${reason} market=${ctx.discoveryMarketSlug} rawItems=${rawSearchItemsThisRun} hitsAfterUrlFilter=${hits.length} droppedResolve=${droppedAfterResolve} droppedAllowUrl=${droppedAllowHitUrl} skippedShouldIngest=${skippedShouldIngest} skippedDup=${skippedDupUrl} skippedMaxFetches=${skippedMaxFetches}`,
+          );
+        }
         return candidates;
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);

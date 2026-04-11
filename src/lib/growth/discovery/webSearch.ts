@@ -31,6 +31,7 @@ async function throttleSearch() {
 export async function runProgrammableSearch(
   query: string,
   start1Based: number,
+  log?: { market?: string; afterBlockedSerp: boolean },
 ): Promise<{ items: SearchHit[]; rawNextStart: number } | null> {
   if (!hasGoogleProgrammableSearch()) return null;
   const key = process.env.GROWTH_GOOGLE_CSE_API_KEY!.trim();
@@ -41,6 +42,16 @@ export async function runProgrammableSearch(
   u.searchParams.set("q", query);
   u.searchParams.set("start", String(start1Based));
 
+  const qPrev = query.replace(/\s+/g, " ").trim().slice(0, 120);
+  const market = log?.market ?? "—";
+  if (log?.afterBlockedSerp) {
+    console.info("[growth discovery] Google CSE fallback request start", {
+      market,
+      start1Based,
+      queryPreview: qPrev,
+    });
+  }
+
   await throttleSearch();
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), 20_000);
@@ -48,21 +59,52 @@ export async function runProgrammableSearch(
     const res = await fetch(u.toString(), { signal: ac.signal });
     lastSearchAt = Date.now();
     if (!res.ok) {
-      console.warn("[growth discovery] Google CSE HTTP", res.status, await res.text().catch(() => ""));
+      const body = await res.text().catch(() => "");
+      if (log?.afterBlockedSerp) {
+        console.warn(
+          `[growth discovery] Google CSE fallback zero-result reason: http_error status=${res.status} market=${market} start=${start1Based} queryPreview="${qPrev}" bodyHead=${body.slice(0, 200)}`,
+        );
+      }
+      console.warn("[growth discovery] Google CSE HTTP", res.status, body.slice(0, 400));
       return null;
     }
     const data = (await res.json()) as {
       items?: { link?: string; title?: string; snippet?: string }[];
       searchInformation?: { totalResults?: string };
+      error?: { code?: number; message?: string };
     };
+    if (log?.afterBlockedSerp && data.error?.message) {
+      console.warn(
+        `[growth discovery] Google CSE fallback zero-result reason: api_error_body market=${market} message=${String(data.error.message).slice(0, 240)}`,
+      );
+    }
     const items: SearchHit[] = [];
     for (const it of data.items ?? []) {
       if (it.link && it.title) items.push({ link: it.link, title: it.title, snippet: it.snippet });
+    }
+    if (log?.afterBlockedSerp) {
+      console.info("[growth discovery] Google CSE fallback result count", {
+        market,
+        itemCount: items.length,
+        start1Based,
+        totalResultsField: data.searchInformation?.totalResults ?? null,
+      });
+      if (items.length === 0) {
+        console.warn(
+          `[growth discovery] Google CSE fallback zero-result reason: no_items_in_response market=${market} start=${start1Based} totalResultsField=${data.searchInformation?.totalResults ?? "n/a"} queryPreview="${qPrev}"`,
+        );
+      }
     }
     const next = start1Based + items.length;
     return { items, rawNextStart: next };
   } catch (e) {
     lastSearchAt = Date.now();
+    if (log?.afterBlockedSerp) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(
+        `[growth discovery] Google CSE fallback zero-result reason: fetch_exception market=${market} start=${start1Based} message=${msg.slice(0, 200)}`,
+      );
+    }
     console.warn("[growth discovery] Google CSE error", e);
     return null;
   } finally {
@@ -260,7 +302,11 @@ export async function runWebSearch(
       };
     }
     if (hasGoogleProgrammableSearch()) {
-      const fallback = await runProgrammableSearch(query, 1);
+      const cseStart = cursor.provider === "google_cse" ? Math.max(1, cursor.start || 1) : 1;
+      const fallback = await runProgrammableSearch(query, cseStart, {
+        market: marketTag,
+        afterBlockedSerp: true,
+      });
       if (!fallback) {
         console.warn(
           `[growth discovery] SerpAPI NO_REQUEST_CHAIN: skip_reason=serp_unavailable_or_empty_then_cse_http_failed market=${marketTag} query="${qPrev}"`,
@@ -280,7 +326,7 @@ export async function runWebSearch(
   }
   if (hasGoogleProgrammableSearch()) {
     const start1 = cursor.provider === "google_cse" ? Math.max(1, cursor.start || 1) : 1;
-    const r = await runProgrammableSearch(query, start1);
+    const r = await runProgrammableSearch(query, start1, { market: marketTag, afterBlockedSerp: false });
     if (!r) {
       console.warn(
         `[growth discovery] web_search SKIPPED: skip_reason=google_cse_http_failed market=${marketTag} query="${qPrev}" start=${start1}`,

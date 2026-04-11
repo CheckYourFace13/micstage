@@ -35,10 +35,14 @@ export function buildVenueOutreachEmailPayload(input: {
   discoveryLabel: string | null;
   publicVenueUrl: string;
   locationPerformersUrl: string | null;
+  /** When known, improves salutation (firstname@ heuristic). */
+  contactEmail?: string | null;
 }): MarketingEmailPayload {
   void input.discoveryLabel;
 
-  const { textBody: coreText, htmlBody: coreHtml } = buildVenueOutreachLetter(input.venueName);
+  const { textBody: coreText, htmlBody: coreHtml } = buildVenueOutreachLetter(input.venueName, {
+    contactEmail: input.contactEmail,
+  });
 
   const textBody = [
     coreText,

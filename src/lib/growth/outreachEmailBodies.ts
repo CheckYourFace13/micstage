@@ -22,6 +22,8 @@ export function buildGrowthLeadOutreachPayload(input: {
   websiteUrl: string | null;
   /** When set on VENUE leads, adds a tracked link to venue registration. */
   leadId?: string | null;
+  /** VENUE only: used to prefer "Hi {first}," from mailbox local part in salutation. */
+  contactEmailForSalutation?: string | null;
 }): MarketingEmailPayload {
   const subjectByType: Record<GrowthLeadType, string> = {
     VENUE: GROWTH_VENUE_OUTREACH_SUBJECT,
@@ -35,7 +37,10 @@ export function buildGrowthLeadOutreachPayload(input: {
       ? `${baseUrl}/register/venue?growthLead=${encodeURIComponent(input.leadId.trim())}`
       : undefined;
 
-  const venueLetter = buildVenueOutreachLetter(input.name, claimVenueUrl ? { claimVenueUrl } : undefined);
+  const venueLetter = buildVenueOutreachLetter(input.name, {
+    claimVenueUrl,
+    contactEmail: input.leadType === "VENUE" ? input.contactEmailForSalutation : undefined,
+  });
   const artistLetter = buildArtistOutreachLetter(input.name);
   const promoterLetter = buildPromoterOutreachLetter(input.name);
 

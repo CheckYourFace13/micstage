@@ -3,6 +3,8 @@
  * Keep HTML/text bodies aligned; escape all interpolated names/URLs in HTML builders.
  */
 
+import { resolveVenueOutreachSalutationParts } from "@/lib/marketing/venueOutreachGreeting";
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -11,76 +13,83 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export const GROWTH_VENUE_OUTREACH_SUBJECT = "MicStage is launching — free help growing your open mic night";
+export const GROWTH_VENUE_OUTREACH_SUBJECT = "A free, easier way to run your open mic";
 export const GROWTH_ARTIST_OUTREACH_SUBJECT = "New free way to find open mics and get more opportunities";
 export const GROWTH_PROMOTER_OUTREACH_SUBJECT = "MicStage is launching in Chicagoland";
 
 const SIGN_OFF_TEXT = ["Thanks,", "Chris", "MicStage"].join("\n");
 const SIGN_OFF_HTML = "<p>Thanks,<br />Chris<br />MicStage</p>";
 
-function venueBodyParagraphs(venueName: string, claimVenueUrl?: string): string[] {
-  const core: string[] = [
-    "MicStage is a new project launching now. We built it to help venues run and grow open mic nights with less manual work.",
-    "For your venue, this is free: we help market your open mic, help grow attendance for the night, and help performers discover your venue when they are actively looking for stages.",
-    "We are willing to adapt the platform so it is easier for venues to use in real operations.",
-    "After creating an account, the process is almost fully automated.",
-    "For venues, the core steps are simple:",
-    "- create your venue account",
+function venueSalutationLines(venueName: string, contactEmail: string | null | undefined): { text: string; html: string } {
+  const parts = resolveVenueOutreachSalutationParts(venueName, contactEmail);
+  if (parts.kind === "neutral") {
+    return { text: "Hey there,", html: "<p>Hey there,</p>" };
+  }
+  return {
+    text: `Hi ${parts.label},`,
+    html: `<p>Hi ${escapeHtml(parts.label)},</p>`,
+  };
+}
+
+function venueCoreParagraphsText(claimVenueUrl?: string): string[] {
+  const lines: string[] = [
+    "We built MicStage to make open mic nights easier for venues, and it's completely free to use.",
+    "It gives you a simple way to set up and manage your open mic, helps market it for free, and makes signups easier for artists too — including QR code signup options we provide so performers can join quickly.",
+    "We're launching now, and you'd be one of the first venues on it.",
+    "Getting started is simple:",
+    "- create your free account",
     "- set up your open mic schedule",
-    "- optionally require artists to be physically on premises before signup (to confirm attendance)",
-    "- share your signup link on social media so performers can find and book",
-    "MicStage then helps automate discovery and flow around your listing as much as possible.",
-    `There is no cost to be included — we would love to feature ${venueName} if it's a fit.`,
+    "- share your link or QR code",
+    "- let MicStage help do the rest",
+    "You can also require artists to be on-site before signing up if you want to confirm attendance first.",
   ];
   if (claimVenueUrl?.trim()) {
-    core.push(
-      `The fastest next step is to create a free venue account (about a minute). That lets you claim your place, publish your open mic, and show up where performers search: ${claimVenueUrl.trim()}`,
-      "If you prefer, just reply to this email and I can help you get set up manually.",
-    );
+    lines.push("Get started here:", claimVenueUrl.trim());
   } else {
-    core.push(
-      "If you're open to it, reply and I'll send a link to create your free venue account — about a minute — or walk you through setup.",
-    );
+    lines.push("Get started here — reply to this email and I'll send you the venue signup link.");
   }
-  return core;
+  lines.push("If you want, just reply and I can help get it set up.");
+  return lines;
 }
 
 /** Plain text + HTML for venue-style outreach (growth VENUE leads + marketing venue cold drafts). */
 export function buildVenueOutreachLetter(
   venueName: string,
-  opts?: { claimVenueUrl?: string },
+  opts?: { claimVenueUrl?: string; contactEmail?: string | null },
 ): { textBody: string; htmlBody: string } {
   const claimVenueUrl = opts?.claimVenueUrl?.trim();
-  const textBody = [`Hi ${venueName},`, "", ...venueBodyParagraphs(venueName, claimVenueUrl), "", SIGN_OFF_TEXT].join("\n");
+  const { text: salText, html: salHtml } = venueSalutationLines(venueName, opts?.contactEmail);
+  const coreText = venueCoreParagraphsText(claimVenueUrl);
+  const textBody = [salText, "", ...coreText, "", SIGN_OFF_TEXT].join("\n");
 
+  const htmlCoreParas = [
+    "We built MicStage to make open mic nights easier for venues, and it's completely free to use.",
+    "It gives you a simple way to set up and manage your open mic, helps market it for free, and makes signups easier for artists too — including QR code signup options we provide so performers can join quickly.",
+    "We're launching now, and you'd be one of the first venues on it.",
+    "Getting started is simple:",
+  ];
   const bullets = [
-    "create a free venue account",
+    "create your free account",
     "set up your open mic schedule",
-    "optionally require on-premises signups before artists can book",
-    "share your signup link socially so performers discover your night",
+    "share your link or QR code",
+    "let MicStage help do the rest",
   ];
-  const htmlParasBeforeList = [
-    "MicStage is a new project launching now. We built it to help venues run and grow open mic nights with less manual work.",
-    "For your venue, this is free: we help market your open mic, help grow attendance for the night, and help performers discover your venue when they are actively looking for stages.",
-    "We are willing to adapt the platform so it is easier for venues to use in real operations.",
-    "After creating an account, the process is almost fully automated. For venues, the core setup is:",
+  const afterList = [
+    "You can also require artists to be on-site before signing up if you want to confirm attendance first.",
   ];
-  const ctaBlock = claimVenueUrl
+  const ctaHtml = claimVenueUrl
     ? [
-        `<p>There is no cost to be included — we would love to feature ${escapeHtml(venueName)} if it's a fit.</p>`,
-        `<p>The fastest next step is to create a free venue account (about a minute). That lets you claim your place, publish your open mic, and show up where performers search:<br /><a href="${escapeHtml(claimVenueUrl)}">${escapeHtml(claimVenueUrl)}</a></p>`,
-        "<p>You can also set your nights so performers must be physically on premises before signup if you want attendance confirmed first.</p>",
-        "<p>If you prefer, just reply and I can help you get set up manually.</p>",
+        "<p>Get started here:</p>",
+        `<p><a href="${escapeHtml(claimVenueUrl)}">${escapeHtml(claimVenueUrl)}</a></p>`,
       ]
-    : [
-        `<p>There is no cost to be included — we would love to feature ${escapeHtml(venueName)} if it's a fit.</p>`,
-        `<p>If you're open to it, reply and I'll send a link to create your free venue account or walk you through setup.</p>`,
-      ];
+    : ["<p>Get started here — reply to this email and I'll send you the venue signup link.</p>"];
   const htmlBody = [
-    `<p>Hi ${escapeHtml(venueName)},</p>`,
-    ...htmlParasBeforeList.map((p) => `<p>${escapeHtml(p)}</p>`),
-    `<ul>${bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>`,
-    ...ctaBlock,
+    salHtml,
+    ...htmlCoreParas.map((p) => `<p>${escapeHtml(p)}</p>`),
+    `<ul style="margin:0 0 1em 1.2em;padding:0;">${bullets.map((b) => `<li style="margin:0.25em 0;">${escapeHtml(b)}</li>`).join("")}</ul>`,
+    ...afterList.map((p) => `<p>${escapeHtml(p)}</p>`),
+    ...ctaHtml,
+    "<p>If you want, just reply and I can help get it set up.</p>",
     SIGN_OFF_HTML,
   ].join("");
 

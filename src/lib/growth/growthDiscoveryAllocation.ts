@@ -27,5 +27,5 @@ export function discoveryIngestCapForAdapter(_adapter: GrowthLeadSourceAdapter):
 
 /** Human-readable note for cron JSON / ops. */
 export function growthDiscoveryAllocationSummary(): string {
-  return "Discovery priority: internal/stub seeds -> curated adapters -> direct crawlers (seed crawl/Eventbrite) -> SerpAPI/CSE venue web search only when quota/state allows. SerpAPI is treated as premium, capped, and circuit-breaker guarded.";
+  return "Discovery priority: internal/stub seeds -> curated adapters -> direct crawlers (seed crawl/Eventbrite) -> SerpAPI venue web search when quota/state allows, then Brave Search API fallback. SerpAPI is premium, capped, and circuit-breaker guarded.";
 }

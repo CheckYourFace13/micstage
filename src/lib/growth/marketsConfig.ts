@@ -7,7 +7,7 @@
  * - **`GROWTH_DISCOVERY_MARKET_SLUGS`** (optional env, comma-separated): which discovery slugs the growth-pipeline cron
  *   iterates. If unset, defaults to `[primaryLaunchDiscoveryMarketSlug(), nationalDiscoveryMarketSlug()]` so curated
  *   primary-metro seeds and **nationwide** autonomous venue web search both run. Omit `national-discovery-us` only if
- *   you intentionally disable SerpAPI/CSE nationwide collection for that environment.
+ *   you intentionally disable SerpAPI/Brave nationwide collection for that environment.
  *
  * `discoveryMarketSlug` values must match `/locations/[slug]` rollups (see `discoveryMarket.ts`).
  */

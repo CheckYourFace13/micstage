@@ -8,7 +8,7 @@ import {
 } from "@/lib/growth/growthDiscoveryAllocation";
 import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
 import {
-  hasGoogleProgrammableSearch,
+  hasBraveSearch,
   hasSerpApi,
   growthSerpApiCostPerCallUsd,
   growthSerpApiEnabled,
@@ -46,7 +46,7 @@ export type GrowthDiscoveryRunResult = {
     serpapi_enabled: boolean;
     /** Which `discoveryMarketSlug` row supplies `serpapi_calls_*` (nationwide search uses `national-discovery-us`). */
     serpapi_state_market: string;
-    google_cse_configured: boolean;
+    brave_search_configured: boolean;
     fallback_ready: boolean;
     warning: string | null;
   };
@@ -207,10 +207,10 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
       serpapi_configured: hasSerpApi(),
       serpapi_enabled: growthSerpApiEnabled(),
       serpapi_state_market: serpMetricsMarketSlug,
-      google_cse_configured: hasGoogleProgrammableSearch(),
-      fallback_ready: hasGoogleProgrammableSearch(),
-      warning: !hasGoogleProgrammableSearch()
-        ? "Google CSE fallback is not configured. If SerpAPI is disabled/exhausted, web-search adapter will emit 0 candidates."
+      brave_search_configured: hasBraveSearch(),
+      fallback_ready: hasBraveSearch(),
+      warning: !hasBraveSearch()
+        ? "Brave Search API fallback is not configured (GROWTH_BRAVE_SEARCH_API_KEY). If SerpAPI is disabled or returns no data, web-search adapter may emit 0 candidates."
         : null,
     },
   };

@@ -21,6 +21,6 @@ export function allGrowthDiscoveryAdapters(): GrowthLeadSourceAdapter[] {
   const stubs = TYPES.map((t) => createStubJsonAdapter(t));
   const autonomous = allAutonomousDiscoveryAdapters();
   const chicagolandCurated = allChicagolandStaticAdapters();
-  /** Priority: internal seeds -> curated -> direct crawlers -> web search (Serp/CSE) last. */
+  /** Priority: internal seeds -> curated -> direct crawlers -> web search (SerpAPI / Brave) last. */
   return [...stubs, ...chicagolandCurated, ...autonomous];
 }

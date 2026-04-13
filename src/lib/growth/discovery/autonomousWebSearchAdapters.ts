@@ -24,6 +24,7 @@ import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
 import {
   discoverySearchProviderForMarket,
   runWebSearch,
+  type DiscoverySearchProvider,
   type SearchHit,
 } from "@/lib/growth/discovery/webSearch";
 import { markSerpApiRunStarted, readSerpApiProviderState, serpApiAvailabilityNow } from "@/lib/growth/discovery/providerState";
@@ -34,20 +35,26 @@ const CURSOR_KEY = "search_rotation";
 type SearchCursor = {
   qi: number;
   start: number;
-  prov: "google_cse" | "serpapi";
+  prov: DiscoverySearchProvider;
 };
 
-function parseCursor(raw: string | null, prov: "google_cse" | "serpapi"): SearchCursor {
-  if (!raw) return { qi: 0, start: prov === "google_cse" ? 1 : 0, prov };
+function normalizeStoredSearchProv(raw: string | undefined, fallback: DiscoverySearchProvider): DiscoverySearchProvider {
+  if (raw === "serpapi" || raw === "brave") return raw;
+  if (raw === "google_cse") return "brave";
+  return fallback;
+}
+
+function parseCursor(raw: string | null, prov: DiscoverySearchProvider): SearchCursor {
+  if (!raw) return { qi: 0, start: 0, prov };
   try {
-    const j = JSON.parse(raw) as Partial<SearchCursor>;
+    const j = JSON.parse(raw) as Partial<SearchCursor & { prov?: string }>;
     return {
       qi: Number.isFinite(j.qi) ? Number(j.qi) : 0,
-      start: Number.isFinite(j.start) ? Number(j.start) : prov === "google_cse" ? 1 : 0,
-      prov: j.prov === "serpapi" || j.prov === "google_cse" ? j.prov : prov,
+      start: Number.isFinite(j.start) ? Number(j.start) : 0,
+      prov: normalizeStoredSearchProv(j.prov, prov),
     };
   } catch {
-    return { qi: 0, start: prov === "google_cse" ? 1 : 0, prov };
+    return { qi: 0, start: 0, prov };
   }
 }
 
@@ -133,7 +140,7 @@ function hostOf(url: string): string | null {
 
 /**
  * Open-mic / live-host intent cores; geo tail appended per rotation.
- * Includes US-wide and metro-tailed variants; `site:` kept for Serp (stripped for Google CSE in webSearch).
+ * Includes US-wide and metro-tailed variants; `site:` and other operators work with SerpAPI and Brave.
  */
 const OPEN_MIC_QUERY_CORES = [
   '"open mic" night venue bar OR coffeehouse',
@@ -243,7 +250,7 @@ const DEEP_PAGES_PER_HIT = 8;
 const NATIONWIDE_WEB_SEARCH_VOLUME_MULT = 1.22;
 
 /**
- * SerpAPI / Google CSE → nationwide open-mic venue queries → multi-page fetch → aggressive email extraction.
+ * SerpAPI (primary) / Brave Search API (fallback) → nationwide open-mic venue queries → multi-page fetch → email extraction.
  * Runs only when the cron market slug is `national-discovery-us` (see `growthDiscoveryMarketSlugs()` default).
  */
 export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter {
@@ -270,7 +277,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         if (!provider || !ctx.prisma) {
           const reason = !ctx.prisma
             ? "missing_prisma"
-            : "no_search_provider (configure SerpAPI key and/or Google CSE; check per-market Serp state)";
+            : "no_search_provider (configure SerpAPI key and/or GROWTH_BRAVE_SEARCH_API_KEY; check per-market Serp state)";
           console.warn(`[growth discovery] autonomous_web_search_venue NO_SERP_REQUESTS: ${reason}`, {
             market: ctx.discoveryMarketSlug,
             provider,
@@ -292,7 +299,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
         let cur = parseCursor(await readDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY), provider);
         if (cur.prov !== provider) {
-          cur = { qi: cur.qi, start: provider === "google_cse" ? 1 : 0, prov: provider };
+          cur = { qi: cur.qi, start: 0, prov: provider };
         }
 
         const serpCallsBefore =
@@ -304,7 +311,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         let droppedAfterResolve = 0;
         let droppedAllowHitUrl = 0;
         console.info("[growth discovery] autonomous_web_search_venue run start (nationwide)", {
-          provider,
+          providerChosen: provider,
           market: ctx.discoveryMarketSlug,
           searchCalls,
           maxFetches,
@@ -317,10 +324,27 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             { prisma, marketSlug: ctx.discoveryMarketSlug },
           );
           if (!res || res.items.length === 0) {
+            console.info("[growth discovery] autonomous_web_search_venue search iteration (no items)", {
+              iteration: i,
+              providerChosen: provider,
+              servedBy: res?.meta.servedBy ?? null,
+              rawResultCount: res?.meta.rawResultCount ?? 0,
+              chainNote: res?.meta.chainNote ?? "no_response",
+              skipFallbackReason: res ? null : "runWebSearch_returned_null",
+            });
             cur.qi = (cur.qi + 1) % (OPEN_MIC_QUERY_CORES.length * GEO_SCOPES.length);
-            cur.start = cur.prov === "google_cse" ? 1 : 0;
+            cur.start = 0;
             continue;
           }
+          console.info("[growth discovery] autonomous_web_search_venue search iteration", {
+            iteration: i,
+            providerChosen: provider,
+            servedBy: res.meta.servedBy,
+            rawResultCount: res.meta.rawResultCount,
+            chainNote: res.meta.chainNote,
+            serpSkipReason: res.meta.serpSkipReason ?? null,
+            bravePaginationExhausted: res.meta.bravePaginationExhausted ?? false,
+          });
           rawSearchItemsThisRun += res.items.length;
           for (const it of res.items) {
             const resolved = resolveOutboundUrlFromSearchHit(it.link);
@@ -336,9 +360,9 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           }
           cur.prov = res.nextCursor.provider;
           cur.start = res.nextCursor.start;
-          if (res.items.length < 8 || (cur.prov === "google_cse" && cur.start > 90)) {
+          if (res.items.length < 8 || res.meta.bravePaginationExhausted) {
             cur.qi = (cur.qi + 1) % (OPEN_MIC_QUERY_CORES.length * GEO_SCOPES.length);
-            cur.start = cur.prov === "google_cse" ? 1 : 0;
+            cur.start = 0;
           }
         }
 
@@ -354,9 +378,9 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
         await writeDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY, JSON.stringify(cur));
         console.info("[growth discovery] autonomous_web_search_venue search phase done", {
-          provider,
-          hitCount: hits.length,
+          providerChosen: provider,
           rawSearchItemsThisRun,
+          hitsAfterUrlGate: hits.length,
           droppedAfterResolve,
           droppedAllowHitUrl,
         });
@@ -546,6 +570,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         });
         console.info("[growth discovery] autonomous_web_search_venue nationwide diagnostics", {
           market: ctx.discoveryMarketSlug,
+          providerChosen: provider,
           searchIterations: searchCalls,
           maxFetchesBudget: maxFetches,
           rawSearchItems: rawSearchItemsThisRun,
@@ -573,7 +598,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
                   ? "stopped_at_maxFetches_before_emit"
                   : "unknown";
           console.warn(
-            `[growth discovery] autonomous_web_search_venue Google/CSE pipeline zero candidates: reason=${reason} market=${ctx.discoveryMarketSlug} rawItems=${rawSearchItemsThisRun} hitsAfterUrlFilter=${hits.length} droppedResolve=${droppedAfterResolve} droppedAllowUrl=${droppedAllowHitUrl} skippedShouldIngest=${skippedShouldIngest} skippedDup=${skippedDupUrl} skippedMaxFetches=${skippedMaxFetches}`,
+            `[growth discovery] autonomous_web_search_venue web_search pipeline zero candidates: reason=${reason} market=${ctx.discoveryMarketSlug} providerPick=${provider} rawItems=${rawSearchItemsThisRun} hitsAfterUrlFilter=${hits.length} droppedResolve=${droppedAfterResolve} droppedAllowUrl=${droppedAllowHitUrl} skippedShouldIngest=${skippedShouldIngest} skippedDup=${skippedDupUrl} skippedMaxFetches=${skippedMaxFetches}`,
           );
         }
         return candidates;

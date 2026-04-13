@@ -1,6 +1,8 @@
 import {
+  braveSearchApiKeyForDiscovery,
+  braveSearchKeySourceForDiscovery,
   growthDiscoveryHttpDelayMs,
-  hasGoogleProgrammableSearch,
+  hasBraveSearch,
   hasSerpApi,
   serpApiKeySourceForDiscovery,
   serpApiKeyForDiscovery,
@@ -15,6 +17,20 @@ import {
 
 export type SearchHit = { link: string; title: string; snippet?: string };
 
+/** Active HTTP search backend for nationwide web discovery (cursor + provider pick). */
+export type DiscoverySearchProvider = "serpapi" | "brave";
+
+export type WebSearchRunMeta = {
+  servedBy: DiscoverySearchProvider;
+  rawResultCount: number;
+  /** Brave: no more pages (offset 0–9) for this query — caller should rotate query index. */
+  bravePaginationExhausted?: boolean;
+  /** Why Serp did not return hits this attempt (fallback only). */
+  serpSkipReason?: string;
+  /** Human-readable chain note for logs. */
+  chainNote?: string;
+};
+
 async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
@@ -26,118 +42,6 @@ async function throttleSearch() {
   const now = Date.now();
   const wait = Math.max(0, delay - (now - lastSearchAt));
   if (wait > 0) await sleep(wait);
-}
-
-/**
- * Custom Search engines are often scoped to one site or a small allowlist. Queries like `site:eventbrite.com`
- * then return **zero** hits even when the engine is "search the web" (API can still behave oddly). SerpAPI
- * uses the raw query; CSE should not rely on cross-site `site:` operators for nationwide venue discovery.
- */
-function queryForGoogleProgrammableSearch(rawQuery: string): string {
-  return rawQuery
-    .replace(/\bsite:[^\s]+\s*/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export async function runProgrammableSearch(
-  query: string,
-  start1Based: number,
-  log?: { market?: string; afterBlockedSerp: boolean; strippedSiteOperators?: boolean },
-): Promise<{ items: SearchHit[]; rawNextStart: number } | null> {
-  if (!hasGoogleProgrammableSearch()) return null;
-  const key = process.env.GROWTH_GOOGLE_CSE_API_KEY!.trim();
-  const cx = process.env.GROWTH_GOOGLE_CSE_CX!.trim();
-  const u = new URL("https://www.googleapis.com/customsearch/v1");
-  u.searchParams.set("key", key);
-  u.searchParams.set("cx", cx);
-  u.searchParams.set("q", query);
-  u.searchParams.set("start", String(start1Based));
-
-  const qPrev = query.replace(/\s+/g, " ").trim().slice(0, 120);
-  const market = log?.market ?? "—";
-  if (log?.afterBlockedSerp) {
-    console.info("[growth discovery] Google CSE fallback request start", {
-      market,
-      start1Based,
-      queryPreview: qPrev,
-      strippedSiteOperators: Boolean(log.strippedSiteOperators),
-    });
-  }
-
-  await throttleSearch();
-  const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), 20_000);
-  try {
-    const res = await fetch(u.toString(), { signal: ac.signal });
-    lastSearchAt = Date.now();
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      if (log?.afterBlockedSerp) {
-        console.warn(
-          `[growth discovery] Google CSE fallback zero-result reason: http_error status=${res.status} market=${market} start=${start1Based} queryPreview="${qPrev}" bodyHead=${body.slice(0, 200)}`,
-        );
-      }
-      console.warn("[growth discovery] Google CSE HTTP", res.status, body.slice(0, 400));
-      return null;
-    }
-    const data = (await res.json()) as {
-      items?: { link?: string; title?: string; snippet?: string }[];
-      searchInformation?: { totalResults?: string };
-      error?: { code?: number; message?: string };
-    };
-    if (log?.afterBlockedSerp && data.error?.message) {
-      console.warn(
-        `[growth discovery] Google CSE fallback zero-result reason: api_error_body market=${market} message=${String(data.error.message).slice(0, 240)}`,
-      );
-    }
-    const items: SearchHit[] = [];
-    for (const it of data.items ?? []) {
-      const row = it as {
-        link?: string;
-        formattedUrl?: string;
-        title?: string;
-        htmlTitle?: string;
-        snippet?: string;
-      };
-      let link = (row.link || row.formattedUrl)?.trim() ?? "";
-      if (link && !/^https?:\/\//i.test(link) && /^[\w.-]+\.\w{2,}/.test(link)) {
-        link = `https://${link}`;
-      }
-      const titleRaw = (row.title || row.htmlTitle)?.trim() ?? "";
-      const title = titleRaw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-      if (link && title && /^https?:\/\//i.test(link)) {
-        items.push({ link, title, snippet: row.snippet });
-      }
-    }
-    if (log?.afterBlockedSerp) {
-      console.info("[growth discovery] Google CSE fallback result count", {
-        market,
-        itemCount: items.length,
-        start1Based,
-        totalResultsField: data.searchInformation?.totalResults ?? null,
-      });
-      if (items.length === 0) {
-        console.warn(
-          `[growth discovery] Google CSE fallback zero-result reason: no_items_in_response market=${market} start=${start1Based} totalResultsField=${data.searchInformation?.totalResults ?? "n/a"} queryPreview="${qPrev}"`,
-        );
-      }
-    }
-    const next = start1Based + items.length;
-    return { items, rawNextStart: next };
-  } catch (e) {
-    lastSearchAt = Date.now();
-    if (log?.afterBlockedSerp) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.warn(
-        `[growth discovery] Google CSE fallback zero-result reason: fetch_exception market=${market} start=${start1Based} message=${msg.slice(0, 200)}`,
-      );
-    }
-    console.warn("[growth discovery] Google CSE error", e);
-    return null;
-  } finally {
-    clearTimeout(t);
-  }
 }
 
 type SerpOrganic = {
@@ -198,6 +102,7 @@ export async function runSerpApiSearch(
     }
   }
   console.info("[growth discovery] SerpAPI request start", {
+    providerChosen: "serpapi" as const,
     keySource: keySource ?? "unknown",
     keyLength: apiKey.length,
     start0Based,
@@ -302,6 +207,12 @@ export async function runSerpApiSearch(
       }
     }
 
+    console.info("[growth discovery] SerpAPI response parsed", {
+      providerChosen: "serpapi" as const,
+      rawResultCount: items.length,
+      start0Based,
+    });
+
     return { items, rawNextStart: start0Based + items.length };
   } catch (e) {
     lastSearchAt = Date.now();
@@ -312,92 +223,243 @@ export async function runSerpApiSearch(
   }
 }
 
-export async function runWebSearch(
+const BRAVE_MAX_OFFSET = 9;
+
+/**
+ * Brave Web Search API — pagination uses `offset` 0–9 (pages) × up to `count` 20 per request.
+ * @see https://api.search.brave.com/documentation
+ */
+export async function runBraveWebSearch(
   query: string,
-  cursor: { provider: "google_cse" | "serpapi"; start: number },
-  opts?: { prisma?: PrismaClient; marketSlug?: string },
-): Promise<{ items: SearchHit[]; nextCursor: { provider: "google_cse" | "serpapi"; start: number } } | null> {
-  const marketTag = opts?.marketSlug ?? "—";
+  pageOffset: number,
+  log: { market: string; fallbackReason?: string; afterSerpFailure?: boolean },
+): Promise<{
+  items: SearchHit[];
+  nextOffset: number;
+  bravePaginationExhausted: boolean;
+} | null> {
+  if (!hasBraveSearch()) return null;
+  const token = braveSearchApiKeyForDiscovery();
+  const keySrc = braveSearchKeySourceForDiscovery();
+  if (!token) return null;
+
+  const clamped = Math.min(BRAVE_MAX_OFFSET, Math.max(0, Math.floor(pageOffset)));
   const qPrev = query.replace(/\s+/g, " ").trim().slice(0, 120);
-  if (hasSerpApi()) {
-    const r = await runSerpApiSearch(query, cursor.provider === "serpapi" ? cursor.start : 0, opts);
-    if (r) {
-      const next = r.rawNextStart;
-      const exhausted = r.items.length === 0;
-      return {
-        items: r.items,
-        nextCursor: { provider: "serpapi", start: exhausted ? 0 : next },
-      };
-    }
-    if (hasGoogleProgrammableSearch()) {
-      const cseStart = cursor.provider === "google_cse" ? Math.max(1, cursor.start || 1) : 1;
-      const cseQuery = queryForGoogleProgrammableSearch(query);
-      const fallback = await runProgrammableSearch(cseQuery, cseStart, {
-        market: marketTag,
-        afterBlockedSerp: true,
-        strippedSiteOperators: /\bsite:/i.test(query),
-      });
-      if (!fallback) {
-        console.warn(
-          `[growth discovery] SerpAPI NO_REQUEST_CHAIN: skip_reason=serp_unavailable_or_empty_then_cse_http_failed market=${marketTag} query="${qPrev}"`,
-        );
-        return null;
-      }
-      const exhausted = fallback.items.length === 0 || fallback.rawNextStart > 81;
-      return {
-        items: fallback.items,
-        nextCursor: { provider: "google_cse", start: exhausted ? 1 : fallback.rawNextStart },
-      };
-    }
-    console.warn(
-      `[growth discovery] SerpAPI NO_REQUEST_CHAIN: skip_reason=serp_unavailable_or_empty_and_no_cse_fallback market=${marketTag} query="${qPrev}"`,
-    );
-    return null;
-  }
-  if (hasGoogleProgrammableSearch()) {
-    const start1 = cursor.provider === "google_cse" ? Math.max(1, cursor.start || 1) : 1;
-    const cseQuery = queryForGoogleProgrammableSearch(query);
-    const r = await runProgrammableSearch(cseQuery, start1, {
-      market: marketTag,
-      afterBlockedSerp: false,
-      strippedSiteOperators: /\bsite:/i.test(query),
+
+  console.info("[growth discovery] Brave Search API request start", {
+    providerChosen: "brave" as const,
+    keySource: keySrc ?? "unknown",
+    market: log.market,
+    offset: clamped,
+    queryPreview: qPrev,
+    fallbackReason: log.fallbackReason ?? null,
+    afterSerpFailure: Boolean(log.afterSerpFailure),
+  });
+
+  const u = new URL("https://api.search.brave.com/res/v1/web/search");
+  u.searchParams.set("q", query);
+  u.searchParams.set("country", "US");
+  u.searchParams.set("search_lang", "en");
+  u.searchParams.set("count", "20");
+  u.searchParams.set("offset", String(clamped));
+
+  await throttleSearch();
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 20_000);
+  try {
+    const res = await fetch(u.toString(), {
+      signal: ac.signal,
+      headers: {
+        Accept: "application/json",
+        "X-Subscription-Token": token,
+      },
     });
-    if (!r) {
+    lastSearchAt = Date.now();
+    const text = await res.text();
+    if (!res.ok) {
       console.warn(
-        `[growth discovery] web_search SKIPPED: skip_reason=google_cse_http_failed market=${marketTag} query="${qPrev}" start=${start1}`,
+        `[growth discovery] Brave Search API zero-result reason: http_error status=${res.status} market=${log.market} offset=${clamped} queryPreview="${qPrev}" bodyHead=${text.slice(0, 200)}`,
       );
       return null;
     }
-    const exhausted = r.items.length === 0 || start1 > 81;
+    let data: {
+      query?: { more_results_available?: boolean; original?: string };
+      web?: { results?: Array<{ title?: string; url?: string; description?: string }> };
+    };
+    try {
+      data = JSON.parse(text) as typeof data;
+    } catch {
+      console.warn("[growth discovery] Brave Search API invalid JSON", text.slice(0, 200));
+      return null;
+    }
+
+    const items: SearchHit[] = [];
+    for (const row of data.web?.results ?? []) {
+      const link = row.url?.trim() ?? "";
+      const titleRaw = row.title?.trim() ?? "";
+      const title = titleRaw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      const snippet = row.description?.trim();
+      if (link && title && /^https?:\/\//i.test(link)) {
+        items.push({ link, title, snippet });
+      }
+    }
+
+    const more = data.query?.more_results_available === true;
+    const paginationExhausted = items.length === 0 || !more || clamped >= BRAVE_MAX_OFFSET;
+    const nextOffset = paginationExhausted ? 0 : clamped + 1;
+
+    console.info("[growth discovery] Brave Search API response parsed", {
+      providerChosen: "brave" as const,
+      rawResultCount: items.length,
+      offset: clamped,
+      moreResultsAvailable: more,
+      bravePaginationExhausted: paginationExhausted,
+      nextOffset,
+    });
+
+    if (items.length === 0) {
+      console.warn(
+        `[growth discovery] Brave Search API zero-result reason: no_parsed_items market=${log.market} offset=${clamped} queryPreview="${qPrev}"`,
+      );
+    }
+
+    return { items, nextOffset, bravePaginationExhausted: paginationExhausted };
+  } catch (e) {
+    lastSearchAt = Date.now();
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(
+      `[growth discovery] Brave Search API zero-result reason: fetch_exception market=${log.market} offset=${clamped} message=${msg.slice(0, 200)}`,
+    );
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+export async function runWebSearch(
+  query: string,
+  cursor: { provider: DiscoverySearchProvider; start: number },
+  opts?: { prisma?: PrismaClient; marketSlug?: string },
+): Promise<{
+  items: SearchHit[];
+  nextCursor: { provider: DiscoverySearchProvider; start: number };
+  meta: WebSearchRunMeta;
+} | null> {
+  const marketTag = opts?.marketSlug ?? "—";
+  const qPrev = query.replace(/\s+/g, " ").trim().slice(0, 120);
+
+  if (hasSerpApi()) {
+    const serp = await runSerpApiSearch(query, cursor.provider === "serpapi" ? cursor.start : 0, opts);
+    if (serp) {
+      const next = serp.rawNextStart;
+      const exhausted = serp.items.length === 0;
+      console.info("[growth discovery] web_search chain: using SerpAPI response", {
+        market: marketTag,
+        servedBy: "serpapi" as const,
+        rawResultCount: serp.items.length,
+        chainNote: exhausted ? "serpapi_ok_zero_hits_no_brave_fallback" : "serpapi_primary_ok",
+      });
+      return {
+        items: serp.items,
+        nextCursor: { provider: "serpapi", start: exhausted ? 0 : next },
+        meta: {
+          servedBy: "serpapi",
+          rawResultCount: serp.items.length,
+          chainNote: exhausted ? "serpapi_ok_zero_hits" : "serpapi_primary_ok",
+        },
+      };
+    }
+
+    const serpReason = "serp_unavailable_blocked_or_http_failure";
+    if (hasBraveSearch()) {
+      const braveOff = cursor.provider === "brave" ? cursor.start : 0;
+      const fb = await runBraveWebSearch(query, braveOff, {
+        market: marketTag,
+        fallbackReason: serpReason,
+        afterSerpFailure: true,
+      });
+      if (!fb) {
+        console.warn(
+          `[growth discovery] web_search CHAIN_FAILED: skip_reason=serp_null_then_brave_http_null market=${marketTag} query="${qPrev}"`,
+        );
+        return null;
+      }
+      const exhausted = fb.bravePaginationExhausted;
+      console.info("[growth discovery] web_search chain: SerpAPI unavailable — using Brave fallback", {
+        market: marketTag,
+        servedBy: "brave" as const,
+        rawResultCount: fb.items.length,
+        serpSkipReason: serpReason,
+      });
+      return {
+        items: fb.items,
+        nextCursor: { provider: "brave", start: fb.nextOffset },
+        meta: {
+          servedBy: "brave",
+          rawResultCount: fb.items.length,
+          bravePaginationExhausted: exhausted,
+          serpSkipReason: serpReason,
+          chainNote: "serp_null_fallback_brave",
+        },
+      };
+    }
+
+    console.warn(
+      `[growth discovery] web_search CHAIN_FAILED: skip_reason=serp_null_no_brave_fallback market=${marketTag} query="${qPrev}"`,
+    );
+    return null;
+  }
+
+  if (hasBraveSearch()) {
+    const braveOff = cursor.provider === "brave" ? cursor.start : 0;
+    const br = await runBraveWebSearch(query, braveOff, {
+      market: marketTag,
+      fallbackReason: "no_serpapi_configured",
+      afterSerpFailure: false,
+    });
+    if (!br) {
+      console.warn(
+        `[growth discovery] web_search SKIPPED: skip_reason=brave_http_failed market=${marketTag} query="${qPrev}" offset=${braveOff}`,
+      );
+      return null;
+    }
+    const exhausted = br.bravePaginationExhausted;
     return {
-      items: r.items,
-      nextCursor: { provider: "google_cse", start: exhausted ? 1 : r.rawNextStart },
+      items: br.items,
+      nextCursor: { provider: "brave", start: br.nextOffset },
+      meta: {
+        servedBy: "brave",
+        rawResultCount: br.items.length,
+        bravePaginationExhausted: exhausted,
+        chainNote: "brave_primary_no_serp",
+      },
     };
   }
+
   console.warn(
-    `[growth discovery] web_search SKIPPED: skip_reason=no_serp_or_cse_providers_configured market=${marketTag} query="${qPrev}"`,
+    `[growth discovery] web_search SKIPPED: skip_reason=no_serp_or_brave_providers_configured market=${marketTag} query="${qPrev}"`,
   );
   return null;
 }
 
-export function discoverySearchProvider(): "serpapi" | "google_cse" | null {
+export function discoverySearchProvider(): DiscoverySearchProvider | null {
   if (hasSerpApi()) return "serpapi";
-  if (hasGoogleProgrammableSearch()) return "google_cse";
+  if (hasBraveSearch()) return "brave";
   return null;
 }
 
 export async function discoverySearchProviderForMarket(
   prisma: PrismaClient | null | undefined,
   marketSlug: string,
-): Promise<"serpapi" | "google_cse" | null> {
+): Promise<DiscoverySearchProvider | null> {
   if (hasSerpApi() && prisma) {
     const avail = await serpApiAvailabilityNow(prisma, marketSlug, new Date(), { forAdapterRunStart: true });
     if (avail.enabled) return "serpapi";
     console.warn(
-      `[growth discovery] SerpAPI NO_REQUEST: ${avail.reason ?? "gate"} (market=${marketSlug} provider_pick; callsToday=${avail.state.callsToday} runsToday=${avail.state.runsToday})`,
+      `[growth discovery] provider_pick: SerpAPI gated — ${avail.reason ?? "gate"} (market=${marketSlug}; callsToday=${avail.state.callsToday}; runsToday=${avail.state.runsToday}) → prefer Brave if configured`,
     );
   }
-  if (hasGoogleProgrammableSearch()) return "google_cse";
+  if (hasBraveSearch()) return "brave";
   if (hasSerpApi()) return "serpapi";
   return null;
 }

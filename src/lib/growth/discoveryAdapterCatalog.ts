@@ -58,7 +58,7 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
       id: "autonomous_web_search_venue",
       tier: "autonomous",
       description:
-        "Nationwide SerpAPI/CSE (national-discovery-us cron lane) → open-mic query rotation + deep page fetch → ranked emails + state rollups",
+        "Nationwide SerpAPI + Brave fallback (national-discovery-us cron lane) → open-mic query rotation + deep page fetch → ranked emails + state rollups",
     },
     {
       id: "autonomous_seed_url_crawl_venue",

@@ -11,12 +11,12 @@ function envAutonomousExplicitlyDisabled(): boolean {
   return s === "false" || s === "0" || s === "no" || s === "off";
 }
 
-/** Master switch for paid / high-volume web discovery (CSE, SerpAPI, crawl, Eventbrite). */
+/** Master switch for paid / high-volume web discovery (SerpAPI, Brave fallback, crawl, Eventbrite). */
 export function growthDiscoveryAutonomousEnabled(): boolean {
   return envTruthy(process.env.GROWTH_DISCOVERY_AUTONOMOUS_ENABLED);
 }
 
-/** Google CSE or SerpAPI search calls per adapter per cron invocation (each returns up to ~10 organic links). */
+/** SerpAPI or Brave search calls per adapter per cron invocation (each returns up to ~10–20 organic links). */
 export function growthDiscoveryAutonomousSearchCallsPerRun(): number {
   return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN", 12);
 }
@@ -31,8 +31,19 @@ export function growthDiscoveryHttpDelayMs(): number {
   return parseIntEnv("GROWTH_DISCOVERY_HTTP_DELAY_MS", 150);
 }
 
-export function hasGoogleProgrammableSearch(): boolean {
-  return Boolean(process.env.GROWTH_GOOGLE_CSE_API_KEY?.trim() && process.env.GROWTH_GOOGLE_CSE_CX?.trim());
+/** Brave Search API key (fallback when SerpAPI is unavailable or exhausted). */
+export function braveSearchApiKeyForDiscovery(): string {
+  return process.env.GROWTH_BRAVE_SEARCH_API_KEY?.trim() || process.env.BRAVE_SEARCH_API_KEY?.trim() || "";
+}
+
+export function braveSearchKeySourceForDiscovery(): "GROWTH_BRAVE_SEARCH_API_KEY" | "BRAVE_SEARCH_API_KEY" | null {
+  if (process.env.GROWTH_BRAVE_SEARCH_API_KEY?.trim()) return "GROWTH_BRAVE_SEARCH_API_KEY";
+  if (process.env.BRAVE_SEARCH_API_KEY?.trim()) return "BRAVE_SEARCH_API_KEY";
+  return null;
+}
+
+export function hasBraveSearch(): boolean {
+  return Boolean(braveSearchApiKeyForDiscovery());
 }
 
 /**
@@ -98,7 +109,7 @@ export function growthSerpApiCostPerCallUsd(): number {
 }
 
 /**
- * Venue-only SerpAPI/CSE web search: also allowed when search keys are configured and the master switch is
+ * Venue-only SerpAPI / Brave web search: also allowed when search keys are configured and the master switch is
  * not explicitly off. Curated adapters ignore `GROWTH_DISCOVERY_AUTONOMOUS_ENABLED`; operators often set SerpAPI
  * but omit the flag, which previously zeroed this adapter while curated seeds still ran.
  * Eventbrite and seed crawl still require {@link growthDiscoveryAutonomousEnabled} only.
@@ -106,7 +117,7 @@ export function growthSerpApiCostPerCallUsd(): number {
 export function growthDiscoveryAutonomousWebSearchEnabled(): boolean {
   if (growthDiscoveryAutonomousEnabled()) return true;
   if (envAutonomousExplicitlyDisabled()) return false;
-  return hasSerpApi() || hasGoogleProgrammableSearch();
+  return hasSerpApi() || hasBraveSearch();
 }
 
 /** Comma-separated root URLs to fetch and mine for contacts (same-host links optional). */

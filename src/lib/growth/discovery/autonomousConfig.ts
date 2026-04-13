@@ -18,12 +18,12 @@ export function growthDiscoveryAutonomousEnabled(): boolean {
 
 /** Google CSE or SerpAPI search calls per adapter per cron invocation (each returns up to ~10 organic links). */
 export function growthDiscoveryAutonomousSearchCallsPerRun(): number {
-  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN", 6);
+  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN", 12);
 }
 
 /** HTML page fetches (for email / social extraction) per autonomous search adapter per run. */
 export function growthDiscoveryAutonomousMaxPageFetchesPerRun(): number {
-  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_PAGE_FETCHES_PER_RUN", 35);
+  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_PAGE_FETCHES_PER_RUN", 72);
 }
 
 /** Delay between outbound HTTP requests during discovery (politeness + rate limits). */

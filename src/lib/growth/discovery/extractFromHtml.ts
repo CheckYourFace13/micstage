@@ -61,7 +61,7 @@ function addressesFromMailtoHref(href: string): string[] {
  * Pull mailto links, obvious socials, same-host anchors, and emails from header/footer/body.
  */
 export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameHostLinks?: number }): ExtractedContactHints {
-  const maxSame = opts?.maxSameHostLinks ?? 48;
+  const maxSame = opts?.maxSameHostLinks ?? 64;
   const pageHost = hostOf(pageUrl);
   const $ = cheerio.load(html);
   const title = cleanTitle($("title").first().text() || $("h1").first().text() || "");
@@ -111,11 +111,19 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
       }
       return;
     }
-    if (lower.includes("facebook.com/") || lower.includes("fb.com/")) {
+    if (
+      lower.includes("facebook.com/") ||
+      lower.includes("fb.com/") ||
+      lower.includes("m.facebook.com/") ||
+      lower.includes("fb.me/")
+    ) {
       try {
         const u = new URL(href.startsWith("http") ? href : `https:${href}`);
         const path = u.pathname.toLowerCase();
         if (path.includes("/share") || path.includes("/sharer")) return;
+        if (u.hostname.toLowerCase().replace(/^www\./, "").startsWith("m.")) {
+          u.hostname = u.hostname.replace(/^m\./i, "www.");
+        }
         facebookUrls.add(u.toString().split("?")[0]!);
       } catch {
         /* skip */
@@ -128,7 +136,7 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
         if (hostOf(abs.toString()) === pageHost && sameHostPaths.size < maxSame) {
           const p = abs.pathname.toLowerCase();
           if (
-            /contact|book|booking|rental|private|events?|calendar|about|team|staff|press|open[\s-]?mic|mic[\s-]?night|talent|perform|entertain|host|venue|faq|music|shows?|lineup|inquir/i.test(
+            /contact|book|booking|rental|private|events?|calendar|schedule|weddings?|corporate|catering|hospitality|about|team|staff|press|open[\s-]?mic|mic[\s-]?night|talent|perform|entertain|host|venue|faq|music|shows?|lineup|inquir|directions|visit|locations?|party|gig|submit|hire|plan|experience|meet|our[\s-]?story/i.test(
               p,
             ) ||
             p === "/" ||
@@ -160,7 +168,7 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
   return {
     nameGuess: title,
     emailsTagged,
-    emails: [...emails].slice(0, 24),
+    emails: [...emails].slice(0, 36),
     instagramUrls: [...instagramUrls].slice(0, 5),
     youtubeUrls: [...youtubeUrls].slice(0, 3),
     tiktokUrls: [...tiktokUrls].slice(0, 3),
@@ -175,8 +183,10 @@ const CONTACT_PATH_PRIORITY: { re: RegExp; w: number }[] = [
   { re: /book|booking|rental|private/i, w: 95 },
   { re: /events?|calendar|schedule/i, w: 90 },
   { re: /open[\s-]?mic|mic[\s-]?night/i, w: 88 },
-  { re: /talent|perform|entertain|host/i, w: 82 },
+  { re: /talent|perform|entertain|host|hire|gig|submit/i, w: 84 },
+  { re: /weddings?|corporate|catering|hospitality/i, w: 80 },
   { re: /about|team|staff/i, w: 70 },
+  { re: /locations?|visit|directions/i, w: 65 },
   { re: /faq|press/i, w: 55 },
 ];
 

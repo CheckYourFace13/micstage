@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
+import { mergeVenueDiscoveryHints } from "@/lib/growth/growthLeadDiscoveryHintsMerge";
 import {
   normalizeFacebookUrlForDedupe,
   normalizeInstagramHandle,
@@ -113,8 +114,17 @@ export async function mergeGrowthLeadFromClaudeImport(
     data.internalNotes = newNotes;
   }
 
-  if (Object.keys(data).length === 0) return false;
+  if (Object.keys(data).length === 0) {
+    if (raw.discoveryHints != null) {
+      await mergeVenueDiscoveryHints(prisma, leadId, raw.discoveryHints);
+      return true;
+    }
+    return false;
+  }
 
   await prisma.growthLead.update({ where: { id: leadId }, data });
+  if (raw.discoveryHints != null) {
+    await mergeVenueDiscoveryHints(prisma, leadId, raw.discoveryHints);
+  }
   return true;
 }

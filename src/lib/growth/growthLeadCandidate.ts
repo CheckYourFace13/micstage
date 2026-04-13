@@ -6,6 +6,7 @@ import type {
   GrowthLeadSourceKind,
   GrowthLeadType,
 } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 
 /** Normalized shape produced by source adapters and fed into ingestion. */
 export type GrowthLeadCandidate = {
@@ -38,4 +39,6 @@ export type GrowthLeadCandidate = {
   performanceTags?: GrowthLeadPerformanceTag[];
   importKey?: string | null;
   internalNotes?: string | null;
+  /** Structured discovery enrichment (public roles, adapter metadata). Persisted on `GrowthLead.discoveryHints`. */
+  discoveryHints?: Prisma.InputJsonValue | null;
 };

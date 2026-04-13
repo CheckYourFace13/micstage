@@ -936,6 +936,9 @@ model GrowthLead {
 
   internalNotes String? @db.Text
 
+  /// Public discovery enrichment (role hints, crawl metadata) — JSON from autonomous adapters.
+  discoveryHints Json?
+
   outreachDrafts  GrowthLeadOutreachDraft[]
   responses       GrowthLeadResponse[]
   followUpSchedules GrowthLeadFollowUpSchedule[]

@@ -6,6 +6,7 @@ import {
   persistGrowthLeadEmailContacts,
 } from "@/lib/growth/growthLeadContactAutomation";
 import { findExistingGrowthLeadForDedupe } from "@/lib/growth/growthLeadDedupe";
+import { mergeVenueDiscoveryHints } from "@/lib/growth/growthLeadDiscoveryHintsMerge";
 import { mergeGrowthLeadFromClaudeImport } from "@/lib/growth/growthLeadMergeFromImport";
 import { parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 import {
@@ -151,6 +152,7 @@ export async function ingestGrowthLeadCandidate(
         facebookUrl: raw.facebookUrl ?? null,
         hasAnyEmail: hasAnyValidParsedEmail(primary, raw.additionalContactEmails),
       });
+      await mergeVenueDiscoveryHints(prisma, dup.id, raw.discoveryHints ?? undefined);
     } else {
       const sidecarPrimary =
         primary.normalized && (primary.confidence === "HIGH" || primary.confidence === "MEDIUM")
@@ -203,6 +205,7 @@ export async function ingestGrowthLeadCandidate(
       internalNotes: raw.internalNotes?.trim() || null,
       websiteHostNormalized,
       instagramHandleNormalized,
+      discoveryHints: raw.discoveryHints ?? undefined,
     },
   });
 

@@ -14,7 +14,7 @@ export function autonomousWebSearchBudgetMultiplier(_adapterId: string): number 
 export function discoveryIngestCapForAdapter(_adapter: GrowthLeadSourceAdapter): number {
   const base = growthDiscoveryMaxCandidatesPerAdapterPerMarket();
   if (_adapter.id === "autonomous_web_search_venue") {
-    return Math.max(50, Math.round(base * 0.5));
+    return Math.max(220, Math.round(base * 0.92));
   }
   if (_adapter.id === "autonomous_seed_url_crawl_venue" || _adapter.id === "autonomous_eventbrite_chicago") {
     return Math.max(80, Math.round(base * 1.2));

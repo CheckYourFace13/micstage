@@ -200,6 +200,16 @@ export default async function AdminGrowthLeadDetailPage(props: {
             <dt className="text-zinc-500">Internal notes</dt>
             <dd className="whitespace-pre-wrap text-zinc-300">{lead.internalNotes ?? "—"}</dd>
           </div>
+          {lead.discoveryHints != null ? (
+            <div className="sm:col-span-2">
+              <dt className="text-zinc-500">Discovery hints (autonomous)</dt>
+              <dd className="max-h-64 overflow-auto rounded border border-zinc-800/80 bg-black/30 p-2 font-mono text-[10px] text-zinc-300">
+                <pre className="whitespace-pre-wrap break-all">
+                  {JSON.stringify(lead.discoveryHints, null, 2)}
+                </pre>
+              </dd>
+            </div>
+          ) : null}
         </dl>
 
         <form action={updateGrowthLeadLocalityAction} className="mt-4 grid gap-2 rounded border border-zinc-800/80 p-3 sm:grid-cols-2">

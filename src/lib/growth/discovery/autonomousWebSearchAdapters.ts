@@ -10,6 +10,7 @@ import {
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
 import { inferDiscoveryGeoForNationwideSearch } from "@/lib/growth/discovery/discoveryGeoInference";
+import { extractPublicVenueRoleHints } from "@/lib/growth/discovery/discoveryVenueRoleHints";
 import {
   extractFromHtml,
   pickPrimaryVenueContactUrl,
@@ -130,32 +131,56 @@ function hostOf(url: string): string | null {
   }
 }
 
-/** Open-mic–intent query cores (geo tail appended per rotation). */
+/**
+ * Open-mic / live-host intent cores; geo tail appended per rotation.
+ * Includes US-wide and metro-tailed variants; `site:` kept for Serp (stripped for Google CSE in webSearch).
+ */
 const OPEN_MIC_QUERY_CORES = [
   '"open mic" night venue bar OR coffeehouse',
   '"open mic" venue United States',
   '"open mic night" live music venue',
+  '"open mic night" venue United States',
+  "open mic night bar venue",
   '"acoustic open mic" venue',
+  "acoustic open mic night venue",
   '"comedy open mic" club OR venue',
+  "comedy open mic night club",
   '"poetry open mic" venue OR cafe',
   '"jam night" live music venue bar',
+  "jam night live music venue",
   '"songwriter open mic" OR "singer songwriter night" venue',
+  "songwriter open mic night venue",
+  "singer songwriter open mic United States",
   '"mic night" open stage venue',
   '"open stage" OR "amateur night" music venue',
+  "open mic signup performers venue",
+  "live music open mic stage venue",
+  "weekly open mic live music venue",
+  "recurring open mic night venue",
+  "recurring live music comedy night venue",
+  "weekly comedy open mic club",
+  "live comedy night bar venue",
   '"open mic" events calendar venue',
-  "recurring weekly open mic night venue",
+  "trivia night live music bar",
+  "karaoke night bar venue",
+  "live entertainment booking venue",
+  "private events music venue booking",
+  '"open mic" brewery OR taproom',
+  '"open mic" listening room OR lounge',
+  '"open mic" coffeehouse OR cafe',
   'site:eventbrite.com "open mic" United States',
   'site:meetup.com "open mic" United States',
   'site:facebook.com/events "open mic"',
   'site:openmikes.org United States',
   'site:badslava.com "open mic"',
-  '"open mic" brewery OR taproom',
-  '"open mic" listening room OR lounge',
+  "open mic United States tonight OR weekly",
+  '"open mic" OR "mic night" venue OR bar',
 ];
 
-/** Rotating metro/state tails so results are not Chicagoland-only. */
+/** Rotating metro/state tails + US-wide so coverage is nationwide, not one-metro skewed. */
 const GEO_SCOPES = [
   "",
+  "United States",
   "Nashville TN",
   "Austin TX",
   "Portland OR",
@@ -181,6 +206,27 @@ const GEO_SCOPES = [
   "Columbus OH",
   "Indianapolis IN",
   "Las Vegas NV",
+  "San Francisco CA",
+  "San Antonio TX",
+  "Orlando FL",
+  "Tampa FL",
+  "Raleigh NC",
+  "Salt Lake City UT",
+  "Milwaukee WI",
+  "Cleveland OH",
+  "Cincinnati OH",
+  "Pittsburgh PA",
+  "Baltimore MD",
+  "Sacramento CA",
+  "Kansas City KS",
+  "Oklahoma City OK",
+  "Memphis TN",
+  "Louisville KY",
+  "Richmond VA",
+  "Buffalo NY",
+  "Albuquerque NM",
+  "Tucson AZ",
+  "Honolulu HI",
 ];
 
 function buildSearchQuery(cursorQi: number): string {
@@ -190,7 +236,11 @@ function buildSearchQuery(cursorQi: number): string {
   return q.replace(/\s+/g, " ").trim();
 }
 
-const DEEP_PAGES_PER_HIT = 5;
+/** Same-host deep pages per search hit (contact / events / team / booking). */
+const DEEP_PAGES_PER_HIT = 8;
+
+/** Extra throughput for the nationwide lane only (env caps still apply via allocation + parseIntEnv). */
+const NATIONWIDE_WEB_SEARCH_VOLUME_MULT = 1.22;
 
 /**
  * SerpAPI / Google CSE → nationwide open-mic venue queries → multi-page fetch → aggressive email extraction.
@@ -233,7 +283,10 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         if (provider === "serpapi") {
           await markSerpApiRunStarted(prisma, ctx.discoveryMarketSlug);
         }
-        const mult = Math.max(0.02, ctx.autonomousWebSearchBudgetMultiplier ?? 1);
+        const mult = Math.max(
+          0.02,
+          (ctx.autonomousWebSearchBudgetMultiplier ?? 1) * NATIONWIDE_WEB_SEARCH_VOLUME_MULT,
+        );
         const searchCalls = Math.max(1, Math.round(growthDiscoveryAutonomousSearchCallsPerRun() * mult));
         const maxFetches = Math.max(2, Math.round(growthDiscoveryAutonomousMaxPageFetchesPerRun() * mult));
 
@@ -314,6 +367,10 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         let skippedShouldIngest = 0;
         let skippedMaxFetches = 0;
         let skippedDupUrl = 0;
+        let emitWithPrimaryEmail = 0;
+        let emitWithMultiEmail = 0;
+        let emitPathOnlyNoEmail = 0;
+        let emitWithDmMeta = 0;
 
         for (const { hit, searchQuery: qUsed } of hits) {
           if (fetches >= maxFetches) {
@@ -363,7 +420,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
               fetches++;
               deep++;
               if (!subHtml) continue;
-              const subEx = extractFromHtml(subUrl, subHtml, { maxSameHostLinks: 32 });
+              const subEx = extractFromHtml(subUrl, subHtml, { maxSameHostLinks: 48 });
               for (const t of subEx.emailsTagged) {
                 emailsTagged.push({ email: t.email, source: "secondary_page" });
               }
@@ -388,7 +445,11 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           const fb = ex.facebookUrls[0] ?? null;
           const contactPick =
             pickPrimaryVenueContactUrl([...allPaths]) ??
-            [...allPaths].find((u) => /contact|book|events|calendar|open|mic/i.test(u)) ??
+            [...allPaths].find((u) =>
+              /contact|book|booking|events?|calendar|open|mic|private|rental|team|staff|about|inquir|hire|gig|submit|wedding|corporate/i.test(
+                u,
+              ),
+            ) ??
             null;
 
           const bodySample = bodyPieces.join("\n").slice(0, 24_000);
@@ -429,9 +490,23 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             pageUrl,
           });
 
+          const roleHints = extractPublicVenueRoleHints(bodySample);
+          const dmNote =
+            roleHints.length > 0
+              ? ` [micstage_dm_meta] ${roleHints
+                  .slice(0, 8)
+                  .map((h) => (h.nameOrLabel ? `${h.role}:${h.nameOrLabel}` : h.role))
+                  .join("; ")}`
+              : "";
+
           const fetchNote = html ? "" : " Page fetch failed or non-HTML; scored from SERP only.";
           const multiNote = additionalContactEmails.length > 0 ? " multi=true" : "";
           const emailMeta = `[micstage_email_meta] count=${totalFound} primary_src=${picked.bestSource}${multiNote}`;
+
+          if (email) emitWithPrimaryEmail++;
+          if (additionalContactEmails.length > 0) emitWithMultiEmail++;
+          if (!email && (contactPick || ig || fb)) emitPathOnlyNoEmail++;
+          if (roleHints.length > 0) emitWithDmMeta++;
 
           candidates.push({
             leadType: "VENUE",
@@ -456,13 +531,35 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             openMicSignalTier: om.tier,
             contactQuality,
             importKey: hashImport(pageUrl),
-            internalNotes: `${emailMeta}. Open-mic–targeted nationwide discovery. Tier ${om.tier}. Market ${geo.discoveryMarketSlug}. Query: ${qUsed.slice(0, 140)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
+            internalNotes: `${emailMeta}${dmNote}. Open-mic–targeted nationwide discovery. Tier ${om.tier}. Market ${geo.discoveryMarketSlug}. Query: ${qUsed.slice(0, 140)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
+            discoveryHints: {
+              source: ADAPTER_ID,
+              nationwide: true,
+              publicRoleHints: roleHints.slice(0, 14),
+            },
           });
         }
 
         console.info("[growth discovery] autonomous_web_search_venue emit", {
           provider,
           candidates: candidates.length,
+        });
+        console.info("[growth discovery] autonomous_web_search_venue nationwide diagnostics", {
+          market: ctx.discoveryMarketSlug,
+          searchIterations: searchCalls,
+          maxFetchesBudget: maxFetches,
+          rawSearchItems: rawSearchItemsThisRun,
+          hitsAfterUrlGate: hits.length,
+          droppedResolve: droppedAfterResolve,
+          droppedAllowUrl: droppedAllowHitUrl,
+          skippedShouldIngest,
+          skippedDupUrl,
+          skippedMaxFetches,
+          candidatesEmitted: candidates.length,
+          emitWithPrimaryEmail,
+          emitWithMultiEmail,
+          emitPathOnlyNoEmail,
+          emitWithDmMeta,
         });
         if (candidates.length === 0) {
           const reason =

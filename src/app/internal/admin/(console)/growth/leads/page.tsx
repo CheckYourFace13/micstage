@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { assertAdminSession } from "@/lib/adminAuth";
-import { GrowthLeadsFilteredTable } from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
+import {
+  GROWTH_LEADS_PAGE_SIZE_DEFAULT,
+  GrowthLeadsFilteredTable,
+} from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
 import type {
   GrowthLeadAcquisitionStage,
   GrowthLeadContactQuality,
@@ -10,7 +13,7 @@ import type {
   GrowthLeadType,
 } from "@/generated/prisma/client";
 import { buildGrowthLeadWhere } from "@/lib/growth/growthLeadFilters";
-import type { GrowthLeadListFilters } from "@/lib/growth/growthLeadFilters";
+import type { GrowthLeadListFilters, GrowthLeadOutreachQueue } from "@/lib/growth/growthLeadFilters";
 import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
 import { defaultGrowthMetro, GROWTH_METROS, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
 import { requirePrisma } from "@/lib/prisma";
@@ -82,6 +85,74 @@ function parseAcquisitionStage(raw: string | undefined): GrowthLeadAcquisitionSt
   return allowed.includes(u as GrowthLeadAcquisitionStage) ? (u as GrowthLeadAcquisitionStage) : null;
 }
 
+function parseOutreachQueue(raw: string | undefined): GrowthLeadOutreachQueue {
+  if (!raw?.trim()) return "all";
+  const u = raw.trim();
+  const allowed: GrowthLeadOutreachQueue[] = [
+    "all",
+    "email_pipeline",
+    "email_outreach_ready",
+    "contact_path_queue",
+    "social_path_queue",
+    "website_only_queue",
+  ];
+  return allowed.includes(u as GrowthLeadOutreachQueue) ? (u as GrowthLeadOutreachQueue) : "all";
+}
+
+function parseLeadsPage(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? "1", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+function parseLeadsPageSize(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n)) return GROWTH_LEADS_PAGE_SIZE_DEFAULT;
+  return Math.min(100, Math.max(10, n));
+}
+
+function buildGrowthLeadsPaginationBaseQuery(p: {
+  market?: string;
+  type?: string;
+  city?: string;
+  suburb?: string;
+  tags?: string;
+  status?: string;
+  fitMin?: string;
+  fitMax?: string;
+  q?: string;
+  pipeline?: string;
+  draftPending?: string;
+  omTier?: string;
+  contactQ?: string;
+  acquisition?: string;
+  queue?: string;
+  perPage?: string;
+}): Record<string, string | undefined> {
+  const o: Record<string, string | undefined> = {};
+  const set = (k: string, v: string | undefined) => {
+    if (v != null && v !== "") o[k] = v;
+  };
+  set("market", p.market?.trim());
+  set("type", p.type?.trim());
+  set("city", p.city?.trim());
+  set("suburb", p.suburb?.trim());
+  set("tags", p.tags?.trim());
+  set("status", p.status?.trim());
+  set("fitMin", p.fitMin?.trim());
+  set("fitMax", p.fitMax?.trim());
+  set("q", p.q?.trim());
+  set("omTier", p.omTier?.trim());
+  set("contactQ", p.contactQ?.trim());
+  set("acquisition", p.acquisition?.trim());
+  if (p.pipeline === "1") o.pipeline = "1";
+  if (p.draftPending === "1") o.draftPending = "1";
+  const queue = parseOutreachQueue(p.queue);
+  if (queue !== "all") o.queue = queue;
+  const ps = parseLeadsPageSize(p.perPage);
+  if (ps !== GROWTH_LEADS_PAGE_SIZE_DEFAULT) o.perPage = String(ps);
+  return o;
+}
+
 export default async function AdminGrowthLeadsPage(props: {
   searchParams: Promise<{
     market?: string;
@@ -99,6 +170,9 @@ export default async function AdminGrowthLeadsPage(props: {
     omTier?: string;
     contactQ?: string;
     acquisition?: string;
+    queue?: string;
+    page?: string;
+    perPage?: string;
   }>;
 }) {
   await assertAdminSession();
@@ -106,6 +180,8 @@ export default async function AdminGrowthLeadsPage(props: {
   const prisma = requirePrisma();
 
   const marketSlug = resolveGrowthMarketSlug({ market: p.market, metro: p.metro });
+  const outreachQueue = parseOutreachQueue(p.queue);
+  const pageSize = parseLeadsPageSize(p.perPage);
   const filters: GrowthLeadListFilters = {
     marketSlug,
     leadType: parseLeadType(p.type),
@@ -121,10 +197,21 @@ export default async function AdminGrowthLeadsPage(props: {
     openMicSignalTier: parseOpenMicTier(p.omTier),
     contactQuality: parseContactQuality(p.contactQ),
     acquisitionStage: parseAcquisitionStage(p.acquisition),
+    outreachQueue,
   };
 
   const where = buildGrowthLeadWhere(filters);
   const matchCount = await prisma.growthLead.count({ where });
+  const page = parseLeadsPage(p.page);
+  const totalPages = Math.max(1, Math.ceil(matchCount / pageSize));
+  const safePage = Math.min(page, totalPages);
+
+  const paginationBase = buildGrowthLeadsPaginationBaseQuery({
+    ...p,
+    market: marketSlug,
+    queue: outreachQueue === "all" ? undefined : outreachQueue,
+    perPage: pageSize === GROWTH_LEADS_PAGE_SIZE_DEFAULT ? undefined : String(pageSize),
+  });
 
   const metro = GROWTH_METROS.find((m) => m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase());
 
@@ -139,8 +226,72 @@ export default async function AdminGrowthLeadsPage(props: {
       <p className="mt-1 text-xs text-zinc-500">
         Default market is <strong className="text-zinc-300">{defaultGrowthMetro().label}</strong> (
         <code className="text-zinc-400">{defaultGrowthMetro().discoveryMarketSlug}</code>). {matchCount} lead
-        {matchCount === 1 ? "" : "s"} match current filters.
+        {matchCount === 1 ? "" : "s"} match current filters (paginated; no fixed row cap).
       </p>
+
+      <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+        <h2 className="text-sm font-medium text-white">Outreach queues</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Primary pipeline = mailable email (HIGH/MEDIUM). Secondary queues keep contact URLs and socials for manual follow-up
+          or future automation. Email-ready filter adds status + discovery-confidence gates; marketing suppression still applies at
+          send time (see lead detail block preview).
+        </p>
+        <ul className="mt-2 flex flex-wrap gap-2 text-sm">
+          <li>
+            <Link
+              className="text-emerald-400 hover:text-emerald-300"
+              href={`/internal/admin/growth/leads?${new URLSearchParams({
+                market: marketSlug,
+                queue: "email_pipeline",
+                ...(p.type ? { type: p.type } : {}),
+              }).toString()}`}
+            >
+              Email pipeline
+            </Link>
+          </li>
+          <li>
+            <Link
+              className="text-emerald-400 hover:text-emerald-300"
+              href={`/internal/admin/growth/leads?${new URLSearchParams({
+                market: marketSlug,
+                queue: "email_outreach_ready",
+                ...(p.type ? { type: p.type } : {}),
+              }).toString()}`}
+            >
+              Email outreach-ready
+            </Link>
+          </li>
+          <li>
+            <Link
+              className="text-sky-400 hover:text-sky-300"
+              href={`/internal/admin/growth/leads?${new URLSearchParams({
+                market: marketSlug,
+                queue: "contact_path_queue",
+                ...(p.type ? { type: p.type } : {}),
+              }).toString()}`}
+            >
+              Contact-path queue
+            </Link>
+          </li>
+          <li>
+            <Link
+              className="text-violet-400 hover:text-violet-300"
+              href={`/internal/admin/growth/leads?${new URLSearchParams({
+                market: marketSlug,
+                queue: "social_path_queue",
+                ...(p.type ? { type: p.type } : {}),
+              }).toString()}`}
+            >
+              Social / calendar queue
+            </Link>
+          </li>
+          <li>
+            <Link className="text-zinc-400 hover:text-zinc-200" href={`/internal/admin/growth/leads?market=${encodeURIComponent(marketSlug)}`}>
+              All leads (email-first sort)
+            </Link>
+          </li>
+        </ul>
+      </section>
 
       <div className="mt-3 flex flex-wrap gap-2 text-xs">
         {GROWTH_METROS.map((m) => (
@@ -164,9 +315,17 @@ export default async function AdminGrowthLeadsPage(props: {
           <li>
             <Link
               className="text-emerald-400 hover:text-emerald-300"
+              href={`/internal/admin/growth/leads?market=${encodeURIComponent(defaultGrowthMetro().discoveryMarketSlug)}&type=VENUE&pipeline=1&queue=email_outreach_ready`}
+            >
+              Chicagoland venues — email outreach-ready
+            </Link>
+          </li>
+          <li>
+            <Link
+              className="text-emerald-400 hover:text-emerald-300"
               href={`/internal/admin/growth/leads?market=${encodeURIComponent(defaultGrowthMetro().discoveryMarketSlug)}&type=VENUE&pipeline=1`}
             >
-              Chicagoland venues (pipeline)
+              Chicagoland venues (pipeline, all queues)
             </Link>
           </li>
           <li>
@@ -213,6 +372,35 @@ export default async function AdminGrowthLeadsPage(props: {
               <option value="VENUE">VENUE</option>
               <option value="ARTIST">ARTIST</option>
               <option value="PROMOTER_ACCOUNT">PROMOTER_ACCOUNT</option>
+            </select>
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs text-zinc-500">Outreach queue (primary vs secondary)</span>
+            <select
+              name="queue"
+              defaultValue={outreachQueue}
+              className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 font-mono text-[11px] text-white"
+            >
+              <option value="all">All — email / contact quality sorted</option>
+              <option value="email_pipeline">Email pipeline (HIGH/MEDIUM email)</option>
+              <option value="email_outreach_ready">Email outreach-ready (+ status / disc. conf.)</option>
+              <option value="contact_path_queue">Secondary — contact-path queue</option>
+              <option value="social_path_queue">Secondary — social / calendar queue</option>
+              <option value="website_only_queue">Secondary — website only</option>
+            </select>
+          </label>
+          <label className="grid gap-1">
+            <span className="text-xs text-zinc-500">Rows per page</span>
+            <select
+              name="perPage"
+              defaultValue={String(pageSize)}
+              className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 text-white"
+            >
+              {[25, 50, 75, 100].map((n) => (
+                <option key={n} value={String(n)}>
+                  {n}
+                </option>
+              ))}
             </select>
           </label>
           <label className="grid gap-1">
@@ -303,6 +491,10 @@ export default async function AdminGrowthLeadsPage(props: {
       <GrowthLeadsFilteredTable
         filters={filters}
         title={metro ? `${metro.label} — filtered leads` : `${marketSlug} — filtered leads`}
+        totalCount={matchCount}
+        page={safePage}
+        pageSize={pageSize}
+        baseQuery={paginationBase}
       />
     </main>
   );

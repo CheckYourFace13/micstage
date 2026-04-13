@@ -14,6 +14,10 @@ import {
 } from "@/app/internal/admin/growthActions";
 import type { GrowthLeadAcquisitionStage, GrowthLeadStatus } from "@/generated/prisma/client";
 import { explainGrowthLeadOutreachBlock } from "@/lib/growth/growthLeadBlock";
+import {
+  describeGrowthLeadContactPaths,
+  growthLeadPipelineBadge,
+} from "@/lib/growth/growthLeadContactPathLabel";
 import { growthFollowUpAutomationEnabled } from "@/lib/marketing/emailConfig";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { requirePrisma } from "@/lib/prisma";
@@ -66,6 +70,20 @@ export default async function AdminGrowthLeadDetailPage(props: {
         where: { discoveryMarketSlug: { equals: lead.discoveryMarketSlug, mode: "insensitive" } },
       })
     : null;
+
+  const pathLabels = describeGrowthLeadContactPaths({
+    contactUrl: lead.contactUrl,
+    websiteUrl: lead.websiteUrl,
+    instagramUrl: lead.instagramUrl,
+    facebookUrl: lead.facebookUrl,
+    youtubeUrl: lead.youtubeUrl,
+    tiktokUrl: lead.tiktokUrl,
+  });
+  const pipelineUi = growthLeadPipelineBadge({
+    contactQuality: lead.contactQuality,
+    contactEmailNormalized: lead.contactEmailNormalized,
+    contactEmailConfidence: lead.contactEmailConfidence,
+  });
 
   const email = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
   let blockPreview: { blocked: boolean; reasons: string[] } | null = null;
@@ -162,6 +180,17 @@ export default async function AdminGrowthLeadDetailPage(props: {
             <dt className="text-zinc-500">Socials</dt>
             <dd className="break-all text-zinc-200">
               {[lead.instagramUrl, lead.facebookUrl, lead.youtubeUrl, lead.tiktokUrl].filter(Boolean).join(" · ") || "—"}
+            </dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-zinc-500">Outreach pipeline &amp; path targets</dt>
+            <dd className="text-zinc-200">
+              <span className="font-medium text-emerald-200/90">{pipelineUi.label}</span>
+              <span className="mt-1 block text-[11px] text-zinc-500">
+                Path summary: {pathLabels.length ? pathLabels.join(" · ") : "—"} · MicStage does not auto-submit external
+                contact forms; non-email URLs can be enqueued as <code className="text-zinc-600">MarketingJob</code> payloads for
+                future automation or manual outreach.
+              </span>
             </dd>
           </div>
           <div>

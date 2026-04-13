@@ -8,6 +8,15 @@ import type {
 } from "@/generated/prisma/client";
 import type { Prisma } from "@/generated/prisma/client";
 
+/** Narrow admin queues without a second table or pipeline. */
+export type GrowthLeadOutreachQueue =
+  | "all"
+  | "email_pipeline"
+  | "email_outreach_ready"
+  | "contact_path_queue"
+  | "social_path_queue"
+  | "website_only_queue";
+
 export type GrowthLeadListFilters = {
   marketSlug?: string | null;
   leadType?: GrowthLeadType | null;
@@ -25,10 +34,16 @@ export type GrowthLeadListFilters = {
   pipelineOnly?: boolean;
   /** When true, only leads with at least one PENDING_REVIEW outreach draft. */
   draftPending?: boolean;
+  /**
+   * Primary vs secondary outreach queues. Does not delete data — filters the list only.
+   * `email_outreach_ready` adds status + confidence gates (marketing suppression still enforced at send time).
+   */
+  outreachQueue?: GrowthLeadOutreachQueue | null;
 };
 
 export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLeadWhereInput {
   const w: Prisma.GrowthLeadWhereInput = {};
+  const extraAnd: Prisma.GrowthLeadWhereInput[] = [];
 
   if (f.marketSlug?.trim()) {
     w.discoveryMarketSlug = { equals: f.marketSlug.trim(), mode: "insensitive" };
@@ -42,6 +57,29 @@ export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLea
     w.status = { in: ["DISCOVERED", "REVIEWED", "APPROVED"] };
   } else if (f.statuses && f.statuses.length > 0) {
     w.status = { in: f.statuses };
+  }
+
+  const queue = f.outreachQueue ?? "all";
+  if (queue === "email_pipeline") {
+    extraAnd.push({
+      contactQuality: "EMAIL",
+      contactEmailNormalized: { not: null },
+      contactEmailConfidence: { in: ["HIGH", "MEDIUM"] },
+    });
+  } else if (queue === "email_outreach_ready") {
+    extraAnd.push({
+      contactQuality: "EMAIL",
+      contactEmailNormalized: { not: null },
+      contactEmailConfidence: { in: ["HIGH", "MEDIUM"] },
+      status: { notIn: ["BOUNCED", "UNSUBSCRIBED", "REJECTED", "JOINED"] },
+      OR: [{ discoveryConfidence: null }, { discoveryConfidence: { gte: 25 } }],
+    });
+  } else if (queue === "contact_path_queue") {
+    extraAnd.push({ contactQuality: "CONTACT_PAGE" });
+  } else if (queue === "social_path_queue") {
+    extraAnd.push({ contactQuality: "SOCIAL_OR_CALENDAR" });
+  } else if (queue === "website_only_queue") {
+    extraAnd.push({ contactQuality: "WEBSITE_ONLY" });
   }
 
   if (f.cityContains?.trim()) {
@@ -83,6 +121,10 @@ export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLea
 
   if (f.acquisitionStage) {
     w.acquisitionStage = f.acquisitionStage;
+  }
+
+  if (extraAnd.length > 0) {
+    w.AND = Array.isArray(w.AND) ? [...w.AND, ...extraAnd] : w.AND ? [w.AND, ...extraAnd] : extraAnd;
   }
 
   return w;

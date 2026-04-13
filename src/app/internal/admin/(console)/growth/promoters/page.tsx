@@ -1,17 +1,37 @@
 import Link from "next/link";
 import { assertAdminSession } from "@/lib/adminAuth";
-import { GrowthLeadsFilteredTable } from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
+import {
+  GROWTH_LEADS_PAGE_SIZE_DEFAULT,
+  GrowthLeadsFilteredTable,
+} from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
+import { buildGrowthLeadWhere } from "@/lib/growth/growthLeadFilters";
 import { defaultGrowthMetro, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
+import { requirePrisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+function parsePage(raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? "1", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 export default async function AdminGrowthPromotersPage(props: {
-  searchParams: Promise<{ market?: string; metro?: string; all?: string }>;
+  searchParams: Promise<{ market?: string; metro?: string; all?: string; page?: string }>;
 }) {
   await assertAdminSession();
   const params = await props.searchParams;
+  const prisma = requirePrisma();
   const market = resolveGrowthMarketSlug({ market: params.market, metro: params.metro });
   const pipelineOnly = params.all !== "1";
+  const filters = { marketSlug: market, leadType: "PROMOTER_ACCOUNT" as const, pipelineOnly };
+  const where = buildGrowthLeadWhere(filters);
+  const totalCount = await prisma.growthLead.count({ where });
+  const page = parsePage(params.page);
+  const pageSize = GROWTH_LEADS_PAGE_SIZE_DEFAULT;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const baseQuery: Record<string, string | undefined> = { market };
+  if (params.all === "1") baseQuery.all = "1";
 
   return (
     <main className="mx-auto max-w-7xl px-3 py-6">
@@ -47,8 +67,12 @@ export default async function AdminGrowthPromotersPage(props: {
       </form>
 
       <GrowthLeadsFilteredTable
-        filters={{ marketSlug: market, leadType: "PROMOTER_ACCOUNT", pipelineOnly }}
+        filters={filters}
         title="Promoter / social leads"
+        totalCount={totalCount}
+        page={safePage}
+        pageSize={pageSize}
+        baseQuery={baseQuery}
       />
     </main>
   );

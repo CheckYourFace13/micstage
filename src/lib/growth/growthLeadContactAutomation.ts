@@ -23,7 +23,7 @@ function uniqueMarketingSafeEmails(raw: Array<string | null | undefined>): strin
   return out;
 }
 
-function pathKindForUrl(url: string): "CONTACT_PAGE" | "BOOKING_PAGE" | "EVENT_PAGE" | "SOCIAL_PATH" | "WEBSITE_PATH" {
+export function pathKindForUrl(url: string): "CONTACT_PAGE" | "BOOKING_PAGE" | "EVENT_PAGE" | "SOCIAL_PATH" | "WEBSITE_PATH" {
   const lower = url.toLowerCase();
   if (/instagram\.com|facebook\.com|fb\.com|tiktok\.com|youtube\.com|youtu\.be/.test(lower)) return "SOCIAL_PATH";
   if (/book|booking|inquiry|inquire/.test(lower)) return "BOOKING_PAGE";

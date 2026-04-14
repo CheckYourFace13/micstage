@@ -2,13 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { track } from "@vercel/analytics/react";
 import {
   isAnalyticsDisabled,
   JOINED_MUSICIAN,
   JOINED_VENUE,
   PRODUCT_ANALYTICS_QS,
 } from "@/lib/productAnalytics";
+import { trackMarketingEvent } from "@/lib/marketingTracking";
 
 /**
  * Fires low-noise product events from ephemeral query params (set by server actions),
@@ -36,21 +36,21 @@ export function MicStageProductAnalytics() {
     const send = process.env.NODE_ENV === "production";
 
     if (booked === "1") {
-      if (send) track("Booking Completed");
+      if (send) trackMarketingEvent("booking_completed");
       next.delete(PRODUCT_ANALYTICS_QS.booked);
       dirty = true;
     }
     if (cancelled === "1") {
-      if (send) track("Booking Cancelled");
+      if (send) trackMarketingEvent("booking_cancelled");
       next.delete(PRODUCT_ANALYTICS_QS.cancelled);
       dirty = true;
     }
     if (joined === JOINED_MUSICIAN) {
-      if (send) track("Artist Signup");
+      if (send) trackMarketingEvent("performer_signup_completed");
       next.delete(PRODUCT_ANALYTICS_QS.joined);
       dirty = true;
     } else if (joined === JOINED_VENUE) {
-      if (send) track("Venue Signup");
+      if (send) trackMarketingEvent("venue_signup_completed");
       next.delete(PRODUCT_ANALYTICS_QS.joined);
       dirty = true;
     }

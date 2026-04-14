@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { Bebas_Neue, Inter } from "next/font/google";
+import { MarketingTrackingClient } from "@/components/MarketingTrackingClient";
 import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -94,6 +95,11 @@ export default async function RootLayout({
         {children}
         {!embed ? <SiteFooter /> : null}
         {!isAnalyticsDisabled() ? <Analytics /> : null}
+        {!isAnalyticsDisabled() ? (
+          <Suspense fallback={null}>
+            <MarketingTrackingClient />
+          </Suspense>
+        ) : null}
         {!isAnalyticsDisabled() ? (
           <Suspense fallback={null}>
             <MicStageProductAnalytics />

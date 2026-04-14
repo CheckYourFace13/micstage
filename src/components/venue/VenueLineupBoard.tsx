@@ -188,7 +188,12 @@ export function VenueLineupBoard({
                           </form>
                         ) : canBook ? (
                           isMusician ? (
-                            <form id={`reserve-form-${s.id}`} action={bookSlot} className="w-full sm:flex sm:justify-end">
+                            <form
+                              id={`reserve-form-${s.id}`}
+                              action={bookSlot}
+                              className="w-full sm:flex sm:justify-end"
+                              data-track-event="booking_started"
+                            >
                               <input type="hidden" name="venueSlug" value={venue.slug} />
                               <input type="hidden" name="returnPath" value={returnPath} />
                               <input type="hidden" name="slotId" value={s.id} />
@@ -220,6 +225,7 @@ export function VenueLineupBoard({
                                 href={`/login/musician?next=${loginNext}`}
                                 title="Sign in with your artist account to book this slot"
                                 className={lineupPrimaryActionClass}
+                                data-track-event="booking_started"
                               >
                                 Perform
                               </Link>

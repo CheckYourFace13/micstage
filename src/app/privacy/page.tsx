@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LegalDocument } from "@/components/LegalDocument";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
-const updated = "March 31, 2026";
+const updated = "April 14, 2026";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Privacy Policy",
@@ -64,9 +64,12 @@ export default function PrivacyPage() {
 
       <h2>Analytics</h2>
       <p>
-        We may use privacy-conscious analytics (for example, page views and product events) to understand how MicStage is
-        used. You can disable optional client analytics where we provide an environment flag; server-side error reporting
-        may still run to keep the service stable. We do not use analytics to sell personal data.
+        We use analytics and advertising measurement tools to understand usage and improve discovery performance. This may
+        include privacy-conscious product analytics, Google Analytics 4 event/page tracking, and Meta Pixel browser events
+        for audience measurement and future retargeting readiness. These tools can use cookies or similar identifiers. We do
+        not sell personal data, and we do not currently run a server-side Conversions API pipeline. You can disable optional
+        client analytics where we provide an environment flag; server-side error reporting may still run to keep the service
+        stable.
       </p>
 
       <h2>Sharing</h2>

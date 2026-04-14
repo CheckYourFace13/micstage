@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { VenuePlacePicker } from "@/app/register/venue/VenuePlacePicker";
 import type { OpenMicFinderVenue, PublicDiscoveryLocationRow } from "@/lib/discoveryLocationRows";
+import { trackMarketingEvent } from "@/lib/marketingTracking";
 
 /** Keep in sync with `MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY` in discoveryMarket (client-safe copy). */
 const MIN_VENUES_FOR_PRIMARY_CITY_PAGE = 10;
@@ -35,7 +36,7 @@ export function FindOpenMicsClient(props: {
 
   const googleKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim());
 
-  const runNearby = useCallback(async (lat: number, lng: number, label: string | null) => {
+  const runNearby = useCallback(async (lat: number, lng: number, label: string | null, source: "geo" | "zip" | "city" | "place") => {
     setLoading(true);
     setError(null);
     try {
@@ -48,6 +49,10 @@ export function FindOpenMicsClient(props: {
       }
       setNearbyList(data.venues);
       setNearbyContext(label);
+      trackMarketingEvent("search_performed", {
+        source,
+        nearby_result_count: data.venues.length,
+      });
     } catch {
       setError("Network error. Try again.");
       setNearbyList(null);
@@ -65,7 +70,7 @@ export function FindOpenMicsClient(props: {
     setError(null);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        void runNearby(pos.coords.latitude, pos.coords.longitude, "Your current location");
+        void runNearby(pos.coords.latitude, pos.coords.longitude, "Your current location", "geo");
       },
       () => {
         setLoading(false);
@@ -91,7 +96,7 @@ export function FindOpenMicsClient(props: {
         setLoading(false);
         return;
       }
-      await runNearby(gj.lat, gj.lng, gj.displayName ?? `ZIP ${z}`);
+      await runNearby(gj.lat, gj.lng, gj.displayName ?? `ZIP ${z}`, "zip");
     } catch {
       setError("Could not look up that ZIP.");
     } finally {
@@ -115,7 +120,7 @@ export function FindOpenMicsClient(props: {
         setLoading(false);
         return;
       }
-      await runNearby(gj.lat, gj.lng, gj.displayName ?? q);
+      await runNearby(gj.lat, gj.lng, gj.displayName ?? q, "city");
     } catch {
       setError("Could not look up that location.");
     } finally {
@@ -143,7 +148,10 @@ export function FindOpenMicsClient(props: {
       <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-black/30 p-1">
         <button
           type="button"
-          onClick={() => setMode("nearby")}
+          onClick={() => {
+            setMode("nearby");
+            trackMarketingEvent("filter_used", { filter: "finder_mode", value: "nearby" });
+          }}
           className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:min-h-0 sm:flex-none ${
             mode === "nearby" ? "bg-[rgb(var(--om-neon))] text-black" : "text-white/75 hover:bg-white/10"
           }`}
@@ -152,7 +160,10 @@ export function FindOpenMicsClient(props: {
         </button>
         <button
           type="button"
-          onClick={() => setMode("metro")}
+          onClick={() => {
+            setMode("metro");
+            trackMarketingEvent("filter_used", { filter: "finder_mode", value: "metro" });
+          }}
           className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:min-h-0 sm:flex-none ${
             mode === "metro" ? "bg-[rgb(var(--om-neon))] text-black" : "text-white/75 hover:bg-white/10"
           }`}
@@ -237,7 +248,7 @@ export function FindOpenMicsClient(props: {
                   types={["(cities)"]}
                   label="Start typing a city or region"
                   placeholder="e.g. Nashville, Austin…"
-                  onPlace={(p) => void runNearby(p.lat, p.lng, p.formattedAddress)}
+                  onPlace={(p) => void runNearby(p.lat, p.lng, p.formattedAddress, "place")}
                 />
               </div>
             </div>
@@ -305,7 +316,10 @@ export function FindOpenMicsClient(props: {
               <button
                 key={m.key}
                 type="button"
-                onClick={() => setSelectedMetroSlug(m.slug)}
+                onClick={() => {
+                  setSelectedMetroSlug(m.slug);
+                  trackMarketingEvent("filter_used", { filter: "metro_slug", value: m.slug });
+                }}
                 className={`rounded-xl border p-4 text-left transition ${
                   selectedMetroSlug === m.slug
                     ? "border-[rgb(var(--om-neon))]/50 bg-[rgba(var(--om-neon),0.08)]"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
@@ -28,13 +28,13 @@ function markerFill(dayFilter: Weekday | null): string {
 }
 
 function makeDivIcon(color: string, selected: boolean): L.DivIcon {
-  const size = selected ? 28 : 22;
+  const size = selected ? 28 : 24;
   const shadow = selected
-    ? "0 0 0 3px rgba(255,255,255,0.95), 0 2px 12px rgba(0,0,0,.45)"
-    : "0 2px 8px rgba(0,0,0,.38)";
+    ? "0 0 0 3px rgba(255,255,255,0.92), 0 3px 14px rgba(0,0,0,.42)"
+    : "0 2px 10px rgba(0,0,0,.4)";
   return L.divIcon({
     className: "om-map-marker-wrap",
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:${shadow}"></div>`,
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.22),${shadow}"></div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -59,7 +59,7 @@ function popupHtml(v: OpenMicMapVenueDto): string {
       <div style="margin-bottom:4px"><strong>Format</strong> · ${escHtml(formatLabels)}</div>
       <div style="margin-bottom:6px"><strong>Next</strong> · ${next}</div>
       <div style="margin-bottom:10px;font-size:12px">${signup}</div>
-      <a href="/venues/${escHtml(v.slug)}" style="display:inline-block;background:#ff2d95;color:#fff;text-decoration:none;font-weight:600;padding:8px 12px;border-radius:8px;font-size:13px">View venue &amp; book</a>
+      <a href="/venues/${escHtml(v.slug)}" style="display:inline-block;background:${OPEN_MIC_MAP_NEUTRAL_MARKER_HEX};color:#fff;text-decoration:none;font-weight:600;padding:8px 12px;border-radius:8px;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,.2)">View venue &amp; book</a>
     </div>
   `;
 }
@@ -86,6 +86,7 @@ export function OpenMicLeafletMap(props: {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
+  const [mapReady, setMapReady] = useState(false);
 
   const emitBounds = useCallback(() => {
     const map = mapRef.current;
@@ -120,6 +121,8 @@ export function OpenMicLeafletMap(props: {
     });
     cluster.addTo(map);
     clusterRef.current = cluster;
+    setMapReady(true);
+    requestAnimationFrame(() => map.invalidateSize());
 
     const scheduleEmit = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -157,6 +160,7 @@ export function OpenMicLeafletMap(props: {
     });
 
     return () => {
+      setMapReady(false);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       map.off("moveend", scheduleEmit);
       map.off("zoomend", scheduleEmit);
@@ -166,6 +170,23 @@ export function OpenMicLeafletMap(props: {
       clusterRef.current = null;
     };
   }, [emitBounds]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const map = mapRef.current;
+    const el = containerRef.current;
+    if (!map || !el) return;
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize({ animate: false });
+    });
+    ro.observe(el);
+    const onWin = () => map.invalidateSize({ animate: false });
+    window.addEventListener("resize", onWin);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", onWin);
+    };
+  }, [mapReady]);
 
   useEffect(() => {
     if (props.refitNonce === 0) return;
@@ -220,5 +241,10 @@ export function OpenMicLeafletMap(props: {
     }
   }, [props.venues, props.dayFilter, props.selectedSlug, props.onSelectSlug]);
 
-  return <div ref={containerRef} className="h-full min-h-[280px] w-full rounded-xl border border-white/15 bg-zinc-900/40 [&_.leaflet-container]:h-full [&_.leaflet-container]:w-full [&_.leaflet-container]:rounded-xl [&_.leaflet-container]:bg-zinc-900" />;
+  return (
+    <div
+      ref={containerRef}
+      className="om-map-leaflet-root h-full min-h-[min(52vh,440px)] w-full rounded-xl border border-white/15 bg-zinc-900/40 sm:min-h-[320px] [&_.leaflet-control-attribution]:rounded-bl-lg [&_.leaflet-control-attribution]:text-[10px] [&_.leaflet-control-zoom]:overflow-hidden [&_.leaflet-control-zoom]:rounded-lg [&_.leaflet-control-zoom_a]:min-h-9 [&_.leaflet-control-zoom_a]:min-w-9 [&_.leaflet-control-zoom_a]:leading-9 [&_.leaflet-popup-content-wrapper]:rounded-xl [&_.leaflet-popup-content-wrapper]:shadow-lg [&_.leaflet-popup-tip]:shadow-none"
+    />
+  );
 }

@@ -8,7 +8,10 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import "leaflet.markercluster";
 import type { Weekday } from "@/generated/prisma/client";
 import type { OpenMicMapVenueDto } from "@/lib/map/openMicMapTypes";
-import { OPEN_MIC_MAP_NEUTRAL_MARKER_HEX, OPEN_MIC_MAP_WEEKDAY_HEX } from "@/lib/map/openMicMapTypes";
+import {
+  OPEN_MIC_MAP_DIM_MARKER_HEX,
+  OPEN_MIC_MAP_NEUTRAL_MARKER_HEX,
+} from "@/lib/map/openMicMapTypes";
 import { latLngBoundsLiteralFromVenues, payloadFromLeafletBounds } from "@/lib/map/openMicMapBounds";
 import type { MapBoundsPayload } from "@/lib/map/openMicMapBounds";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
@@ -22,9 +25,9 @@ function escHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function markerFill(dayFilter: Weekday | null): string {
-  if (dayFilter) return OPEN_MIC_MAP_WEEKDAY_HEX[dayFilter];
-  return OPEN_MIC_MAP_NEUTRAL_MARKER_HEX;
+function markerFill(dayFilter: Weekday | null, v: OpenMicMapVenueDto): string {
+  if (!dayFilter) return OPEN_MIC_MAP_NEUTRAL_MARKER_HEX;
+  return v.weekdays.includes(dayFilter) ? OPEN_MIC_MAP_NEUTRAL_MARKER_HEX : OPEN_MIC_MAP_DIM_MARKER_HEX;
 }
 
 function makeDivIcon(color: string, selected: boolean): L.DivIcon {
@@ -235,8 +238,8 @@ export function OpenMicLeafletMap(props: {
     if (!cluster) return;
     cluster.clearLayers();
     const { venues, dayFilter, selectedSlug, onSelectSlug } = propsRef.current;
-    const fill = markerFill(dayFilter);
     for (const v of venues) {
+      const fill = markerFill(dayFilter, v);
       const icon = makeDivIcon(fill, selectedSlug === v.slug);
       const marker = L.marker([v.lat, v.lng], { icon });
       marker.bindPopup(popupHtml(v), { maxWidth: 300, className: "om-map-popup" });

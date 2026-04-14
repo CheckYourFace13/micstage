@@ -79,6 +79,16 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
     setRefitNonce((n) => n + 1);
   }, [filterSig]);
 
+  /** Format + booking only — map pins always include every setup venue; weekday is highlight-only on the map. */
+  const filteredForMap = useMemo(() => {
+    return allVenues.filter((v) => {
+      if (formatFilter && !v.performanceFormats.includes(formatFilter)) return false;
+      if (acceptingOnly && !v.acceptingSignups) return false;
+      return true;
+    });
+  }, [allVenues, formatFilter, acceptingOnly]);
+
+  /** Weekday + format + booking — sidebar list stays filter-driven. */
   const filtered = useMemo(() => {
     return allVenues.filter((v) => {
       if (dayFilter && !v.weekdays.includes(dayFilter)) return false;
@@ -88,7 +98,12 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
     });
   }, [allVenues, dayFilter, formatFilter, acceptingOnly]);
 
-  const visible = useMemo(() => {
+  const visibleMap = useMemo(() => {
+    if (!mapBounds) return filteredForMap;
+    return filteredForMap.filter((v) => venueInBoundsPayload(mapBounds, v.lat, v.lng));
+  }, [filteredForMap, mapBounds]);
+
+  const visibleList = useMemo(() => {
     if (!mapBounds) return filtered;
     return filtered.filter((v) => venueInBoundsPayload(mapBounds, v.lat, v.lng));
   }, [filtered, mapBounds]);
@@ -102,9 +117,9 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
   }, [mapBounds, initialCenter]);
 
   const sortedVisible = useMemo(() => {
-    if (visible.length === 0) return visible;
-    return sortVenuesByProximity(visible, sortOrigin);
-  }, [visible, sortOrigin]);
+    if (visibleList.length === 0) return visibleList;
+    return sortVenuesByProximity(visibleList, sortOrigin);
+  }, [visibleList, sortOrigin]);
 
   const onSelectSlug = useCallback((slug: string) => {
     setSelectedSlug(slug);
@@ -154,12 +169,13 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
         <div>
           <h2 className="text-xs font-semibold text-white md:text-sm">Find your night</h2>
           <p className="mt-1 text-xs leading-relaxed text-white/55 md:hidden">
-            Pick a weekday, format, and booking filter—the list matches the map.
+            Weekday highlights matching pins on the map; the list still filters by night, format, and booking.
           </p>
           <p className="mt-1 hidden text-xs leading-relaxed text-white/55 md:block">
-            Pick a weekday to color pins by that open mic night. Leave it on &ldquo;Any day&rdquo; for MicStage pink pins
-            when a venue runs multiple nights. Recently active MicStage venues without a current public schedule are still
-            shown, so you can discover and follow up early. The list on the right stays in sync with what you see on the map.
+            Pick a weekday to highlight pins that run that night—every venue stays on the map. Leave it on &ldquo;Any
+            day&rdquo; for MicStage pink pins when a venue runs multiple nights. The list on the right still reflects your
+            weekday, format, and booking filters. Recently active MicStage venues without a current public schedule are
+            still shown, so you can discover and follow up early.
           </p>
         </div>
 
@@ -273,9 +289,9 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
 
         <p className="text-[10px] text-white/40 md:text-xs md:text-white/50" aria-live="polite">
           <span className="font-medium text-white/65">Map:</span>{" "}
-          <span className="tabular-nums text-white/80">{visible.length}</span> in view ·{" "}
-          <span className="font-medium text-white/65">Filters:</span>{" "}
-          <span className="tabular-nums text-white/80">{filtered.length}</span> ·{" "}
+          <span className="tabular-nums text-white/80">{visibleMap.length}</span> in view ·{" "}
+          <span className="font-medium text-white/65">List:</span>{" "}
+          <span className="tabular-nums text-white/80">{filtered.length}</span> match filters ·{" "}
           <span className="font-medium text-white/65">Total:</span>{" "}
           <span className="tabular-nums text-white/80">{allVenues.length}</span> on MicStage
         </p>
@@ -288,8 +304,8 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
           aria-describedby="open-mic-map-filters"
         >
           <OpenMicLeafletMap
-            venues={visible}
-            refitTargets={filtered}
+            venues={visibleMap}
+            refitTargets={filteredForMap}
             refitNonce={refitNonce}
             dayFilter={dayFilter}
             selectedSlug={selectedSlug}
@@ -308,8 +324,9 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
           <h2 className="text-xs font-semibold text-white md:text-sm">Venues on this map</h2>
           <p className="mt-1 text-xs leading-relaxed text-white/50 md:hidden">Tap a row to zoom; tap a pin for a quick summary.</p>
           <p className="mt-1 hidden text-xs leading-relaxed text-white/50 md:block">
-            Same pins as the list — sorted by distance from the center of what you&apos;re looking at. Tap a row to zoom
-            the map; tap a pin for a quick summary.
+            The map shows every venue in view for your format &amp; booking filters (weekday highlights matching pins). The
+            list also applies your weekday filter — sorted by distance from the center of what you&apos;re looking at. Tap
+            a row to zoom the map; tap a pin for a quick summary.
           </p>
           <div className="mt-2 flex max-h-[min(46vh,420px)] flex-col gap-2 overflow-y-auto overscroll-contain pr-1 pb-2 [-webkit-overflow-scrolling:touch] sm:mt-3 sm:max-h-[min(52vh,520px)] lg:max-h-[520px]">
             {sortedVisible.length === 0 ? (

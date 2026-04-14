@@ -17,6 +17,9 @@ export const OPEN_MIC_MAP_WEEKDAY_HEX: Record<Weekday, string> = {
 /** MicStage accent when every night is shown (no weekday filter). */
 export const OPEN_MIC_MAP_NEUTRAL_MARKER_HEX = "#e11d72";
 
+/** Pins still shown on the map when a weekday is selected but this venue does not run that night. */
+export const OPEN_MIC_MAP_DIM_MARKER_HEX = "#52525b";
+
 export type OpenMicMapTemplateDto = {
   id: string;
   title: string;

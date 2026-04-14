@@ -67,23 +67,78 @@ export default async function AdminGrowthLeadsPage(props: {
 
   const metro = GROWTH_METROS.find((m) => m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase());
 
+  const quickViewBase = new URLSearchParams();
+  quickViewBase.set("market", marketSlug);
+  if (p.type?.trim()) quickViewBase.set("type", p.type.trim());
+
+  const hrefAllLeads = `/internal/admin/growth/leads?${quickViewBase.toString()}`;
+  const qsEmailReady = new URLSearchParams(quickViewBase);
+  qsEmailReady.set("queue", "email_outreach_ready");
+  const hrefEmailOutreachReady = `/internal/admin/growth/leads?${qsEmailReady.toString()}`;
+  const qsContactPath = new URLSearchParams(quickViewBase);
+  qsContactPath.set("queue", "contact_path_queue");
+  const hrefContactPathQueue = `/internal/admin/growth/leads?${qsContactPath.toString()}`;
+
   return (
     <main className="mx-auto max-w-7xl px-3 py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-white">Growth leads</h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
+        <Link href="/internal/admin/growth" className="text-sm text-zinc-400 hover:text-white">
+          ← Growth hub
+        </Link>
+      </div>
+
+      <nav
+        aria-label="Growth leads quick views"
+        className="mt-4 flex flex-col gap-2 rounded-lg border border-zinc-600/80 bg-zinc-950/70 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3"
+      >
+        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400 sm:mr-1">Full list</span>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={hrefAllLeads}
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
+              outreachQueue === "all"
+                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-100"
+                : "border-zinc-600 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
+            }`}
+          >
+            All leads
+          </Link>
+          <Link
+            href={hrefEmailOutreachReady}
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
+              outreachQueue === "email_outreach_ready"
+                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-100"
+                : "border-zinc-600 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
+            }`}
+          >
+            Email outreach ready
+          </Link>
+          <Link
+            href={hrefContactPathQueue}
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
+              outreachQueue === "contact_path_queue"
+                ? "border-sky-500/60 bg-sky-500/15 text-sky-100"
+                : "border-zinc-600 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
+            }`}
+          >
+            Contact-path queue
+          </Link>
           <a
             href={exportHref}
-            className="text-emerald-400 hover:text-emerald-300"
             download
+            className="inline-flex items-center rounded-md border border-amber-600/50 bg-amber-950/40 px-3 py-2 text-sm font-medium text-amber-100 hover:border-amber-500 hover:bg-amber-950/60"
           >
-            Export CSV (current filters)
+            Export current results to CSV
           </a>
-          <Link href="/internal/admin/growth" className="text-zinc-400 hover:text-white">
-            ← Growth hub
-          </Link>
         </div>
-      </div>
+        <p className="w-full text-[11px] leading-snug text-zinc-500 sm:pl-0">
+          Routes: <code className="text-zinc-400">/internal/admin/growth/leads</code> (filters in query). CSV:{" "}
+          <code className="text-zinc-400">/internal/admin/growth/leads/export</code> — same query string as this page (exports the{" "}
+          <strong className="text-zinc-300">full</strong> filtered set, not only this page).
+        </p>
+      </nav>
+
       <p className="mt-1 text-xs text-zinc-500">
         Default market is <strong className="text-zinc-300">{defaultGrowthMetro().label}</strong> (
         <code className="text-zinc-400">{defaultGrowthMetro().discoveryMarketSlug}</code>). {matchCount} lead

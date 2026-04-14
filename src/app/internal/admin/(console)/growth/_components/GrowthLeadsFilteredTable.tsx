@@ -7,14 +7,9 @@ import {
 } from "@/lib/growth/growthLeadContactPathLabel";
 import { buildGrowthLeadOrderBy } from "@/lib/growth/growthLeadListOrderBy";
 import { requirePrisma } from "@/lib/prisma";
+import { clampGrowthLeadPageSize } from "@/lib/growth/growthLeadListPaging";
 
-export const GROWTH_LEADS_PAGE_SIZE_DEFAULT = 50;
-const GROWTH_LEADS_PAGE_SIZE_MAX = 100;
-
-function clampPageSize(n: number | undefined): number {
-  const raw = n == null || !Number.isFinite(n) ? GROWTH_LEADS_PAGE_SIZE_DEFAULT : Math.floor(n);
-  return Math.min(GROWTH_LEADS_PAGE_SIZE_MAX, Math.max(10, raw));
-}
+export { GROWTH_LEADS_PAGE_SIZE_DEFAULT } from "@/lib/growth/growthLeadListPaging";
 
 function badgeClass(badge: ReturnType<typeof growthLeadPipelineBadge>["badge"]): string {
   switch (badge) {
@@ -57,7 +52,7 @@ export async function GrowthLeadsFilteredTable(props: {
 }) {
   const prisma = requirePrisma();
   const where = buildGrowthLeadWhere(props.filters);
-  const pageSize = clampPageSize(props.pageSize);
+  const pageSize = clampGrowthLeadPageSize(props.pageSize);
   const page = Math.max(1, props.page ?? 1);
   const total = props.totalCount;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));

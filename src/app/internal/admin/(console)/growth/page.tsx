@@ -346,6 +346,11 @@ export default async function AdminGrowthHubPage(props: {
         <span className="font-mono text-zinc-400">stub_json_*</span> via{" "}
         <code className="text-zinc-400">GROWTH_DISCOVERY_STUB_LEADS_JSON</code>. Cron returns{" "}
         <code className="text-zinc-400">adapterRegistry</code> + <code className="text-zinc-400">candidatesEmittedByAdapter</code>.
+        Each completed discovery job also persists a <code className="text-zinc-400">GrowthDiscoveryRun</code> row (see{" "}
+        <Link href="/internal/admin/growth/discovery-runs" className="text-sky-400 hover:text-sky-300">
+          Discovery runs
+        </Link>
+        ).
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
@@ -374,6 +379,12 @@ export default async function AdminGrowthHubPage(props: {
           className="rounded border border-zinc-600 px-2 py-1 text-zinc-300 hover:border-zinc-500"
         >
           All filters →
+        </Link>
+        <Link
+          href="/internal/admin/growth/discovery-runs"
+          className="rounded border border-sky-700/50 px-2 py-1 text-sky-200/90 hover:border-sky-500"
+        >
+          Discovery runs →
         </Link>
       </div>
 

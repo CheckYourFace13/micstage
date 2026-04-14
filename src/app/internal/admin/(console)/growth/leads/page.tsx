@@ -1,157 +1,20 @@
 import Link from "next/link";
 import { assertAdminSession } from "@/lib/adminAuth";
+import { GrowthLeadsFilteredTable } from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
+import { buildGrowthLeadWhere } from "@/lib/growth/growthLeadFilters";
+import {
+  buildGrowthLeadsPaginationBaseQuery,
+  growthLeadFiltersFromAdminSearchParams,
+} from "@/lib/growth/growthAdminLeadsFilters";
 import {
   GROWTH_LEADS_PAGE_SIZE_DEFAULT,
-  GrowthLeadsFilteredTable,
-} from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
-import type {
-  GrowthLeadAcquisitionStage,
-  GrowthLeadContactQuality,
-  GrowthLeadOpenMicSignalTier,
-  GrowthLeadPerformanceTag,
-  GrowthLeadStatus,
-  GrowthLeadType,
-} from "@/generated/prisma/client";
-import { buildGrowthLeadWhere } from "@/lib/growth/growthLeadFilters";
-import type { GrowthLeadListFilters, GrowthLeadOutreachQueue } from "@/lib/growth/growthLeadFilters";
-import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
-import { defaultGrowthMetro, GROWTH_METROS, resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
+  parseGrowthLeadsPage,
+  parseGrowthLeadsPageSizeParam,
+} from "@/lib/growth/growthLeadListPaging";
+import { defaultGrowthMetro, GROWTH_METROS } from "@/lib/growth/marketsConfig";
 import { requirePrisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
-
-function parseLeadType(raw: string | undefined): GrowthLeadType | null {
-  if (!raw?.trim()) return null;
-  const u = raw.trim().toUpperCase();
-  if (u === "VENUE" || u === "ARTIST" || u === "PROMOTER_ACCOUNT") return u;
-  return null;
-}
-
-function parseTagsParam(raw: string | undefined): GrowthLeadPerformanceTag[] {
-  if (!raw?.trim()) return [];
-  const out: GrowthLeadPerformanceTag[] = [];
-  for (const part of raw.split(",")) {
-    const u = part.trim().toUpperCase();
-    if (u === "MUSIC") out.push("MUSIC");
-    if (u === "COMEDY") out.push("COMEDY");
-    if (u === "POETRY") out.push("POETRY");
-    if (u === "VARIETY") out.push("VARIETY");
-  }
-  return [...new Set(out)];
-}
-
-function parseStatusesParam(raw: string | undefined): GrowthLeadStatus[] | null {
-  if (!raw?.trim()) return null;
-  const out: GrowthLeadStatus[] = [];
-  for (const part of raw.split(",")) {
-    const t = part.trim() as GrowthLeadStatus;
-    if (GROWTH_LEAD_STATUS_SET.has(t)) out.push(t);
-  }
-  return out.length ? out : null;
-}
-
-function parseIntOpt(raw: string | undefined): number | null {
-  if (!raw?.trim()) return null;
-  const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) ? n : null;
-}
-
-function parseOpenMicTier(raw: string | undefined): GrowthLeadOpenMicSignalTier | null {
-  if (!raw?.trim()) return null;
-  const u = raw.trim();
-  if (u === "EXPLICIT_OPEN_MIC" || u === "STRONG_LIVE_EVENT" || u === "WEAK_INFERRED") return u;
-  return null;
-}
-
-function parseContactQuality(raw: string | undefined): GrowthLeadContactQuality | null {
-  if (!raw?.trim()) return null;
-  const u = raw.trim();
-  if (u === "EMAIL" || u === "CONTACT_PAGE" || u === "SOCIAL_OR_CALENDAR" || u === "WEBSITE_ONLY") return u;
-  return null;
-}
-
-function parseAcquisitionStage(raw: string | undefined): GrowthLeadAcquisitionStage | null {
-  if (!raw?.trim()) return null;
-  const u = raw.trim();
-  const allowed: GrowthLeadAcquisitionStage[] = [
-    "DISCOVERED",
-    "OUTREACH_DRAFTED",
-    "OUTREACH_SENT",
-    "CLICKED",
-    "SIGNUP_STARTED",
-    "ACCOUNT_CREATED",
-    "LISTING_LIVE",
-  ];
-  return allowed.includes(u as GrowthLeadAcquisitionStage) ? (u as GrowthLeadAcquisitionStage) : null;
-}
-
-function parseOutreachQueue(raw: string | undefined): GrowthLeadOutreachQueue {
-  if (!raw?.trim()) return "all";
-  const u = raw.trim();
-  const allowed: GrowthLeadOutreachQueue[] = [
-    "all",
-    "email_pipeline",
-    "email_outreach_ready",
-    "contact_path_queue",
-    "social_path_queue",
-    "website_only_queue",
-  ];
-  return allowed.includes(u as GrowthLeadOutreachQueue) ? (u as GrowthLeadOutreachQueue) : "all";
-}
-
-function parseLeadsPage(raw: string | undefined): number {
-  const n = Number.parseInt(raw ?? "1", 10);
-  return Number.isFinite(n) && n >= 1 ? n : 1;
-}
-
-function parseLeadsPageSize(raw: string | undefined): number {
-  const n = Number.parseInt(raw ?? "", 10);
-  if (!Number.isFinite(n)) return GROWTH_LEADS_PAGE_SIZE_DEFAULT;
-  return Math.min(100, Math.max(10, n));
-}
-
-function buildGrowthLeadsPaginationBaseQuery(p: {
-  market?: string;
-  type?: string;
-  city?: string;
-  suburb?: string;
-  tags?: string;
-  status?: string;
-  fitMin?: string;
-  fitMax?: string;
-  q?: string;
-  pipeline?: string;
-  draftPending?: string;
-  omTier?: string;
-  contactQ?: string;
-  acquisition?: string;
-  queue?: string;
-  perPage?: string;
-}): Record<string, string | undefined> {
-  const o: Record<string, string | undefined> = {};
-  const set = (k: string, v: string | undefined) => {
-    if (v != null && v !== "") o[k] = v;
-  };
-  set("market", p.market?.trim());
-  set("type", p.type?.trim());
-  set("city", p.city?.trim());
-  set("suburb", p.suburb?.trim());
-  set("tags", p.tags?.trim());
-  set("status", p.status?.trim());
-  set("fitMin", p.fitMin?.trim());
-  set("fitMax", p.fitMax?.trim());
-  set("q", p.q?.trim());
-  set("omTier", p.omTier?.trim());
-  set("contactQ", p.contactQ?.trim());
-  set("acquisition", p.acquisition?.trim());
-  if (p.pipeline === "1") o.pipeline = "1";
-  if (p.draftPending === "1") o.draftPending = "1";
-  const queue = parseOutreachQueue(p.queue);
-  if (queue !== "all") o.queue = queue;
-  const ps = parseLeadsPageSize(p.perPage);
-  if (ps !== GROWTH_LEADS_PAGE_SIZE_DEFAULT) o.perPage = String(ps);
-  return o;
-}
 
 export default async function AdminGrowthLeadsPage(props: {
   searchParams: Promise<{
@@ -179,30 +42,13 @@ export default async function AdminGrowthLeadsPage(props: {
   const p = await props.searchParams;
   const prisma = requirePrisma();
 
-  const marketSlug = resolveGrowthMarketSlug({ market: p.market, metro: p.metro });
-  const outreachQueue = parseOutreachQueue(p.queue);
-  const pageSize = parseLeadsPageSize(p.perPage);
-  const filters: GrowthLeadListFilters = {
-    marketSlug,
-    leadType: parseLeadType(p.type),
-    cityContains: p.city,
-    suburbContains: p.suburb,
-    tagsAny: parseTagsParam(p.tags),
-    statuses: parseStatusesParam(p.status),
-    fitMin: parseIntOpt(p.fitMin),
-    fitMax: parseIntOpt(p.fitMax),
-    nameContains: p.q,
-    pipelineOnly: p.pipeline === "1",
-    draftPending: p.draftPending === "1",
-    openMicSignalTier: parseOpenMicTier(p.omTier),
-    contactQuality: parseContactQuality(p.contactQ),
-    acquisitionStage: parseAcquisitionStage(p.acquisition),
-    outreachQueue,
-  };
+  const { marketSlug, filters } = growthLeadFiltersFromAdminSearchParams(p);
+  const pageSize = parseGrowthLeadsPageSizeParam(p.perPage);
+  const outreachQueue = filters.outreachQueue ?? "all";
 
   const where = buildGrowthLeadWhere(filters);
   const matchCount = await prisma.growthLead.count({ where });
-  const page = parseLeadsPage(p.page);
+  const page = parseGrowthLeadsPage(p.page);
   const totalPages = Math.max(1, Math.ceil(matchCount / pageSize));
   const safePage = Math.min(page, totalPages);
 
@@ -213,15 +59,30 @@ export default async function AdminGrowthLeadsPage(props: {
     perPage: pageSize === GROWTH_LEADS_PAGE_SIZE_DEFAULT ? undefined : String(pageSize),
   });
 
+  const exportQs = new URLSearchParams();
+  for (const [k, v] of Object.entries(paginationBase)) {
+    if (v != null && v !== "") exportQs.set(k, v);
+  }
+  const exportHref = `/internal/admin/growth/leads/export?${exportQs.toString()}`;
+
   const metro = GROWTH_METROS.find((m) => m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase());
 
   return (
     <main className="mx-auto max-w-7xl px-3 py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-white">Growth leads</h1>
-        <Link href="/internal/admin/growth" className="text-sm text-zinc-400 hover:text-white">
-          ← Growth hub
-        </Link>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <a
+            href={exportHref}
+            className="text-emerald-400 hover:text-emerald-300"
+            download
+          >
+            Export CSV (current filters)
+          </a>
+          <Link href="/internal/admin/growth" className="text-zinc-400 hover:text-white">
+            ← Growth hub
+          </Link>
+        </div>
       </div>
       <p className="mt-1 text-xs text-zinc-500">
         Default market is <strong className="text-zinc-300">{defaultGrowthMetro().label}</strong> (
@@ -396,7 +257,7 @@ export default async function AdminGrowthLeadsPage(props: {
               defaultValue={String(pageSize)}
               className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 text-white"
             >
-              {[25, 50, 75, 100].map((n) => (
+              {Array.from(new Set([25, 50, 75, 100, 200, 500, pageSize].sort((a, b) => a - b))).map((n) => (
                 <option key={n} value={String(n)}>
                   {n}
                 </option>

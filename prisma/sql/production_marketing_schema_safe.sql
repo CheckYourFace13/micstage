@@ -394,4 +394,22 @@ BEGIN
 END
 $g$;
 
+-- ---------------------------------------------------------------------------
+-- GrowthDiscoveryRun (persisted discovery cron / script summaries)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS "GrowthDiscoveryRun" (
+  "id" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "markets" TEXT[] NOT NULL,
+  "createdLeads" INTEGER NOT NULL,
+  "duplicateLeads" INTEGER NOT NULL,
+  "skippedLeads" INTEGER NOT NULL,
+  "candidatesTotal" INTEGER NOT NULL,
+  "summary" JSONB NOT NULL,
+  CONSTRAINT "GrowthDiscoveryRun_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "GrowthDiscoveryRun_createdAt_idx" ON "GrowthDiscoveryRun"("createdAt");
+
 -- Done.

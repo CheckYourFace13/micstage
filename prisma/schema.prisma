@@ -970,6 +970,26 @@ model GrowthDiscoveryCursor {
   @@index([adapterId, marketSlug])
 }
 
+/// One persisted row per completed `runGrowthLeadDiscovery` execution (cron or script).
+model GrowthDiscoveryRun {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  /// Markets included in this run (`growthDiscoveryMarketSlugs()` at run time).
+  markets String[]
+
+  createdLeads    Int
+  duplicateLeads  Int
+  skippedLeads    Int
+  /// Sum of candidates emitted to ingest after per-adapter caps (pre-dedupe at ingest).
+  candidatesTotal Int
+
+  /// Bounded JSON: per-adapter stats, SerpAPI snapshot, adapterErrors (truncated), registry, etc.
+  summary Json
+
+  @@index([createdAt])
+}
+
 model GrowthLeadOutreachDraft {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())

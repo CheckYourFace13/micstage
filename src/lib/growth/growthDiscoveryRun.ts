@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { GrowthDiscoveryAdapterInfo } from "@/lib/growth/discoveryAdapterCatalog";
 import { listGrowthDiscoveryAdapterRegistry } from "@/lib/growth/discoveryAdapterCatalog";
@@ -51,6 +52,52 @@ export type GrowthDiscoveryRunResult = {
     warning: string | null;
   };
 };
+
+const MAX_ADAPTER_ERROR_LINES = 80;
+const MAX_ADAPTER_ERROR_CHARS = 480;
+
+function discoveryRunSummaryForDb(r: GrowthDiscoveryRunResult): Prisma.InputJsonValue {
+  const adapterErrors: Record<string, string[]> = {};
+  for (const [id, errs] of Object.entries(r.adapterErrors)) {
+    adapterErrors[id] = errs.slice(0, MAX_ADAPTER_ERROR_LINES).map((e) => e.slice(0, MAX_ADAPTER_ERROR_CHARS));
+  }
+  return {
+    byAdapter: r.byAdapter,
+    adapterRegistry: r.adapterRegistry,
+    candidatesEmittedByAdapter: r.candidatesEmittedByAdapter,
+    adapterErrors,
+    discoveryAllocationSummary: r.discoveryAllocationSummary,
+    effectiveCapsByAdapter: r.effectiveCapsByAdapter,
+    serpapi_calls_today: r.serpapi_calls_today,
+    serpapi_calls_month: r.serpapi_calls_month,
+    serpapi_disabled_until: r.serpapi_disabled_until,
+    serpapi_last_429_at: r.serpapi_last_429_at,
+    serpapi_reason: r.serpapi_reason,
+    candidates_by_source: r.candidates_by_source,
+    drafts_created_by_source: r.drafts_created_by_source,
+    sent_by_source: r.sent_by_source,
+    cost_per_candidate_by_source_usd: r.cost_per_candidate_by_source_usd,
+    search_provider_status: r.search_provider_status,
+  } as Prisma.InputJsonValue;
+}
+
+async function persistGrowthDiscoveryRun(prisma: PrismaClient, r: GrowthDiscoveryRunResult): Promise<void> {
+  const candidatesTotal = Object.values(r.candidatesEmittedByAdapter).reduce((a, b) => a + b, 0);
+  try {
+    await prisma.growthDiscoveryRun.create({
+      data: {
+        markets: r.markets,
+        createdLeads: r.created,
+        duplicateLeads: r.duplicates,
+        skippedLeads: r.skipped,
+        candidatesTotal,
+        summary: discoveryRunSummaryForDb(r),
+      },
+    });
+  } catch (e) {
+    console.error("[growth discovery] GrowthDiscoveryRun persist failed", e);
+  }
+}
 
 /**
  * Runs all discovery adapters for configured markets and lead types; inserts DISCOVERED rows with dedupe.
@@ -183,7 +230,7 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
     }
   }
 
-  return {
+  const result: GrowthDiscoveryRunResult = {
     markets,
     created,
     duplicates,
@@ -214,4 +261,7 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
         : null,
     },
   };
+
+  await persistGrowthDiscoveryRun(prisma, result);
+  return result;
 }

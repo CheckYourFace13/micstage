@@ -80,6 +80,17 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
         <h1 className="om-heading mt-3 text-4xl tracking-wide">{article.title}</h1>
         <p className="mt-3 text-base text-white/80">{article.intro}</p>
 
+        {article.practicalTips?.length ? (
+          <section className="mt-8 rounded-2xl border border-emerald-500/25 bg-emerald-950/25 p-5">
+            <h2 className="text-xl font-semibold text-emerald-100">Practical tips</h2>
+            <ul className="mt-3 list-inside list-disc space-y-2 text-sm leading-6 text-white/85">
+              {article.practicalTips.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <div className="mt-8 grid gap-8">
           {article.sections.map((s) => (
             <section key={s.heading}>
@@ -93,6 +104,20 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
           ))}
         </div>
 
+        {article.faq?.length ? (
+          <section className="mt-10">
+            <h2 className="text-2xl font-semibold">FAQ</h2>
+            <div className="mt-4 grid gap-3">
+              {article.faq.map((item, i) => (
+                <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <h3 className="font-semibold text-white">{item.q}</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/75">{item.a}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <section className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-xl font-semibold">Key takeaways</h2>
           <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-white/80">
@@ -101,6 +126,24 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
             ))}
           </ul>
         </section>
+
+        {article.relatedGuides?.length ? (
+          <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
+            <h2 className="text-xl font-semibold">Related guides</h2>
+            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+              {article.relatedGuides.map((g) => (
+                <li key={g.slug}>
+                  <Link
+                    href={`/resources/${g.slug}`}
+                    className="text-sm text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2 hover:brightness-110"
+                  >
+                    {g.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-xl font-semibold">Explore MicStage discovery pages</h2>

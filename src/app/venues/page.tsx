@@ -97,6 +97,9 @@ export default async function VenuesDirectoryPage() {
           <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/locations">
             Upcoming performers by market
           </Link>
+          <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/map">
+            Open mic map
+          </Link>
           <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/resources">
             Open mic guides
           </Link>

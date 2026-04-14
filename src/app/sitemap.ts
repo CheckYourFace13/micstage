@@ -16,6 +16,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPaths = [
     "",
     "/find-open-mics",
+    "/map",
     "/performers",
     "/locations",
     "/venues",

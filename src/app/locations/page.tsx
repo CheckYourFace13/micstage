@@ -73,7 +73,11 @@ export default async function LocationsPage() {
           <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
             Find Local Open Mic&apos;s
           </Link>
-          . Or browse the{" "}
+          , the{" "}
+          <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/map">
+            open mic map
+          </Link>
+          , or browse the{" "}
           <Link className="underline hover:text-white" href="/venues">
             full venue directory
           </Link>

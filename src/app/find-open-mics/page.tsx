@@ -51,6 +51,9 @@ export default async function FindOpenMicsPage() {
           <Link href="/venues" className="text-white/70 underline hover:text-white">
             Full venue A–Z list
           </Link>
+          <Link href="/map" className="text-white/70 underline hover:text-white">
+            Open mic map
+          </Link>
         </div>
 
         {loadError ? (

@@ -144,8 +144,8 @@ export function FindOpenMicsClient(props: {
   const selectedMetroLabel = locationRows.find((r) => r.slug === selectedMetroSlug)?.label ?? null;
 
   return (
-    <div className="mt-8 grid gap-8">
-      <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-black/30 p-1">
+    <div className="mt-0 grid gap-5 md:gap-8">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-black/30 p-0.5 md:gap-2 md:p-1">
         <button
           type="button"
           onClick={() => {
@@ -173,16 +173,16 @@ export function FindOpenMicsClient(props: {
       </div>
 
       {mode === "nearby" ? (
-        <section className="grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
+        <section className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-6 md:gap-6">
           <div>
-            <h2 className="text-lg font-semibold text-white">Search near a location</h2>
-            <p className="mt-1 text-sm text-white/65">
+            <h2 className="text-base font-semibold text-white md:text-lg">Search near a location</h2>
+            <p className="mt-1 text-xs leading-snug text-white/50 md:text-sm md:leading-normal md:text-white/65">
               We sort open mic venues by distance when we know your search point. Venues without map coordinates still
               appear at the end of the list.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 md:gap-3">
             <button
               type="button"
               onClick={() => onUseLocation()}
@@ -193,9 +193,9 @@ export function FindOpenMicsClient(props: {
             </button>
           </div>
 
-          <div className="grid gap-4 border-t border-white/10 pt-6 sm:grid-cols-2">
+          <div className="grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-2 sm:gap-4 sm:pt-6">
             <div className="grid gap-2">
-              <label className="text-sm text-white/80">ZIP code</label>
+              <label className="text-xs text-white/75 md:text-sm md:text-white/80">ZIP code</label>
               <div className="flex flex-wrap gap-2">
                 <input
                   value={zip}
@@ -215,7 +215,7 @@ export function FindOpenMicsClient(props: {
               </div>
             </div>
             <div className="grid gap-2">
-              <label className="text-sm text-white/80">City or area (text)</label>
+              <label className="text-xs text-white/75 md:text-sm md:text-white/80">City or area (text)</label>
               <div className="flex flex-wrap gap-2">
                 <input
                   value={cityQ}
@@ -237,9 +237,9 @@ export function FindOpenMicsClient(props: {
           </div>
 
           {googleKey ? (
-            <div className="rounded-xl border border-white/10 bg-black/25 p-4">
-              <div className="text-sm font-medium text-white/90">City or area (Google suggestions)</div>
-              <p className="mt-1 text-xs text-white/50">
+            <div className="rounded-xl border border-white/10 bg-black/25 p-3 md:p-4">
+              <div className="text-xs font-medium text-white/85 md:text-sm md:text-white/90">City or area (Google suggestions)</div>
+              <p className="mt-1 text-[10px] leading-snug text-white/45 md:text-xs md:leading-relaxed md:text-white/50">
                 Optional: pick a place from Google’s list when your project has{" "}
                 <span className="font-mono text-white/70">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</span> set.
               </p>
@@ -262,13 +262,13 @@ export function FindOpenMicsClient(props: {
           {loading ? <p className="text-sm text-white/55">Loading…</p> : null}
 
           {nearbyList && nearbyList.length > 0 ? (
-            <div className="border-t border-white/10 pt-6">
+            <div className="border-t border-white/10 pt-4 md:pt-6">
               {nearbyContext ? (
-                <p className="text-sm text-white/70">
+                <p className="text-xs text-white/60 md:text-sm md:text-white/70">
                   Results near <span className="text-white/90">{nearbyContext}</span>
                 </p>
               ) : null}
-              <ul className="mt-4 grid gap-3">
+              <ul className="mt-3 grid gap-2 md:mt-4 md:gap-3">
                 {nearbyList.map((v) => (
                   <li key={v.slug}>
                     <Link
@@ -293,16 +293,16 @@ export function FindOpenMicsClient(props: {
           ) : null}
         </section>
       ) : (
-        <section className="grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
+        <section className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-6 md:gap-6">
           <div>
-            <h2 className="text-lg font-semibold text-white">Browse by metropolitan area</h2>
-            <p className="mt-1 text-sm text-white/65">
+            <h2 className="text-base font-semibold text-white md:text-lg">Browse by metropolitan area</h2>
+            <p className="mt-1 text-xs leading-snug text-white/50 md:text-sm md:leading-normal md:text-white/65">
               Markets group nearby cities so you can explore open mics regionally. Smaller towns roll into a larger hub
               until there are at least {MIN_VENUES_FOR_PRIMARY_CITY_PAGE} MicStage venues in that city.
             </p>
           </div>
-          <label className="grid max-w-md gap-1 text-sm">
-            <span className="text-white/80">Filter metro &amp; regional markets</span>
+          <label className="grid max-w-md gap-0.5 md:gap-1">
+            <span className="text-xs text-white/75 md:text-sm md:text-white/80">Filter metro &amp; regional markets</span>
             <input
               type="search"
               value={metroFilter}
@@ -338,15 +338,15 @@ export function FindOpenMicsClient(props: {
           ) : null}
 
           {selectedMetroSlug && selectedMetroLabel ? (
-            <div className="border-t border-white/10 pt-6">
-              <h3 className="text-base font-semibold text-white">Open mics in {selectedMetroLabel}</h3>
-              <p className="mt-1 text-sm text-white/60">
+            <div className="border-t border-white/10 pt-4 md:pt-6">
+              <h3 className="text-sm font-semibold text-white md:text-base">Open mics in {selectedMetroLabel}</h3>
+              <p className="mt-1 text-xs text-white/50 md:text-sm md:text-white/60">
                 Each venue has its own public page with schedules and booking.
               </p>
               {metroVenues.length === 0 ? (
                 <p className="mt-3 text-sm text-white/55">No venues mapped to this market in the directory.</p>
               ) : (
-                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2 sm:mt-4 sm:gap-3">
                   {metroVenues.map((v) => (
                     <li key={v.slug}>
                       <Link
@@ -365,7 +365,7 @@ export function FindOpenMicsClient(props: {
                   ))}
                 </ul>
               )}
-              <p className="mt-4 text-sm text-white/55">
+              <p className="mt-3 text-xs text-white/45 md:mt-4 md:text-sm md:text-white/55">
                 Upcoming artists in this market:{" "}
                 <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href={`/locations/${selectedMetroSlug}/performers`}>
                   See who’s booking slots →

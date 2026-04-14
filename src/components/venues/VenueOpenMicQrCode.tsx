@@ -228,7 +228,7 @@ export function VenueOpenMicQrCode({ publicPageUrl, venueName, variant = "public
 
   const shell =
     variant === "public"
-      ? "rounded-2xl border border-white/15 bg-white/[0.06] p-5 sm:p-6"
+      ? "rounded-2xl border border-white/15 bg-white/[0.06] p-4 sm:p-6"
       : "rounded-xl border border-white/12 bg-black/30 p-4 sm:p-5";
 
   return (
@@ -252,16 +252,20 @@ export function VenueOpenMicQrCode({ publicPageUrl, venueName, variant = "public
         </div>
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <h2 id={svgTitleId} className="text-base font-semibold text-white sm:text-lg">
+            <h2 id={svgTitleId} className="text-sm font-semibold text-white sm:text-lg">
               Scan to view or book this open mic on MicStage
             </h2>
-            <p className="mt-1 break-all text-xs leading-relaxed text-white/55 sm:text-sm sm:text-white/60">
+            <p className="mt-1 break-all text-[11px] leading-relaxed text-white/45 sm:text-sm sm:text-white/60">
               {publicPageUrl}
             </p>
-            {hint ? <p className="mt-2 text-sm leading-relaxed text-white/65">{hint}</p> : null}
+            {hint ? (
+              <p className="mt-2 text-xs leading-snug text-white/50 sm:text-sm sm:leading-relaxed sm:text-white/65">
+                {hint}
+              </p>
+            ) : null}
           </div>
           {notice ? <p className="text-sm text-emerald-300/95">{notice}</p> : null}
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-2">
             <button type="button" onClick={(ev) => void copyLink(ev)} className={lineupPrimaryActionClass}>
               Copy page link
             </button>

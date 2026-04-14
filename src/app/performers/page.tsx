@@ -91,9 +91,12 @@ export default async function PerformersPage({
           <div className="min-w-0">
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Artists</div>
             <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">Search by stage name</h1>
-            <p className="mt-2 max-w-xl text-sm text-white/65">
+            <p className="mt-2 hidden max-w-xl text-sm text-white/65 md:block">
               MicStage lists <span className="text-white/85">stage names only</span>. First and last names
               from artist accounts are private and never appear here.
+            </p>
+            <p className="mt-2 text-sm text-white/65 md:hidden">
+              Public directory uses <span className="text-white/85">stage names only</span>—legal names stay private.
             </p>
           </div>
           <Link
@@ -104,7 +107,7 @@ export default async function PerformersPage({
           </Link>
         </div>
 
-        <form method="get" className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <form method="get" className="mt-4 flex flex-col gap-3 md:mt-8 md:flex-row md:flex-wrap">
           <label className="grid min-w-0 flex-1 gap-1 text-sm sm:min-w-[200px]">
             <span className="text-white/80">Stage name contains</span>
             <input

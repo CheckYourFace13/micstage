@@ -82,45 +82,59 @@ export default async function VenuesDirectoryPage() {
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-5xl px-6 py-12">
+      <main className="mx-auto w-full max-w-5xl px-4 py-8 md:px-6 md:py-12">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList) }} />
-        <h1 className="om-heading text-4xl tracking-wide">Open mic venues</h1>
-        <p className="mt-2 max-w-3xl text-sm text-white/70">
+        <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide md:text-4xl">Open mic venues</h1>
+        <div className="mt-2 flex flex-col gap-3 md:gap-4">
+        <p className="order-2 text-xs leading-snug text-white/55 md:hidden">
+          Grouped by city and state on file—tap a venue for the full public page.
+        </p>
+        <p className="order-6 max-w-3xl text-xs leading-relaxed text-white/55 md:order-1 md:text-sm md:text-white/70">
           Venues are grouped below by the city and state on file—your address on each venue page is always the source of
           truth. For artist discovery, MicStage prefers metro and regional markets until a city reaches enough venues to
           earn its own directory.
         </p>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/60">
-          <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{totalVenues} public venues</span>
-          <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{totalLocations} city/state groupings</span>
-          <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/locations">
+        <div className="order-3 flex flex-wrap gap-2 text-[10px] text-white/50 md:order-2 md:gap-2 md:text-xs md:text-white/60">
+          <span className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 md:min-h-0">
+            {totalVenues} public venues
+          </span>
+          <span className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 md:min-h-0">
+            {totalLocations} city/state groupings
+          </span>
+          <Link
+            className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white md:min-h-0"
+            href="/locations"
+          >
             Upcoming performers by market
           </Link>
-          <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/map">
+          <Link className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white md:min-h-0" href="/map">
             Open mic map
           </Link>
-          <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/resources">
+          <Link
+            className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white md:min-h-0"
+            href="/resources"
+          >
             Open mic guides
           </Link>
         </div>
 
         {queryFailed ? (
-          <div className="mt-6 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white/85">
+          <div className="order-4 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white/85 md:order-3">
             We could not load the venue directory right now. Please try again shortly.
           </div>
         ) : null}
 
         {sections.length === 0 ? (
-          <div className="mt-8 rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
+          <div className="order-5 mt-2 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/70 md:order-4 md:mt-8 md:p-6">
             No public venues are available yet.
           </div>
         ) : (
-          <div className="mt-8 grid gap-6">
+          <div className="order-5 mt-2 grid gap-6 md:order-4 md:mt-8">
             {recentlyUpdated.length > 0 ? (
-              <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <h2 className="text-xl font-semibold">Recently updated venues</h2>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <section className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
+                <h2 className="text-lg font-semibold md:text-xl">Recently updated venues</h2>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 md:mt-3">
                   {recentlyUpdated.map((v) => (
                     <Link
                       key={v.id}
@@ -169,6 +183,7 @@ export default async function VenuesDirectoryPage() {
             ))}
           </div>
         )}
+        </div>
       </main>
     </div>
   );

@@ -50,70 +50,82 @@ export default async function LocationsPage() {
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
+      <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-12">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
         {rows.length > 0 ? (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }} />
         ) : null}
-        <h1 className="om-heading text-3xl tracking-wide sm:text-4xl">Open mic discovery by market</h1>
-        <p className="mt-2 max-w-2xl text-sm text-white/70">
-          Browse metro and regional hubs—not every small town gets its own directory page yet. When a place has fewer than{" "}
-          <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> MicStage venues, we group it into a
-          broader market (for example Chicagoland or Central Illinois) so discovery is easier. Addresses on each venue page
-          stay exact.
+        <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide sm:text-4xl">Open mic discovery by market</h1>
+        <p className="mt-1.5 text-xs leading-snug text-white/55 md:hidden">
+          Search hubs below—venue addresses stay exact on each profile.
         </p>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/60">
-          <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{rows.length} discovery markets</span>
-          <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">
-            {rows.reduce((sum, r) => sum + r.count, 0)} venue profiles
-          </span>
-        </div>
-        <p className="mt-2 text-sm text-white/65">
-          Looking for venues near you? Start with{" "}
-          <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
-            Find Local Open Mic&apos;s
-          </Link>
-          , the{" "}
-          <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/map">
-            open mic map
-          </Link>
-          , or browse the{" "}
-          <Link className="underline hover:text-white" href="/venues">
-            full venue directory
-          </Link>
-          {" "}and{" "}
-          <Link className="underline hover:text-white" href="/resources">
-            open mic resources
-          </Link>
-          .
-        </p>
-        {featured.length > 0 ? (
-          <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
-            <h2 className="text-lg font-semibold">Largest discovery markets</h2>
-            <p className="mt-1 text-sm text-white/70">
-              Hubs with the most MicStage venues right now—often metros or dense cities.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {featured.map((r) => (
-                <Link
-                  key={r.key}
-                  href={`/locations/${r.slug}/performers`}
-                  className="rounded-md border border-white/15 bg-black/25 px-3 py-1.5 text-sm hover:bg-black/40"
-                >
-                  {r.label} ({r.count})
-                </Link>
-              ))}
+
+        <div className="mt-3 flex flex-col gap-4 md:mt-6 md:gap-8">
+          <div className="order-1 md:order-2">
+            <div className="rounded-xl ring-1 ring-white/10 md:rounded-none md:ring-0">
+              <LocationsDirectory rows={rows} />
             </div>
-          </section>
-        ) : null}
-
-        {queryFailed ? (
-          <div className="mt-6 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white/85">
-            We couldn’t load discovery markets. Try again in a moment.
           </div>
-        ) : null}
 
-        <LocationsDirectory rows={rows} />
+          <div className="order-2 flex flex-col gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-4 md:order-1 md:gap-4 md:rounded-none md:border-0 md:bg-transparent md:px-0 md:py-0">
+            <p className="max-w-2xl text-xs leading-relaxed text-white/55 md:text-sm md:text-white/70">
+              Browse metro and regional hubs—not every small town gets its own directory page yet. When a place has fewer than{" "}
+              <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> MicStage venues, we group it into a
+              broader market (for example Chicagoland or Central Illinois) so discovery is easier. Addresses on each venue page
+              stay exact.
+            </p>
+            <div className="flex flex-wrap gap-2 text-[10px] text-white/50 md:text-xs md:text-white/60">
+              <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{rows.length} discovery markets</span>
+              <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">
+                {rows.reduce((sum, r) => sum + r.count, 0)} venue profiles
+              </span>
+            </div>
+            <p className="text-xs leading-snug text-white/50 md:text-sm md:leading-normal md:text-white/65">
+              Looking for venues near you? Start with{" "}
+              <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
+                Find Local Open Mic&apos;s
+              </Link>
+              , the{" "}
+              <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/map">
+                open mic map
+              </Link>
+              , or browse the{" "}
+              <Link className="underline hover:text-white" href="/venues">
+                full venue directory
+              </Link>
+              {" "}and{" "}
+              <Link className="underline hover:text-white" href="/resources">
+                open mic resources
+              </Link>
+              .
+            </p>
+            {featured.length > 0 ? (
+              <section className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
+                <h2 className="text-base font-semibold md:text-lg">Largest discovery markets</h2>
+                <p className="mt-1 text-xs text-white/55 md:text-sm md:text-white/70">
+                  Hubs with the most MicStage venues right now—often metros or dense cities.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {featured.map((r) => (
+                    <Link
+                      key={r.key}
+                      href={`/locations/${r.slug}/performers`}
+                      className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-black/25 px-2.5 py-1 text-xs hover:bg-black/40 md:min-h-0 md:px-3 md:py-1.5 md:text-sm"
+                    >
+                      {r.label} ({r.count})
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {queryFailed ? (
+              <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white/85">
+                We couldn’t load discovery markets. Try again in a moment.
+              </div>
+            ) : null}
+          </div>
+        </div>
       </main>
     </div>
   );

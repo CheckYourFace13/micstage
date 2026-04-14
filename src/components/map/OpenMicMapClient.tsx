@@ -21,7 +21,7 @@ const OpenMicLeafletMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[min(52vh,440px)] min-h-[280px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-white/15 bg-zinc-900/50 px-4 text-center sm:min-h-[320px]">
+      <div className="flex h-[min(60vh,520px)] min-h-[280px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-white/15 bg-zinc-900/50 px-4 text-center sm:h-[min(52vh,440px)] sm:min-h-[320px]">
         <span className="text-sm font-medium text-white/70">Loading map…</span>
         <span className="max-w-xs text-xs text-white/45">Tiles and pins load after this panel — a moment on slow connections is normal.</span>
       </div>
@@ -145,15 +145,18 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
   const hasActiveFilters = dayFilter !== null || formatFilter !== "" || acceptingOnly;
 
   return (
-    <div className="flex flex-col gap-5 lg:gap-6">
+    <div className="flex flex-col gap-3 md:gap-5 lg:gap-6">
       <section
         id="open-mic-map-filters"
-        className="flex flex-col gap-4 rounded-xl border border-white/12 bg-white/[0.04] p-4 backdrop-blur-sm sm:p-5"
+        className="flex flex-col gap-3 rounded-xl border border-white/12 bg-white/[0.04] p-3 backdrop-blur-sm sm:p-5 sm:gap-4"
         aria-label="Map filters"
       >
         <div>
-          <h2 className="text-sm font-semibold text-white">Find your night</h2>
-          <p className="mt-1 text-xs leading-relaxed text-white/55">
+          <h2 className="text-xs font-semibold text-white md:text-sm">Find your night</h2>
+          <p className="mt-1 text-xs leading-relaxed text-white/55 md:hidden">
+            Pick a weekday, format, and booking filter—the list matches the map.
+          </p>
+          <p className="mt-1 hidden text-xs leading-relaxed text-white/55 md:block">
             Pick a weekday to color pins by that open mic night. Leave it on &ldquo;Any day&rdquo; for MicStage pink pins
             when a venue runs multiple nights. Recently active MicStage venues without a current public schedule are still
             shown, so you can discover and follow up early. The list on the right stays in sync with what you see on the map.
@@ -225,7 +228,10 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
               }`}
             >
               <span className="block font-semibold text-white">Online signup open</span>
-              <span className="mt-0.5 block text-xs font-normal text-white/55">
+              <span className="mt-0.5 block text-xs font-normal text-white/55 md:hidden">
+                Bookable slots soon; excludes house-only nights.
+              </span>
+              <span className="mt-0.5 hidden text-xs font-normal text-white/55 md:block">
                 Only venues with at least one bookable slot soon (not house-only nights).
               </span>
             </button>
@@ -265,7 +271,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
           </p>
         ) : null}
 
-        <p className="text-xs text-white/50" aria-live="polite">
+        <p className="text-[10px] text-white/40 md:text-xs md:text-white/50" aria-live="polite">
           <span className="font-medium text-white/65">Map:</span>{" "}
           <span className="tabular-nums text-white/80">{visible.length}</span> in view ·{" "}
           <span className="font-medium text-white/65">Filters:</span>{" "}
@@ -275,9 +281,9 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
         </p>
       </section>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-5">
         <section
-          className="min-h-[min(52vh,480px)] flex-1 lg:min-h-[520px]"
+          className="min-h-[min(60vh,540px)] flex-1 sm:min-h-[min(52vh,480px)] lg:min-h-[520px]"
           aria-label="Interactive map of open mic venues"
           aria-describedby="open-mic-map-filters"
         >
@@ -298,13 +304,14 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
           />
         </section>
 
-        <aside className="flex w-full flex-col border-t border-white/10 pt-4 lg:w-[min(100%,400px)] lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-          <h2 className="text-sm font-semibold text-white">Venues on this map</h2>
-          <p className="mt-1 text-xs leading-relaxed text-white/50">
+        <aside className="flex w-full flex-col border-t border-white/10 pt-3 lg:w-[min(100%,400px)] lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <h2 className="text-xs font-semibold text-white md:text-sm">Venues on this map</h2>
+          <p className="mt-1 text-xs leading-relaxed text-white/50 md:hidden">Tap a row to zoom; tap a pin for a quick summary.</p>
+          <p className="mt-1 hidden text-xs leading-relaxed text-white/50 md:block">
             Same pins as the list — sorted by distance from the center of what you&apos;re looking at. Tap a row to zoom
             the map; tap a pin for a quick summary.
           </p>
-          <div className="mt-3 flex max-h-[min(52vh,520px)] flex-col gap-2 overflow-y-auto overscroll-contain pr-1 pb-2 [-webkit-overflow-scrolling:touch] lg:max-h-[520px]">
+          <div className="mt-2 flex max-h-[min(46vh,420px)] flex-col gap-2 overflow-y-auto overscroll-contain pr-1 pb-2 [-webkit-overflow-scrolling:touch] sm:mt-3 sm:max-h-[min(52vh,520px)] lg:max-h-[520px]">
             {sortedVisible.length === 0 ? (
               <div className="rounded-xl border border-white/12 bg-zinc-900/45 px-4 py-6 text-sm leading-relaxed text-white/70">
                 {filtered.length === 0 ? (

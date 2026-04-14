@@ -55,7 +55,8 @@ export default async function OpenMicMapPage() {
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/70">
           See where open mics actually happen — not just a list. Filter by the night you want to play, the kind of room
           (acoustic, full band, comedy, and more), and whether you can book online right now. Every pin links through to
-          the venue&apos;s MicStage page to grab a slot.
+          the venue&apos;s MicStage page to grab a slot. Recently active MicStage venues without a current public schedule
+          still appear so discovery stays broad.
         </p>
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <Link href="/find-open-mics" className="text-white/70 underline decoration-white/25 underline-offset-2 hover:text-white">

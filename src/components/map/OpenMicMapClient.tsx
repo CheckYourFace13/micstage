@@ -155,7 +155,8 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
           <h2 className="text-sm font-semibold text-white">Find your night</h2>
           <p className="mt-1 text-xs leading-relaxed text-white/55">
             Pick a weekday to color pins by that open mic night. Leave it on &ldquo;Any day&rdquo; for MicStage pink pins
-            when a venue runs multiple nights. The list on the right stays in sync with what you see on the map.
+            when a venue runs multiple nights. Recently active MicStage venues without a current public schedule are still
+            shown, so you can discover and follow up early. The list on the right stays in sync with what you see on the map.
           </p>
         </div>
 
@@ -342,6 +343,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
               sortedVisible.map((v) => {
                 const active = selectedSlug === v.slug;
                 const days = [...new Set(v.templates.map((t) => weekdayToLabel(t.weekday)))].join(", ");
+                const formats = [...new Set(v.performanceFormats.map((f) => performanceFormatLabel(f)))].join(" · ");
                 return (
                   <div
                     key={v.slug}
@@ -378,18 +380,22 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
                         ) : null}
                       </div>
                       <p className="mt-2 text-xs text-white/60">
-                        <span className="text-white/75">Open mic: {days}</span>
-                        {v.templates.length > 1 ? (
+                        {v.hasPublicSchedule ? (
+                          <span className="text-white/75">Open mic: {days}</span>
+                        ) : (
+                          <span className="text-white/75">MicStage venue · recently active</span>
+                        )}
+                        {v.hasPublicSchedule && v.templates.length > 1 ? (
                           <span className="text-white/40"> · {v.templates.length} recurring nights</span>
                         ) : null}
                       </p>
-                      <p className="mt-1 text-xs text-white/55">
-                        {[...new Set(v.performanceFormats.map((f) => performanceFormatLabel(f)))].join(" · ")}
-                      </p>
-                      {v.nextEvent ? (
+                      <p className="mt-1 text-xs text-white/55">{v.hasPublicSchedule ? formats : "Schedule details coming soon"}</p>
+                      {v.nextEvent && v.hasPublicSchedule ? (
                         <p className="mt-1 text-xs text-white/75">{v.nextEvent.timeLabel}</p>
                       ) : (
-                        <p className="mt-1 text-xs text-white/45">Full schedule on venue page</p>
+                        <p className="mt-1 text-xs text-white/45">
+                          {v.hasPublicSchedule ? "Full schedule on venue page" : "Visit the venue page for latest updates"}
+                        </p>
                       )}
                     </button>
                     <div className="border-t border-white/10 px-3 py-2.5">

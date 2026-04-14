@@ -47,3 +47,47 @@ input[type="radio"]:focus-visible {
   outline-offset: 2px;
 }
 
+/* Public /map (Leaflet) — keep controls and popup in MicStage dark/pink system. */
+.om-map-leaflet-root .leaflet-bar {
+  border-color: rgb(255 255 255 / 0.2);
+  background: rgb(24 24 27 / 0.92);
+}
+
+.om-map-leaflet-root .leaflet-bar a {
+  color: rgb(255 255 255 / 0.9);
+  background: transparent;
+}
+
+.om-map-leaflet-root .leaflet-bar a:hover {
+  background: rgb(255 255 255 / 0.09);
+}
+
+.om-map-leaflet-root .leaflet-popup-content-wrapper {
+  background: rgb(18 18 22 / 0.97);
+  color: rgb(255 255 255 / 0.92);
+  border: 1px solid rgb(255 255 255 / 0.14);
+}
+
+.om-map-leaflet-root .leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+.om-map-leaflet-root .leaflet-popup-tip {
+  background: rgb(18 18 22 / 0.97);
+  border: 1px solid rgb(255 255 255 / 0.12);
+}
+
+.om-map-leaflet-root .marker-cluster-small,
+.om-map-leaflet-root .marker-cluster-medium,
+.om-map-leaflet-root .marker-cluster-large {
+  background: rgb(225 29 114 / 0.26);
+}
+
+.om-map-leaflet-root .marker-cluster-small div,
+.om-map-leaflet-root .marker-cluster-medium div,
+.om-map-leaflet-root .marker-cluster-large div {
+  background: rgb(225 29 114 / 0.86);
+  color: white;
+  font-weight: 700;
+}
+

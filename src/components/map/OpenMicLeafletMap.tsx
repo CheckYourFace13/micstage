@@ -44,19 +44,25 @@ function popupHtml(v: OpenMicMapVenueDto): string {
   const place = [v.city, v.region].filter(Boolean).join(", ") || "Location on file";
   const dayLabels = [...new Set(v.templates.map((t) => weekdayToLabel(t.weekday)))].join(", ");
   const formatLabels = [...new Set(v.performanceFormats.map((f) => performanceFormatLabel(f)))].join(" · ");
+  const scheduleLine = v.hasPublicSchedule ? escHtml(dayLabels || "Schedule details coming soon") : "Schedule details coming soon";
+  const formatLine = v.hasPublicSchedule ? escHtml(formatLabels || "MicStage venue") : "MicStage venue";
   const next =
-    v.nextEvent != null
+    v.nextEvent != null && v.hasPublicSchedule
       ? `${escHtml(v.nextEvent.timeLabel)} <span style="opacity:.85">(${escHtml(v.nextEvent.badge)})</span>`
-      : '<span style="opacity:.75">No upcoming night in the current window — open the venue page for full schedule.</span>';
-  const signup = v.acceptingSignups
-    ? '<span style="color:#4ade80">Slots available to book on at least one upcoming night.</span>'
-    : '<span style="opacity:.75">Booking may be limited or house-managed — check the venue page.</span>';
+      : v.hasPublicSchedule
+        ? '<span style="opacity:.75">No upcoming night in the current window — open the venue page for full schedule.</span>'
+        : '<span style="opacity:.75">Recently active on MicStage. Public schedule details are coming soon.</span>';
+  const signup = v.hasPublicSchedule
+    ? v.acceptingSignups
+      ? '<span style="color:#4ade80">Slots available to book on at least one upcoming night.</span>'
+      : '<span style="opacity:.75">Booking may be limited or house-managed — check the venue page.</span>'
+    : '<span style="opacity:.75">MicStage venue · recently active.</span>';
   return `
-    <div style="min-width:220px;max-width:280px;font-family:system-ui,sans-serif;font-size:13px;line-height:1.35;color:#111">
+    <div style="min-width:220px;max-width:280px;font-family:system-ui,sans-serif;font-size:13px;line-height:1.35;color:#f5f5f5">
       <div style="font-weight:700;font-size:14px;margin-bottom:4px">${escHtml(v.name)}</div>
       <div style="opacity:.85;margin-bottom:6px">${escHtml(place)}</div>
-      <div style="margin-bottom:4px"><strong>Nights</strong> · ${escHtml(dayLabels)}</div>
-      <div style="margin-bottom:4px"><strong>Format</strong> · ${escHtml(formatLabels)}</div>
+      <div style="margin-bottom:4px"><strong>Nights</strong> · ${scheduleLine}</div>
+      <div style="margin-bottom:4px"><strong>Format</strong> · ${formatLine}</div>
       <div style="margin-bottom:6px"><strong>Next</strong> · ${next}</div>
       <div style="margin-bottom:10px;font-size:12px">${signup}</div>
       <a href="/venues/${escHtml(v.slug)}" style="display:inline-block;background:${OPEN_MIC_MAP_NEUTRAL_MARKER_HEX};color:#fff;text-decoration:none;font-weight:600;padding:8px 12px;border-radius:8px;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,.2)">View venue &amp; book</a>

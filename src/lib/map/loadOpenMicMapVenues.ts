@@ -5,6 +5,15 @@ import { pickPrimaryLineup, storageYmdUtc } from "@/lib/venuePublicLineup";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import type { OpenMicMapVenueDto } from "@/lib/map/openMicMapTypes";
 
+const MAP_ACTIVE_WINDOW_DAYS = 120;
+
+function cutoffForMapActivity(): Date {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - MAP_ACTIVE_WINDOW_DAYS);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
 function cutoffForMapInstances(): Date {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - 10);
@@ -13,6 +22,7 @@ function cutoffForMapInstances(): Date {
 }
 
 export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMicMapVenueDto[]> {
+  const activeCutoff = cutoffForMapActivity();
   const cutoff = cutoffForMapInstances();
   const now = new Date();
 
@@ -20,7 +30,57 @@ export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMi
     where: {
       lat: { not: null },
       lng: { not: null },
-      eventTemplates: { some: { isPublic: true } },
+      OR: [
+        // Account-level activity proxy (no persisted login timestamp exists yet).
+        { updatedAt: { gte: activeCutoff } },
+        { owner: { updatedAt: { gte: activeCutoff } } },
+        { managerAccess: { some: { manager: { updatedAt: { gte: activeCutoff } } } } },
+        // Open mic / schedule / booking activity.
+        {
+          eventTemplates: {
+            some: {
+              OR: [
+                { createdAt: { gte: activeCutoff } },
+                { updatedAt: { gte: activeCutoff } },
+                {
+                  instances: {
+                    some: {
+                      OR: [
+                        { createdAt: { gte: activeCutoff } },
+                        { updatedAt: { gte: activeCutoff } },
+                        { date: { gte: activeCutoff } },
+                        {
+                          slots: {
+                            some: {
+                              OR: [
+                                { createdAt: { gte: activeCutoff } },
+                                { updatedAt: { gte: activeCutoff } },
+                                { booking: { is: { updatedAt: { gte: activeCutoff } } } },
+                              ],
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+        // Messaging activity.
+        {
+          messageThreads: {
+            some: {
+              OR: [
+                { updatedAt: { gte: activeCutoff } },
+                { lastMessageAt: { gte: activeCutoff } },
+                { messages: { some: { createdAt: { gte: activeCutoff } } } },
+              ],
+            },
+          },
+        },
+      ],
     },
     orderBy: [{ name: "asc" }],
     select: {
@@ -73,10 +133,10 @@ export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMi
     const lat = v.lat;
     const lng = v.lng;
     if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-    if (v.eventTemplates.length === 0) continue;
 
+    const hasPublicSchedule = v.eventTemplates.length > 0;
     const templatesForPick = v.eventTemplates as unknown as LineupTemplate[];
-    const primary = pickPrimaryLineup(templatesForPick, v.timeZone, now);
+    const primary = hasPublicSchedule ? pickPrimaryLineup(templatesForPick, v.timeZone, now) : null;
 
     let nextEvent: OpenMicMapVenueDto["nextEvent"] = null;
     if (primary) {
@@ -134,6 +194,7 @@ export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMi
       })),
       weekdays,
       performanceFormats,
+      hasPublicSchedule,
       nextEvent,
       acceptingSignups,
     });

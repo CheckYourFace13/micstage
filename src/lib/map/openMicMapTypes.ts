@@ -1,17 +1,17 @@
 import type { VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
 
 /**
- * Marker fills when a weekday filter is active — saturated for contrast on OSM tiles,
- * with white ring + inset shadow applied in `OpenMicLeafletMap`.
+ * Subtle brand-safe tints used only when a weekday filter is active.
+ * Default map state stays MicStage pink/black/white.
  */
 export const OPEN_MIC_MAP_WEEKDAY_HEX: Record<Weekday, string> = {
-  MON: "#1d4ed8",
-  TUE: "#15803d",
-  WED: "#b45309",
-  THU: "#c2410c",
-  FRI: "#b91c1c",
-  SAT: "#7e22ce",
-  SUN: "#0f766e",
+  MON: "#f472b6",
+  TUE: "#ec4899",
+  WED: "#db2777",
+  THU: "#be185d",
+  FRI: "#9d174d",
+  SAT: "#a1a1aa",
+  SUN: "#ffffff",
 };
 
 /** MicStage accent when every night is shown (no weekday filter). */
@@ -46,6 +46,8 @@ export type OpenMicMapVenueDto = {
   templates: OpenMicMapTemplateDto[];
   weekdays: Weekday[];
   performanceFormats: VenuePerformanceFormat[];
+  /** True when venue currently has at least one public recurring template. */
+  hasPublicSchedule: boolean;
   nextEvent: OpenMicMapNextEventDto | null;
   /** Has at least one non–house-only template with an AVAILABLE slot on a bookable future instance. */
   acceptingSignups: boolean;

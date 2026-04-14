@@ -15,6 +15,9 @@ export async function SiteFooter() {
             <Link className="hover:text-white" href="/contact">
               Contact
             </Link>
+            <Link className="hover:text-white" href="/resources">
+              Open mic guides
+            </Link>
             <Link className="hover:text-white" href="/privacy">
               Privacy Policy
             </Link>

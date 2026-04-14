@@ -7,7 +7,7 @@ import { getAllResourceArticles } from "@/lib/resourcesContent";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic resources and guides",
   description:
-    "Evergreen MicStage guides for venue owners, performers, and local communities: open mic strategy, formats, operations, audience growth, and first-night preparation.",
+    "In-depth MicStage guides for open mic venues, hosts, and performers: weeknight programming, open mic signups, formats, loyalty, neighborhood impact, and how to find open mics near you.",
   path: "/resources",
 });
 
@@ -31,32 +31,32 @@ const BROWSE_GOALS: { label: string; slug: string; blurb: string }[] = [
   {
     label: "Run a stronger room",
     slug: "how-to-run-a-successful-open-mic-night",
-    blurb: "Scheduling, sign-up, and host workflow",
+    blurb: "Host workflow, open mic signups, and weeknight operations for live music venues",
   },
   {
     label: "Grow repeat visits",
     slug: "open-mics-repeat-visits-customer-loyalty",
-    blurb: "Habit, trust, and weeknight loyalty",
+    blurb: "Habit, trust, and loyalty loops around a recurring open mic night",
   },
   {
     label: "Pick the right format",
     slug: "types-of-open-mic-nights",
-    blurb: "Acoustic, comedy, poetry, variety",
+    blurb: "Acoustic, comedy, poetry, variety, and band-friendly open mic nights explained",
   },
   {
     label: "Support your block",
     slug: "how-open-mics-help-neighborhoods",
-    blurb: "Neighborhoods and local scenes",
+    blurb: "Neighborhood impact, local music scenes, and beginner-friendly culture",
   },
   {
     label: "Performers’ priorities",
     slug: "what-performers-look-for-in-open-mics",
-    blurb: "What artists notice first",
+    blurb: "Fair signups, technical honesty, and how artists choose an open mic venue",
   },
   {
     label: "Venue value story",
     slug: "why-open-mic-nights-work-for-venues",
-    blurb: "Why weeknight open mics work",
+    blurb: "Why open mic nights work for weeknight revenue and performer opportunities",
   },
 ];
 
@@ -102,8 +102,13 @@ export default function ResourcesIndexPage() {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }} />
         <h1 className="om-heading text-4xl tracking-wide">Open mic resources</h1>
         <p className="mt-2 max-w-3xl text-sm text-white/70">
-          People-first guides for venue teams, hosts, performers, and neighbors. Each article includes practical tips, a short
-          FAQ, and links into MicStage discovery so you can go from reading to finding a real room.
+          Long-form, people-first guides for open mic venues, hosts, and performers—covering open mic nights from first
+          signup to repeat audiences in your local music scene. Every guide includes practical tips, FAQs, and direct links to
+          MicStage discovery (<Link href="/find-open-mics" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">find open mics</Link>,{" "}
+          <Link href="/map" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">map</Link>,{" "}
+          <Link href="/venues" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">venues</Link>,{" "}
+          <Link href="/locations" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">locations</Link>
+          ) so reading turns into a plan.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2 text-xs text-white/60">

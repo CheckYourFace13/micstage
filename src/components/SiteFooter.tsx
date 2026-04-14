@@ -16,7 +16,7 @@ export async function SiteFooter() {
               Contact
             </Link>
             <Link className="hover:text-white" href="/resources">
-              Open mic guides
+              Open Mic Resources
             </Link>
             <Link className="hover:text-white" href="/privacy">
               Privacy Policy

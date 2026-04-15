@@ -72,12 +72,22 @@ export async function sendApprovedGrowthLeadDraft(
     return { ok: false, blocked: true, reasons: [`Draft status is ${draft.status}, expected APPROVED`] };
   }
 
-  if (draft.lead.contactEmailConfidence === "LOW" && !opts?.allowLowConfidenceEmail) {
-    return {
-      ok: false,
-      blocked: true,
-      reasons: ["LOW confidence email — blocked for automated sends"],
-    };
+  const bypassConfidence = opts?.allowLowConfidenceEmail === true;
+  const allowMediumOutreach = process.env.GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE === "true";
+  if (!bypassConfidence) {
+    const conf = draft.lead.contactEmailConfidence;
+    if (conf === "LOW") {
+      return { ok: false, blocked: true, reasons: ["LOW confidence email — blocked for automated sends"] };
+    }
+    if (conf === "MEDIUM" && !allowMediumOutreach) {
+      return {
+        ok: false,
+        blocked: true,
+        reasons: [
+          "MEDIUM confidence — blocked for production outreach (HIGH only). Set GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE=true to allow MEDIUM, or use an admin send override.",
+        ],
+      };
+    }
   }
 
   let email: string;

@@ -333,7 +333,8 @@ export default async function AdminGrowthHubPage(props: {
         <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>; default includes{" "}
         <code className="text-zinc-400">{nationalDiscoveryMarketSlug()}</code> for nationwide SerpAPI/Brave venue search). Caps:
         outreach{" "}
-        {marketingDailyCap("outreach")}/day · per-domain {marketingPerDomainDailyCap()}/day · contact cooldown{" "}
+        {marketingDailyCap("outreach")}/day · per-domain {marketingPerDomainDailyCap("OUTREACH")}/day · contact
+        cooldown{" "}
         {marketingContactCooldownHours()}h.
       </p>
       <p className="mt-2 max-w-3xl text-xs leading-relaxed text-zinc-500">

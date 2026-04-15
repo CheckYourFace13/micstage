@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { GrowthLeadEmailConfidence, PrismaClient } from "@/generated/prisma/client";
 import { growthAutoDraftBatchLimit, growthAutoDraftFitMin } from "@/lib/growth/expansionConfig";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { sendApprovedGrowthLeadDraft } from "@/lib/growth/growthLeadDraftSend";
@@ -26,11 +26,13 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const fitMin = growthAutoDraftFitMin();
   const venueAutoFitMin = Math.max(6, fitMin - 1);
   const limit = growthAutoDraftBatchLimit();
+  const allowMediumOutreach = process.env.GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE === "true";
+  const emailReadyLevels: GrowthLeadEmailConfidence[] = allowMediumOutreach ? ["HIGH", "MEDIUM"] : ["HIGH"];
 
   const candidates = await prisma.growthLead.findMany({
     where: {
       contactEmailNormalized: { not: null },
-      NOT: { contactEmailConfidence: "LOW" },
+      contactEmailConfidence: { in: emailReadyLevels },
       OR: [
         // Keep existing non-venue behavior.
         { status: "APPROVED" },
@@ -96,6 +98,8 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   });
 
   for (const d of venuePriority.sort((a, b) => (b.lead.fitScore ?? 0) - (a.lead.fitScore ?? 0))) {
+    const conf = d.lead.contactEmailConfidence;
+    if (!(conf === "HIGH" || (allowMediumOutreach && conf === "MEDIUM"))) continue;
     const slug = d.lead.discoveryMarketSlug?.trim().toLowerCase();
     if (!slug || !activeMarketSet.has(slug)) {
       continue;

@@ -56,7 +56,8 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
     case "transactional":
       return parseIntEnv("MARKETING_CAP_DAILY_TRANSACTIONAL", 50_000);
     case "outreach":
-      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 50);
+      /** Production-safe default: 30 outreach sends/day (UTC) across all recipients. Override with MARKETING_CAP_DAILY_OUTREACH. */
+      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 30);
     case "marketing":
       return parseIntEnv("MARKETING_CAP_DAILY_MARKETING", 40);
     default:
@@ -64,8 +65,22 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
   }
 }
 
-export function marketingPerDomainDailyCap(): number {
-  return parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 5);
+/**
+ * Per recipient-domain daily caps (UTC day, SENT rows only).
+ * - OUTREACH: default 5 (MARKETING_CAP_PER_DOMAIN_DAILY_OUTREACH, or legacy MARKETING_CAP_PER_DOMAIN_DAILY).
+ * - MARKETING: separate default 15 so venue welcome bursts are less likely to hit the outreach domain budget.
+ */
+export function marketingPerDomainDailyCap(category: MarketingEmailCategory): number {
+  const legacyShared = parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 5);
+  if (category === "OUTREACH") {
+    const v = process.env.MARKETING_CAP_PER_DOMAIN_DAILY_OUTREACH?.trim();
+    if (v) return parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY_OUTREACH", legacyShared);
+    return legacyShared;
+  }
+  if (category === "MARKETING") {
+    return parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY_MARKETING", 15);
+  }
+  return 1_000_000;
 }
 
 /** Hours between sends to same contact for outreach+marketing (same template family uses purposeKey). */

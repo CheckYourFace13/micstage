@@ -227,7 +227,8 @@ export default async function AdminMarketingPage(props: {
             {marketingDailyCap("marketing")}/day
           </li>
           <li className="text-zinc-500">
-            Per recipient domain (outreach+marketing): {marketingPerDomainDailyCap()}/day
+            Per recipient domain (UTC): outreach {marketingPerDomainDailyCap("OUTREACH")}/day · marketing{" "}
+            {marketingPerDomainDailyCap("MARKETING")}/day
           </li>
         </ul>
       </section>

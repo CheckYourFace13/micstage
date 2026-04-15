@@ -151,7 +151,7 @@ export async function buildOwnerDailySummary(
         updatedAt: true,
       },
       orderBy: { updatedAt: "desc" },
-      take: 25,
+      take: 12,
     }),
     prisma.growthLead.findMany({
       where: {
@@ -174,7 +174,7 @@ export async function buildOwnerDailySummary(
         status: true,
       },
       orderBy: { updatedAt: "desc" },
-      take: 25,
+      take: 12,
     }),
     prisma.growthLead.findMany({
       where: {
@@ -192,7 +192,7 @@ export async function buildOwnerDailySummary(
         status: true,
       },
       orderBy: [{ fitScore: "desc" }, { createdAt: "desc" }],
-      take: 40,
+      take: 15,
     }),
   ]);
 

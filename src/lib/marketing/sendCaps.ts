@@ -57,10 +57,10 @@ export async function checkCategoryAndDomainCaps(
     return { ok: false, reason: `Daily cap reached for category ${category} (${daily})` };
   }
   if (mic !== "transactional") {
-    const domCap = marketingPerDomainDailyCap();
+    const domCap = marketingPerDomainDailyCap(category);
     const domCount = await countSendsTodayToDomain(prisma, category, toDomain, since);
     if (domCount >= domCap) {
-      return { ok: false, reason: `Per-domain daily cap reached for ${toDomain} (${domCap})` };
+      return { ok: false, reason: `Per-domain daily cap reached for ${toDomain} (${domCap}, ${category})` };
     }
   }
   return { ok: true };

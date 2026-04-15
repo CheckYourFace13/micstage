@@ -5,7 +5,12 @@ import {
 } from "@/lib/growth/expansionConfig";
 import { runAutoGrowthOutreachDrafts } from "@/lib/growth/growthDraftAutomation";
 import { runGrowthLeadDiscovery } from "@/lib/growth/growthDiscoveryRun";
+import type { PrismaClient } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
+
+/** Transaction-scoped Postgres advisory lock keys (unique to growth draft/outreach automation). */
+const GROWTH_DRAFT_PIPELINE_LOCK_K1 = 54_788_913;
+const GROWTH_DRAFT_PIPELINE_LOCK_K2 = 20_993_311;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,7 +46,22 @@ async function handle(request: Request) {
 
   try {
     const discovery = discoveryEnabled ? await runGrowthLeadDiscovery(prisma) : null;
-    const drafts = draftEnabled ? await runAutoGrowthOutreachDrafts(prisma) : null;
+    /**
+     * Serialize draft creation + outreach sends so overlapping cron invocations do not interleave
+     * (Postgres `pg_advisory_xact_lock` — held for the whole transaction on one pooled connection).
+     * Discovery above is not under this lock and may still overlap across instances.
+     */
+    const drafts = draftEnabled
+      ? await prisma.$transaction(
+          async (tx) => {
+            await tx.$executeRawUnsafe(
+              `SELECT pg_advisory_xact_lock(${GROWTH_DRAFT_PIPELINE_LOCK_K1}, ${GROWTH_DRAFT_PIPELINE_LOCK_K2})`,
+            );
+            return runAutoGrowthOutreachDrafts(tx as unknown as PrismaClient);
+          },
+          { maxWait: 45_000, timeout: 240_000 },
+        )
+      : null;
 
     return NextResponse.json(
       {

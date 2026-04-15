@@ -42,6 +42,16 @@ export function growthAutoDraftBatchLimit(): number {
   return parseIntEnv("GROWTH_AUTO_DRAFT_BATCH_LIMIT", 100);
 }
 
+/**
+ * Successful outreach sends per `/api/cron/growth-pipeline` run (after draft automation).
+ * Still bounded by MARKETING_CAP_DAILY_OUTREACH (30) and per-domain caps — this only smooths bursts.
+ * Default 4 (target band ~3–5). Clamp 1–5.
+ */
+export function growthOutreachSendsPerCronRun(): number {
+  const n = parseIntEnv("GROWTH_OUTREACH_SENDS_PER_CRON_RUN", 4);
+  return Math.min(5, Math.max(1, n));
+}
+
 export type ExpansionThresholds = {
   minApprovedLeads: number;
   minSentEmails: number;

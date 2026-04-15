@@ -5,7 +5,7 @@ export const metadata = {
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { safeAfterAuthPath } from "@/lib/safeRedirect";
-import { loginVenue } from "./serverActions";
+import { VENUE_LOGIN_SUBMIT_PATH } from "./serverActions";
 import { BetaNote } from "@/components/BetaNote";
 import { VenueLoginForm } from "./VenueLoginForm";
 
@@ -35,7 +35,7 @@ export default async function VenueLoginPage(props: {
         <BetaNote className="mt-3" />
 
         <VenueLoginForm
-          action={loginVenue}
+          action={VENUE_LOGIN_SUBMIT_PATH}
           next={next ?? ""}
           footer={
             <div className="text-xs text-white/60">

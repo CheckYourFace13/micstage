@@ -7,7 +7,7 @@ import { getSession } from "@/lib/session";
 import { safeAfterMusicianLoginPath } from "@/lib/safeRedirect";
 import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
-import { loginMusician } from "./serverActions";
+import { MUSICIAN_LOGIN_SUBMIT_PATH } from "./serverActions";
 
 export default async function MusicianLoginPage(props: {
   searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
@@ -41,7 +41,11 @@ export default async function MusicianLoginPage(props: {
         </p>
         <BetaNote className="mt-3" />
 
-        <form action={loginMusician} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <form
+          method="post"
+          action={MUSICIAN_LOGIN_SUBMIT_PATH}
+          className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6"
+        >
           <input type="hidden" name="next" value={next ?? ""} />
           {showResetSuccess ? (
             <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">

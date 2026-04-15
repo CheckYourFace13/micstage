@@ -18,7 +18,7 @@ function SubmitButton() {
 }
 
 type Props = {
-  action: (formData: FormData) => void | Promise<void>;
+  action: string;
   next: string;
   children: ReactNode;
   footer: ReactNode;
@@ -26,7 +26,7 @@ type Props = {
 
 export function VenueLoginForm({ action, next, children, footer }: Props) {
   return (
-    <form action={action} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+    <form method="post" action={action} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
       <input type="hidden" name="next" value={next} />
       {children}
       <SubmitButton />

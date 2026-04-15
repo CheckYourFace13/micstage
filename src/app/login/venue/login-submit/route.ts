@@ -5,6 +5,7 @@ import { getPrismaOrNull } from "@/lib/prisma";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { safeAfterAuthPath } from "@/lib/safeRedirect";
 import { setSession } from "@/lib/session";
+import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 
 export const runtime = "nodejs";
 
@@ -14,8 +15,8 @@ function venueLoginQuery(code: string, nextField: string): string {
   return `/login/venue?${q.toString()}`;
 }
 
-function redirectTo(request: Request, path: string) {
-  return NextResponse.redirect(new URL(path, request.url));
+function redirectTo(path: string) {
+  return NextResponse.redirect(absoluteServerRedirectUrl(path));
 }
 
 export async function POST(request: Request) {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
   try {
     formData = await request.formData();
   } catch {
-    return redirectTo(request, "/login/venue?error=invalid");
+    return redirectTo("/login/venue?error=invalid");
   }
 
   const nextEntry = formData.get("next");
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     typeof passwordRaw !== "string" ||
     !passwordRaw.trim()
   ) {
-    return redirectTo(request, venueLoginQuery("invalid", nextField));
+    return redirectTo(venueLoginQuery("invalid", nextField));
   }
   const email = emailRaw.trim().toLowerCase();
   const password = passwordRaw;
@@ -48,12 +49,12 @@ export async function POST(request: Request) {
     limit: 10,
     windowSec: 60 * 15,
   });
-  if (!rl.allowed) return redirectTo(request, venueLoginQuery("rate", nextField));
+  if (!rl.allowed) return redirectTo(venueLoginQuery("rate", nextField));
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[loginVenue] database not configured");
-    return redirectTo(request, venueLoginQuery("unavailable", nextField));
+    return redirectTo(venueLoginQuery("unavailable", nextField));
   }
 
   let owner;
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginVenue] venueOwner findUnique", e);
-    return redirectTo(request, venueLoginQuery("unavailable", nextField));
+    return redirectTo(venueLoginQuery("unavailable", nextField));
   }
 
   if (owner) {
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
     } catch (e) {
       unstable_rethrow(e);
       console.error("[loginVenue] bcrypt owner", e);
-      return redirectTo(request, venueLoginQuery("unavailable", nextField));
+      return redirectTo(venueLoginQuery("unavailable", nextField));
     }
     if (ownerOk) {
       try {
@@ -83,9 +84,9 @@ export async function POST(request: Request) {
       } catch (e) {
         unstable_rethrow(e);
         console.error("[loginVenue] setSession owner", e);
-        return redirectTo(request, venueLoginQuery("unavailable", nextField));
+        return redirectTo(venueLoginQuery("unavailable", nextField));
       }
-      return redirectTo(request, safeAfterAuthPath(nextField, "/venue"));
+      return redirectTo(safeAfterAuthPath(nextField, "/venue"));
     }
   }
 
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginVenue] venueManager findUnique", e);
-    return redirectTo(request, venueLoginQuery("unavailable", nextField));
+    return redirectTo(venueLoginQuery("unavailable", nextField));
   }
 
   if (manager) {
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
     } catch (e) {
       unstable_rethrow(e);
       console.error("[loginVenue] bcrypt manager", e);
-      return redirectTo(request, venueLoginQuery("unavailable", nextField));
+      return redirectTo(venueLoginQuery("unavailable", nextField));
     }
     if (managerOk) {
       try {
@@ -116,12 +117,12 @@ export async function POST(request: Request) {
       } catch (e) {
         unstable_rethrow(e);
         console.error("[loginVenue] setSession manager", e);
-        return redirectTo(request, venueLoginQuery("unavailable", nextField));
+        return redirectTo(venueLoginQuery("unavailable", nextField));
       }
-      return redirectTo(request, safeAfterAuthPath(nextField, "/venue"));
+      return redirectTo(safeAfterAuthPath(nextField, "/venue"));
     }
   }
 
-  return redirectTo(request, venueLoginQuery("invalid", nextField));
+  return redirectTo(venueLoginQuery("invalid", nextField));
 }
 

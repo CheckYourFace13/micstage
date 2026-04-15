@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isNationalDiscoveryMarket } from "@/lib/growth/marketsConfig";
+import { isGrowthDiscoveryWebSearchMarket } from "@/lib/growth/marketsConfig";
 import {
   growthDiscoveryAutonomousEnabled,
   growthDiscoveryAutonomousMaxPageFetchesPerRun,
@@ -236,9 +236,44 @@ const GEO_SCOPES = [
   "Honolulu HI",
 ];
 
-function buildSearchQuery(cursorQi: number): string {
+/** Metro tails when the cron context is `chicagoland-il` (Chicago-first web discovery). */
+const CHICAGOLAND_WEB_GEO_SCOPES = [
+  "Chicago IL",
+  "Chicagoland Illinois",
+  "Evanston IL",
+  "Oak Park IL",
+  "Naperville IL",
+  "Aurora IL",
+  "Joliet IL",
+  "Schaumburg IL",
+  "Arlington Heights IL",
+  "Skokie IL",
+  "Waukegan IL",
+];
+
+const ILLINOIS_REGIONAL_WEB_GEO_SCOPES = ["Illinois", "IL USA", "Rockford IL", "Rockford Illinois"];
+
+const CENTRAL_IL_WEB_GEO_SCOPES = [
+  "Bloomington IL",
+  "Champaign IL",
+  "Peoria IL",
+  "Decatur IL",
+  "Urbana IL",
+  "Normal IL",
+  "Springfield IL",
+];
+
+function webSearchGeoScopesForMarket(slug: string): string[] {
+  const s = slug.trim().toLowerCase();
+  if (s === "chicagoland-il") return CHICAGOLAND_WEB_GEO_SCOPES;
+  if (s === "illinois-regional") return ILLINOIS_REGIONAL_WEB_GEO_SCOPES;
+  if (s === "central-illinois-il") return CENTRAL_IL_WEB_GEO_SCOPES;
+  return GEO_SCOPES;
+}
+
+function buildSearchQuery(cursorQi: number, geoScopes: string[]): string {
   const core = OPEN_MIC_QUERY_CORES[cursorQi % OPEN_MIC_QUERY_CORES.length]!;
-  const geo = GEO_SCOPES[Math.floor(cursorQi / OPEN_MIC_QUERY_CORES.length) % GEO_SCOPES.length]!;
+  const geo = geoScopes[Math.floor(cursorQi / OPEN_MIC_QUERY_CORES.length) % geoScopes.length]!;
   const q = geo ? `${core} ${geo}` : core;
   return q.replace(/\s+/g, " ").trim();
 }
@@ -250,8 +285,9 @@ const DEEP_PAGES_PER_HIT = 8;
 const NATIONWIDE_WEB_SEARCH_VOLUME_MULT = 1.22;
 
 /**
- * SerpAPI (primary) / Brave Search API (fallback) → nationwide open-mic venue queries → multi-page fetch → email extraction.
- * Runs only when the cron market slug is `national-discovery-us` (see `growthDiscoveryMarketSlugs()` default).
+ * SerpAPI (primary) / Brave Search API (fallback) → open-mic venue queries → multi-page fetch → email extraction.
+ * Runs when the cron context slug is one of `growthDiscoveryWebSearchMarketPriority()` (Illinois rollups + national);
+ * geo query tails are scoped per slug (Chicago-first vs statewide vs central IL vs nationwide rotation).
  */
 export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter {
   return {
@@ -266,13 +302,14 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           });
           return [];
         }
-        if (!isNationalDiscoveryMarket(ctx.discoveryMarketSlug)) {
-          console.info("[growth discovery] autonomous_web_search_venue skipped: not national discovery lane", {
+        if (!isGrowthDiscoveryWebSearchMarket(ctx.discoveryMarketSlug)) {
+          console.info("[growth discovery] autonomous_web_search_venue skipped: not a web-search discovery lane", {
             market: ctx.discoveryMarketSlug,
-            expected: "national-discovery-us",
           });
           return [];
         }
+        const geoScopes = webSearchGeoScopesForMarket(ctx.discoveryMarketSlug);
+        const rotationSpan = Math.max(1, OPEN_MIC_QUERY_CORES.length * geoScopes.length);
         const provider = await discoverySearchProviderForMarket(ctx.prisma, ctx.discoveryMarketSlug);
         if (!provider || !ctx.prisma) {
           const reason = !ctx.prisma
@@ -310,14 +347,15 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         let rawSearchItemsThisRun = 0;
         let droppedAfterResolve = 0;
         let droppedAllowHitUrl = 0;
-        console.info("[growth discovery] autonomous_web_search_venue run start (nationwide)", {
+        console.info("[growth discovery] autonomous_web_search_venue run start", {
           providerChosen: provider,
           market: ctx.discoveryMarketSlug,
+          geoScopeCount: geoScopes.length,
           searchCalls,
           maxFetches,
         });
         for (let i = 0; i < searchCalls; i++) {
-          const q = buildSearchQuery(cur.qi);
+          const q = buildSearchQuery(cur.qi, geoScopes);
           const res = await runWebSearch(
             q,
             { provider: cur.prov, start: cur.start },
@@ -332,7 +370,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
               chainNote: res?.meta.chainNote ?? "no_response",
               skipFallbackReason: res ? null : "runWebSearch_returned_null",
             });
-            cur.qi = (cur.qi + 1) % (OPEN_MIC_QUERY_CORES.length * GEO_SCOPES.length);
+            cur.qi = (cur.qi + 1) % rotationSpan;
             cur.start = 0;
             continue;
           }
@@ -361,7 +399,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           cur.prov = res.nextCursor.provider;
           cur.start = res.nextCursor.start;
           if (res.items.length < 8 || res.meta.bravePaginationExhausted) {
-            cur.qi = (cur.qi + 1) % (OPEN_MIC_QUERY_CORES.length * GEO_SCOPES.length);
+            cur.qi = (cur.qi + 1) % rotationSpan;
             cur.start = 0;
           }
         }

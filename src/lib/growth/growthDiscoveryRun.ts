@@ -15,7 +15,12 @@ import {
   growthSerpApiEnabled,
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readSerpApiMetricsForMarket } from "@/lib/growth/discovery/webSearch";
-import { growthDiscoveryMarketSlugs, nationalDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
+import {
+  growthDiscoveryMarketSlugs,
+  growthDiscoveryWebSearchMarketPriority,
+  isGrowthDiscoveryWebSearchMarket,
+  nationalDiscoveryMarketSlug,
+} from "@/lib/growth/marketsConfig";
 import { allGrowthDiscoveryAdapters } from "@/lib/growth/sources/growthDiscoveryAdapters";
 
 export type GrowthDiscoveryRunResult = {
@@ -55,6 +60,7 @@ export type GrowthDiscoveryRunResult = {
 
 const MAX_ADAPTER_ERROR_LINES = 80;
 const MAX_ADAPTER_ERROR_CHARS = 480;
+const AUTONOMOUS_WEB_SEARCH_ADAPTER_ID = "autonomous_web_search_venue";
 
 function discoveryRunSummaryForDb(r: GrowthDiscoveryRunResult): Prisma.InputJsonValue {
   const adapterErrors: Record<string, string[]> = {};
@@ -120,8 +126,13 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
     effectiveCapsByAdapter[adapter.id] = discoveryIngestCapForAdapter(adapter);
   }
 
+  const webSearchAdapter = adapters.find((a) => a.id === AUTONOMOUS_WEB_SEARCH_ADAPTER_ID);
+
   for (const slug of markets) {
     for (const adapter of adapters) {
+      if (adapter.id === AUTONOMOUS_WEB_SEARCH_ADAPTER_ID) {
+        continue;
+      }
       try {
         const cap = discoveryIngestCapForAdapter(adapter);
         let candidates = await adapter.discover({
@@ -172,6 +183,78 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
     }
   }
 
+  if (webSearchAdapter) {
+    const marketSetLower = new Set(markets.map((m) => m.trim().toLowerCase()));
+    const webPriority = process.env.GROWTH_DISCOVERY_MARKET_SLUGS?.trim()
+      ? growthDiscoveryWebSearchMarketPriority().filter((s) => marketSetLower.has(s.toLowerCase()))
+      : [...growthDiscoveryWebSearchMarketPriority()];
+    let pickedSlug: string | null = null;
+    for (const slug of webPriority) {
+      try {
+        const cap = discoveryIngestCapForAdapter(webSearchAdapter);
+        let candidates = await webSearchAdapter.discover({
+          discoveryMarketSlug: slug,
+          leadType: webSearchAdapter.leadType,
+          prisma,
+          autonomousWebSearchBudgetMultiplier: autonomousWebSearchBudgetMultiplier(webSearchAdapter.id),
+        });
+        if (candidates.length > cap) {
+          candidates = candidates.slice(0, cap);
+        }
+        candidatesEmittedByAdapter[webSearchAdapter.id] =
+          (candidatesEmittedByAdapter[webSearchAdapter.id] ?? 0) + candidates.length;
+
+        for (const cand of candidates) {
+          try {
+            const r = await ingestGrowthLeadCandidate(prisma, cand);
+            if (r.status === "created") {
+              created++;
+              byAdapter[webSearchAdapter.id].created++;
+            } else if (r.status === "duplicate") {
+              duplicates++;
+              byAdapter[webSearchAdapter.id].duplicates++;
+            } else {
+              skipped++;
+              byAdapter[webSearchAdapter.id].skipped++;
+            }
+          } catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            const reason = `ingest failure (${slug}): ${message.slice(0, 400)}`;
+            adapterErrors[webSearchAdapter.id].push(reason);
+            console.error("[growth discovery] adapter ingest failure", {
+              adapterId: webSearchAdapter.id,
+              market: slug,
+              reason,
+            });
+          }
+        }
+
+        if (candidates.length > 0) {
+          pickedSlug = slug;
+          console.info("[growth discovery] autonomous_web_search_venue priority stop", {
+            pickedSlug,
+            candidates: candidates.length,
+          });
+          break;
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        const reason = `discover failure (${slug}): ${message.slice(0, 400)}`;
+        adapterErrors[webSearchAdapter.id].push(reason);
+        console.error("[growth discovery] adapter discover failure", {
+          adapterId: webSearchAdapter.id,
+          market: slug,
+          reason,
+        });
+      }
+    }
+    if (!pickedSlug && webPriority.length > 0) {
+      console.info("[growth discovery] autonomous_web_search_venue priority exhausted", {
+        tried: webPriority,
+      });
+    }
+  }
+
   const adapterRegistry = listGrowthDiscoveryAdapterRegistry();
 
   const curatedProducers = adapterRegistry
@@ -196,9 +279,10 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
   }
 
   const nationalSlug = nationalDiscoveryMarketSlug();
-  const marketSet = new Set(markets.map((m) => m.trim().toLowerCase()));
-  /** Serp quota/state is per market; venue web search only increments counters on the nationwide lane. */
-  const serpMetricsMarketSlug = marketSet.has(nationalSlug.toLowerCase()) ? nationalSlug : (markets[0] ?? nationalSlug);
+  /** Serp quota/state row: use nationwide lane whenever any web-search market is in this run. */
+  const serpMetricsMarketSlug = markets.some((m) => isGrowthDiscoveryWebSearchMarket(m))
+    ? nationalSlug
+    : (markets[0] ?? nationalSlug);
   const serpMetrics = await readSerpApiMetricsForMarket(prisma, serpMetricsMarketSlug);
   const candidatesBySource: Record<string, number> = { ...candidatesEmittedByAdapter };
   const draftsCreatedBySource: Record<string, number> = {};

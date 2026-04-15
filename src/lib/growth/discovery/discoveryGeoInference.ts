@@ -1,3 +1,4 @@
+import { discoveryRollupSlugFromCityRegion } from "@/lib/discoveryMarket";
 import { nationalDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 
 const CHICAGOLAND_HINT = /\b(chicago|chicagoland|evanston|skokie|oak park|wicker park|logan square|rogers park|andersonville|hyde park|pilsen|lakeview|lincoln park|bucktown|uptown|berwyn|cicero|aurora|naperville|joliet|schaumburg|arlington heights)\b/i;
@@ -6,6 +7,7 @@ const CITY_ST = /\b([A-Za-z][A-Za-z\s.'-]{1,42}),\s*([A-Z]{2})\b/g;
 
 /**
  * Map Serp title/snippet/query + URL into a discovery rollup slug for growth leads.
+ * Illinois uses the same city lists as venue rollup (`discoveryRollupSlugFromCityRegion`).
  * Falls back to `national-discovery-us` when geo is unclear (expansion queue).
  */
 export function inferDiscoveryGeoForNationwideSearch(input: {
@@ -30,11 +32,9 @@ export function inferDiscoveryGeoForNationwideSearch(input: {
     if (!best || city.length >= best.city.length) best = { city, st };
   }
   if (best) {
-    if (best.st === "IL" && CHICAGOLAND_HINT.test(best.city)) {
-      return { discoveryMarketSlug: "chicagoland-il", city: best.city, region: "IL" };
-    }
+    const slug = discoveryRollupSlugFromCityRegion(best.city, best.st);
     return {
-      discoveryMarketSlug: `open-mics-${best.st.toLowerCase()}`,
+      discoveryMarketSlug: slug,
       city: best.city,
       region: best.st,
     };

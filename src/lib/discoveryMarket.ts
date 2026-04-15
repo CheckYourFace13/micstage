@@ -289,6 +289,15 @@ function thinMarketRollupSlug(city: string, region: string | null | undefined): 
   return locationDirectorySlug(city, region);
 }
 
+/**
+ * Growth / nationwide SERP geo: same Illinois city allowlists as venue thin rollup (`CHICAGOLAND_IL_CITIES`,
+ * `CENTRAL_ILLINOIS_CITIES`), then `illinois-regional` for other IL; other US states → `open-mics-{st}`.
+ * Does **not** apply venue-density “own city slug” rules — use `primaryDiscoverySlugForVenue` for that.
+ */
+export function discoveryRollupSlugFromCityRegion(city: string, region: string | null | undefined): string {
+  return thinMarketRollupSlug(city, region);
+}
+
 export function computeCitySlugVenueCounts(
   venues: { city: string | null; region: string | null }[],
 ): Map<string, number> {

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
-import { registerVenue } from "./actions";
+import { VENUE_REGISTER_SUBMIT_PATH } from "./actions";
 import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { VenuePlaceFields } from "./venuePlaceFields";
@@ -57,7 +57,11 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
         ) : null}
         <BetaNote className="mt-3" />
 
-        <form action={registerVenue} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <form
+          method="post"
+          action={VENUE_REGISTER_SUBMIT_PATH}
+          className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6"
+        >
           {traceId ? <input type="hidden" name="growthTraceLeadId" value={traceId} /> : null}
           {showPlace ? (
             <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white">

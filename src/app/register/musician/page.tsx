@@ -7,7 +7,7 @@ import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
 import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
-import { registerMusician } from "./actions";
+import { MUSICIAN_REGISTER_SUBMIT_PATH } from "./actions";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
 
@@ -36,7 +36,11 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
         </p>
         <BetaNote className="mt-3" />
 
-        <form action={registerMusician} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <form
+          method="post"
+          action={MUSICIAN_REGISTER_SUBMIT_PATH}
+          className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6"
+        >
           {showRate ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Too many signup attempts. Please try again later.

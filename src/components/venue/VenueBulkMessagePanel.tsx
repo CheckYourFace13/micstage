@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { lineupNavLabelFromYmd } from "@/lib/time";
-import { messageAllParticipantsForDateAction } from "@/app/venue/bulkMessageActions";
+import { VENUE_BULK_MESSAGE_SUBMIT_PATH } from "@/app/venue/bulkMessageActions";
 import { lineupPrimaryActionClass, lineupSecondaryActionClass } from "@/components/venue/lineupActionStyles";
 
 type Props = {
@@ -24,7 +24,7 @@ export function VenueBulkMessagePanel({ venueId, dateYmds, defaultYmd }: Props) 
         Sends one MicStage message (and email) to each artist with a MicStage account who has an active booking on the date
         you pick. Artists without accounts are skipped.
       </p>
-      <form action={messageAllParticipantsForDateAction} className="mt-4 grid gap-3">
+      <form method="post" action={VENUE_BULK_MESSAGE_SUBMIT_PATH} className="mt-4 grid gap-3">
         <input type="hidden" name="venueId" value={venueId} />
         <label className="grid gap-1 text-sm">
           <span className="text-white/80">Open mic date</span>

@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { VenuePlacePicker, type PlaceData } from "@/app/register/venue/VenuePlacePicker";
 import { formatVenuePickLabel } from "@/lib/musicianProfile";
-import { lookupMicStageVenueByGooglePlaceId } from "./actions";
+import { lookupMicStageVenueByGooglePlaceId } from "./lookupActions";
 
 export type PastVenueChip = { id: string; name: string; city: string | null; region: string | null };
 

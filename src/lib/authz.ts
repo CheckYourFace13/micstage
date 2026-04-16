@@ -26,6 +26,16 @@ export async function requireMusicianSession() {
   return s;
 }
 
+export async function getVenueSessionOrNull() {
+  const s = await getSession();
+  return s && s.kind === "venue" ? s : null;
+}
+
+export async function getMusicianSessionOrNull() {
+  const s = await getSession();
+  return s && s.kind === "musician" ? s : null;
+}
+
 /** Venue IDs the signed-in venue owner/manager may act for; empty if not a venue session. */
 export async function venueIdsForVenueSession(session: Session | null): Promise<string[]> {
   if (!session || session.kind !== "venue") return [];

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Venue } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 import { requirePrisma } from "@/lib/prisma";
-import { requireVenueSession, venueIdsForSession } from "@/lib/authz";
+import { getVenueSessionOrNull, venueIdsForSession } from "@/lib/authz";
 import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { VenueInviteManagerForm } from "./VenueInviteManagerForm";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
@@ -67,7 +67,7 @@ function logVenuePortalFailure(phase: string, e: unknown) {
   }
 }
 
-async function loadVenuePortalRows(session: Awaited<ReturnType<typeof requireVenueSession>>): Promise<{
+async function loadVenuePortalRows(session: NonNullable<Awaited<ReturnType<typeof getVenueSessionOrNull>>>): Promise<{
   venues: VenuePortalRow[];
   loadError: "none" | "requirePrisma" | "venueList";
   performerSuggestionsByVenueId: Record<string, Awaited<ReturnType<typeof loadVenuePerformerSuggestions>>>;
@@ -230,7 +230,10 @@ export default async function VenuePortalPage({
   const preservedQuery: Record<string, string | undefined> = Object.fromEntries(
     Object.entries(q).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
   );
-  const session = await requireVenueSession();
+  const session = await getVenueSessionOrNull();
+  if (!session) {
+    throw new Error("Expected venue auth guard middleware for /venue.");
+  }
   const { venues, loadError, performerSuggestionsByVenueId, performerHistoryByVenueId } =
     await loadVenuePortalRows(session);
 

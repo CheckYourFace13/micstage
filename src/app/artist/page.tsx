@@ -3,7 +3,7 @@ import type { MusicianUser } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
 import { requirePrisma } from "@/lib/prisma";
-import { requireMusicianSession } from "@/lib/authz";
+import { getMusicianSessionOrNull } from "@/lib/authz";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { minutesToTimeLabel } from "@/lib/time";
 import { ArtistProfileForm } from "./ArtistProfileForm";
@@ -167,7 +167,10 @@ export default async function ArtistPortalPage({
   searchParams: Promise<{ profile?: string; profileError?: string }>;
 }) {
   const q = await searchParams;
-  const session = await requireMusicianSession();
+  const session = await getMusicianSessionOrNull();
+  if (!session) {
+    throw new Error("Expected musician auth guard middleware for /artist.");
+  }
 
   const data = await loadArtistPortalData(session.musicianId);
 

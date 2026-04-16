@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { jwtVerify } from "jose";
 import {
   LAUNCH_METRICS_COOKIE_NAME,
   LAUNCH_METRICS_PATH_PREFIX,
@@ -16,6 +17,77 @@ import {
   logAdminLogoutDebug,
 } from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
+import { OM_SESSION_COOKIE_NAME } from "@/lib/authCookieNames";
+import { ARTIST_DASHBOARD_HREF, VENUE_DASHBOARD_HREF, safeLoginNextPath } from "@/lib/safeRedirect";
+
+type SessionKind = "venue" | "musician";
+
+function getAuthSecretForMiddleware(): string {
+  const fromEnv = process.env.AUTH_SECRET?.trim();
+  if (fromEnv) return fromEnv;
+  if (process.env.NODE_ENV === "development") {
+    return "micstage-dev-only-auth-secret-change-me";
+  }
+  throw new Error(
+    "Missing AUTH_SECRET. Add AUTH_SECRET to your environment (see .env.example).",
+  );
+}
+
+function authSecretKey() {
+  return new TextEncoder().encode(getAuthSecretForMiddleware());
+}
+
+async function sessionKindFromRequest(request: NextRequest): Promise<SessionKind | null> {
+  const token = request.cookies.get(OM_SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, authSecretKey());
+    const kind = payload?.kind;
+    if (kind === "venue" || kind === "musician") return kind;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function authRedirectForRequest(
+  request: NextRequest,
+  loginBase: "/login/venue" | "/login/musician",
+  fallback: string,
+): NextResponse {
+  const next = safeLoginNextPath(
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    fallback,
+  );
+  const target = request.nextUrl.clone();
+  target.pathname = loginBase;
+  target.search = "";
+  target.searchParams.set("next", next);
+  return NextResponse.redirect(target);
+}
+
+async function appPortalAuthGuard(request: NextRequest): Promise<NextResponse | null> {
+  const pathname = request.nextUrl.pathname;
+  if (pathname !== "/artist" && pathname !== "/venue" && pathname !== "/messages") {
+    return null;
+  }
+
+  const kind = await sessionKindFromRequest(request);
+  if (pathname === "/artist") {
+    return kind === "musician"
+      ? null
+      : authRedirectForRequest(request, "/login/musician", ARTIST_DASHBOARD_HREF);
+  }
+  if (pathname === "/venue") {
+    return kind === "venue"
+      ? null
+      : authRedirectForRequest(request, "/login/venue", VENUE_DASHBOARD_HREF);
+  }
+  return kind === "musician" || kind === "venue"
+    ? null
+    : authRedirectForRequest(request, "/login/musician", "/messages");
+}
 async function adminSessionTokenOrNull(secret: string): Promise<string | null> {
   try {
     if (typeof crypto === "undefined" || !crypto.subtle) {
@@ -61,6 +133,8 @@ export async function middleware(request: NextRequest) {
 
 async function runMiddleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  const appPortalGuard = await appPortalAuthGuard(request);
+  if (appPortalGuard) return appPortalGuard;
 
   if (
     process.env.MICSTAGE_ADMIN_LOGOUT_DEBUG === "1" &&

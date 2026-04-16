@@ -1,6 +1,10 @@
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { ArtistProfileWebsiteImport } from "@/components/portal/ProfileWebsiteImportPanels";
-import { updateMusicianProfile, uploadMusicianProfilePhoto, uploadMusicianSecondaryPhoto } from "./actions";
+import {
+  ARTIST_PROFILE_SUBMIT_PATH,
+  ARTIST_UPLOAD_PROFILE_PHOTO_SUBMIT_PATH,
+  ARTIST_UPLOAD_SECONDARY_PHOTO_SUBMIT_PATH,
+} from "./actions";
 
 // Prisma payload is wide; fields are validated at save time.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- server-only prop from artist portal query
@@ -75,7 +79,12 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
         </p>
       </div>
 
-      <form action={updateMusicianProfile} encType="multipart/form-data" className="mt-6 grid gap-6">
+      <form
+        method="post"
+        action={ARTIST_PROFILE_SUBMIT_PATH}
+        encType="multipart/form-data"
+        className="mt-6 grid gap-6"
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid gap-1 text-sm">
             <span className="text-white/80">
@@ -202,7 +211,7 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
                 className="max-w-xs text-xs text-white/70 file:mr-2 file:rounded file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white"
               />
               <FormSubmitButton
-                formAction={uploadMusicianProfilePhoto}
+                formAction={ARTIST_UPLOAD_PROFILE_PHOTO_SUBMIT_PATH}
                 label="Upload profile photo"
                 pendingLabel="Uploading…"
                 className="h-9 rounded-md border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/15 disabled:opacity-60"
@@ -238,7 +247,7 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
                 className="max-w-xs text-xs text-white/70 file:mr-2 file:rounded file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white"
               />
               <FormSubmitButton
-                formAction={uploadMusicianSecondaryPhoto}
+                formAction={ARTIST_UPLOAD_SECONDARY_PHOTO_SUBMIT_PATH}
                 label="Upload second photo"
                 pendingLabel="Uploading…"
                 className="h-9 rounded-md border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/15 disabled:opacity-60"

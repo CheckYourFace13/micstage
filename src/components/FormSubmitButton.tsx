@@ -8,7 +8,7 @@ type Props = {
   className?: string;
   disabled?: boolean;
   /** When set, this submit posts the enclosing form to this action (e.g. upload slot) instead of the form `action`. */
-  formAction?: (formData: FormData) => void | Promise<void>;
+  formAction?: string | ((formData: FormData) => void | Promise<void>);
 };
 
 /** Must be rendered inside the same <form> that triggers the submission. */

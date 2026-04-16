@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { venueIdsForVenueSession } from "@/lib/authz";
 import { unreadForMusician, unreadForVenue } from "@/lib/messaging/service";
 import { requirePrisma } from "@/lib/prisma";
@@ -15,7 +14,7 @@ export const metadata = {
 export default async function MessagesInboxPage() {
   const session = await getSession();
   if (!session || (session.kind !== "musician" && session.kind !== "venue")) {
-    redirect("/login/musician?next=%2Fmessages");
+    throw new Error("Expected auth guard middleware for /messages.");
   }
 
   const prisma = requirePrisma();

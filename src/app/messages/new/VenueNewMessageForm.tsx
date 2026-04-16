@@ -11,15 +11,15 @@ export function VenueNewMessageForm(props: {
   venueRows: VenueRow[];
   musiciansByVenue: Record<string, EligibleMusicianRow[]>;
   initialVenueId: string;
-  action: (formData: FormData) => void;
+  actionPath: string;
 }) {
-  const { venueRows, musiciansByVenue, initialVenueId, action } = props;
+  const { venueRows, musiciansByVenue, initialVenueId, actionPath } = props;
   const [venueId, setVenueId] = useState(initialVenueId);
 
   const musicians = useMemo(() => musiciansByVenue[venueId] ?? [], [musiciansByVenue, venueId]);
 
   return (
-    <form action={action} className="mt-6 grid gap-4">
+    <form method="post" action={actionPath} className="mt-6 grid gap-4">
       <label className="grid gap-1 text-sm">
         <span className="text-white/80">Your venue</span>
         <select

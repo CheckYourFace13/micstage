@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { bookSlot, cancelBooking } from "@/app/venues/[venueSlug]/actions";
+import { VENUE_BOOK_SLOT_SUBMIT_PATH, VENUE_CANCEL_BOOKING_SUBMIT_PATH } from "@/app/venues/[venueSlug]/actions";
 import type { Session } from "@/lib/session";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
@@ -176,7 +176,11 @@ export function VenueLineupBoard({
 
                       const rightCell =
                         activeBooking && canCancelBooking ? (
-                          <form action={cancelBooking} className="w-full sm:flex sm:justify-end">
+                          <form
+                            method="post"
+                            action={`/venues/${venue.slug}/${VENUE_CANCEL_BOOKING_SUBMIT_PATH}`}
+                            className="w-full sm:flex sm:justify-end"
+                          >
                             <input type="hidden" name="venueSlug" value={venue.slug} />
                             <input type="hidden" name="returnPath" value={returnPath} />
                             <input type="hidden" name="bookingId" value={activeBooking.id} />
@@ -190,7 +194,8 @@ export function VenueLineupBoard({
                           isMusician ? (
                             <form
                               id={`reserve-form-${s.id}`}
-                              action={bookSlot}
+                              method="post"
+                              action={`/venues/${venue.slug}/${VENUE_BOOK_SLOT_SUBMIT_PATH}`}
                               className="w-full sm:flex sm:justify-end"
                               data-track-event="booking_started"
                             >

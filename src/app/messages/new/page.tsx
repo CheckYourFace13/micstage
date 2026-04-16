@@ -6,7 +6,7 @@ import { loadEligibleMusiciansForVenue, loadEligibleVenuesForMusician } from "@/
 import { requirePrisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { lineupPrimaryActionClass, lineupSecondaryActionClass } from "@/components/venue/lineupActionStyles";
-import { startThreadMusicianAction, startThreadVenueAction } from "../actions";
+import { MESSAGES_NEW_MUSICIAN_SUBMIT_PATH, MESSAGES_NEW_VENUE_SUBMIT_PATH } from "../actions";
 import { VenueNewMessageForm } from "./VenueNewMessageForm";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,7 @@ export default async function NewMessagePage(props: { searchParams: Promise<{ er
             No eligible venues yet — book a slot or add venues from your artist dashboard.
           </p>
         ) : (
-          <form action={startThreadMusicianAction} className="mt-6 grid gap-4">
+          <form method="post" action={MESSAGES_NEW_MUSICIAN_SUBMIT_PATH} className="mt-6 grid gap-4">
             <label className="grid gap-1 text-sm">
               <span className="text-white/80">Venue</span>
               <select
@@ -126,7 +126,7 @@ export default async function NewMessagePage(props: { searchParams: Promise<{ er
           venueRows={venueRows}
           musiciansByVenue={musiciansByVenue}
           initialVenueId={defaultVenueId}
-          action={startThreadVenueAction}
+          actionPath={MESSAGES_NEW_VENUE_SUBMIT_PATH}
         />
       )}
     </main>

@@ -67,6 +67,29 @@ export async function claimNextPendingMarketingJob(prisma: PrismaClient) {
   });
 }
 
+/** Claim the next due PENDING job for a specific kind. */
+export async function claimNextPendingMarketingJobOfKind(
+  prisma: PrismaClient,
+  kind: MarketingJobKind,
+) {
+  const now = new Date();
+  return prisma.$transaction(async (tx) => {
+    const next = await tx.marketingJob.findFirst({
+      where: {
+        kind,
+        status: "PENDING",
+        OR: [{ runAfter: null }, { runAfter: { lte: now } }],
+      },
+      orderBy: [{ createdAt: "asc" }],
+    });
+    if (!next) return null;
+    return tx.marketingJob.update({
+      where: { id: next.id },
+      data: { status: "PROCESSING", attempts: { increment: 1 } },
+    });
+  });
+}
+
 export async function completeMarketingJob(
   prisma: PrismaClient,
   jobId: string,

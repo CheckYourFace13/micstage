@@ -189,7 +189,7 @@ export function splitCsvIntoRows(text: string): string[][] {
   return rows;
 }
 
-export const CLAUDE_GROWTH_CSV_HEADERS = [
+export const LEAD_UPLOAD_CSV_HEADERS = [
   "name",
   "leadType",
   "discoveryMarketSlug",
@@ -208,6 +208,9 @@ export const CLAUDE_GROWTH_CSV_HEADERS = [
   "fitScore",
   "internalNotes",
 ] as const;
+
+/** Backward-compatible alias used by older imports/UI. */
+export const CLAUDE_GROWTH_CSV_HEADERS = LEAD_UPLOAD_CSV_HEADERS;
 
 export type ParsedClaudeGrowthLeadRow = {
   rowIndex: number;

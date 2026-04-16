@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { importClaudeGrowthLeadsCsvAction } from "@/app/internal/admin/growthActions";
-import { CLAUDE_GROWTH_CSV_HEADERS, parseClaudeGrowthLeadCsv } from "@/lib/growth/csvImport";
+import { LEAD_UPLOAD_CSV_HEADERS, parseClaudeGrowthLeadCsv } from "@/lib/growth/csvImport";
 
 export function ClaudeGrowthCsvImportPanel() {
   const [previewLabel, setPreviewLabel] = useState<string | null>(null);
@@ -14,9 +14,9 @@ export function ClaudeGrowthCsvImportPanel() {
       <form action={importClaudeGrowthLeadsCsvAction} encType="multipart/form-data" className="space-y-3">
         <div className="flex flex-wrap items-end gap-2">
           <label className="grid gap-1 text-xs">
-            <span className="text-zinc-500">Claude spreadsheet (.csv)</span>
+            <span className="text-zinc-500">Lead spreadsheet (.csv)</span>
             <input
-              name="claudeCsvFile"
+              name="leadCsvFile"
               type="file"
               accept=".csv,text/csv"
               required
@@ -51,12 +51,12 @@ export function ClaudeGrowthCsvImportPanel() {
             type="submit"
             className="rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-600"
           >
-            Import Claude CSV
+            Import Lead CSV
           </button>
         </div>
         <p className="text-[11px] leading-relaxed text-zinc-500">
           Headers (exact names, case-insensitive):{" "}
-          <code className="text-zinc-400">{CLAUDE_GROWTH_CSV_HEADERS.join(", ")}</code>. Rows are deduped against
+          <code className="text-zinc-400">{LEAD_UPLOAD_CSV_HEADERS.join(", ")}</code>. Rows are deduped against
           existing growth leads and marketing contacts; venue rows use the same contact + path automation as other
           imports. Sends still obey daily caps, domain caps, cooldowns, and suppression — unchanged.
         </p>

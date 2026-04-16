@@ -9,8 +9,10 @@ import { venueLeadMatchesAutoDraftHeuristic } from "@/lib/growth/growthAutoDraft
 import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
 import { parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
+import { inferDiscoveryGeoForNationwideSearch } from "@/lib/growth/discovery/discoveryGeoInference";
 import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
 import { sendGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadDraftSend";
+import { discoveryRollupSlugFromCityRegion } from "@/lib/discoveryMarket";
 import type {
   GrowthLeadAcquisitionStage,
   GrowthLeadPerformanceTag,
@@ -262,11 +264,64 @@ function claudeRowEmailStats(row: {
   return { hasPrimary, hasAdditional };
 }
 
+const LEAD_UPLOAD_FALLBACK_MARKET_SLUG = "manual-upload";
+
+function resolveLeadUploadMarketSlug(row: {
+  rowIndex: number;
+  discoveryMarketSlug: string | null;
+  city: string | null;
+  suburb: string | null;
+  websiteUrl: string | null;
+}): { slug: string; warning: string | null } {
+  const explicit = row.discoveryMarketSlug?.trim();
+  if (explicit) return { slug: explicit, warning: null };
+
+  const city = row.city?.trim();
+  if (city) {
+    const inferred = discoveryRollupSlugFromCityRegion(city, null);
+    return {
+      slug: inferred,
+      warning: `Row ${row.rowIndex}: inferred discovery market slug "${inferred}" from city "${city}".`,
+    };
+  }
+
+  const suburb = row.suburb?.trim();
+  if (suburb) {
+    const inferred = discoveryRollupSlugFromCityRegion(suburb, null);
+    return {
+      slug: inferred,
+      warning: `Row ${row.rowIndex}: inferred discovery market slug "${inferred}" from suburb "${suburb}".`,
+    };
+  }
+
+  const website = row.websiteUrl?.trim();
+  if (website) {
+    const inferredGeo = inferDiscoveryGeoForNationwideSearch({
+      title: "",
+      snippet: "",
+      searchQuery: "",
+      pageUrl: website,
+    });
+    const inferred = inferredGeo.discoveryMarketSlug;
+    if (inferred?.trim()) {
+      return {
+        slug: inferred,
+        warning: `Row ${row.rowIndex}: inferred discovery market slug "${inferred}" from website URL.`,
+      };
+    }
+  }
+
+  return {
+    slug: LEAD_UPLOAD_FALLBACK_MARKET_SLUG,
+    warning: `Row ${row.rowIndex}: discovery market slug missing; used fallback "${LEAD_UPLOAD_FALLBACK_MARKET_SLUG}".`,
+  };
+}
+
 export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
   await assertAdminSession();
   const prisma = requirePrisma();
 
-  const file = formData.get("claudeCsvFile");
+  const file = formData.get("leadCsvFile") ?? formData.get("claudeCsvFile");
   if (!(file instanceof File) || file.size === 0) {
     redirect(q("/internal/admin/growth", "err", "noFile"));
   }
@@ -289,6 +344,7 @@ export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
   let duplicateNoChange = 0;
   let ingestSkipped = 0;
   const rowErrors = [...errors];
+  const rowWarnings: string[] = [];
 
   let primaryEmailRows = 0;
   let additionalEmailRows = 0;
@@ -299,14 +355,14 @@ export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
   const venueAutoEligibleLeadIds = new Set<string>();
 
   for (const r of rows) {
-    const slug = r.discoveryMarketSlug?.trim();
-    if (!slug) {
-      rowErrors.push(`Row ${r.rowIndex}: missing discovery market slug`);
+    const { hasPrimary, hasAdditional } = claudeRowEmailStats(r);
+    const hasUsableEmail = hasPrimary || hasAdditional;
+    if (!hasUsableEmail) {
+      rowWarnings.push(`Row ${r.rowIndex}: skipped (no usable email in contactEmail/additionalContactEmails).`);
       ingestSkipped++;
       continue;
     }
 
-    const { hasPrimary, hasAdditional } = claudeRowEmailStats(r);
     if (hasPrimary) primaryEmailRows++;
     if (hasAdditional) additionalEmailRows++;
     const hasPath = !!(
@@ -320,6 +376,9 @@ export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
     if (r.leadType === "VENUE") venueRows++;
     else if (r.leadType === "ARTIST") artistRows++;
     else if (r.leadType === "PROMOTER_ACCOUNT") promoterRows++;
+
+    const market = resolveLeadUploadMarketSlug(r);
+    if (market.warning) rowWarnings.push(market.warning);
 
     const importKey = `claude_csv:${batchId}:row:${r.rowIndex}`;
     const candidate: GrowthLeadCandidate = {
@@ -335,7 +394,7 @@ export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
       city: r.city,
       suburb: r.suburb,
       region: null,
-      discoveryMarketSlug: slug,
+      discoveryMarketSlug: market.slug,
       source: r.source?.trim() || "claude_csv",
       sourceKind: r.sourceKind,
       fitScore: r.fitScore,
@@ -392,23 +451,31 @@ export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
   revalidatePath("/internal/admin/growth/promoters");
 
   if (rowErrors.length) console.error("[growth claude csv import]", rowErrors);
+  if (rowWarnings.length) console.warn("[growth lead upload warnings]", rowWarnings);
 
   const qParams = new URLSearchParams();
-  qParams.set("claudeBatch", batchId);
-  qParams.set("claudeFile", safeName);
-  qParams.set("claudeRows", String(rows.length));
-  qParams.set("claudeInserted", String(inserted));
-  qParams.set("claudeUpdated", String(updated));
-  qParams.set("claudeDup", String(duplicateNoChange));
-  qParams.set("claudeSkipped", String(ingestSkipped));
-  qParams.set("claudeParseErrs", String(errors.length));
-  qParams.set("claudePrimaryEmailRows", String(primaryEmailRows));
-  qParams.set("claudeAdditionalEmailRows", String(additionalEmailRows));
-  qParams.set("claudeContactPageOnlyRows", String(contactPageOnlyRows));
-  qParams.set("claudeVenueRows", String(venueRows));
-  qParams.set("claudeArtistRows", String(artistRows));
-  qParams.set("claudePromoterRows", String(promoterRows));
-  qParams.set("claudeVenueAutoEligible", String(venueAutoEligibleLeadIds.size));
+  qParams.set("leadUploadBatch", batchId);
+  qParams.set("leadUploadFile", safeName);
+  qParams.set("leadUploadRows", String(rows.length));
+  qParams.set("leadUploadInserted", String(inserted));
+  qParams.set("leadUploadUpdated", String(updated));
+  qParams.set("leadUploadDup", String(duplicateNoChange));
+  qParams.set("leadUploadSkipped", String(ingestSkipped));
+  qParams.set("leadUploadParseErrs", String(errors.length));
+  qParams.set("leadUploadPrimaryEmailRows", String(primaryEmailRows));
+  qParams.set("leadUploadAdditionalEmailRows", String(additionalEmailRows));
+  qParams.set("leadUploadContactPageOnlyRows", String(contactPageOnlyRows));
+  qParams.set("leadUploadVenueRows", String(venueRows));
+  qParams.set("leadUploadArtistRows", String(artistRows));
+  qParams.set("leadUploadPromoterRows", String(promoterRows));
+  qParams.set("leadUploadVenueAutoEligible", String(venueAutoEligibleLeadIds.size));
+  qParams.set("leadUploadWarnCount", String(rowWarnings.length));
+  if (rowWarnings.length > 0) {
+    qParams.set("leadUploadWarnSample", rowWarnings.slice(0, 12).join(" || ").slice(0, 1800));
+  }
+  if (rowErrors.length > 0) {
+    qParams.set("leadUploadErrorSample", rowErrors.slice(0, 12).join(" || ").slice(0, 1800));
+  }
 
   redirect(`/internal/admin/growth?${qParams.toString()}`);
 }

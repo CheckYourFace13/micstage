@@ -55,6 +55,24 @@ export default async function AdminGrowthHubPage(props: {
     claudeArtistRows?: string;
     claudePromoterRows?: string;
     claudeVenueAutoEligible?: string;
+    leadUploadBatch?: string;
+    leadUploadFile?: string;
+    leadUploadRows?: string;
+    leadUploadInserted?: string;
+    leadUploadUpdated?: string;
+    leadUploadDup?: string;
+    leadUploadSkipped?: string;
+    leadUploadParseErrs?: string;
+    leadUploadPrimaryEmailRows?: string;
+    leadUploadAdditionalEmailRows?: string;
+    leadUploadContactPageOnlyRows?: string;
+    leadUploadVenueRows?: string;
+    leadUploadArtistRows?: string;
+    leadUploadPromoterRows?: string;
+    leadUploadVenueAutoEligible?: string;
+    leadUploadWarnCount?: string;
+    leadUploadWarnSample?: string;
+    leadUploadErrorSample?: string;
   }>;
 }) {
   await assertAdminSession();
@@ -313,6 +331,25 @@ export default async function AdminGrowthHubPage(props: {
   const chiSlug = defaultGrowthMetro().discoveryMarketSlug;
   const curatedDiscoveryAdapters = listGrowthDiscoveryAdapterRegistry().filter((a) => a.tier === "curated");
   const autonomousDiscoveryAdapters = listGrowthDiscoveryAdapterRegistry().filter((a) => a.tier === "autonomous");
+  const leadUploadBatch = params.leadUploadBatch ?? params.claudeBatch;
+  const leadUploadFile = params.leadUploadFile ?? params.claudeFile;
+  const leadUploadRows = params.leadUploadRows ?? params.claudeRows;
+  const leadUploadInserted = params.leadUploadInserted ?? params.claudeInserted;
+  const leadUploadUpdated = params.leadUploadUpdated ?? params.claudeUpdated;
+  const leadUploadDup = params.leadUploadDup ?? params.claudeDup;
+  const leadUploadSkipped = params.leadUploadSkipped ?? params.claudeSkipped;
+  const leadUploadParseErrs = params.leadUploadParseErrs ?? params.claudeParseErrs;
+  const leadUploadPrimaryEmailRows =
+    params.leadUploadPrimaryEmailRows ?? params.claudePrimaryEmailRows;
+  const leadUploadAdditionalEmailRows =
+    params.leadUploadAdditionalEmailRows ?? params.claudeAdditionalEmailRows;
+  const leadUploadContactPageOnlyRows =
+    params.leadUploadContactPageOnlyRows ?? params.claudeContactPageOnlyRows;
+  const leadUploadVenueRows = params.leadUploadVenueRows ?? params.claudeVenueRows;
+  const leadUploadArtistRows = params.leadUploadArtistRows ?? params.claudeArtistRows;
+  const leadUploadPromoterRows = params.leadUploadPromoterRows ?? params.claudePromoterRows;
+  const leadUploadVenueAutoEligible =
+    params.leadUploadVenueAutoEligible ?? params.claudeVenueAutoEligible;
 
   return (
     <main className="mx-auto max-w-5xl px-3 py-6">
@@ -598,36 +635,47 @@ export default async function AdminGrowthHubPage(props: {
           failures &gt; 0.
         </p>
       ) : null}
-      {params.claudeRows !== undefined ? (
+      {leadUploadRows !== undefined ? (
         <div className="mt-3 rounded border border-teal-700/40 bg-teal-950/25 px-3 py-2 text-sm text-teal-50">
-          <p className="font-medium text-teal-100">Claude CSV import summary</p>
+          <p className="font-medium text-teal-100">Lead upload summary</p>
           <p className="mt-1 text-xs text-teal-200/90">
-            Batch <span className="font-mono text-teal-100">{params.claudeBatch}</span>
-            {params.claudeFile ? (
+            Batch <span className="font-mono text-teal-100">{leadUploadBatch}</span>
+            {leadUploadFile ? (
               <>
                 {" "}
-                · file <span className="font-mono text-teal-100">{params.claudeFile}</span>
+                · file <span className="font-mono text-teal-100">{leadUploadFile}</span>
               </>
             ) : null}
           </p>
           <ul className="mt-2 grid gap-1 text-xs text-teal-100/95 sm:grid-cols-2">
-            <li>Rows in file: {params.claudeRows}</li>
-            <li>New leads created: {params.claudeInserted}</li>
-            <li>Existing leads updated (merged fields): {params.claudeUpdated}</li>
-            <li>Duplicates (no field changes): {params.claudeDup}</li>
-            <li>Skipped / failed rows: {params.claudeSkipped}</li>
-            <li>CSV parse errors: {params.claudeParseErrs}</li>
-            <li>Rows with primary email (valid): {params.claudePrimaryEmailRows}</li>
-            <li>Rows with ≥1 additional email (valid): {params.claudeAdditionalEmailRows}</li>
-            <li>Rows with paths only (no valid email): {params.claudeContactPageOnlyRows}</li>
-            <li>VENUE / ARTIST / PROMOTER rows: {params.claudeVenueRows} / {params.claudeArtistRows} /{" "}
-              {params.claudePromoterRows}</li>
+            <li>Rows in file: {leadUploadRows}</li>
+            <li>New leads created: {leadUploadInserted}</li>
+            <li>Existing leads updated (merged fields): {leadUploadUpdated}</li>
+            <li>Duplicates (no field changes): {leadUploadDup}</li>
+            <li>Skipped / failed rows: {leadUploadSkipped}</li>
+            <li>CSV parse errors: {leadUploadParseErrs}</li>
+            <li>Rows with primary email (valid): {leadUploadPrimaryEmailRows}</li>
+            <li>Rows with ≥1 additional email (valid): {leadUploadAdditionalEmailRows}</li>
+            <li>Rows with paths only (no valid email): {leadUploadContactPageOnlyRows}</li>
+            <li>VENUE / ARTIST / PROMOTER rows: {leadUploadVenueRows} / {leadUploadArtistRows} /{" "}
+              {leadUploadPromoterRows}</li>
             <li className="sm:col-span-2">
               Distinct venue leads matching auto-draft heuristic in an ACTIVE launch market:{" "}
-              <span className="font-semibold text-teal-50">{params.claudeVenueAutoEligible}</span> (next cron run can
+              <span className="font-semibold text-teal-50">{leadUploadVenueAutoEligible}</span> (next cron run can
               draft/send under existing caps)
             </li>
           </ul>
+          {params.leadUploadWarnCount ? (
+            <p className="mt-2 text-xs text-amber-200/95">
+              Row warnings: {params.leadUploadWarnCount}
+              {params.leadUploadWarnSample ? <> · {params.leadUploadWarnSample.split(" || ").join(" | ")}</> : null}
+            </p>
+          ) : null}
+          {params.leadUploadErrorSample ? (
+            <p className="mt-1 text-xs text-red-200/95">
+              Row errors sample: {params.leadUploadErrorSample.split(" || ").join(" | ")}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -751,9 +799,9 @@ export default async function AdminGrowthHubPage(props: {
 
       <section className="mt-10 grid gap-8 lg:grid-cols-2">
         <div className="rounded-lg border border-teal-900/50 bg-zinc-900/40 p-4">
-          <h2 className="text-lg font-medium text-white">Import Claude CSV (full column set)</h2>
+          <h2 className="text-lg font-medium text-white">Lead upload (full column set)</h2>
           <p className="mt-1 text-xs text-zinc-500">
-            Upload a Claude-generated spreadsheet. Preview runs in the browser; import runs on the server with batch
+            Upload a lead spreadsheet. Preview runs in the browser; import runs on the server with batch
             metadata in internal notes. Same dedupe, MarketingContact sidecar, and venue path jobs as the rest of growth.
           </p>
           <ClaudeGrowthCsvImportPanel />

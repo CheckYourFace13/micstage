@@ -113,7 +113,9 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     if (outreachSendsThisRun >= outreachSendCapPerRun) break;
     const conf = d.lead.contactEmailConfidence;
     if (!(conf === "HIGH" || (allowMediumOutreach && conf === "MEDIUM"))) continue;
-    const slug = d.lead.discoveryMarketSlug?.trim().toLowerCase();
+    // Mirror approved-backlog behavior: use draft slug when present, then lead slug.
+    // This keeps older/migrated rows with null lead slug eligible when draft slug is valid.
+    const slug = (d.discoveryMarketSlug ?? d.lead.discoveryMarketSlug ?? "").trim().toLowerCase();
     if (!slug || !activeMarketSet.has(slug)) {
       continue;
     }

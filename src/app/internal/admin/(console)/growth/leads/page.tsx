@@ -34,6 +34,7 @@ export default async function AdminGrowthLeadsPage(props: {
     contactQ?: string;
     acquisition?: string;
     queue?: string;
+    sourceKind?: string;
     page?: string;
     perPage?: string;
   }>;
@@ -70,6 +71,7 @@ export default async function AdminGrowthLeadsPage(props: {
   const quickViewBase = new URLSearchParams();
   quickViewBase.set("market", marketSlug);
   if (p.type?.trim()) quickViewBase.set("type", p.type.trim());
+  if (p.sourceKind?.trim()) quickViewBase.set("sourceKind", p.sourceKind.trim());
 
   const hrefAllLeads = `/internal/admin/growth/leads?${quickViewBase.toString()}`;
   const qsEmailReady = new URLSearchParams(quickViewBase);
@@ -78,6 +80,10 @@ export default async function AdminGrowthLeadsPage(props: {
   const qsValidHm = new URLSearchParams(quickViewBase);
   qsValidHm.set("queue", "valid_high_medium_email");
   const hrefValidHighMediumEmail = `/internal/admin/growth/leads?${qsValidHm.toString()}`;
+  const qsValidHmUploads = new URLSearchParams(quickViewBase);
+  qsValidHmUploads.set("queue", "valid_high_medium_email");
+  qsValidHmUploads.set("sourceKind", "CSV_IMPORT,CLAUDE_CSV");
+  const hrefValidHmUploadImports = `/internal/admin/growth/leads?${qsValidHmUploads.toString()}`;
   const qsContactPath = new URLSearchParams(quickViewBase);
   qsContactPath.set("queue", "contact_path_queue");
   const hrefContactPathQueue = `/internal/admin/growth/leads?${qsContactPath.toString()}`;
@@ -128,6 +134,12 @@ export default async function AdminGrowthLeadsPage(props: {
             Valid email (HIGH/MEDIUM)
           </Link>
           <Link
+            href={hrefValidHmUploadImports}
+            className="rounded-md border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
+          >
+            Valid email — CSV / Claude uploads only
+          </Link>
+          <Link
             href={hrefContactPathQueue}
             className={`rounded-md border px-3 py-2 text-sm font-medium ${
               outreachQueue === "contact_path_queue"
@@ -146,7 +158,8 @@ export default async function AdminGrowthLeadsPage(props: {
           </a>
         </div>
         <p className="w-full text-[11px] leading-snug text-zinc-500 sm:pl-0">
-          Routes: <code className="text-zinc-400">/internal/admin/growth/leads</code> (filters in query). CSV:{" "}
+          Routes: <code className="text-zinc-400">/internal/admin/growth/leads</code> (filters in query; optional{" "}
+          <code className="text-zinc-400">sourceKind=CSV_IMPORT,CLAUDE_CSV</code> to narrow by ingestion path). CSV:{" "}
           <code className="text-zinc-400">/internal/admin/growth/leads/export</code> — same query string as this page (exports the{" "}
           <strong className="text-zinc-300">full</strong> filtered set, not only this page).
         </p>
@@ -163,8 +176,9 @@ export default async function AdminGrowthLeadsPage(props: {
         <p className="mt-1 text-xs text-zinc-500">
           The main <code className="text-zinc-400">GrowthLead</code> table now only accepts new rows when discovery/import extracts
           at least one parsed-valid email. Use <strong className="text-zinc-300">Valid email (HIGH/MEDIUM)</strong> + Export for the
-          full mailable contact list. Secondary queues keep contact URLs and socials for manual follow-up (not mixed into the
-          email list). Email-ready adds status + discovery-confidence gates; suppression still applies at send time.
+          full mailable contact list (uploads and discovery share this queue; omit <code className="text-zinc-400">sourceKind</code>{" "}
+          to see everyone). Secondary queues keep contact URLs and socials for manual follow-up (not mixed into the email list).
+          Email-ready adds status + discovery-confidence gates; suppression still applies at send time.
         </p>
         <ul className="mt-2 flex flex-wrap gap-2 text-sm">
           <li>
@@ -415,6 +429,17 @@ export default async function AdminGrowthLeadsPage(props: {
               <option value="ACCOUNT_CREATED">ACCOUNT_CREATED</option>
               <option value="LISTING_LIVE">LISTING_LIVE</option>
             </select>
+          </label>
+          <label className="grid gap-1 sm:col-span-2">
+            <span className="text-xs text-zinc-500">
+              Source kind (comma-separated, e.g. CSV_IMPORT,CLAUDE_CSV or WEBSITE_CONTACT,SCHEDULED_JOB)
+            </span>
+            <input
+              name="sourceKind"
+              defaultValue={p.sourceKind ?? ""}
+              placeholder="CSV_IMPORT,CLAUDE_CSV"
+              className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 font-mono text-xs text-white"
+            />
           </label>
         </div>
         <button type="submit" className="rounded-md bg-zinc-700 px-4 py-2 text-sm text-white hover:bg-zinc-600">

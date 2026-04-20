@@ -43,6 +43,11 @@ export type GrowthDiscoveryRunResult = {
   serpapi_disabled_until: string | null;
   serpapi_last_429_at: string | null;
   serpapi_reason: string | null;
+  /**
+   * Same keys as `candidatesEmittedByAdapter`: **discovery adapter ids** (plus synthetic keys like web search), not
+   * `GrowthLead.source` / `GrowthLeadSourceKind`. CSV/Claude uploads never appear here — see cron
+   * `growthLeadsCreatedUtcTodayBySourceKind` for created rows by `sourceKind`.
+   */
   candidates_by_source: Record<string, number>;
   drafts_created_by_source: Record<string, number>;
   sent_by_source: Record<string, number>;

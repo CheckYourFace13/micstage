@@ -3,6 +3,7 @@ import type {
   GrowthLeadContactQuality,
   GrowthLeadOpenMicSignalTier,
   GrowthLeadPerformanceTag,
+  GrowthLeadSourceKind,
   GrowthLeadStatus,
   GrowthLeadType,
 } from "@/generated/prisma/client";
@@ -38,6 +39,8 @@ export type GrowthLeadListFilters = {
   pipelineOnly?: boolean;
   /** When true, only leads with at least one PENDING_REVIEW outreach draft. */
   draftPending?: boolean;
+  /** Optional filter on `GrowthLead.sourceKind` (upload vs discovery, etc.). */
+  sourceKinds?: GrowthLeadSourceKind[] | null;
   /**
    * Primary vs secondary outreach queues. Does not delete data — filters the list only.
    * `email_outreach_ready` adds status + confidence gates (marketing suppression still enforced at send time).
@@ -141,6 +144,10 @@ export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLea
 
   if (f.acquisitionStage) {
     w.acquisitionStage = f.acquisitionStage;
+  }
+
+  if (f.sourceKinds && f.sourceKinds.length > 0) {
+    w.sourceKind = { in: f.sourceKinds };
   }
 
   if (extraAnd.length > 0) {

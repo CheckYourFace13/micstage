@@ -13,6 +13,7 @@ import { inferDiscoveryGeoForNationwideSearch } from "@/lib/growth/discovery/dis
 import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
 import { sendGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadDraftSend";
 import { discoveryRollupSlugFromCityRegion } from "@/lib/discoveryMarket";
+import { primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import type {
   GrowthLeadAcquisitionStage,
   GrowthLeadPerformanceTag,
@@ -189,7 +190,8 @@ export async function importGrowthLeadsCsvAction(formData: FormData) {
 
   const text = await file.text();
   const defaults: CsvImportDefaults = {
-    discoveryMarketSlug: String(formData.get("defaultDiscoveryMarketSlug") ?? "").trim() || null,
+    discoveryMarketSlug:
+      String(formData.get("defaultDiscoveryMarketSlug") ?? "").trim() || primaryLaunchDiscoveryMarketSlug(),
     city: String(formData.get("defaultCity") ?? "").trim() || null,
     suburb: String(formData.get("defaultSuburb") ?? "").trim() || null,
     region: String(formData.get("defaultRegion") ?? "").trim() || null,
@@ -267,8 +269,6 @@ function claudeRowEmailStats(row: {
   return { hasPrimary, hasAdditional };
 }
 
-const LEAD_UPLOAD_FALLBACK_MARKET_SLUG = "manual-upload";
-
 function resolveLeadUploadMarketSlug(row: {
   rowIndex: number;
   discoveryMarketSlug: string | null;
@@ -314,9 +314,10 @@ function resolveLeadUploadMarketSlug(row: {
     }
   }
 
+  const fallback = primaryLaunchDiscoveryMarketSlug();
   return {
-    slug: LEAD_UPLOAD_FALLBACK_MARKET_SLUG,
-    warning: `Row ${row.rowIndex}: discovery market slug missing; used fallback "${LEAD_UPLOAD_FALLBACK_MARKET_SLUG}".`,
+    slug: fallback,
+    warning: `Row ${row.rowIndex}: discovery market slug missing; used primary launch default "${fallback}".`,
   };
 }
 

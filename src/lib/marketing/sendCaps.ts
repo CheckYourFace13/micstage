@@ -9,7 +9,7 @@ import {
 } from "@/lib/marketing/emailConfig";
 import { growthOutreachDailyMax, growthOutreachDailyTarget } from "@/lib/growth/expansionConfig";
 
-function startOfUtcDay(d = new Date()): Date {
+export function startOfUtcDay(d = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
 }
 

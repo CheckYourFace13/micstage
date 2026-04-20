@@ -7,6 +7,7 @@ import { runAutoGrowthOutreachDrafts } from "@/lib/growth/growthDraftAutomation"
 import { runGrowthLeadDiscovery } from "@/lib/growth/growthDiscoveryRun";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
+import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 
 /** Transaction-scoped Postgres advisory lock keys (unique to growth draft/outreach automation). */
 const GROWTH_DRAFT_PIPELINE_LOCK_K1 = 54_788_913;
@@ -46,6 +47,15 @@ async function handle(request: Request) {
 
   try {
     const discovery = discoveryEnabled ? await runGrowthLeadDiscovery(prisma) : null;
+    const sinceUtcDay = startOfUtcDay();
+    const growthLeadsCreatedUtcTodayBySourceKind = await prisma.growthLead.groupBy({
+      by: ["sourceKind"],
+      where: { createdAt: { gte: sinceUtcDay } },
+      _count: { _all: true },
+    });
+    const growthLeadsCreatedUtcToday = Object.fromEntries(
+      growthLeadsCreatedUtcTodayBySourceKind.map((r) => [r.sourceKind, r._count._all]),
+    );
     /**
      * Serialize draft creation + outreach sends so overlapping cron invocations do not interleave
      * (Postgres `pg_advisory_xact_lock` — held for the whole transaction on one pooled connection).
@@ -70,6 +80,8 @@ async function handle(request: Request) {
         draftEnabled,
         discovery,
         autoDrafts: drafts,
+        /** Uploads/imports use `sourceKind` (CSV_IMPORT, CLAUDE_CSV, …); discovery JSON `candidates_by_source` is adapter ids only. */
+        growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );

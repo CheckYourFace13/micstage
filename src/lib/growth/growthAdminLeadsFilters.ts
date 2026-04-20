@@ -3,6 +3,7 @@ import type {
   GrowthLeadContactQuality,
   GrowthLeadOpenMicSignalTier,
   GrowthLeadPerformanceTag,
+  GrowthLeadSourceKind,
   GrowthLeadStatus,
   GrowthLeadType,
 } from "@/generated/prisma/client";
@@ -97,6 +98,27 @@ export function parseOutreachQueueParam(raw: string | undefined): GrowthLeadOutr
   return allowed.includes(u as GrowthLeadOutreachQueue) ? (u as GrowthLeadOutreachQueue) : "all";
 }
 
+const GROWTH_LEAD_SOURCE_KIND_SET = new Set<string>([
+  "MANUAL_ADMIN",
+  "CSV_IMPORT",
+  "CLAUDE_CSV",
+  "WEBSITE_CONTACT",
+  "SOCIAL_PROFILE",
+  "EVENT_LISTING",
+  "SCHEDULED_JOB",
+]);
+
+/** Comma-separated `GrowthLeadSourceKind` values (e.g. `CSV_IMPORT,CLAUDE_CSV`). */
+export function parseSourceKindsParam(raw: string | undefined): GrowthLeadSourceKind[] | null {
+  if (!raw?.trim()) return null;
+  const out: GrowthLeadSourceKind[] = [];
+  for (const part of raw.split(",")) {
+    const t = part.trim();
+    if (GROWTH_LEAD_SOURCE_KIND_SET.has(t)) out.push(t as GrowthLeadSourceKind);
+  }
+  return out.length ? out : null;
+}
+
 export type AdminGrowthLeadsSearchParams = {
   market?: string;
   metro?: string;
@@ -114,6 +136,8 @@ export type AdminGrowthLeadsSearchParams = {
   contactQ?: string;
   acquisition?: string;
   queue?: string;
+  /** Comma-separated source kinds (upload vs discovery paths). */
+  sourceKind?: string;
   page?: string;
   perPage?: string;
 };
@@ -141,6 +165,7 @@ export function adminGrowthLeadsSearchParamsFromUrl(sp: URLSearchParams): AdminG
     contactQ: g("contactQ"),
     acquisition: g("acquisition"),
     queue: g("queue"),
+    sourceKind: g("sourceKind"),
     page: g("page"),
     perPage: g("perPage"),
   };
@@ -168,6 +193,7 @@ export function growthLeadFiltersFromAdminSearchParams(p: AdminGrowthLeadsSearch
     contactQuality: parseContactQualityParam(p.contactQ),
     acquisitionStage: parseAcquisitionStageParam(p.acquisition),
     outreachQueue,
+    sourceKinds: parseSourceKindsParam(p.sourceKind),
   };
   return { marketSlug, filters };
 }
@@ -188,6 +214,7 @@ export function buildGrowthLeadsPaginationBaseQuery(p: {
   contactQ?: string;
   acquisition?: string;
   queue?: string;
+  sourceKind?: string;
   perPage?: string;
 }): Record<string, string | undefined> {
   const o: Record<string, string | undefined> = {};
@@ -210,6 +237,7 @@ export function buildGrowthLeadsPaginationBaseQuery(p: {
   if (p.draftPending === "1") o.draftPending = "1";
   const queue = parseOutreachQueueParam(p.queue);
   if (queue !== "all") o.queue = queue;
+  set("sourceKind", p.sourceKind?.trim());
   const ps = parseGrowthLeadsPageSizeParam(p.perPage);
   if (ps !== GROWTH_LEADS_PAGE_SIZE_DEFAULT) o.perPage = String(ps);
   return o;

@@ -110,6 +110,12 @@ export default async function AdminGrowthHubPage(props: {
     emailRejectionReasonBreakdown,
     lowConfidenceEmailCount,
     invalidEmailDroppedCount,
+    globalValidHighMediumEmailLeads,
+    globalEmailOutreachReadyLeads,
+    globalBlockedLowEmailLeads,
+    globalBlockedInvalidEmailLeads,
+    globalNoPrimaryEmailLeads,
+    globalPendingSocialPayloadTasks,
   ] =
     await Promise.all([
       loadGrowthMarketMetrics(prisma, marketSlug),
@@ -206,10 +212,33 @@ export default async function AdminGrowthHubPage(props: {
         _count: { _all: true },
       }),
       prisma.growthLead.count({
-        where: { ...marketEq, contactEmailConfidence: "LOW" },
+        where: { ...marketEq, contactEmailConfidence: "LOW", contactEmailNormalized: { not: null } },
       }),
       prisma.growthLead.count({
         where: { ...marketEq, contactEmailRejectionReason: { not: null } },
+      }),
+      prisma.growthLead.count({
+        where: {
+          contactEmailNormalized: { not: null },
+          contactEmailConfidence: { in: ["HIGH", "MEDIUM"] },
+        },
+      }),
+      prisma.growthLead.count({
+        where: {
+          contactQuality: "EMAIL",
+          contactEmailNormalized: { not: null },
+          contactEmailConfidence: { in: ["HIGH", "MEDIUM"] },
+          status: { notIn: ["BOUNCED", "UNSUBSCRIBED", "REJECTED", "JOINED"] },
+          OR: [{ discoveryConfidence: null }, { discoveryConfidence: { gte: 25 } }],
+        },
+      }),
+      prisma.growthLead.count({
+        where: { contactEmailNormalized: { not: null }, contactEmailConfidence: "LOW" },
+      }),
+      prisma.growthLead.count({ where: { contactEmailRejectionReason: { not: null } } }),
+      prisma.growthLead.count({ where: { contactEmailNormalized: null } }),
+      prisma.marketingJob.count({
+        where: { kind: "SOCIAL_PAYLOAD_RENDER", status: "PENDING" },
       }),
     ]);
 
@@ -431,6 +460,49 @@ export default async function AdminGrowthHubPage(props: {
         {metroConfig.label !== marketSlug ? ` (${metroConfig.label})` : ""}.
       </p>
 
+      <section className="mt-4 rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-4">
+        <h2 className="text-sm font-medium text-white">Email outreach pipeline (all markets)</h2>
+        <p className="mt-1 text-xs text-zinc-400">
+          New ingestion saves only leads with at least one parsed-valid email. Use the leads list filters for export.
+        </p>
+        <ul className="mt-2 grid gap-1 font-mono text-[11px] text-zinc-300 sm:grid-cols-2">
+          <li>
+            Valid HIGH/MEDIUM email (stored):{" "}
+            <Link className="text-emerald-400 hover:text-emerald-300" href="/internal/admin/growth/leads?queue=valid_high_medium_email">
+              {globalValidHighMediumEmailLeads}
+            </Link>
+          </li>
+          <li>
+            Email outreach-ready (same gates as automation queue):{" "}
+            <Link className="text-emerald-400 hover:text-emerald-300" href="/internal/admin/growth/leads?queue=email_outreach_ready">
+              {globalEmailOutreachReadyLeads}
+            </Link>
+          </li>
+          <li>
+            Blocked LOW confidence (has email):{" "}
+            <Link className="text-amber-300/90 hover:text-amber-200" href="/internal/admin/growth/leads?queue=blocked_low_confidence_email">
+              {globalBlockedLowEmailLeads}
+            </Link>
+          </li>
+          <li>
+            Blocked invalid parse (rejection reason set):{" "}
+            <Link className="text-rose-300/90 hover:text-rose-200" href="/internal/admin/growth/leads?queue=blocked_invalid_email">
+              {globalBlockedInvalidEmailLeads}
+            </Link>
+          </li>
+          <li>
+            No primary email on lead (legacy or dropped):{" "}
+            <Link className="text-zinc-400 hover:text-zinc-200" href="/internal/admin/growth/leads?queue=no_primary_email">
+              {globalNoPrimaryEmailLeads}
+            </Link>
+          </li>
+          <li className="sm:col-span-2">
+            Non-email venue path queue (PENDING SOCIAL_PAYLOAD_RENDER):{" "}
+            <span className="text-zinc-200">{globalPendingSocialPayloadTasks}</span>
+          </li>
+        </ul>
+      </section>
+
       <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <h2 className="text-sm font-medium text-white">Lead email hygiene (this market)</h2>
         <p className="mt-1 text-xs text-zinc-400">
@@ -620,7 +692,9 @@ export default async function AdminGrowthHubPage(props: {
             ? "That lead looks like a duplicate (email, website, Instagram, import key, or name+city in this market)."
             : params.err === "needMarket"
               ? "Discovery market slug is required."
-              : params.err}
+              : params.err === "noValidEmail"
+                ? "The main growth pipeline only saves leads when at least one contact email parses as a valid mailbox (structural validation). Fix the email field or wait for discovery to extract a valid address."
+                : params.err}
         </p>
       ) : null}
       {params.ok ? (

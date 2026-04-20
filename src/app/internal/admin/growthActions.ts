@@ -91,6 +91,9 @@ export async function createGrowthLeadAction(formData: FormData) {
     redirect(q("/internal/admin/growth", "err", "duplicateLead"));
   }
   if (ingested.status === "skipped") {
+    if (ingested.reason === "no_valid_email_for_main_pipeline") {
+      redirect(q("/internal/admin/growth", "err", "noValidEmail"));
+    }
     redirect(q("/internal/admin/growth", "err", "badLead"));
   }
 

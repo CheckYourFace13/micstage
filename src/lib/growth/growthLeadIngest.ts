@@ -95,6 +95,10 @@ export async function ingestGrowthLeadCandidate(
 
   const primary = parsePrimaryEmailForIngest(raw);
   const email = primary.normalized;
+  /** Main growth-lead table is email-only: never insert new rows without at least one parsed-valid mailbox. */
+  if (!hasAnyValidParsedEmail(primary, raw.additionalContactEmails)) {
+    return { status: "skipped", reason: "no_valid_email_for_main_pipeline" };
+  }
   const websiteHostNormalized = normalizeWebsiteHost(raw.websiteUrl ?? null);
   const instagramHandleNormalized = normalizeInstagramHandle(raw.instagramUrl ?? null);
   const nameCityKey = normalizeNameCityKey(name, raw.city ?? null);

@@ -75,6 +75,9 @@ export default async function AdminGrowthLeadsPage(props: {
   const qsEmailReady = new URLSearchParams(quickViewBase);
   qsEmailReady.set("queue", "email_outreach_ready");
   const hrefEmailOutreachReady = `/internal/admin/growth/leads?${qsEmailReady.toString()}`;
+  const qsValidHm = new URLSearchParams(quickViewBase);
+  qsValidHm.set("queue", "valid_high_medium_email");
+  const hrefValidHighMediumEmail = `/internal/admin/growth/leads?${qsValidHm.toString()}`;
   const qsContactPath = new URLSearchParams(quickViewBase);
   qsContactPath.set("queue", "contact_path_queue");
   const hrefContactPathQueue = `/internal/admin/growth/leads?${qsContactPath.toString()}`;
@@ -115,6 +118,16 @@ export default async function AdminGrowthLeadsPage(props: {
             Email outreach ready
           </Link>
           <Link
+            href={hrefValidHighMediumEmail}
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
+              outreachQueue === "valid_high_medium_email"
+                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-100"
+                : "border-zinc-600 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
+            }`}
+          >
+            Valid email (HIGH/MEDIUM)
+          </Link>
+          <Link
             href={hrefContactPathQueue}
             className={`rounded-md border px-3 py-2 text-sm font-medium ${
               outreachQueue === "contact_path_queue"
@@ -148,9 +161,10 @@ export default async function AdminGrowthLeadsPage(props: {
       <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <h2 className="text-sm font-medium text-white">Outreach queues</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Primary pipeline = mailable email (HIGH/MEDIUM). Secondary queues keep contact URLs and socials for manual follow-up
-          or future automation. Email-ready filter adds status + discovery-confidence gates; marketing suppression still applies at
-          send time (see lead detail block preview).
+          The main <code className="text-zinc-400">GrowthLead</code> table now only accepts new rows when discovery/import extracts
+          at least one parsed-valid email. Use <strong className="text-zinc-300">Valid email (HIGH/MEDIUM)</strong> + Export for the
+          full mailable contact list. Secondary queues keep contact URLs and socials for manual follow-up (not mixed into the
+          email list). Email-ready adds status + discovery-confidence gates; suppression still applies at send time.
         </p>
         <ul className="mt-2 flex flex-wrap gap-2 text-sm">
           <li>
@@ -300,6 +314,10 @@ export default async function AdminGrowthLeadsPage(props: {
               <option value="all">All — email / contact quality sorted</option>
               <option value="email_pipeline">Email pipeline (HIGH/MEDIUM email)</option>
               <option value="email_outreach_ready">Email outreach-ready (+ status / disc. conf.)</option>
+              <option value="valid_high_medium_email">Valid email — HIGH/MEDIUM (export full contact list)</option>
+              <option value="blocked_low_confidence_email">Blocked — LOW confidence (has email)</option>
+              <option value="blocked_invalid_email">Blocked — invalid / rejected parse</option>
+              <option value="no_primary_email">No primary email on lead (legacy / dropped)</option>
               <option value="contact_path_queue">Secondary — contact-path queue</option>
               <option value="social_path_queue">Secondary — social / calendar queue</option>
               <option value="website_only_queue">Secondary — website only</option>

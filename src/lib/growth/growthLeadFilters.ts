@@ -13,6 +13,10 @@ export type GrowthLeadOutreachQueue =
   | "all"
   | "email_pipeline"
   | "email_outreach_ready"
+  | "valid_high_medium_email"
+  | "blocked_low_confidence_email"
+  | "blocked_invalid_email"
+  | "no_primary_email"
   | "contact_path_queue"
   | "social_path_queue"
   | "website_only_queue";
@@ -74,6 +78,22 @@ export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLea
       status: { notIn: ["BOUNCED", "UNSUBSCRIBED", "REJECTED", "JOINED"] },
       OR: [{ discoveryConfidence: null }, { discoveryConfidence: { gte: 25 } }],
     });
+  } else if (queue === "valid_high_medium_email") {
+    extraAnd.push({
+      contactEmailNormalized: { not: null },
+      contactEmailConfidence: { in: ["HIGH", "MEDIUM"] },
+    });
+  } else if (queue === "blocked_low_confidence_email") {
+    extraAnd.push({
+      contactEmailNormalized: { not: null },
+      contactEmailConfidence: "LOW",
+    });
+  } else if (queue === "blocked_invalid_email") {
+    extraAnd.push({
+      contactEmailRejectionReason: { not: null },
+    });
+  } else if (queue === "no_primary_email") {
+    extraAnd.push({ contactEmailNormalized: null });
   } else if (queue === "contact_path_queue") {
     extraAnd.push({ contactQuality: "CONTACT_PAGE" });
   } else if (queue === "social_path_queue") {

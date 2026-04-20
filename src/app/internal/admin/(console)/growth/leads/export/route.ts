@@ -29,6 +29,7 @@ const CSV_HEADER = [
   "discoveryMarketSlug",
   "contactEmailNormalized",
   "contactEmailConfidence",
+  "contactEmailRejectionReason",
   "contactUrl",
   "websiteUrl",
   "instagramUrl",
@@ -64,7 +65,9 @@ export async function GET(request: Request) {
   const orderBy = [...buildGrowthLeadOrderBy(filters), { id: "asc" as const }];
 
   const prisma = requirePrisma();
-  const filename = `growth-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+  const queue = adminParams.queue?.trim();
+  const queueSuffix = queue && queue !== "all" ? `-${queue.replace(/[^a-z0-9_-]+/gi, "_")}` : "";
+  const filename = `growth-leads${queueSuffix}-${new Date().toISOString().slice(0, 10)}.csv`;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -87,6 +90,7 @@ export async function GET(request: Request) {
             discoveryMarketSlug: true,
             contactEmailNormalized: true,
             contactEmailConfidence: true,
+            contactEmailRejectionReason: true,
             contactUrl: true,
             websiteUrl: true,
             instagramUrl: true,
@@ -115,6 +119,7 @@ export async function GET(request: Request) {
             csvCell(r.discoveryMarketSlug),
             csvCell(r.contactEmailNormalized),
             csvCell(r.contactEmailConfidence),
+            csvCell(r.contactEmailRejectionReason),
             csvCell(r.contactUrl),
             csvCell(r.websiteUrl),
             csvCell(r.instagramUrl),

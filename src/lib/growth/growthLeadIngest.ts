@@ -61,6 +61,29 @@ function parsePrimaryEmailForIngest(raw: GrowthLeadCandidate): {
   return { normalized: null, rawExtracted: null, confidence: null, rejectionReason: null };
 }
 
+/**
+ * Persist the first parsed-valid mailbox on the lead row so admin/export queues see a primary email when imports only
+ * supplied `additionalContactEmails` (or the primary field failed parse but an extra was valid).
+ */
+function resolveStoredPrimaryEmail(
+  raw: GrowthLeadCandidate,
+  primary: ReturnType<typeof parsePrimaryEmailForIngest>,
+): ReturnType<typeof parsePrimaryEmailForIngest> {
+  if (primary.normalized) return primary;
+  for (const extra of raw.additionalContactEmails ?? []) {
+    const p = parseGrowthLeadEmailInput(extra, { extractedFromNoisyText: true });
+    if (p.kind === "valid") {
+      return {
+        normalized: p.normalized,
+        rawExtracted: p.rawExtracted,
+        confidence: p.confidence,
+        rejectionReason: null,
+      };
+    }
+  }
+  return primary;
+}
+
 function additionalEmailsNormalizedForDedupe(raw: string[] | null | undefined): string[] {
   const out: string[] = [];
   for (const e of raw ?? []) {
@@ -93,10 +116,11 @@ export async function ingestGrowthLeadCandidate(
   const discoveryMarketSlug = raw.discoveryMarketSlug?.trim();
   if (!discoveryMarketSlug) return { status: "skipped", reason: "missing discoveryMarketSlug" };
 
-  const primary = parsePrimaryEmailForIngest(raw);
+  const primaryParsed = parsePrimaryEmailForIngest(raw);
+  const primary = resolveStoredPrimaryEmail(raw, primaryParsed);
   const email = primary.normalized;
   /** Main growth-lead table is email-only: never insert new rows without at least one parsed-valid mailbox. */
-  if (!hasAnyValidParsedEmail(primary, raw.additionalContactEmails)) {
+  if (!hasAnyValidParsedEmail(primaryParsed, raw.additionalContactEmails)) {
     return { status: "skipped", reason: "no_valid_email_for_main_pipeline" };
   }
   const websiteHostNormalized = normalizeWebsiteHost(raw.websiteUrl ?? null);

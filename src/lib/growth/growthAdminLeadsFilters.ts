@@ -87,6 +87,7 @@ export function parseOutreachQueueParam(raw: string | undefined): GrowthLeadOutr
     "all",
     "email_pipeline",
     "email_outreach_ready",
+    "usable_email_backlog",
     "valid_high_medium_email",
     "blocked_low_confidence_email",
     "blocked_invalid_email",

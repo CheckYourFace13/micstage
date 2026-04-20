@@ -85,6 +85,7 @@ export async function GrowthLeadsFilteredTable(props: {
       fitScore: true,
       performanceTags: true,
       source: true,
+      sourceKind: true,
       createdAt: true,
       openMicSignalTier: true,
       contactQuality: true,
@@ -111,7 +112,7 @@ export async function GrowthLeadsFilteredTable(props: {
         Non-email targets are stored and can be enqueued as <code className="text-zinc-500">MarketingJob</code> path tasks;
         external contact forms are not auto-submitted.
       </p>
-      <table className="mt-3 w-full min-w-[1180px] text-left text-xs text-zinc-400">
+      <table className="mt-3 w-full min-w-[1280px] text-left text-xs text-zinc-400">
         <thead>
           <tr className="border-b border-zinc-800 text-[10px] uppercase tracking-wide text-zinc-500">
             <th className="py-2 pr-2">Pipeline</th>
@@ -128,6 +129,7 @@ export async function GrowthLeadsFilteredTable(props: {
             <th className="py-2 pr-2">Disc. conf</th>
             <th className="py-2 pr-2">Acq.</th>
             <th className="py-2 pr-2">Tags</th>
+            <th className="py-2 pr-2">Source kind</th>
             <th className="py-2">Source</th>
           </tr>
         </thead>
@@ -186,6 +188,7 @@ export async function GrowthLeadsFilteredTable(props: {
                 <td className="py-2 pr-2 align-top font-mono text-[10px]">{r.discoveryConfidence ?? "—"}</td>
                 <td className="py-2 pr-2 align-top font-mono text-[10px]">{r.acquisitionStage}</td>
                 <td className="py-2 pr-2 align-top">{r.performanceTags.join(", ") || "—"}</td>
+                <td className="py-2 pr-2 align-top font-mono text-[10px] text-zinc-500">{r.sourceKind}</td>
                 <td className="py-2 align-top">{r.source ?? "—"}</td>
               </tr>
             );

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { assertAdminSession } from "@/lib/adminAuth";
 import { GrowthLeadsFilteredTable } from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
-import { buildGrowthLeadWhere } from "@/lib/growth/growthLeadFilters";
+import type { Prisma } from "@/generated/prisma/client";
+import { buildGrowthLeadWhere, type GrowthLeadListFilters } from "@/lib/growth/growthLeadFilters";
 import {
   buildGrowthLeadsPaginationBaseQuery,
   growthLeadFiltersFromAdminSearchParams,
@@ -47,8 +48,27 @@ export default async function AdminGrowthLeadsPage(props: {
   const pageSize = parseGrowthLeadsPageSizeParam(p.perPage);
   const outreachQueue = filters.outreachQueue ?? "all";
 
+  const backlogCountFilters: GrowthLeadListFilters = {
+    ...filters,
+    outreachQueue: "usable_email_backlog",
+    sourceKinds: null,
+  };
+  const whereUsableAll = buildGrowthLeadWhere(backlogCountFilters);
+  const whereUsableUploaded = buildGrowthLeadWhere({
+    ...backlogCountFilters,
+    sourceKinds: ["CSV_IMPORT", "CLAUDE_CSV"],
+  });
+  const whereUsableDiscovered: Prisma.GrowthLeadWhereInput = {
+    AND: [whereUsableAll, { sourceKind: { notIn: ["CSV_IMPORT", "CLAUDE_CSV"] } }],
+  };
+
   const where = buildGrowthLeadWhere(filters);
-  const matchCount = await prisma.growthLead.count({ where });
+  const [matchCount, countUsableAll, countUsableUploaded, countUsableDiscovered] = await Promise.all([
+    prisma.growthLead.count({ where }),
+    prisma.growthLead.count({ where: whereUsableAll }),
+    prisma.growthLead.count({ where: whereUsableUploaded }),
+    prisma.growthLead.count({ where: whereUsableDiscovered }),
+  ]);
   const page = parseGrowthLeadsPage(p.page);
   const totalPages = Math.max(1, Math.ceil(matchCount / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -77,13 +97,16 @@ export default async function AdminGrowthLeadsPage(props: {
   const qsEmailReady = new URLSearchParams(quickViewBase);
   qsEmailReady.set("queue", "email_outreach_ready");
   const hrefEmailOutreachReady = `/internal/admin/growth/leads?${qsEmailReady.toString()}`;
+  const qsUsableBacklog = new URLSearchParams(quickViewBase);
+  qsUsableBacklog.set("queue", "usable_email_backlog");
+  const hrefUsableEmailBacklog = `/internal/admin/growth/leads?${qsUsableBacklog.toString()}`;
   const qsValidHm = new URLSearchParams(quickViewBase);
   qsValidHm.set("queue", "valid_high_medium_email");
   const hrefValidHighMediumEmail = `/internal/admin/growth/leads?${qsValidHm.toString()}`;
-  const qsValidHmUploads = new URLSearchParams(quickViewBase);
-  qsValidHmUploads.set("queue", "valid_high_medium_email");
-  qsValidHmUploads.set("sourceKind", "CSV_IMPORT,CLAUDE_CSV");
-  const hrefValidHmUploadImports = `/internal/admin/growth/leads?${qsValidHmUploads.toString()}`;
+  const qsUsableUploads = new URLSearchParams(quickViewBase);
+  qsUsableUploads.set("queue", "usable_email_backlog");
+  qsUsableUploads.set("sourceKind", "CSV_IMPORT,CLAUDE_CSV");
+  const hrefUsableUploadImports = `/internal/admin/growth/leads?${qsUsableUploads.toString()}`;
   const qsContactPath = new URLSearchParams(quickViewBase);
   qsContactPath.set("queue", "contact_path_queue");
   const hrefContactPathQueue = `/internal/admin/growth/leads?${qsContactPath.toString()}`;
@@ -124,6 +147,16 @@ export default async function AdminGrowthLeadsPage(props: {
             Email outreach ready
           </Link>
           <Link
+            href={hrefUsableEmailBacklog}
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
+              outreachQueue === "usable_email_backlog"
+                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-100"
+                : "border-zinc-600 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
+            }`}
+          >
+            Full usable-email backlog
+          </Link>
+          <Link
             href={hrefValidHighMediumEmail}
             className={`rounded-md border px-3 py-2 text-sm font-medium ${
               outreachQueue === "valid_high_medium_email"
@@ -131,13 +164,13 @@ export default async function AdminGrowthLeadsPage(props: {
                 : "border-zinc-600 bg-zinc-900/80 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
             }`}
           >
-            Valid email (HIGH/MEDIUM)
+            Automation tier (HIGH/MEDIUM only)
           </Link>
           <Link
-            href={hrefValidHmUploadImports}
+            href={hrefUsableUploadImports}
             className="rounded-md border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm font-medium text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800"
           >
-            Valid email — CSV / Claude uploads only
+            Usable-email — CSV / Claude uploads only
           </Link>
           <Link
             href={hrefContactPathQueue}
@@ -157,6 +190,19 @@ export default async function AdminGrowthLeadsPage(props: {
             Export current results to CSV
           </a>
         </div>
+        <div className="w-full rounded-md border border-zinc-700/80 bg-black/30 px-3 py-2 text-[11px] text-zinc-400">
+          <span className="font-semibold uppercase tracking-wide text-zinc-500">Usable-email backlog</span> (same filters as this page,
+          ignoring <code className="text-zinc-500">sourceKind</code>):{" "}
+          <Link className="text-emerald-400 hover:text-emerald-300" href={hrefUsableEmailBacklog}>
+            all {countUsableAll}
+          </Link>
+          {" · "}
+          <Link className="text-emerald-400/90 hover:text-emerald-300" href={hrefUsableUploadImports}>
+            uploaded (CSV/Claude) {countUsableUploaded}
+          </Link>
+          {" · "}
+          <span className="text-zinc-500">discovered + other paths {countUsableDiscovered}</span>
+        </div>
         <p className="w-full text-[11px] leading-snug text-zinc-500 sm:pl-0">
           Routes: <code className="text-zinc-400">/internal/admin/growth/leads</code> (filters in query; optional{" "}
           <code className="text-zinc-400">sourceKind=CSV_IMPORT,CLAUDE_CSV</code> to narrow by ingestion path). CSV:{" "}
@@ -174,11 +220,12 @@ export default async function AdminGrowthLeadsPage(props: {
       <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <h2 className="text-sm font-medium text-white">Outreach queues</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          The main <code className="text-zinc-400">GrowthLead</code> table now only accepts new rows when discovery/import extracts
-          at least one parsed-valid email. Use <strong className="text-zinc-300">Valid email (HIGH/MEDIUM)</strong> + Export for the
-          full mailable contact list (uploads and discovery share this queue; omit <code className="text-zinc-400">sourceKind</code>{" "}
-          to see everyone). Secondary queues keep contact URLs and socials for manual follow-up (not mixed into the email list).
-          Email-ready adds status + discovery-confidence gates; suppression still applies at send time.
+          The main <code className="text-zinc-400">GrowthLead</code> table only accepts new rows when discovery/import extracts at
+          least one parsed-valid email. Use <strong className="text-zinc-300">Full usable-email backlog</strong> + Export for every
+          stored mailbox (HIGH/MEDIUM/LOW parse confidence — same table for uploads and discovery). Use{" "}
+          <strong className="text-zinc-300">Automation tier (HIGH/MEDIUM only)</strong> to match auto-draft/send gates (LOW still
+          visible in the full backlog). Secondary queues keep contact URLs and socials for manual follow-up. Email outreach-ready
+          adds status + discovery-confidence gates; suppression still applies at send time.
         </p>
         <ul className="mt-2 flex flex-wrap gap-2 text-sm">
           <li>
@@ -203,6 +250,18 @@ export default async function AdminGrowthLeadsPage(props: {
               }).toString()}`}
             >
               Email outreach-ready
+            </Link>
+          </li>
+          <li>
+            <Link
+              className="text-emerald-400 hover:text-emerald-300"
+              href={`/internal/admin/growth/leads?${new URLSearchParams({
+                market: marketSlug,
+                queue: "usable_email_backlog",
+                ...(p.type ? { type: p.type } : {}),
+              }).toString()}`}
+            >
+              Full usable-email backlog
             </Link>
           </li>
           <li>
@@ -328,7 +387,8 @@ export default async function AdminGrowthLeadsPage(props: {
               <option value="all">All — email / contact quality sorted</option>
               <option value="email_pipeline">Email pipeline (HIGH/MEDIUM email)</option>
               <option value="email_outreach_ready">Email outreach-ready (+ status / disc. conf.)</option>
-              <option value="valid_high_medium_email">Valid email — HIGH/MEDIUM (export full contact list)</option>
+              <option value="usable_email_backlog">Full usable-email backlog (HIGH/MEDIUM/LOW — export)</option>
+              <option value="valid_high_medium_email">Automation tier — HIGH/MEDIUM email only</option>
               <option value="blocked_low_confidence_email">Blocked — LOW confidence (has email)</option>
               <option value="blocked_invalid_email">Blocked — invalid / rejected parse</option>
               <option value="no_primary_email">No primary email on lead (legacy / dropped)</option>

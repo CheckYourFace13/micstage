@@ -37,16 +37,23 @@ export async function mergeGrowthLeadFromClaudeImport(
   const take = (next: string | null | undefined, prev: string | null | undefined) =>
     next?.trim() && !prev?.trim() ? next.trim() : undefined;
 
-  const rawMailbox = raw.contactEmailNormalized?.trim();
-  if (rawMailbox && !existing.contactEmailNormalized) {
-    const parsed = parseGrowthLeadEmailInput(rawMailbox, {
-      extractedFromNoisyText: raw.emailExtractedFromNoisyText === true,
-    });
-    if (parsed.kind === "valid") {
-      data.contactEmailNormalized = parsed.normalized;
-      data.contactEmailRaw = parsed.rawExtracted;
-      data.contactEmailConfidence = parsed.confidence;
-      data.contactEmailRejectionReason = null;
+  if (!existing.contactEmailNormalized) {
+    const tryMailbox = (rawStr: string, extractedFromNoisyText: boolean): boolean => {
+      const parsed = parseGrowthLeadEmailInput(rawStr, { extractedFromNoisyText });
+      if (parsed.kind === "valid") {
+        data.contactEmailNormalized = parsed.normalized;
+        data.contactEmailRaw = parsed.rawExtracted;
+        data.contactEmailConfidence = parsed.confidence;
+        data.contactEmailRejectionReason = null;
+        return true;
+      }
+      return false;
+    };
+    const rawMailbox = raw.contactEmailNormalized?.trim();
+    if (!(rawMailbox && tryMailbox(rawMailbox, raw.emailExtractedFromNoisyText === true))) {
+      for (const ex of raw.additionalContactEmails ?? []) {
+        if (tryMailbox(ex, true)) break;
+      }
     }
   }
 

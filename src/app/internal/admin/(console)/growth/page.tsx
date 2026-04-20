@@ -242,6 +242,30 @@ export default async function AdminGrowthHubPage(props: {
       }),
     ]);
 
+  const [globalUsableEmailBacklogLeads, globalUsableEmailUploadedLeads, globalUsableEmailDiscoveredLeads] =
+    await Promise.all([
+      prisma.growthLead.count({
+        where: {
+          contactEmailNormalized: { not: null },
+          contactEmailConfidence: { in: ["HIGH", "MEDIUM", "LOW"] },
+        },
+      }),
+      prisma.growthLead.count({
+        where: {
+          contactEmailNormalized: { not: null },
+          contactEmailConfidence: { in: ["HIGH", "MEDIUM", "LOW"] },
+          sourceKind: { in: ["CSV_IMPORT", "CLAUDE_CSV"] },
+        },
+      }),
+      prisma.growthLead.count({
+        where: {
+          contactEmailNormalized: { not: null },
+          contactEmailConfidence: { in: ["HIGH", "MEDIUM", "LOW"] },
+          sourceKind: { notIn: ["CSV_IMPORT", "CLAUDE_CSV"] },
+        },
+      }),
+    ]);
+
   const autoWebVenueBase = {
     leadType: "VENUE" as const,
     source: { contains: "autonomous_web_search_venue", mode: "insensitive" as const },
@@ -467,7 +491,19 @@ export default async function AdminGrowthHubPage(props: {
         </p>
         <ul className="mt-2 grid gap-1 font-mono text-[11px] text-zinc-300 sm:grid-cols-2">
           <li>
-            Valid HIGH/MEDIUM email (stored):{" "}
+            Full usable-email backlog (HIGH/MEDIUM/LOW, stored):{" "}
+            <Link className="text-emerald-400 hover:text-emerald-300" href="/internal/admin/growth/leads?queue=usable_email_backlog">
+              {globalUsableEmailBacklogLeads}
+            </Link>
+            {" — uploaded "}
+            <Link className="text-emerald-400/90 hover:text-emerald-300" href="/internal/admin/growth/leads?queue=usable_email_backlog&sourceKind=CSV_IMPORT,CLAUDE_CSV">
+              {globalUsableEmailUploadedLeads}
+            </Link>
+            {" · other paths "}
+            <span className="text-zinc-500">{globalUsableEmailDiscoveredLeads}</span>
+          </li>
+          <li>
+            Automation tier HIGH/MEDIUM only (stored):{" "}
             <Link className="text-emerald-400 hover:text-emerald-300" href="/internal/admin/growth/leads?queue=valid_high_medium_email">
               {globalValidHighMediumEmailLeads}
             </Link>

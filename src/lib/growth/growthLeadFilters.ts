@@ -14,6 +14,8 @@ export type GrowthLeadOutreachQueue =
   | "all"
   | "email_pipeline"
   | "email_outreach_ready"
+  /** Parsed mailbox on the lead row (HIGH/MEDIUM/LOW). Admin/export backlog; automation still uses HIGH/MEDIUM only. */
+  | "usable_email_backlog"
   | "valid_high_medium_email"
   | "blocked_low_confidence_email"
   | "blocked_invalid_email"
@@ -80,6 +82,11 @@ export function buildGrowthLeadWhere(f: GrowthLeadListFilters): Prisma.GrowthLea
       contactEmailConfidence: { in: ["HIGH", "MEDIUM"] },
       status: { notIn: ["BOUNCED", "UNSUBSCRIBED", "REJECTED", "JOINED"] },
       OR: [{ discoveryConfidence: null }, { discoveryConfidence: { gte: 25 } }],
+    });
+  } else if (queue === "usable_email_backlog") {
+    extraAnd.push({
+      contactEmailNormalized: { not: null },
+      contactEmailConfidence: { in: ["HIGH", "MEDIUM", "LOW"] },
     });
   } else if (queue === "valid_high_medium_email") {
     extraAnd.push({

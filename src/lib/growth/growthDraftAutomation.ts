@@ -13,8 +13,8 @@ import {
 } from "@/lib/marketing/sendCaps";
 
 /**
- * Auto-creates PENDING_REVIEW drafts for approved (or high-fit reviewed) leads with email.
- * Does not send. Safe for queued markets (drafts are allowed; sends are gated separately).
+ * Auto-creates PENDING_REVIEW drafts for approved (or high-fit reviewed) leads with email,
+ * then may auto-approve + send top venue drafts in ACTIVE launch markets (bounded by caps).
  */
 export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise<{
   created: number;
@@ -94,6 +94,12 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     }
   }
 
+  /**
+   * Venue auto-send: pick PENDING_REVIEW drafts for venues that already passed draft creation.
+   * Draft candidates can enter via APPROVED / REVIEWED(fit) without strong open-mic tier, but the old
+   * venuePriority query required EXPLICIT/STRONG tier for every status — excluding those rows entirely
+   * and yielding autoApprovedVenue=0 even in ACTIVE markets. Tier is still enforced below for DISCOVERED only.
+   */
   const venuePriority = await prisma.growthLeadOutreachDraft.findMany({
     where: {
       status: "PENDING_REVIEW",
@@ -101,7 +107,6 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
         leadType: "VENUE",
         OR: [{ status: "DISCOVERED" }, { status: "REVIEWED" }, { status: "APPROVED" }],
         fitScore: { gte: venueAutoFitMin },
-        openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] },
       },
     },
     include: { lead: true },
@@ -111,6 +116,10 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
 
   for (const d of venuePriority.sort((a, b) => (b.lead.fitScore ?? 0) - (a.lead.fitScore ?? 0))) {
     if (outreachSendsThisRun >= outreachSendCapPerRun) break;
+    if (d.lead.status === "DISCOVERED") {
+      const t = d.lead.openMicSignalTier;
+      if (!(t === "EXPLICIT_OPEN_MIC" || t === "STRONG_LIVE_EVENT")) continue;
+    }
     const conf = d.lead.contactEmailConfidence;
     if (!(conf === "HIGH" || (allowMediumOutreach && conf === "MEDIUM"))) continue;
     // Mirror approved-backlog behavior: use draft slug when present, then lead slug.

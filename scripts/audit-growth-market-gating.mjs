@@ -89,6 +89,8 @@ async function main() {
             discoveryMarketSlug: true,
             status: true,
             contactEmailConfidence: true,
+            fitScore: true,
+            openMicSignalTier: true,
           },
         },
       },
@@ -111,8 +113,11 @@ async function main() {
     const affectedSlugs = new Set();
     const bySlug = new Map();
     const autoVenueEligibleStatus = new Set(["DISCOVERED", "REVIEWED", "APPROVED"]);
-    const autoVenueEligibleTier = new Set(["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"]);
-    const venueAutoFitMin = 6;
+    const fitMinRaw = process.env.GROWTH_AUTO_DRAFT_FIT_MIN?.trim();
+    const fitMinParsed = fitMinRaw ? Number.parseInt(fitMinRaw, 10) : 7;
+    const fitMin = Number.isFinite(fitMinParsed) ? fitMinParsed : 7;
+    const venueAutoFitMin = Math.max(6, fitMin - 1); // match growthDraftAutomation.ts
+    const allowMediumOutreach = process.env.GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE === "true";
     const activePendingBlockers = {
       totalPendingActive: 0,
       missingOrBadConfidence: 0,
@@ -138,17 +143,21 @@ async function main() {
       if (d.status === "PENDING_REVIEW" && effectiveNorm && activeSet.has(effectiveNorm)) {
         activePendingBlockers.totalPendingActive++;
         const conf = d.lead.contactEmailConfidence ?? null;
-        const confOk = conf === "HIGH";
+        const confOk = conf === "HIGH" || (allowMediumOutreach && conf === "MEDIUM");
         const statusOk = autoVenueEligibleStatus.has(d.lead.status);
-        const tierOk = autoVenueEligibleTier.has(d.lead.openMicSignalTier ?? "");
+        const tier = d.lead.openMicSignalTier ?? null;
+        const tierOkForDiscovered =
+          d.lead.status !== "DISCOVERED" ||
+          tier === "EXPLICIT_OPEN_MIC" ||
+          tier === "STRONG_LIVE_EVENT";
         const fitOk = (d.lead.fitScore ?? 0) >= venueAutoFitMin;
         if (!confOk) activePendingBlockers.missingOrBadConfidence++;
         if (conf === "LOW") activePendingBlockers.lowConfidence++;
-        if (conf === "MEDIUM") activePendingBlockers.mediumConfidenceRequiresEnv++;
+        if (conf === "MEDIUM" && !allowMediumOutreach) activePendingBlockers.mediumConfidenceRequiresEnv++;
         if (!statusOk) activePendingBlockers.statusNotEligible++;
-        if (!tierOk) activePendingBlockers.tierNotEligible++;
+        if (!tierOkForDiscovered) activePendingBlockers.tierNotEligible++;
         if (!fitOk) activePendingBlockers.fitBelowVenueAutoMin++;
-        if (confOk && statusOk && tierOk && fitOk) activePendingBlockers.fullyEligibleNow++;
+        if (confOk && statusOk && tierOkForDiscovered && fitOk) activePendingBlockers.fullyEligibleNow++;
       }
 
       const key = effectiveNorm || "(missing)";
@@ -163,10 +172,17 @@ async function main() {
       row.totalDrafts++;
       if (d.status === "PENDING_REVIEW") row.pendingReview++;
       if (d.status === "APPROVED") row.approvedUnsent++;
-      const confOk = d.lead.contactEmailConfidence === "HIGH";
+      const confOk =
+        d.lead.contactEmailConfidence === "HIGH" ||
+        (allowMediumOutreach && d.lead.contactEmailConfidence === "MEDIUM");
       const statusOk = autoVenueEligibleStatus.has(d.lead.status);
-      const tierOk = autoVenueEligibleTier.has(d.lead.openMicSignalTier ?? "");
-      if (d.status === "PENDING_REVIEW" && confOk && statusOk && tierOk) {
+      const tier = d.lead.openMicSignalTier ?? null;
+      const tierOkForDiscovered =
+        d.lead.status !== "DISCOVERED" ||
+        tier === "EXPLICIT_OPEN_MIC" ||
+        tier === "STRONG_LIVE_EVENT";
+      const fitOk = (d.lead.fitScore ?? 0) >= venueAutoFitMin;
+      if (d.status === "PENDING_REVIEW" && confOk && statusOk && tierOkForDiscovered && fitOk) {
         row.autoVenueEligibleNow++;
       }
       bySlug.set(key, row);

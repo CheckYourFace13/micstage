@@ -1,4 +1,4 @@
-import type { GrowthLeadEmailConfidence, PrismaClient } from "@/generated/prisma/client";
+import type { GrowthLead, GrowthLeadEmailConfidence, GrowthLeadOutreachDraft, PrismaClient } from "@/generated/prisma/client";
 import {
   growthAutoDraftBatchLimit,
   growthAutoDraftFitMin,
@@ -9,8 +9,54 @@ import { sendApprovedGrowthLeadDraft } from "@/lib/growth/growthLeadDraftSend";
 import {
   isOnlyTransientMarketingThrottle,
   reasonsIncludeGlobalCategoryDailyCap,
-  remainingOutreachDailySends,
+  remainingGrowthOutreachAutomationBudget,
 } from "@/lib/marketing/sendCaps";
+
+type GrowthDraftWithLead = GrowthLeadOutreachDraft & { lead: GrowthLead };
+
+function activeMarketSlugForDraft(d: GrowthDraftWithLead): string {
+  return (d.discoveryMarketSlug ?? d.lead.discoveryMarketSlug ?? "").trim().toLowerCase();
+}
+
+function sortDraftsByFitThenCreated<T extends { lead: { fitScore: number | null }; createdAt: Date }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const df = (b.lead.fitScore ?? 0) - (a.lead.fitScore ?? 0);
+    if (df !== 0) return df;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+}
+
+/** Pending venue drafts that may enter automation (never LOW / missing confidence). */
+function venuePendingPassesAutomationGate(
+  d: GrowthDraftWithLead,
+  venueAutoFitMin: number,
+  activeMarketSet: Set<string>,
+  allowMediumOutreach: boolean,
+): boolean {
+  if (d.lead.leadType !== "VENUE" || d.status !== "PENDING_REVIEW") return false;
+  if (!(d.lead.status === "DISCOVERED" || d.lead.status === "REVIEWED" || d.lead.status === "APPROVED")) return false;
+  if ((d.lead.fitScore ?? 0) < venueAutoFitMin) return false;
+  if (d.lead.status === "DISCOVERED") {
+    const t = d.lead.openMicSignalTier;
+    if (!(t === "EXPLICIT_OPEN_MIC" || t === "STRONG_LIVE_EVENT")) return false;
+  }
+  const slug = activeMarketSlugForDraft(d);
+  if (!slug || !activeMarketSet.has(slug)) return false;
+  const conf = d.lead.contactEmailConfidence;
+  if (conf == null || conf === "LOW") return false;
+  if (conf === "MEDIUM" && !allowMediumOutreach) return false;
+  return conf === "HIGH" || conf === "MEDIUM";
+}
+
+function backlogPassesAutomationGate(d: GrowthDraftWithLead, activeMarketSet: Set<string>, allowMediumOutreach: boolean): boolean {
+  if (d.status !== "APPROVED" || d.marketingEmailSendId != null) return false;
+  const slug = activeMarketSlugForDraft(d);
+  if (!slug || !activeMarketSet.has(slug)) return false;
+  const conf = d.lead.contactEmailConfidence;
+  if (conf == null || conf === "LOW") return false;
+  if (conf === "MEDIUM" && !allowMediumOutreach) return false;
+  return conf === "HIGH" || conf === "MEDIUM";
+}
 
 /**
  * Auto-creates PENDING_REVIEW drafts for approved (or high-fit reviewed) leads with email,
@@ -24,8 +70,26 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   approvedQueueDrained: number;
   /** Successful outreach sends this run (venue auto + backlog); capped per cron for burst smoothing. */
   outreachSendsThisRun: number;
-  /** Effective cap on outreachSendsThisRun for this invocation (from GROWTH_OUTREACH_SENDS_PER_CRON_RUN). */
+  /** Effective cap on outreachSendsThisRun for this invocation (min(daily room left, GROWTH_OUTREACH_SENDS_PER_CRON_RUN)). */
   outreachSendCapPerRun: number;
+  /** UTC-day outreach automation budget snapshot (before this run’s sends). */
+  outreachAutomationBudget: {
+    sentTodayUtc: number;
+    marketingOutreachCap: number;
+    growthDailyMax: number;
+    effectiveDailyMax: number;
+    dailyTarget: number;
+    remainingToEffectiveMax: number;
+  };
+  /** Successful sends attributed to fallback wave (HIGH venue pending → MEDIUM → REVIEWED/APPROVED backlog → other). */
+  outreachSendsByFallbackWave: {
+    venuePendingHigh: number;
+    venuePendingMedium: number;
+    backlogReviewedApprovedHigh: number;
+    backlogReviewedApprovedMedium: number;
+    backlogOtherHigh: number;
+    backlogOtherMedium: number;
+  };
   nonEmailVenuePathsQueued: number;
   skipped: number;
   errors: string[];
@@ -34,9 +98,9 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const fitMin = growthAutoDraftFitMin();
   const venueAutoFitMin = Math.max(6, fitMin - 1);
   const limit = growthAutoDraftBatchLimit();
-  const outreachSendCapPerRun = growthOutreachSendsPerCronRun();
-  const draftWorkTake = Math.min(limit, Math.max(24, outreachSendCapPerRun * 8));
-  const venueReviewTake = Math.min(limit, Math.max(12, outreachSendCapPerRun * 6));
+  const perCronSendCeiling = growthOutreachSendsPerCronRun();
+  const draftWorkTake = Math.min(limit, Math.max(24, perCronSendCeiling * 8));
+  const venueReviewTake = Math.min(limit, Math.max(12, perCronSendCeiling * 6));
   let outreachSendsThisRun = 0;
   const allowMediumOutreach = process.env.GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE === "true";
   const emailReadyLevels: GrowthLeadEmailConfidence[] = allowMediumOutreach ? ["HIGH", "MEDIUM"] : ["HIGH"];
@@ -114,20 +178,37 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     take: venueReviewTake,
   });
 
-  for (const d of venuePriority.sort((a, b) => (b.lead.fitScore ?? 0) - (a.lead.fitScore ?? 0))) {
-    if (outreachSendsThisRun >= outreachSendCapPerRun) break;
-    if (d.lead.status === "DISCOVERED") {
-      const t = d.lead.openMicSignalTier;
-      if (!(t === "EXPLICIT_OPEN_MIC" || t === "STRONG_LIVE_EVENT")) continue;
-    }
-    const conf = d.lead.contactEmailConfidence;
-    if (!(conf === "HIGH" || (allowMediumOutreach && conf === "MEDIUM"))) continue;
-    // Mirror approved-backlog behavior: use draft slug when present, then lead slug.
-    // This keeps older/migrated rows with null lead slug eligible when draft slug is valid.
-    const slug = (d.discoveryMarketSlug ?? d.lead.discoveryMarketSlug ?? "").trim().toLowerCase();
-    if (!slug || !activeMarketSet.has(slug)) {
-      continue;
-    }
+  const outreachAutomationBudget = await remainingGrowthOutreachAutomationBudget(prisma);
+  const outreachSendCapPerRun = Math.min(
+    outreachAutomationBudget.remainingToEffectiveMax,
+    perCronSendCeiling,
+  );
+  let remainingHeadroom = outreachAutomationBudget.remainingToEffectiveMax;
+
+  const outreachSendsByFallbackWave = {
+    venuePendingHigh: 0,
+    venuePendingMedium: 0,
+    backlogReviewedApprovedHigh: 0,
+    backlogReviewedApprovedMedium: 0,
+    backlogOtherHigh: 0,
+    backlogOtherMedium: 0,
+  };
+
+  const eligiblePendingVenue = sortDraftsByFitThenCreated(
+    (venuePriority as GrowthDraftWithLead[]).filter((d) =>
+      venuePendingPassesAutomationGate(d, venueAutoFitMin, activeMarketSet, allowMediumOutreach),
+    ),
+  );
+  const pendingHigh = eligiblePendingVenue.filter((d) => d.lead.contactEmailConfidence === "HIGH");
+  const pendingMedium = allowMediumOutreach
+    ? eligiblePendingVenue.filter((d) => d.lead.contactEmailConfidence === "MEDIUM")
+    : [];
+
+  async function approveAndTrySendPendingVenueDraft(
+    d: GrowthDraftWithLead,
+    wave: keyof typeof outreachSendsByFallbackWave,
+  ): Promise<void> {
+    if (outreachSendsThisRun >= outreachSendCapPerRun || remainingHeadroom <= 0) return;
     await prisma.growthLeadOutreachDraft.update({
       where: { id: d.id },
       data: {
@@ -141,6 +222,8 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     if (sent.ok) {
       autoSentVenue++;
       outreachSendsThisRun++;
+      remainingHeadroom--;
+      outreachSendsByFallbackWave[wave]++;
     } else {
       for (const reason of sent.reasons) {
         bumpReason(`send_blocked: ${reason}`);
@@ -149,36 +232,79 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     }
   }
 
+  for (const d of pendingHigh) {
+    if (outreachSendsThisRun >= outreachSendCapPerRun || remainingHeadroom <= 0) break;
+    await approveAndTrySendPendingVenueDraft(d, "venuePendingHigh");
+  }
+  for (const d of pendingMedium) {
+    if (outreachSendsThisRun >= outreachSendCapPerRun || remainingHeadroom <= 0) break;
+    await approveAndTrySendPendingVenueDraft(d, "venuePendingMedium");
+  }
+
   let approvedQueueDrained = 0;
-  let remainingHeadroom = await remainingOutreachDailySends(prisma);
   if (remainingHeadroom > 0 && outreachSendsThisRun < outreachSendCapPerRun) {
     const sendSlotsLeft = outreachSendCapPerRun - outreachSendsThisRun;
-    const backlogTake = Math.min(200, Math.max(25, sendSlotsLeft * 12));
+    const backlogTake = Math.min(2000, Math.max(200, sendSlotsLeft * 40));
     const backlogRaw = await prisma.growthLeadOutreachDraft.findMany({
       where: { status: "APPROVED", marketingEmailSendId: null },
       include: { lead: true },
       orderBy: { createdAt: "asc" },
       take: backlogTake,
     });
-    const backlog = backlogRaw.filter((d) => {
-      const slug = (d.discoveryMarketSlug ?? d.lead.discoveryMarketSlug ?? "").trim().toLowerCase();
-      return slug && activeMarketSet.has(slug);
-    });
+    const backlogAll = (backlogRaw as GrowthDraftWithLead[]).filter((d) =>
+      backlogPassesAutomationGate(d, activeMarketSet, allowMediumOutreach),
+    );
+    const waveReviewedApproved = backlogAll.filter(
+      (d) => d.lead.status === "REVIEWED" || d.lead.status === "APPROVED",
+    );
+    const waveRaIds = new Set(waveReviewedApproved.map((d) => d.id));
+    const waveOther = backlogAll.filter((d) => !waveRaIds.has(d.id));
 
-    for (const d of backlog) {
-      if (remainingHeadroom <= 0 || outreachSendsThisRun >= outreachSendCapPerRun) break;
-      const sent = await sendApprovedGrowthLeadDraft(prisma, d.id);
-      if (sent.ok) {
-        approvedQueueDrained++;
-        remainingHeadroom--;
-        outreachSendsThisRun++;
-      } else if (reasonsIncludeGlobalCategoryDailyCap(sent.reasons)) {
-        break;
-      } else if (!isOnlyTransientMarketingThrottle(sent.reasons)) {
-        for (const reason of sent.reasons) {
-          bumpReason(`queue_send_blocked: ${reason}`);
+    const waves: { rows: GrowthDraftWithLead[]; wave: keyof typeof outreachSendsByFallbackWave }[] = [
+      {
+        rows: sortDraftsByFitThenCreated(waveReviewedApproved.filter((d) => d.lead.contactEmailConfidence === "HIGH")),
+        wave: "backlogReviewedApprovedHigh",
+      },
+      {
+        rows: sortDraftsByFitThenCreated(
+          allowMediumOutreach
+            ? waveReviewedApproved.filter((d) => d.lead.contactEmailConfidence === "MEDIUM")
+            : [],
+        ),
+        wave: "backlogReviewedApprovedMedium",
+      },
+      {
+        rows: sortDraftsByFitThenCreated(waveOther.filter((d) => d.lead.contactEmailConfidence === "HIGH")),
+        wave: "backlogOtherHigh",
+      },
+      {
+        rows: sortDraftsByFitThenCreated(
+          allowMediumOutreach ? waveOther.filter((d) => d.lead.contactEmailConfidence === "MEDIUM") : [],
+        ),
+        wave: "backlogOtherMedium",
+      },
+    ];
+
+    let abortBacklogForGlobalCap = false;
+    for (const { rows, wave } of waves) {
+      if (abortBacklogForGlobalCap) break;
+      for (const d of rows) {
+        if (remainingHeadroom <= 0 || outreachSendsThisRun >= outreachSendCapPerRun) break;
+        const sent = await sendApprovedGrowthLeadDraft(prisma, d.id);
+        if (sent.ok) {
+          approvedQueueDrained++;
+          remainingHeadroom--;
+          outreachSendsThisRun++;
+          outreachSendsByFallbackWave[wave]++;
+        } else if (reasonsIncludeGlobalCategoryDailyCap(sent.reasons)) {
+          abortBacklogForGlobalCap = true;
+          break;
+        } else if (!isOnlyTransientMarketingThrottle(sent.reasons)) {
+          for (const reason of sent.reasons) {
+            bumpReason(`queue_send_blocked: ${reason}`);
+          }
+          errors.push(`${d.id}: approved queue send blocked (${sent.reasons.join(" | ").slice(0, 300)})`);
         }
-        errors.push(`${d.id}: approved queue send blocked (${sent.reasons.join(" | ").slice(0, 300)})`);
       }
     }
   }
@@ -188,19 +314,30 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     where: { kind: "SOCIAL_PAYLOAD_RENDER", status: "PENDING" },
   });
 
-  if (autoApprovedVenue === 0 || autoSentVenue === 0) {
-    console.info("[growth drafts] venue auto-send diagnostics", {
-      fitMin,
-      venueAutoFitMin,
-      createdDrafts: created,
-      autoApprovedVenue,
-      autoSentVenue,
-      outreachSendCapPerRun,
-      outreachSendsThisRun,
-      activeMarketCount: activeMarketSet.size,
-      errorCount: errors.length,
-    });
-  }
+  const capNarrowedByMarketing =
+    outreachAutomationBudget.marketingOutreachCap < outreachAutomationBudget.growthDailyMax;
+  const approxSentTodayAfterRun = outreachAutomationBudget.sentTodayUtc + outreachSendsThisRun;
+  const softHeadroomTowardDailyTarget = Math.max(
+    0,
+    outreachAutomationBudget.dailyTarget - approxSentTodayAfterRun,
+  );
+  console.info("[growth outreach automation]", {
+    fitMin,
+    venueAutoFitMin,
+    createdDrafts: created,
+    autoApprovedVenue,
+    autoSentVenue,
+    approvedQueueDrained,
+    outreachAutomationBudget,
+    capNarrowedByMarketing,
+    outreachSendCapPerRun,
+    outreachSendsThisRun,
+    approxSentTodayAfterRun,
+    softHeadroomTowardDailyTarget,
+    outreachSendsByFallbackWave,
+    activeMarketCount: activeMarketSet.size,
+    errorCount: errors.length,
+  });
 
   return {
     created,
@@ -209,6 +346,8 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     approvedQueueDrained,
     outreachSendsThisRun,
     outreachSendCapPerRun,
+    outreachAutomationBudget,
+    outreachSendsByFallbackWave,
     nonEmailVenuePathsQueued,
     skipped,
     errors,

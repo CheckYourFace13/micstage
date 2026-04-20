@@ -7,6 +7,7 @@ import {
   marketingSequenceDelayMinutes,
   micStageCategoryFromPrisma,
 } from "@/lib/marketing/emailConfig";
+import { growthOutreachDailyMax, growthOutreachDailyTarget } from "@/lib/growth/expansionConfig";
 
 function startOfUtcDay(d = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
@@ -139,4 +140,33 @@ export async function remainingOutreachDailySends(prisma: PrismaClient): Promise
   const daily = marketingDailyCap("outreach");
   const catCount = await countSendsToday(prisma, "OUTREACH", since);
   return Math.max(0, daily - catCount);
+}
+
+/**
+ * Daily budget for growth-pipeline outreach automation: min(marketing outreach cap, GROWTH_OUTREACH_DAILY_MAX).
+ * Use this (not {@link remainingOutreachDailySends} alone) so growth can respect a 50/day ceiling while global
+ * marketing env may still cap lower.
+ */
+export async function remainingGrowthOutreachAutomationBudget(prisma: PrismaClient): Promise<{
+  sentTodayUtc: number;
+  marketingOutreachCap: number;
+  growthDailyMax: number;
+  effectiveDailyMax: number;
+  dailyTarget: number;
+  remainingToEffectiveMax: number;
+}> {
+  const since = startOfUtcDay();
+  const sentTodayUtc = await countSendsToday(prisma, "OUTREACH", since);
+  const marketingOutreachCap = marketingDailyCap("outreach");
+  const growthDailyMax = growthOutreachDailyMax();
+  const effectiveDailyMax = Math.min(marketingOutreachCap, growthDailyMax);
+  const dailyTarget = growthOutreachDailyTarget();
+  return {
+    sentTodayUtc,
+    marketingOutreachCap,
+    growthDailyMax,
+    effectiveDailyMax,
+    dailyTarget,
+    remainingToEffectiveMax: Math.max(0, effectiveDailyMax - sentTodayUtc),
+  };
 }

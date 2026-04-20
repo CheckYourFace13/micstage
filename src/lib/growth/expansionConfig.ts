@@ -43,13 +43,23 @@ export function growthAutoDraftBatchLimit(): number {
 }
 
 /**
- * Successful outreach sends per `/api/cron/growth-pipeline` run (after draft automation).
- * Still bounded by MARKETING_CAP_DAILY_OUTREACH (30) and per-domain caps — this only smooths bursts.
- * Default 4 (target band ~3–5). Clamp 1–5.
+ * Successful growth outreach sends attempted per `/api/cron/growth-pipeline` run (after draft automation).
+ * Still bounded by the effective daily OUTREACH max (see {@link growthOutreachDailyMax}) and marketing caps.
+ * Default 25; clamp 1–50 so a cron every ~30 minutes can drain a 30–50/day budget without starving backlog.
  */
 export function growthOutreachSendsPerCronRun(): number {
-  const n = parseIntEnv("GROWTH_OUTREACH_SENDS_PER_CRON_RUN", 4);
-  return Math.min(5, Math.max(1, n));
+  const n = parseIntEnv("GROWTH_OUTREACH_SENDS_PER_CRON_RUN", 25);
+  return Math.min(50, Math.max(1, n));
+}
+
+/** Soft daily goal for growth automation (logging / ordering only — never forces junk sends). */
+export function growthOutreachDailyTarget(): number {
+  return parseIntEnv("GROWTH_OUTREACH_DAILY_TARGET", 30);
+}
+
+/** Hard daily ceiling for growth outreach automation (combined with MARKETING_CAP_DAILY_OUTREACH via min). */
+export function growthOutreachDailyMax(): number {
+  return parseIntEnv("GROWTH_OUTREACH_DAILY_MAX", 50);
 }
 
 export type ExpansionThresholds = {

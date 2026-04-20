@@ -56,8 +56,8 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
     case "transactional":
       return parseIntEnv("MARKETING_CAP_DAILY_TRANSACTIONAL", 50_000);
     case "outreach":
-      /** Production-safe default: 30 outreach sends/day (UTC) across all recipients. Override with MARKETING_CAP_DAILY_OUTREACH. */
-      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 30);
+      /** Default 50/day (UTC) across all outreach recipients; growth automation also caps via GROWTH_OUTREACH_DAILY_MAX (min of the two). */
+      return parseIntEnv("MARKETING_CAP_DAILY_OUTREACH", 50);
     case "marketing":
       return parseIntEnv("MARKETING_CAP_DAILY_MARKETING", 40);
     default:

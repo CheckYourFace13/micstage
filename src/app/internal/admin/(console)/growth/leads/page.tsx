@@ -3,6 +3,7 @@ import { assertAdminSession } from "@/lib/adminAuth";
 import { GrowthLeadsFilteredTable } from "@/app/internal/admin/(console)/growth/_components/GrowthLeadsFilteredTable";
 import type { Prisma } from "@/generated/prisma/client";
 import { buildGrowthLeadWhere, type GrowthLeadListFilters } from "@/lib/growth/growthLeadFilters";
+import type { AdminGrowthLeadsSearchParams } from "@/lib/growth/growthAdminLeadsFilters";
 import {
   buildGrowthLeadsPaginationBaseQuery,
   growthLeadFiltersFromAdminSearchParams,
@@ -17,29 +18,28 @@ import { requirePrisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminGrowthLeadsPage(props: {
-  searchParams: Promise<{
-    market?: string;
-    metro?: string;
-    type?: string;
-    city?: string;
-    suburb?: string;
-    tags?: string;
-    status?: string;
-    fitMin?: string;
-    fitMax?: string;
-    q?: string;
-    pipeline?: string;
-    draftPending?: string;
-    omTier?: string;
-    contactQ?: string;
-    acquisition?: string;
-    queue?: string;
-    sourceKind?: string;
-    page?: string;
-    perPage?: string;
-  }>;
-}) {
+function growthLeadsListHref(entries: Record<string, string | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(entries)) {
+    if (v != null && v !== "") q.set(k, v);
+  }
+  const s = q.toString();
+  return s ? `/internal/admin/growth/leads?${s}` : "/internal/admin/growth/leads";
+}
+
+function growthLeadsPaginationQuery(
+  p: AdminGrowthLeadsSearchParams,
+  opts: { marketSlug: string | null; perPage: string | undefined; queue?: string },
+): Record<string, string | undefined> {
+  return buildGrowthLeadsPaginationBaseQuery({
+    ...p,
+    market: opts.marketSlug != null && opts.marketSlug !== "" ? opts.marketSlug : undefined,
+    queue: opts.queue,
+    perPage: opts.perPage,
+  });
+}
+
+export default async function AdminGrowthLeadsPage(props: { searchParams: Promise<AdminGrowthLeadsSearchParams> }) {
   await assertAdminSession();
   const p = await props.searchParams;
   const prisma = requirePrisma();
@@ -73,11 +73,13 @@ export default async function AdminGrowthLeadsPage(props: {
   const totalPages = Math.max(1, Math.ceil(matchCount / pageSize));
   const safePage = Math.min(page, totalPages);
 
-  const paginationBase = buildGrowthLeadsPaginationBaseQuery({
-    ...p,
-    market: marketSlug,
-    queue: outreachQueue === "all" ? undefined : outreachQueue,
-    perPage: pageSize === GROWTH_LEADS_PAGE_SIZE_DEFAULT ? undefined : String(pageSize),
+  const perPageForQuery = pageSize === GROWTH_LEADS_PAGE_SIZE_DEFAULT ? undefined : String(pageSize);
+  const queueForPagination = outreachQueue === "all" ? undefined : outreachQueue;
+
+  const paginationBase = growthLeadsPaginationQuery(p, {
+    marketSlug,
+    perPage: perPageForQuery,
+    queue: queueForPagination,
   });
 
   const exportQs = new URLSearchParams();
@@ -86,30 +88,40 @@ export default async function AdminGrowthLeadsPage(props: {
   }
   const exportHref = `/internal/admin/growth/leads/export?${exportQs.toString()}`;
 
-  const metro = GROWTH_METROS.find((m) => m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase());
+  const metro = marketSlug
+    ? GROWTH_METROS.find((m) => m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase())
+    : undefined;
 
-  const quickViewBase = new URLSearchParams();
-  quickViewBase.set("market", marketSlug);
-  if (p.type?.trim()) quickViewBase.set("type", p.type.trim());
-  if (p.sourceKind?.trim()) quickViewBase.set("sourceKind", p.sourceKind.trim());
+  const withQueue = (queue?: string) =>
+    growthLeadsListHref(
+      growthLeadsPaginationQuery(p, {
+        marketSlug,
+        perPage: perPageForQuery,
+        queue,
+      }),
+    );
 
-  const hrefAllLeads = `/internal/admin/growth/leads?${quickViewBase.toString()}`;
-  const qsEmailReady = new URLSearchParams(quickViewBase);
-  qsEmailReady.set("queue", "email_outreach_ready");
-  const hrefEmailOutreachReady = `/internal/admin/growth/leads?${qsEmailReady.toString()}`;
-  const qsUsableBacklog = new URLSearchParams(quickViewBase);
-  qsUsableBacklog.set("queue", "usable_email_backlog");
-  const hrefUsableEmailBacklog = `/internal/admin/growth/leads?${qsUsableBacklog.toString()}`;
-  const qsValidHm = new URLSearchParams(quickViewBase);
-  qsValidHm.set("queue", "valid_high_medium_email");
-  const hrefValidHighMediumEmail = `/internal/admin/growth/leads?${qsValidHm.toString()}`;
-  const qsUsableUploads = new URLSearchParams(quickViewBase);
-  qsUsableUploads.set("queue", "usable_email_backlog");
-  qsUsableUploads.set("sourceKind", "CSV_IMPORT,CLAUDE_CSV");
-  const hrefUsableUploadImports = `/internal/admin/growth/leads?${qsUsableUploads.toString()}`;
-  const qsContactPath = new URLSearchParams(quickViewBase);
-  qsContactPath.set("queue", "contact_path_queue");
-  const hrefContactPathQueue = `/internal/admin/growth/leads?${qsContactPath.toString()}`;
+  const hrefAllLeads = withQueue(undefined);
+  const hrefEmailOutreachReady = withQueue("email_outreach_ready");
+  const hrefUsableEmailBacklog = withQueue("usable_email_backlog");
+  const hrefValidHighMediumEmail = withQueue("valid_high_medium_email");
+  const hrefUsableUploadImports = growthLeadsListHref({
+    ...growthLeadsPaginationQuery(p, { marketSlug, perPage: perPageForQuery, queue: "usable_email_backlog" }),
+    sourceKind: "CSV_IMPORT,CLAUDE_CSV",
+  });
+  const hrefContactPathQueue = withQueue("contact_path_queue");
+  const hrefEmailPipeline = withQueue("email_pipeline");
+  const hrefSocialPathQueue = withQueue("social_path_queue");
+  const hrefLeadsEmailSortSameScope = growthLeadsListHref(
+    growthLeadsPaginationQuery(p, { marketSlug, perPage: perPageForQuery, queue: undefined }),
+  );
+  const hrefAllMarketsSameFilters = growthLeadsListHref(
+    growthLeadsPaginationQuery(p, {
+      marketSlug: null,
+      perPage: perPageForQuery,
+      queue: queueForPagination,
+    }),
+  );
 
   return (
     <main className="mx-auto max-w-7xl px-3 py-6">
@@ -119,6 +131,17 @@ export default async function AdminGrowthLeadsPage(props: {
           ← Growth hub
         </Link>
       </div>
+      <p className="mt-2 text-xs text-zinc-400">
+        <span
+          className={`inline-flex rounded-full border px-2.5 py-0.5 font-medium ${
+            marketSlug
+              ? "border-sky-500/40 bg-sky-500/10 text-sky-100"
+              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
+          }`}
+        >
+          {marketSlug ? `Market filter: ${metro?.label ?? marketSlug}` : "All markets (no discovery slug filter)"}
+        </span>
+      </p>
 
       <nav
         aria-label="Growth leads quick views"
@@ -191,8 +214,8 @@ export default async function AdminGrowthLeadsPage(props: {
           </a>
         </div>
         <div className="w-full rounded-md border border-zinc-700/80 bg-black/30 px-3 py-2 text-[11px] text-zinc-400">
-          <span className="font-semibold uppercase tracking-wide text-zinc-500">Usable-email backlog</span> (same filters as this page,
-          ignoring <code className="text-zinc-500">sourceKind</code>):{" "}
+          <span className="font-semibold uppercase tracking-wide text-zinc-500">Usable-email backlog</span> (same filters + market
+          scope as this page, ignoring <code className="text-zinc-500">sourceKind</code>):{" "}
           <Link className="text-emerald-400 hover:text-emerald-300" href={hrefUsableEmailBacklog}>
             all {countUsableAll}
           </Link>
@@ -204,17 +227,26 @@ export default async function AdminGrowthLeadsPage(props: {
           <span className="text-zinc-500">discovered + other paths {countUsableDiscovered}</span>
         </div>
         <p className="w-full text-[11px] leading-snug text-zinc-500 sm:pl-0">
-          Routes: <code className="text-zinc-400">/internal/admin/growth/leads</code> (filters in query; optional{" "}
-          <code className="text-zinc-400">sourceKind=CSV_IMPORT,CLAUDE_CSV</code> to narrow by ingestion path). CSV:{" "}
+          Routes: <code className="text-zinc-400">/internal/admin/growth/leads</code> (omit <code className="text-zinc-500">market</code>{" "}
+          for all markets; optional <code className="text-zinc-500">sourceKind=CSV_IMPORT,CLAUDE_CSV</code>). CSV:{" "}
           <code className="text-zinc-400">/internal/admin/growth/leads/export</code> — same query string as this page (exports the{" "}
           <strong className="text-zinc-300">full</strong> filtered set, not only this page).
         </p>
       </nav>
 
       <p className="mt-1 text-xs text-zinc-500">
-        Default market is <strong className="text-zinc-300">{defaultGrowthMetro().label}</strong> (
-        <code className="text-zinc-400">{defaultGrowthMetro().discoveryMarketSlug}</code>). {matchCount} lead
-        {matchCount === 1 ? "" : "s"} match current filters (paginated; no fixed row cap).
+        {marketSlug ? (
+          <>
+            Scoped to <strong className="text-zinc-300">{metro?.label ?? marketSlug}</strong> (
+            <code className="text-zinc-400">{marketSlug}</code>).
+          </>
+        ) : (
+          <>
+            <strong className="text-zinc-300">All markets</strong> — no default slug filter (saved Chicagoland shortcuts below still
+            pass <code className="text-zinc-400">market=chicagoland-il</code> explicitly).
+          </>
+        )}{" "}
+        {matchCount} lead{matchCount === 1 ? "" : "s"} match current filters (paginated; no fixed row cap).
       </p>
 
       <section className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
@@ -229,80 +261,60 @@ export default async function AdminGrowthLeadsPage(props: {
         </p>
         <ul className="mt-2 flex flex-wrap gap-2 text-sm">
           <li>
-            <Link
-              className="text-emerald-400 hover:text-emerald-300"
-              href={`/internal/admin/growth/leads?${new URLSearchParams({
-                market: marketSlug,
-                queue: "email_pipeline",
-                ...(p.type ? { type: p.type } : {}),
-              }).toString()}`}
-            >
+            <Link className="text-emerald-400 hover:text-emerald-300" href={hrefEmailPipeline}>
               Email pipeline
             </Link>
           </li>
           <li>
-            <Link
-              className="text-emerald-400 hover:text-emerald-300"
-              href={`/internal/admin/growth/leads?${new URLSearchParams({
-                market: marketSlug,
-                queue: "email_outreach_ready",
-                ...(p.type ? { type: p.type } : {}),
-              }).toString()}`}
-            >
+            <Link className="text-emerald-400 hover:text-emerald-300" href={hrefEmailOutreachReady}>
               Email outreach-ready
             </Link>
           </li>
           <li>
-            <Link
-              className="text-emerald-400 hover:text-emerald-300"
-              href={`/internal/admin/growth/leads?${new URLSearchParams({
-                market: marketSlug,
-                queue: "usable_email_backlog",
-                ...(p.type ? { type: p.type } : {}),
-              }).toString()}`}
-            >
+            <Link className="text-emerald-400 hover:text-emerald-300" href={hrefUsableEmailBacklog}>
               Full usable-email backlog
             </Link>
           </li>
           <li>
-            <Link
-              className="text-sky-400 hover:text-sky-300"
-              href={`/internal/admin/growth/leads?${new URLSearchParams({
-                market: marketSlug,
-                queue: "contact_path_queue",
-                ...(p.type ? { type: p.type } : {}),
-              }).toString()}`}
-            >
+            <Link className="text-sky-400 hover:text-sky-300" href={hrefContactPathQueue}>
               Contact-path queue
             </Link>
           </li>
           <li>
-            <Link
-              className="text-violet-400 hover:text-violet-300"
-              href={`/internal/admin/growth/leads?${new URLSearchParams({
-                market: marketSlug,
-                queue: "social_path_queue",
-                ...(p.type ? { type: p.type } : {}),
-              }).toString()}`}
-            >
+            <Link className="text-violet-400 hover:text-violet-300" href={hrefSocialPathQueue}>
               Social / calendar queue
             </Link>
           </li>
           <li>
-            <Link className="text-zinc-400 hover:text-zinc-200" href={`/internal/admin/growth/leads?market=${encodeURIComponent(marketSlug)}`}>
-              All leads (email-first sort)
+            <Link className="text-zinc-400 hover:text-zinc-200" href={hrefLeadsEmailSortSameScope}>
+              All leads (email-first sort, same scope)
             </Link>
           </li>
         </ul>
       </section>
 
-      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-zinc-500">Market:</span>
+        <Link
+          href={hrefAllMarketsSameFilters}
+          className={`rounded border px-2 py-1 ${
+            marketSlug == null ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-100" : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+          }`}
+        >
+          All markets
+        </Link>
         {GROWTH_METROS.map((m) => (
           <Link
             key={m.id}
-            href={`/internal/admin/growth/leads?market=${encodeURIComponent(m.discoveryMarketSlug)}`}
+            href={growthLeadsListHref(
+              growthLeadsPaginationQuery(p, {
+                marketSlug: m.discoveryMarketSlug,
+                perPage: perPageForQuery,
+                queue: queueForPagination,
+              }),
+            )}
             className={`rounded border px-2 py-1 ${
-              m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase()
+              marketSlug != null && m.discoveryMarketSlug.toLowerCase() === marketSlug.toLowerCase()
                 ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-100"
                 : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
             }`}
@@ -361,10 +373,11 @@ export default async function AdminGrowthLeadsPage(props: {
       <form method="get" className="mt-6 space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-sm">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="grid gap-1">
-            <span className="text-xs text-zinc-500">Discovery market slug</span>
+            <span className="text-xs text-zinc-500">Discovery market slug (leave blank for all markets)</span>
             <input
               name="market"
-              defaultValue={marketSlug}
+              defaultValue={marketSlug ?? ""}
+              placeholder="e.g. chicagoland-il — empty = all"
               className="rounded border border-zinc-700 bg-black/40 px-2 py-1.5 font-mono text-xs text-white"
             />
           </label>
@@ -509,7 +522,13 @@ export default async function AdminGrowthLeadsPage(props: {
 
       <GrowthLeadsFilteredTable
         filters={filters}
-        title={metro ? `${metro.label} — filtered leads` : `${marketSlug} — filtered leads`}
+        title={
+          marketSlug
+            ? metro
+              ? `${metro.label} — filtered leads`
+              : `${marketSlug} — filtered leads`
+            : "All markets — filtered leads"
+        }
         totalCount={matchCount}
         page={safePage}
         pageSize={pageSize}

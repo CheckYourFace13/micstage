@@ -103,6 +103,19 @@ export function resolveGrowthMarketSlug(params: { market?: string | null; metro?
   return defaultGrowthMetro().discoveryMarketSlug;
 }
 
+/**
+ * Admin growth-leads list/export only: when both `market` and `metro` are omitted, return **null**
+ * (no `discoveryMarketSlug` filter — all markets). Hub metrics and other tools keep using
+ * {@link resolveGrowthMarketSlug} with the primary-metro default.
+ */
+export function resolveAdminGrowthLeadsMarketSlug(params: { market?: string | null; metro?: string | null }): string | null {
+  const fromSlug = params.market?.trim();
+  if (fromSlug) return fromSlug;
+  const fromMetro = growthMetroById(params.metro ?? null);
+  if (fromMetro) return fromMetro.discoveryMarketSlug;
+  return null;
+}
+
 /** Map env/list slugs to canonical `GROWTH_METROS` discovery slugs when they match case-insensitively. */
 function canonicalDiscoveryMarketSlug(segment: string): string {
   const t = segment.trim();

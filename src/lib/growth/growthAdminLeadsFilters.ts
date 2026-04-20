@@ -10,7 +10,7 @@ import type {
 import { buildGrowthLeadWhere } from "@/lib/growth/growthLeadFilters";
 import type { GrowthLeadListFilters, GrowthLeadOutreachQueue } from "@/lib/growth/growthLeadFilters";
 import { GROWTH_LEAD_STATUS_SET } from "@/lib/growth/growthLeadStatusSet";
-import { resolveGrowthMarketSlug } from "@/lib/growth/marketsConfig";
+import { resolveAdminGrowthLeadsMarketSlug } from "@/lib/growth/marketsConfig";
 import {
   GROWTH_LEADS_PAGE_SIZE_DEFAULT,
   parseGrowthLeadsPageSizeParam,
@@ -173,10 +173,10 @@ export function adminGrowthLeadsSearchParamsFromUrl(sp: URLSearchParams): AdminG
 }
 
 export function growthLeadFiltersFromAdminSearchParams(p: AdminGrowthLeadsSearchParams): {
-  marketSlug: string;
+  marketSlug: string | null;
   filters: GrowthLeadListFilters;
 } {
-  const marketSlug = resolveGrowthMarketSlug({ market: p.market, metro: p.metro });
+  const marketSlug = resolveAdminGrowthLeadsMarketSlug({ market: p.market, metro: p.metro });
   const outreachQueue = parseOutreachQueueParam(p.queue);
   const filters: GrowthLeadListFilters = {
     marketSlug,

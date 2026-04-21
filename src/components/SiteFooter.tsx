@@ -24,6 +24,9 @@ export async function SiteFooter() {
             <Link className="hover:text-white" href="/terms">
               Terms of Service
             </Link>
+            <Link className="hover:text-white" href="/media">
+              Media
+            </Link>
             {adminOk ? (
               <Link className="hover:text-white" href="/internal/admin">
                 Admin

@@ -1,16 +1,16 @@
 import type { GrowthLeadType } from "@/generated/prisma/client";
 import type { MarketingEmailPayload } from "@/lib/marketing/emailPayloads";
+import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import {
-  buildArtistOutreachLetter,
-  buildPromoterOutreachLetter,
-  buildVenueOutreachLetter,
-  GROWTH_ARTIST_OUTREACH_SUBJECT,
-  GROWTH_PROMOTER_OUTREACH_SUBJECT,
-  GROWTH_VENUE_OUTREACH_SUBJECT,
+  buildArtistGrowthOutreachLetter,
+  buildPromoterGrowthOutreachLetter,
+  buildVenueGrowthOutreachLetter,
+  formatGrowthOutreachAreaLabel,
+  growthOutreachSubject,
+  type GrowthOutreachSequenceStep,
   OUTREACH_DRAFT_FOOTER_TEXT,
   outreachPlainLeanHtml,
 } from "@/lib/marketing/outreachTemplates";
-import { appBaseUrl } from "@/lib/marketing/emailConfig";
 
 /** Draft outreach bodies for imported / manual growth leads (not venue-claim cold). */
 export function buildGrowthLeadOutreachPayload(input: {
@@ -22,14 +22,10 @@ export function buildGrowthLeadOutreachPayload(input: {
   websiteUrl: string | null;
   /** When set on VENUE leads, adds a tracked link to venue registration. */
   leadId?: string | null;
-  /** VENUE / ARTIST: mailbox used for "Hi {first}," salutation heuristic when applicable. */
-  contactEmailForSalutation?: string | null;
+  sequenceStep?: GrowthOutreachSequenceStep;
 }): MarketingEmailPayload {
-  const subjectByType: Record<GrowthLeadType, string> = {
-    VENUE: GROWTH_VENUE_OUTREACH_SUBJECT,
-    ARTIST: GROWTH_ARTIST_OUTREACH_SUBJECT,
-    PROMOTER_ACCOUNT: GROWTH_PROMOTER_OUTREACH_SUBJECT,
-  };
+  const step: GrowthOutreachSequenceStep = input.sequenceStep ?? 1;
+  const areaLabel = formatGrowthOutreachAreaLabel(input.city, input.discoveryMarketSlug);
 
   const baseUrl = appBaseUrl().replace(/\/$/, "");
   const claimVenueUrl =
@@ -41,15 +37,15 @@ export function buildGrowthLeadOutreachPayload(input: {
       ? `${baseUrl}/register/musician?growthLead=${encodeURIComponent(input.leadId.trim())}`
       : undefined;
 
-  const venueLetter = buildVenueOutreachLetter(input.name, {
+  const venueLetter = buildVenueGrowthOutreachLetter(input.name, step, {
     claimVenueUrl,
-    contactEmail: input.leadType === "VENUE" ? input.contactEmailForSalutation : undefined,
+    areaLabel,
   });
-  const artistLetter = buildArtistOutreachLetter(input.name, {
+  const artistLetter = buildArtistGrowthOutreachLetter(input.name, step, {
     claimArtistUrl,
-    contactEmail: input.leadType === "ARTIST" ? input.contactEmailForSalutation : undefined,
+    areaLabel,
   });
-  const promoterLetter = buildPromoterOutreachLetter(input.name);
+  const promoterLetter = buildPromoterGrowthOutreachLetter(step, { areaLabel });
 
   const coreText =
     input.leadType === "VENUE"
@@ -80,9 +76,9 @@ export function buildGrowthLeadOutreachPayload(input: {
       : outreachPlainLeanHtml(textBody);
 
   return {
-    subject: subjectByType[input.leadType],
+    subject: growthOutreachSubject(input.leadType, step),
     textBody,
     htmlBody,
-    tags: ["growth-lead", input.leadType.toLowerCase(), "draft"],
+    tags: ["growth-lead", input.leadType.toLowerCase(), "draft", `seq-${step}`],
   };
 }

@@ -93,6 +93,11 @@ export async function checkContactSendSpacing(
     };
   }
 
+  /** OUTREACH uses sequence spacing only so multi-step growth mail can advance without a redundant same-category cooldown. */
+  if (category === "OUTREACH") {
+    return { ok: true };
+  }
+
   const coolH = marketingContactCooldownHours();
   const coolCut = new Date(Date.now() - coolH * 60 * 60 * 1000);
   const recentCool = await prisma.marketingEmailSend.findFirst({

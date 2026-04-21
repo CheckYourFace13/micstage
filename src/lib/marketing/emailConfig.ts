@@ -67,11 +67,11 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
 
 /**
  * Per recipient-domain daily caps (UTC day, SENT rows only).
- * - OUTREACH: default 5 (MARKETING_CAP_PER_DOMAIN_DAILY_OUTREACH, or legacy MARKETING_CAP_PER_DOMAIN_DAILY).
+ * - OUTREACH: default 3 (MARKETING_CAP_PER_DOMAIN_DAILY_OUTREACH, or legacy MARKETING_CAP_PER_DOMAIN_DAILY).
  * - MARKETING: separate default 15 so venue welcome bursts are less likely to hit the outreach domain budget.
  */
 export function marketingPerDomainDailyCap(category: MarketingEmailCategory): number {
-  const legacyShared = parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 5);
+  const legacyShared = parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 3);
   if (category === "OUTREACH") {
     const v = process.env.MARKETING_CAP_PER_DOMAIN_DAILY_OUTREACH?.trim();
     if (v) return parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY_OUTREACH", legacyShared);
@@ -83,14 +83,17 @@ export function marketingPerDomainDailyCap(category: MarketingEmailCategory): nu
   return 1_000_000;
 }
 
-/** Hours between sends to same contact for outreach+marketing (same template family uses purposeKey). */
+/**
+ * Hours between sends to the same contact for **MARKETING** category (enforced in {@link checkContactSendSpacing}).
+ * OUTREACH spacing uses {@link marketingSequenceDelayMinutes} only so growth sequences can advance.
+ */
 export function marketingContactCooldownHours(): number {
-  return parseIntEnv("MARKETING_CONTACT_COOLDOWN_HOURS", 168);
+  return parseIntEnv("MARKETING_CONTACT_COOLDOWN_HOURS", 72);
 }
 
-/** Minimum minutes between any outreach/marketing sends to the same contact. */
+/** Minimum minutes between any outreach/marketing sends to the same contact (always enforced for OUTREACH + MARKETING). */
 export function marketingSequenceDelayMinutes(): number {
-  return parseIntEnv("MARKETING_SEQUENCE_DELAY_MINUTES", 60);
+  return parseIntEnv("MARKETING_SEQUENCE_DELAY_MINUTES", 2880);
 }
 
 export function marketingPhysicalAddressFooter(): string {

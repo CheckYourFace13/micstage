@@ -121,7 +121,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
           openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] },
         },
       ],
-      outreachDrafts: { none: { status: { in: ["PENDING_REVIEW", "APPROVED", "SENT"] } } },
+      outreachDrafts: { none: { status: { in: ["PENDING_REVIEW", "APPROVED"] } } },
     },
     select: { id: true },
     orderBy: [{ fitScore: "desc" }, { updatedAt: "desc" }],

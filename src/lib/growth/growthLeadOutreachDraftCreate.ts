@@ -4,10 +4,12 @@ import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquis
 import { buildGrowthLeadOutreachPayload } from "@/lib/growth/outreachEmailBodies";
 import { venueLeadMailboxForOutreach } from "@/lib/growth/leadEmailValidation";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
+import { checkContactSendSpacing } from "@/lib/marketing/sendCaps";
+import type { GrowthOutreachSequenceStep } from "@/lib/marketing/outreachTemplates";
 
 /**
- * Creates a single PENDING_REVIEW growth outreach draft when the lead has email
- * and does not already have an open cold draft (pending, approved, or sent).
+ * Creates a PENDING_REVIEW growth outreach draft (sequence steps 1–3) when the lead has email,
+ * no in-flight draft (pending/approved), and sequence / spacing rules allow the next step.
  */
 export async function createPendingGrowthLeadOutreachDraft(
   prisma: PrismaClient,
@@ -39,25 +41,23 @@ export async function createPendingGrowthLeadOutreachDraft(
     return { ok: false, reason: "Lead email is LOW confidence (skipped for automation)" };
   }
 
-  const existing = await prisma.growthLeadOutreachDraft.findFirst({
-    where: {
-      leadId,
-      status: { in: ["PENDING_REVIEW", "APPROVED", "SENT"] },
-    },
+  const openDraft = await prisma.growthLeadOutreachDraft.findFirst({
+    where: { leadId, status: { in: ["PENDING_REVIEW", "APPROVED"] } },
     select: { id: true },
   });
-  if (existing) return { ok: false, reason: "Lead already has an active or sent outreach draft" };
+  if (openDraft) {
+    return { ok: false, reason: "Lead already has a pending or approved outreach draft" };
+  }
 
-  const payload = buildGrowthLeadOutreachPayload({
-    leadType: lead.leadType,
-    name: lead.name,
-    city: lead.city,
-    discoveryMarketSlug: lead.discoveryMarketSlug,
-    contactUrl: lead.contactUrl,
-    websiteUrl: lead.websiteUrl,
-    leadId: lead.id,
-    contactEmailForSalutation: lead.leadType === "VENUE" || lead.leadType === "ARTIST" ? email : undefined,
+  const sentRows = await prisma.growthLeadOutreachDraft.findMany({
+    where: { leadId, status: "SENT" },
+    select: { sequenceStep: true },
   });
+  const maxSentStep = sentRows.reduce((m, r) => Math.max(m, r.sequenceStep), 0);
+  if (maxSentStep >= 3) {
+    return { ok: false, reason: "Growth outreach sequence already completed (3 emails sent)" };
+  }
+  const nextSequenceStep = (maxSentStep + 1) as GrowthOutreachSequenceStep;
 
   const contact = await prisma.marketingContact.upsert({
     where: { emailNormalized: email },
@@ -74,6 +74,24 @@ export async function createPendingGrowthLeadOutreachDraft(
     },
   });
 
+  if (nextSequenceStep > 1) {
+    const spacing = await checkContactSendSpacing(prisma, contact.id, "OUTREACH");
+    if (!spacing.ok) {
+      return { ok: false, reason: spacing.reason };
+    }
+  }
+
+  const payload = buildGrowthLeadOutreachPayload({
+    leadType: lead.leadType,
+    name: lead.name,
+    city: lead.city,
+    discoveryMarketSlug: lead.discoveryMarketSlug,
+    contactUrl: lead.contactUrl,
+    websiteUrl: lead.websiteUrl,
+    leadId: lead.id,
+    sequenceStep: nextSequenceStep,
+  });
+
   const draft = await prisma.growthLeadOutreachDraft.create({
     data: {
       leadId: lead.id,
@@ -84,10 +102,11 @@ export async function createPendingGrowthLeadOutreachDraft(
       textBody: payload.textBody,
       htmlBody: payload.htmlBody,
       discoveryMarketSlug: lead.discoveryMarketSlug,
+      sequenceStep: nextSequenceStep,
     },
   });
 
-  if (lead.leadType === "VENUE") {
+  if (lead.leadType === "VENUE" && nextSequenceStep === 1) {
     await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "OUTREACH_DRAFTED", { leadType: "VENUE" });
   }
 

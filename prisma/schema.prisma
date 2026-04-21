@@ -1008,6 +1008,9 @@ model GrowthLeadOutreachDraft {
   textBody String @db.Text
   htmlBody String @db.Text
 
+  /// 1 = intro, 2 = follow-up, 3 = traction / social proof (same lead may have up to three sent rows over time).
+  sequenceStep Int @default(1)
+
   discoveryMarketSlug String?
 
   approvedAt      DateTime?

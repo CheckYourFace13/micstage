@@ -61,8 +61,7 @@ export async function createGrowthLeadAction(formData: FormData) {
   const contactUrl = String(formData.get("contactUrl") ?? "").trim() || null;
   const fitRaw = String(formData.get("fitScore") ?? "").trim();
   const fitScore = fitRaw ? Number.parseInt(fitRaw, 10) : null;
-  const discoveryMarketSlug = String(formData.get("discoveryMarketSlug") ?? "").trim();
-  if (!discoveryMarketSlug) redirect(q("/internal/admin/growth", "err", "needMarket"));
+  const discoveryMarketSlug = String(formData.get("discoveryMarketSlug") ?? "").trim() || null;
 
   const candidate: GrowthLeadCandidate = {
     leadType,
@@ -77,7 +76,7 @@ export async function createGrowthLeadAction(formData: FormData) {
     city: String(formData.get("city") ?? "").trim() || null,
     suburb: String(formData.get("suburb") ?? "").trim() || null,
     region: String(formData.get("region") ?? "").trim() || null,
-    discoveryMarketSlug,
+    ...(discoveryMarketSlug ? { discoveryMarketSlug } : {}),
     source: String(formData.get("source") ?? "").trim() || "manual",
     sourceKind: "MANUAL_ADMIN",
     fitScore: Number.isFinite(fitScore as number) ? fitScore : null,
@@ -204,11 +203,7 @@ export async function importGrowthLeadsCsvAction(formData: FormData) {
   const rowErrors = [...errors];
 
   for (const r of rows) {
-    const slug = r.discoveryMarketSlug?.trim();
-    if (!slug) {
-      rowErrors.push(`Row ${r.rowIndex}: missing discovery market slug`);
-      continue;
-    }
+    const slug = r.discoveryMarketSlug?.trim() || defaults.discoveryMarketSlug?.trim() || null;
     const candidate: GrowthLeadCandidate = {
       leadType: r.leadType,
       name: r.name,
@@ -221,7 +216,7 @@ export async function importGrowthLeadsCsvAction(formData: FormData) {
       city: r.city,
       suburb: r.suburb,
       region: r.region,
-      discoveryMarketSlug: slug,
+      ...(slug ? { discoveryMarketSlug: slug } : {}),
       source: r.source,
       sourceKind: "CSV_IMPORT",
       fitScore: r.fitScore,
@@ -275,7 +270,7 @@ function resolveLeadUploadMarketSlug(row: {
   city: string | null;
   suburb: string | null;
   websiteUrl: string | null;
-}): { slug: string; warning: string | null } {
+}): { slug: string | null; warning: string | null } {
   const explicit = row.discoveryMarketSlug?.trim();
   if (explicit) return { slug: explicit, warning: null };
 
@@ -314,10 +309,9 @@ function resolveLeadUploadMarketSlug(row: {
     }
   }
 
-  const fallback = primaryLaunchDiscoveryMarketSlug();
   return {
-    slug: fallback,
-    warning: `Row ${row.rowIndex}: discovery market slug missing; used primary launch default "${fallback}".`,
+    slug: null,
+    warning: `Row ${row.rowIndex}: discovery market slug missing; stored without market slug (outreach still allowed when email is valid).`,
   };
 }
 
@@ -336,12 +330,6 @@ export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
   const uploadedAt = new Date().toISOString();
   const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(0, 180);
   const importMetaNote = `[claude_csv import ${uploadedAt} batch=${batchId} file=${safeName}]`;
-
-  const activeMarkets = await prisma.growthLaunchMarket.findMany({
-    where: { status: "ACTIVE" },
-    select: { discoveryMarketSlug: true },
-  });
-  const activeMarketSet = new Set(activeMarkets.map((m) => m.discoveryMarketSlug.trim().toLowerCase()));
 
   let inserted = 0;
   let updated = 0;
@@ -398,7 +386,7 @@ export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
       city: r.city,
       suburb: r.suburb,
       region: null,
-      discoveryMarketSlug: market.slug,
+      ...(market.slug ? { discoveryMarketSlug: market.slug } : {}),
       source: r.source?.trim() || "claude_csv",
       sourceKind: r.sourceKind,
       fitScore: r.fitScore,
@@ -417,24 +405,14 @@ export async function importClaudeGrowthLeadsCsvAction(formData: FormData) {
       if (res.status === "created") {
         inserted++;
         const lead = await prisma.growthLead.findUnique({ where: { id: res.id } });
-        if (
-          lead &&
-          venueLeadMatchesAutoDraftHeuristic(lead) &&
-          lead.discoveryMarketSlug &&
-          activeMarketSet.has(lead.discoveryMarketSlug.trim().toLowerCase())
-        ) {
+        if (lead && venueLeadMatchesAutoDraftHeuristic(lead)) {
           venueAutoEligibleLeadIds.add(lead.id);
         }
       } else if (res.status === "duplicate") {
         if (res.merged) updated++;
         else duplicateNoChange++;
         const lead = await prisma.growthLead.findUnique({ where: { id: res.existingId } });
-        if (
-          lead &&
-          venueLeadMatchesAutoDraftHeuristic(lead) &&
-          lead.discoveryMarketSlug &&
-          activeMarketSet.has(lead.discoveryMarketSlug.trim().toLowerCase())
-        ) {
+        if (lead && venueLeadMatchesAutoDraftHeuristic(lead)) {
           venueAutoEligibleLeadIds.add(lead.id);
         }
       } else {

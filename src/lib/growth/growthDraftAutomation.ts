@@ -14,10 +14,6 @@ import {
 
 type GrowthDraftWithLead = GrowthLeadOutreachDraft & { lead: GrowthLead };
 
-function activeMarketSlugForDraft(d: GrowthDraftWithLead): string {
-  return (d.discoveryMarketSlug ?? d.lead.discoveryMarketSlug ?? "").trim().toLowerCase();
-}
-
 function sortDraftsByFitThenCreated<T extends { lead: { fitScore: number | null }; createdAt: Date }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
     const df = (b.lead.fitScore ?? 0) - (a.lead.fitScore ?? 0);
@@ -30,7 +26,7 @@ function sortDraftsByFitThenCreated<T extends { lead: { fitScore: number | null 
 function venuePendingPassesAutomationGate(
   d: GrowthDraftWithLead,
   venueAutoFitMin: number,
-  activeMarketSet: Set<string>,
+  _activeMarketSet: Set<string>,
   allowMediumOutreach: boolean,
 ): boolean {
   if (d.lead.leadType !== "VENUE" || d.status !== "PENDING_REVIEW") return false;
@@ -40,18 +36,14 @@ function venuePendingPassesAutomationGate(
     const t = d.lead.openMicSignalTier;
     if (!(t === "EXPLICIT_OPEN_MIC" || t === "STRONG_LIVE_EVENT")) return false;
   }
-  const slug = activeMarketSlugForDraft(d);
-  if (!slug || !activeMarketSet.has(slug)) return false;
   const conf = d.lead.contactEmailConfidence;
   if (conf == null || conf === "LOW") return false;
   if (conf === "MEDIUM" && !allowMediumOutreach) return false;
   return conf === "HIGH" || conf === "MEDIUM";
 }
 
-function backlogPassesAutomationGate(d: GrowthDraftWithLead, activeMarketSet: Set<string>, allowMediumOutreach: boolean): boolean {
+function backlogPassesAutomationGate(d: GrowthDraftWithLead, _activeMarketSet: Set<string>, allowMediumOutreach: boolean): boolean {
   if (d.status !== "APPROVED" || d.marketingEmailSendId != null) return false;
-  const slug = activeMarketSlugForDraft(d);
-  if (!slug || !activeMarketSet.has(slug)) return false;
   const conf = d.lead.contactEmailConfidence;
   if (conf == null || conf === "LOW") return false;
   if (conf === "MEDIUM" && !allowMediumOutreach) return false;
@@ -112,7 +104,8 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       OR: [
         // Keep existing non-venue behavior.
         { status: "APPROVED" },
-        { status: "REVIEWED", fitScore: { gte: fitMin } },
+        // REVIEWED: fit score when present; null fit (common on imports) still eligible with valid email.
+        { status: "REVIEWED", OR: [{ fitScore: { gte: fitMin } }, { fitScore: null }] },
         // Venue-first: allow strong newly discovered autonomous venues into draft automation.
         {
           leadType: "VENUE",

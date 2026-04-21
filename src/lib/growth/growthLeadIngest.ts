@@ -113,8 +113,7 @@ export async function ingestGrowthLeadCandidate(
   const name = raw.name?.trim();
   if (!name) return { status: "skipped", reason: "missing name" };
 
-  const discoveryMarketSlug = raw.discoveryMarketSlug?.trim();
-  if (!discoveryMarketSlug) return { status: "skipped", reason: "missing discoveryMarketSlug" };
+  const discoveryMarketSlug = raw.discoveryMarketSlug?.trim() || null;
 
   const primaryParsed = parsePrimaryEmailForIngest(raw);
   const primary = resolveStoredPrimaryEmail(raw, primaryParsed);

@@ -26,27 +26,26 @@ export async function sendGrowthLeadOutreachDraft(
 
   if (draft.status === "PENDING_REVIEW") {
     const slug = (draft.lead.discoveryMarketSlug ?? draft.discoveryMarketSlug ?? "").trim();
-    if (!slug) {
-      return { ok: false, blocked: true, reasons: ["Lead has no discovery market slug"] };
-    }
-    const launch = await prisma.growthLaunchMarket.findFirst({
-      where: { discoveryMarketSlug: { equals: slug, mode: "insensitive" } },
-    });
-    if (!launch?.coldApprovalRelaxed) {
-      return {
-        ok: false,
-        blocked: true,
-        reasons: [
-          "Cold outreach requires approval for this market. Approve the draft first, or enable “Relax cold approval” on Launch markets.",
-        ],
-      };
+    if (slug) {
+      const launch = await prisma.growthLaunchMarket.findFirst({
+        where: { discoveryMarketSlug: { equals: slug, mode: "insensitive" } },
+      });
+      if (!launch?.coldApprovalRelaxed) {
+        return {
+          ok: false,
+          blocked: true,
+          reasons: [
+            "Cold outreach requires approval for this market. Approve the draft first, or enable “Relax cold approval” on Launch markets.",
+          ],
+        };
+      }
     }
     await prisma.growthLeadOutreachDraft.update({
       where: { id: draftId },
       data: {
         status: "APPROVED",
         approvedAt: new Date(),
-        approvedByEmail: opts?.actorEmail?.trim() || "relaxed-market",
+        approvedByEmail: opts?.actorEmail?.trim() || (slug ? "relaxed-market" : "no-market-slug"),
       },
     });
   }

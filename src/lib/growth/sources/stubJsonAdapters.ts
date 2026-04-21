@@ -30,8 +30,7 @@ function parseCandidate(row: unknown, fallbackKind: GrowthLeadSourceKind): Growt
   if (!name) return null;
   const lt = String(o.leadType ?? "").toUpperCase();
   if (lt !== "VENUE" && lt !== "ARTIST" && lt !== "PROMOTER_ACCOUNT") return null;
-  const slug = typeof o.discoveryMarketSlug === "string" ? o.discoveryMarketSlug.trim() : "";
-  if (!slug) return null;
+  const slugRaw = typeof o.discoveryMarketSlug === "string" ? o.discoveryMarketSlug.trim() : "";
   const sk = String(o.sourceKind ?? fallbackKind).toUpperCase();
   const sourceKind = SOURCE_KINDS.has(sk) ? (sk as GrowthLeadSourceKind) : fallbackKind;
   return {
@@ -46,7 +45,7 @@ function parseCandidate(row: unknown, fallbackKind: GrowthLeadSourceKind): Growt
     city: typeof o.city === "string" ? o.city : null,
     suburb: typeof o.suburb === "string" ? o.suburb : null,
     region: typeof o.region === "string" ? o.region : null,
-    discoveryMarketSlug: slug,
+    ...(slugRaw ? { discoveryMarketSlug: slugRaw } : {}),
     source: typeof o.source === "string" ? o.source : "growth_stub_json",
     sourceKind,
     fitScore: typeof o.fitScore === "number" ? o.fitScore : null,
@@ -115,11 +114,12 @@ export function createStubJsonAdapter(leadType: GrowthLeadType): GrowthLeadSourc
     leadType,
     async discover(ctx) {
       const all = readStubCandidatesFromEnv();
-      return all.filter(
-        (c) =>
-          c.leadType === ctx.leadType &&
-          c.discoveryMarketSlug.toLowerCase() === ctx.discoveryMarketSlug.toLowerCase(),
-      );
+      return all.filter((c) => {
+        if (c.leadType !== ctx.leadType) return false;
+        const cs = c.discoveryMarketSlug?.trim().toLowerCase();
+        if (!cs) return true;
+        return cs === ctx.discoveryMarketSlug.toLowerCase();
+      });
     },
   };
 }

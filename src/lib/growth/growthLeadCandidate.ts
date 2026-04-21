@@ -31,7 +31,8 @@ export type GrowthLeadCandidate = {
   city?: string | null;
   suburb?: string | null;
   region?: string | null;
-  discoveryMarketSlug: string;
+  /** Optional; null/omit when unknown — ingestion still stores the lead if email + name are valid. */
+  discoveryMarketSlug?: string | null;
   source?: string | null;
   sourceKind: GrowthLeadSourceKind;
   fitScore?: number | null;

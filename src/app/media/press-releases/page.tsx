@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { MediaPrintOnQuery } from "@/components/MediaPrintOnQuery";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { PRESS_RELEASE_META } from "@/lib/mediaContent";
 
@@ -13,6 +15,9 @@ export const metadata: Metadata = buildPublicMetadata({
 export default function MediaPressReleasesPage() {
   return (
     <div className="min-h-dvh bg-black text-white print:bg-white print:text-black">
+      <Suspense fallback={null}>
+        <MediaPrintOnQuery />
+      </Suspense>
       <style>{`
         @media print {
           header, footer { display: none !important; }
@@ -25,9 +30,12 @@ export default function MediaPressReleasesPage() {
           </Link>
           <span>·</span>
           <span>Press Releases</span>
-          <span className="ml-auto rounded-md border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/90">
-            Use browser Print / Save PDF
-          </span>
+          <Link
+            href="/media/press-releases?pdf=1"
+            className="ml-auto rounded-md border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/90 hover:bg-white/10"
+          >
+            Print / Download PDF
+          </Link>
         </div>
 
         <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-8 print:rounded-none print:border-0 print:bg-transparent print:p-0">
@@ -90,9 +98,8 @@ export default function MediaPressReleasesPage() {
             <h2 className="text-xl font-semibold">Media Contact</h2>
             <div className="mt-3 space-y-1 text-sm text-white/80 print:text-black">
               <p>MicStage Communications</p>
-              <p>Email: press@micstage.com (placeholder)</p>
-              <p>Phone: +1 (000) 000-0000 (placeholder)</p>
               <p>Media page: https://micstage.com/media</p>
+              <p className="hidden print:block">Email: drummer@micstage.com</p>
             </div>
           </section>
         </article>

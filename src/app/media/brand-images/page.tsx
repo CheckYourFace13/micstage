@@ -40,11 +40,18 @@ export default function MediaBrandImagesPage() {
         }
       `}</style>
       <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 print:max-w-none print:px-0">
-        <div className="mb-5 text-sm text-white/70 print:hidden">
+        <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-white/70 print:hidden">
           <Link href="/media" className="underline decoration-white/25 underline-offset-2 hover:text-white">
             Media
           </Link>
-          <span> · Brand Images</span>
+          <span>·</span>
+          <span>Brand Images</span>
+          <Link
+            href="/media/brand-images#downloads"
+            className="ml-auto rounded-md border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/90 hover:bg-white/10"
+          >
+            Download
+          </Link>
         </div>
 
         <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-8 print:rounded-none print:border-0 print:bg-transparent print:p-0">
@@ -79,6 +86,35 @@ export default function MediaBrandImagesPage() {
               <p className="mt-2 text-sm text-white/75 print:text-black">
                 No dedicated logo files were detected in `public/brand` yet. Drop approved logo files there (PNG/SVG/WebP) and
                 this page will surface them automatically.
+              </p>
+            )}
+          </section>
+
+          <section id="downloads" className="mt-8 scroll-mt-24 rounded-xl border border-white/10 bg-white/[0.04] p-4 sm:p-5 print:border-black/25">
+            <h2 className="text-xl font-semibold">Downloads</h2>
+            <p className="mt-2 text-sm leading-7 text-white/75 print:text-black">
+              Use the links below to download files directly. Add additional approved assets under <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/brand/</code>{" "}
+              to have them appear automatically on this page.
+            </p>
+            {existingAssets.length > 0 ? (
+              <ul className="mt-3 grid gap-2 text-sm">
+                {existingAssets.map((asset) => (
+                  <li key={`dl-${asset.publicPath}`}>
+                    <a
+                      href={asset.publicPath}
+                      download
+                      className="font-medium text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2 hover:brightness-110"
+                    >
+                      Download — {asset.label}
+                    </a>
+                    <span className="ml-2 text-white/50 print:text-black/60">({asset.publicPath})</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-white/65 print:text-black">
+                No downloadable files detected yet. Add assets under <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/brand/</code> or include{" "}
+                <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/favicon.png</code>.
               </p>
             )}
           </section>

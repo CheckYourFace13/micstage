@@ -1,32 +1,44 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { MediaPrintOnQuery } from "@/components/MediaPrintOnQuery";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "MicStage How-To for Venues | Printable open mic operations guide",
+  title: "MicStage How-To for Venues | Open mic operations guide",
   description:
-    "Printable MicStage venue guide covering open mic platform setup, venue profile creation, recurring open mic scheduling, performer attraction, and marketing visibility.",
+    "MicStage venue guide covering open mic platform setup, venue profile creation, recurring open mic scheduling, performer attraction, and marketing visibility.",
   path: "/media/how-to-venues",
 });
 
 export default function MediaHowToVenuesPage() {
   return (
     <div className="min-h-dvh bg-black text-white print:bg-white print:text-black">
+      <Suspense fallback={null}>
+        <MediaPrintOnQuery />
+      </Suspense>
       <style>{`
         @media print {
           header, footer { display: none !important; }
         }
       `}</style>
       <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 print:max-w-none print:px-0">
-        <div className="mb-5 text-sm text-white/70 print:hidden">
+        <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-white/70 print:hidden">
           <Link href="/media" className="underline decoration-white/25 underline-offset-2 hover:text-white">
             Media
           </Link>
-          <span> · How-To for Venues</span>
+          <span>·</span>
+          <span>How-To for Venues</span>
+          <Link
+            href="/media/how-to-venues?pdf=1"
+            className="ml-auto rounded-md border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/90 hover:bg-white/10"
+          >
+            Print / Download PDF
+          </Link>
         </div>
 
         <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-8 print:rounded-none print:border-0 print:bg-transparent print:p-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgb(var(--om-neon))] print:text-black">Printable how-to sheet</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgb(var(--om-neon))] print:text-black">Venue how-to sheet</p>
           <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">MicStage How-To Sheet for Venues</h1>
           <p className="mt-3 text-sm leading-7 text-white/80 print:text-black">
             A concise guide for venue teams using MicStage as an open mic platform to run cleaner scheduling, increase repeat

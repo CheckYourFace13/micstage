@@ -3,6 +3,12 @@ import path from "node:path";
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
+import {
+  MEDIA_BRAND_KIT,
+  brandKitPublicPath,
+  getBrandKitAssetDiskPath,
+  readPngDimensions,
+} from "@/lib/mediaBrandKit";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 const BRAND_IMAGE_CANDIDATES = [
@@ -22,6 +28,12 @@ function getExistingBrandAssets(): { publicPath: string; label: string }[] {
   });
 }
 
+function previewShellClass(surface: "on-light" | "on-dark"): string {
+  return surface === "on-light"
+    ? "rounded-lg bg-zinc-100 p-4 ring-1 ring-black/10"
+    : "rounded-lg bg-zinc-950 p-4 ring-1 ring-white/15";
+}
+
 export const metadata: Metadata = buildPublicMetadata({
   title: "MicStage Brand Images | Logos, icon, and usage notes",
   description:
@@ -31,6 +43,13 @@ export const metadata: Metadata = buildPublicMetadata({
 
 export default function MediaBrandImagesPage() {
   const existingAssets = getExistingBrandAssets();
+
+  const brandKitResolved = MEDIA_BRAND_KIT.map((entry) => {
+    const diskPath = getBrandKitAssetDiskPath(entry.file);
+    const publicPath = brandKitPublicPath(entry.file);
+    const dims = fs.existsSync(diskPath) ? readPngDimensions(diskPath) : null;
+    return { ...entry, diskPath, publicPath, dims };
+  }).filter((row) => fs.existsSync(row.diskPath));
 
   return (
     <div className="min-h-dvh bg-black text-white print:bg-white print:text-black">
@@ -67,8 +86,13 @@ export default function MediaBrandImagesPage() {
             {existingAssets.length > 0 ? (
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {existingAssets.map((asset) => (
-                  <figure key={asset.publicPath} className="rounded-xl border border-white/10 bg-black/30 p-4 print:border-black/25 print:bg-white">
-                    <div className="rounded-lg border border-dashed border-white/20 bg-black/20 p-4 print:border-black/25 print:bg-white">
+                  <figure
+                    key={asset.publicPath}
+                    className="rounded-xl border border-white/10 bg-black/30 p-4 print:border-black/25 print:bg-white"
+                  >
+                    <div
+                      className={`rounded-lg p-4 print:border-black/25 ${asset.publicPath.includes("favicon") ? "bg-zinc-100 ring-1 ring-black/10" : "border border-dashed border-white/20 bg-black/20"}`}
+                    >
                       <Image
                         src={asset.publicPath}
                         alt={`${asset.label} for MicStage`}
@@ -84,8 +108,8 @@ export default function MediaBrandImagesPage() {
               </div>
             ) : (
               <p className="mt-2 text-sm text-white/75 print:text-black">
-                No dedicated logo files were detected in `public/brand` yet. Drop approved logo files there (PNG/SVG/WebP) and
-                this page will surface them automatically.
+                Optional legacy paths under <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/brand/</code> are empty. The official downloadable kit lives under{" "}
+                <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/media/brand-images/</code>.
               </p>
             )}
           </section>
@@ -93,30 +117,71 @@ export default function MediaBrandImagesPage() {
           <section id="downloads" className="mt-8 scroll-mt-24 rounded-xl border border-white/10 bg-white/[0.04] p-4 sm:p-5 print:border-black/25">
             <h2 className="text-xl font-semibold">Downloads</h2>
             <p className="mt-2 text-sm leading-7 text-white/75 print:text-black">
-              Use the links below to download files directly. Add additional approved assets under <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/brand/</code>{" "}
-              to have them appear automatically on this page.
+              Official MicStage brand files live at{" "}
+              <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/media/brand-images/</code> and are served from{" "}
+              <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">/media/brand-images/</code>. Previews use a neutral surface so
+              light and dark marks stay readable on this page; downloaded files are unchanged.
             </p>
-            {existingAssets.length > 0 ? (
-              <ul className="mt-3 grid gap-2 text-sm">
-                {existingAssets.map((asset) => (
-                  <li key={`dl-${asset.publicPath}`}>
+
+            <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-white/55 print:text-black">Official brand kit</h3>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {brandKitResolved.map((asset) => {
+                const maxW = asset.dims ? Math.min(asset.dims.width, 560) : 280;
+                const ratio = asset.dims ? asset.dims.height / asset.dims.width : 0.35;
+                const h = asset.dims ? Math.max(1, Math.round(maxW * ratio)) : 100;
+                const meta =
+                  asset.dims != null ? `PNG · ${asset.dims.width}×${asset.dims.height}px` : "PNG";
+
+                return (
+                  <div
+                    key={asset.file}
+                    className="flex flex-col rounded-xl border border-white/10 bg-black/25 p-4 print:border-black/25 print:bg-white"
+                  >
+                    <div className={`flex min-h-[9.5rem] items-center justify-center ${previewShellClass(asset.previewSurface)}`}>
+                      <Image
+                        src={asset.publicPath}
+                        alt={asset.displayName}
+                        width={maxW}
+                        height={h}
+                        className="h-auto max-h-36 w-auto max-w-full object-contain"
+                      />
+                    </div>
+                    <div className="mt-3 text-sm font-medium text-white print:text-black">{asset.displayName}</div>
+                    <div className="mt-1 font-mono text-[11px] text-white/45 print:text-black/60">{asset.publicPath}</div>
+                    <div className="mt-1 text-[11px] text-white/40 print:text-black/55">{meta}</div>
                     <a
                       href={asset.publicPath}
-                      download
-                      className="font-medium text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2 hover:brightness-110"
+                      download={asset.file}
+                      className="mt-3 inline-flex w-fit rounded-md border border-[rgb(var(--om-neon))]/50 bg-[rgb(var(--om-neon))]/15 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--om-neon))] hover:brightness-110"
                     >
-                      Download — {asset.label}
+                      Download
                     </a>
-                    <span className="ml-2 text-white/50 print:text-black/60">({asset.publicPath})</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm text-white/65 print:text-black">
-                No downloadable files detected yet. Add assets under <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/brand/</code> or include{" "}
-                <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/favicon.png</code>.
-              </p>
-            )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {existingAssets.length > 0 ? (
+              <>
+                <h3 className="mt-8 text-sm font-semibold uppercase tracking-wide text-white/55 print:text-black">
+                  Additional legacy paths
+                </h3>
+                <ul className="mt-3 grid gap-2 text-sm">
+                  {existingAssets.map((asset) => (
+                    <li key={`legacy-dl-${asset.publicPath}`}>
+                      <a
+                        href={asset.publicPath}
+                        download
+                        className="font-medium text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2 hover:brightness-110"
+                      >
+                        Download — {asset.label}
+                      </a>
+                      <span className="ml-2 text-white/50 print:text-black/60">({asset.publicPath})</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
           </section>
 
           <section className="mt-8">

@@ -37,7 +37,7 @@ export default function WhyVenueControlledStructurePage() {
         </section>
 
         <section className="mt-6 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-white">Why this helps you signups and traffic</h2>
+          <h2 className="text-lg font-semibold text-white">Why this helps signups and traffic</h2>
           <p className="text-sm text-white/75">
             Structured venue pages improve discoverability for searches like “open mic near me,” “open mic in [metro or
             region],” and “[venue name] open mic schedule.” When your listing is clear and updated, artists trust the page,

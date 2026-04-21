@@ -41,8 +41,8 @@ export default function MediaHowToVenuesPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgb(var(--om-neon))] print:text-black">Venue how-to sheet</p>
           <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">MicStage How-To Sheet for Venues</h1>
           <p className="mt-3 text-sm leading-7 text-white/80 print:text-black">
-            A concise guide for venue teams using MicStage as an open mic platform to run cleaner scheduling, increase repeat
-            traffic, and improve discoverability across local live events search behavior.
+            A short guide for venue teams using MicStage to run cleaner scheduling, bring people back on a recurring night, and
+            give performers a page they can trust.
           </p>
 
           <section className="mt-7">

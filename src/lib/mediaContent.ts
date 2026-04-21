@@ -11,7 +11,7 @@ export const MEDIA_CATEGORY_CARDS: MediaCategoryCard[] = [
     href: "/media/press-releases",
     title: "Press Releases",
     description:
-      "Official MicStage announcements for media, venues, artists, and ecosystem partners covering platform milestones and mission updates.",
+      "Official MicStage announcements for media, venues, artists, and partners: milestones, launches, and product news.",
   },
   {
     href: "/media/brand-images",
@@ -30,13 +30,13 @@ export const MEDIA_CATEGORY_CARDS: MediaCategoryCard[] = [
     href: "/media/how-to-artists",
     title: "How-To Sheets for Artists",
     description:
-      "A concise performer guide to profile setup, finding open mics, booking open slots, and improving discovery visibility on MicStage.",
+      "A concise performer guide to profile setup, finding open mics, booking open slots, and keeping your public presence current on MicStage.",
   },
 ];
 
 export const PRESS_RELEASE_META = {
   headline: "MicStage Open Mic Platform Launches in Beta on April 20, 2026",
   subheadline:
-    "The long-awaited open mic platform helps venues organize nights, helps performers get discovered, and helps audiences find local talent and live events.",
-  releaseLine: "CHICAGO, IL — April 20, 2026",
+    "MicStage helps venues publish open mic schedules, helps performers get found, and gives audiences a clearer way to discover local shows.",
+  releaseLine: "CHICAGO, IL · April 20, 2026",
 };

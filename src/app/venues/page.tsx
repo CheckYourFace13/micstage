@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic venues directory",
   description:
-    "Browse every MicStage venue page—addresses stay exact on each listing. Links to upcoming performers use metro and regional discovery hubs until a city has enough venues to stand alone.",
+    "Browse every MicStage venue page; addresses stay exact on each listing. Links to upcoming performers use metro and regional discovery hubs until a city has enough venues to stand alone.",
   path: "/venues",
 });
 
@@ -91,7 +91,7 @@ export default async function VenuesDirectoryPage() {
           Grouped by city and state on file—tap a venue for the full public page.
         </p>
         <p className="order-6 max-w-3xl text-xs leading-relaxed text-white/55 md:order-1 md:text-sm md:text-white/70">
-          Venues are grouped below by the city and state on file—your address on each venue page is always the source of
+          Venues are grouped below by the city and state on file. Your address on each venue page is always the source of
           truth. For artist discovery, MicStage prefers metro and regional markets until a city reaches enough venues to
           earn its own directory.
         </p>

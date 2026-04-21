@@ -29,10 +29,9 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Artist registration</h1>
         <p className="mt-2 text-sm text-white/70">
-          Create your artist account with <span className="text-white/90">email + password</span> (private). You’ll set
-          a <span className="text-white/90">stage name</span> that is{" "}
-          <span className="text-emerald-200/90">public</span> — that’s what venues and fans see and how you show up in
-          artist search.
+          Create your artist account with <span className="text-white/90">email + password</span> (private). You’ll set a{" "}
+          <span className="text-white/90">stage name</span> that is <span className="text-emerald-200/90">public</span>. That is
+          what venues and fans see, and how you show up in artist search.
         </p>
         <BetaNote className="mt-3" />
 

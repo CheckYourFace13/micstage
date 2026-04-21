@@ -50,37 +50,29 @@ export default function MediaPressReleasesPage() {
 
           <div className="mt-6 grid gap-4 text-sm leading-7 text-white/85 print:text-black">
             <p>
-              MicStage, the long-awaited open mic platform, announced today that its beta platform officially launched on
-              April 20, 2026. Built for today&apos;s local creative economy, MicStage helps venues plan and run open mic nights with
-              structured scheduling tools while helping performers and audiences discover meaningful live events in their own
-              communities.
+              MicStage announced today that its open mic platform entered public beta on April 20, 2026. The product helps venues
+              publish recurring schedules and bookable slots, helps performers find rooms that fit their act, and gives audiences a
+              single place to confirm nights, times, and lineups.
             </p>
             <p>
-              The platform is designed to solve persistent friction on both sides of the stage. For venues, MicStage provides
-              open mic scheduling infrastructure with venue-controlled event windows, slot structures, recurring templates, and
-              clear public pages that improve discoverability and simplify communication. For performers, MicStage makes it
-              easier to find open mics, compare open mic venues, and secure opportunities aligned with their goals and format.
+              For venues, MicStage is built around venue-controlled templates: event windows, slot length, recurring nights, and
+              public pages that stay in sync with the live board artists book against. For performers, it reduces guesswork: search
+              and map flows point to the same schedule the room is running.
             </p>
             <p>
-              MicStage supports musicians, comedians, poets, spoken-word artists, and multidisciplinary performers who need
-              visibility in a fragmented discovery landscape. By centralizing schedules, booking flow, and venue information in
-              a dedicated open mic platform, MicStage helps artists focus less on logistics and more on craft, preparation, and
-              performance.
+              MicStage supports musicians, comedians, poets, spoken-word artists, and mixed-format rooms. Centralized schedules
+              and booking status mean less back-and-forth in inboxes and comment threads, and more time on stage prep.
             </p>
             <p>
-              For audiences, the value is straightforward: easier access to local talent and more reliable ways to discover live
-              events. Instead of piecing together scattered social posts, audiences can identify active nights, participating
-              venues, and local performers through one cohesive discovery experience.
+              For audiences, the pitch is simple: fewer “is it happening?” dead ends. When a venue keeps MicStage updated, fans can
+              trust the date-specific lineup link the same way performers do.
             </p>
             <p>
-              The beta launch reflects MicStage&apos;s long-term commitment to strengthening the local creative ecosystem. Open mic
-              nights are not only talent pipelines; they are neighborhood engines that connect businesses, artists, and
-              audiences. By improving scheduling clarity, event visibility, and marketing readiness, MicStage helps communities
-              sustain inclusive pathways for creative expression and small-venue growth.
+              Open mics are weeknight infrastructure for a lot of small venues. MicStage is built to support that work with clearer
+              scheduling, steadier discovery, and marketing-friendly public URLs venues can reuse week after week.
             </p>
             <p>
-              Additional updates, partner initiatives, and future expansion milestones will be announced through MicStage media
-              channels as the platform continues to evolve.
+              Additional updates and milestones will ship through MicStage&apos;s normal product channels as the beta continues.
             </p>
           </div>
 

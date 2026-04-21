@@ -5,7 +5,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Discovery & marketing for open mic venues and artists",
   description:
-    "How MicStage combines artist discovery, venue pages, and easy-to-share links so your open mic is easier to find—without treating marketing as an afterthought.",
+    "How MicStage combines artist discovery, venue pages, and shareable links so your open mic is easier to find without treating marketing as an afterthought.",
   path: "/why/marketing-and-seo",
 });
 
@@ -15,11 +15,11 @@ export default function WhyMarketingAndDiscoveryPage() {
       <main className="mx-auto w-full max-w-4xl px-6 py-12">
         <div className="text-xs font-medium uppercase tracking-widest text-white/60">Why MicStage works</div>
         <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">
-          Discovery and marketing built into every venue workflow
+          Discovery and marketing that stay tied to the real schedule
         </h1>
         <p className="mt-3 text-sm text-white/75">
-          MicStage is designed to help people find your open mic: clear pages, consistent location routing, and links that
-          are easy to share in newsletters, social posts, and flyers.
+          MicStage is built so your open mic has a stable page people can return to: address, nights, lineup links, and the same
+          URLs you can drop into newsletters, posts, or a flyer QR code.
         </p>
 
         <section className="mt-8 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
@@ -27,22 +27,22 @@ export default function WhyMarketingAndDiscoveryPage() {
           <ul className="grid gap-3 text-sm text-white/75">
             <li>Public venue pages (exact addresses) and metro/regional artist discovery pages.</li>
             <li>
-              Stable routes: venue pages plus market-level browsing—smaller towns roll up until local venue density supports
-              a dedicated hub.
+              Stable routes: venue pages plus market-level browsing. Smaller towns roll up until local venue density supports a
+              dedicated hub.
             </li>
             <li>Sitemap and robots support for launch-ready discovery.</li>
           </ul>
         </section>
 
         <section className="mt-6 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-white">Why this converts better</h2>
+          <h2 className="text-lg font-semibold text-white">Why this tends to convert better</h2>
           <p className="text-sm text-white/75">
-            People scouting an open mic care about clear timing, venue identity, and who is performing. When those details
-            live on stable public pages, your promotion becomes cumulative instead of one-off social posts.
+            People scouting an open mic want timing, address, and format. When that lives on a page that does not move every
+            week, your promo links keep working after the post scrolls away.
           </p>
           <p className="text-sm text-white/75">
-            In practical terms: better click confidence, more direct traffic, and stronger repeat discovery for both venues
-            and artists.
+            In practice, that usually means fewer “is this still the right link?” messages and more repeat visits from people who
+            trust the page.
           </p>
         </section>
 

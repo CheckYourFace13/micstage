@@ -25,7 +25,7 @@ const body = Inter({
 const origin = siteOrigin();
 const siteTagline = "Find open mics · Book slots · Grow your room";
 const defaultDescription =
-  "MicStage helps you find local open mics and helps venues run bookable schedules—public pages that make discovery and marketing easier for rooms and artists.";
+  "MicStage helps you find local open mics and helps venues run bookable schedules, with public pages that make discovery and marketing easier for rooms and artists.";
 
 export const viewport: Viewport = {
   width: "device-width",

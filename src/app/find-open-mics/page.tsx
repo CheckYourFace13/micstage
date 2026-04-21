@@ -42,7 +42,7 @@ export default async function FindOpenMicsPage() {
             </p>
             <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide sm:text-4xl">Find Local Open Mic&apos;s</h1>
             <p className="text-xs leading-snug text-white/55 md:hidden">
-              Search by location, ZIP, city, or metro—then open a venue for schedule and booking.
+              Search by location, ZIP, city, or metro, then open a venue for schedule and booking.
             </p>
           </div>
 

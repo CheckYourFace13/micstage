@@ -23,7 +23,7 @@ export default function PrivacyPage() {
       <h2>Information we collect</h2>
       <ul>
         <li>
-          <strong>Account information.</strong> When you register or log in, we collect data you provide—such as email
+          <strong>Account information.</strong> When you register or log in, we collect data you provide, such as email
           address, password (stored securely), and profile details you choose to add (for example, stage name for
           artists or venue and location information for venues). When you complete registration, we record the time and
           policy version associated with your acceptance of our Terms, Privacy Policy, and the content-use permissions
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
       <ul>
         <li>To create and maintain your account and to authenticate you.</li>
         <li>
-          To display schedules, process bookings, and show information you or venues choose to make public—including
+          To display schedules, process bookings, and show information you or venues choose to make public, including
           using submitted names, images, logos, and similar materials to operate and promote MicStage as outlined in our{" "}
           <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/terms">
             Terms of Service

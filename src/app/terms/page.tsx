@@ -77,14 +77,14 @@ export default function TermsPage() {
 
       <h2>Your content and promotional use</h2>
       <p>
-        You may upload or submit profile, venue, or booking-related materials—such as names, stage or venue branding,
+        You may upload or submit profile, venue, or booking-related materials, such as names, stage or venue branding,
         logos, photos or likeness, biographical text, links, and optional audio or music samples or clips you choose to
         provide. By submitting that material, you confirm you have the rights needed to share it on MicStage.
       </p>
       <p>
         You grant MicStage a worldwide, non-exclusive, royalty-free license to host, store, reproduce, display,
         distribute, and otherwise use those submitted materials to operate, improve, and promote the platform and
-        MicStage’s products and community—including on the site, in email or in-app communications about the service,
+        MicStage’s products and community, including on the site, in email or in-app communications about the service,
         and in marketing or educational materials that reference MicStage (for example, showcasing how the platform
         works or highlighting public listings). Where reasonable, we will use good faith efforts to present your
         materials in a truthful, context-appropriate way. You may remove or update much of this content through the

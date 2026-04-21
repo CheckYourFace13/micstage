@@ -23,7 +23,7 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
   const place = await resolveLocationPlaceTitle(slug);
   return buildPublicMetadata({
     title: `${place} open mic artists`,
-    description: `Upcoming open mic performers across the ${place} discovery market on MicStage—public, shareable artist list (venue addresses stay exact on each venue page).`,
+    description: `Upcoming open mic performers across the ${place} discovery market on MicStage: public, shareable artist list (venue addresses stay exact on each venue page).`,
     path: `/locations/${slug}/performers`,
   });
 }

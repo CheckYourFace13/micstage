@@ -174,7 +174,7 @@ export default function MediaBrandImagesPage() {
                         download
                         className="font-medium text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2 hover:brightness-110"
                       >
-                        Download — {asset.label}
+                        Download: {asset.label}
                       </a>
                       <span className="ml-2 text-white/50 print:text-black/60">({asset.publicPath})</span>
                     </li>
@@ -206,9 +206,9 @@ export default function MediaBrandImagesPage() {
           <section className="mt-8 border-t border-white/15 pt-6 print:border-black/30">
             <h2 className="text-xl font-semibold">Short brand description</h2>
             <p className="mt-3 text-sm leading-7 text-white/80 print:text-black">
-              MicStage is an open mic platform that helps open mic venues publish structured schedules, helps performers find open
-              mics and book slots, and helps audiences discover local talent and recurring live events. The brand represents
-              clarity, creative opportunity, and practical tools for the local performance ecosystem.
+              MicStage is an open mic platform for venues that want a clean public schedule and for performers who want a straight
+              path to book. These assets exist so press, partners, and rooms can reference the product without rebuilding logos
+              from screenshots.
             </p>
           </section>
         </article>

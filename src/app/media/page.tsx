@@ -18,9 +18,8 @@ export default function MediaLandingPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgb(var(--om-neon))]">Media Center</p>
           <h1 className="om-heading mt-2 text-4xl tracking-wide sm:text-5xl">MicStage Media</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-white/80 sm:text-base">
-            Welcome to MicStage&apos;s media and resource center for venues, artists, press, and partners. This section includes
-            press materials, brand assets, and operational how-to sheets designed to support open mic scheduling, performer
-            discovery, and local live events growth.
+            Press kits, brand files, and printable one-pagers for venues, artists, press, and partners. Use this area when you
+            need official wording, logos, or a quick handout about how MicStage handles scheduling and discovery.
           </p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/60">
             <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">Open mic platform</span>

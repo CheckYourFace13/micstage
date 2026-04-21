@@ -5,7 +5,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "No double-booking: reliable open mic reservations",
   description:
-    "MicStage uses slot locking and clear reservations so venues and artists see the same availability—less confusion, stronger trust.",
+    "MicStage uses slot locking and clear reservations so venues and artists see the same availability: less confusion, stronger trust.",
   path: "/why/no-double-booking",
 });
 
@@ -36,9 +36,8 @@ export default function WhyNoDoubleBookingPage() {
         <section className="mt-6 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">Why this helps discovery</h2>
           <p className="text-sm text-white/75">
-            Reliable booking flows increase repeat usage and positive mentions. That means more people share your public
-            venue links and come back next week—so your room is easier to find through word of mouth and steady online
-            presence.
+            Reliable booking flows increase repeat usage and positive mentions. More people share your public venue links and
+            come back next week, which makes the room easier to find by word of mouth and steady online presence.
           </p>
         </section>
 

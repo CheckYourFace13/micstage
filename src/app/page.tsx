@@ -2,13 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
-const homeTitle = "MicStage — Find open mics, book slots, grow your room";
+const homeTitle = "MicStage: find open mics, book slots, grow your room";
 
 export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
-      "Find local open mics, book a slot, and help your venue get discovered. MicStage is free for artists and venues—schedules, bookings, and public pages that make marketing easier.",
+      "Find local open mics, book a slot, and help your venue get discovered. MicStage is free for artists and venues: schedules, bookings, and public pages that make marketing simpler.",
     path: "/",
   }),
   /** Avoid root layout `title.template` appending "| MicStage" twice. */
@@ -125,7 +125,7 @@ export default function Home() {
             className="rounded-xl border border-white/10 bg-white/5 p-3.5 transition hover:border-[rgb(var(--om-neon))]/40 hover:bg-white/10 md:p-4"
           >
             <div className="font-semibold text-white">Venue-controlled structure</div>
-            <div className="mt-1">Set day/time and slot length—the schedule builds itself.</div>
+            <div className="mt-1">Set day and time, set slot length, and let the schedule build from there.</div>
             <div className="mt-3 inline-flex text-sm text-[rgb(var(--om-neon))] hover:brightness-110">
               Learn more →
             </div>
@@ -145,7 +145,7 @@ export default function Home() {
             className="rounded-xl border border-white/10 bg-white/5 p-3.5 transition hover:border-[rgb(var(--om-neon))]/40 hover:bg-white/10 md:p-4"
           >
             <div className="font-semibold text-white">Discovery &amp; marketing built in</div>
-            <div className="mt-1">Show up where people are searching—without a separate “website project.”</div>
+            <div className="mt-1">Show up where people search, without treating your room like a separate website project.</div>
             <div className="mt-3 inline-flex text-sm text-[rgb(var(--om-neon))] hover:brightness-110">
               Learn more →
             </div>
@@ -155,9 +155,9 @@ export default function Home() {
         <section className="order-2 max-w-3xl border-t border-white/[0.06] pt-6 text-xs leading-relaxed text-white/50 md:order-1 md:border-t-0 md:pt-0 md:text-sm md:text-white/65">
           <h2 className="text-sm font-semibold text-white/80 md:text-base md:text-white/90">How MicStage helps</h2>
           <p className="mt-1.5 md:mt-2">
-            Venues get structured open mic nights, shareable lineup links, and public pages that make marketing and
-            discovery easier—clear titles, stable URLs, and content people (and search) can actually use. Artists get a
-            simple way to find rooms and reserve spots. Most venues can publish a first schedule in a few guided steps.
+            Venues get structured open mic nights, shareable lineup links, and public pages with clear titles and stable URLs
+            that are easier to market and easier to discover. Artists get a straight path to find rooms and reserve spots.
+            Most venues can publish a first schedule in a few guided steps.
           </p>
         </section>
         </div>

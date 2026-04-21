@@ -41,8 +41,8 @@ export default function MediaHowToArtistsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgb(var(--om-neon))] print:text-black">Artist how-to sheet</p>
           <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">MicStage How-To Sheet for Artists</h1>
           <p className="mt-3 text-sm leading-7 text-white/80 print:text-black">
-            A practical guide for musicians, comedians, poets, and other performers using MicStage to find open mics, book
-            opportunities, and improve local visibility.
+            A practical guide for musicians, comedians, poets, and other performers using MicStage to find open mics, book slots,
+            and keep your public profile current.
           </p>
 
           <section className="mt-7">
@@ -96,9 +96,8 @@ export default function MediaHowToArtistsPage() {
           <section className="mt-7 border-t border-white/15 pt-6 print:border-black/30">
             <h2 className="text-xl font-semibold">6) MicStage for comedians, musicians, poets, and multidisciplinary acts</h2>
             <p className="mt-3 text-sm leading-7 text-white/80 print:text-black">
-              MicStage supports a broad creative ecosystem. Whether you perform songs, stand-up, spoken word, storytelling, or a
-              hybrid format, you can use MicStage to identify welcoming rooms, locate recurring opportunities, and build momentum
-              through dependable live events participation.
+              Songs, stand-up, spoken word, storytelling, or a hybrid night: if the room posts it on MicStage, you can treat the
+              venue page as the source of truth for format, timing, and how booking works that week.
             </p>
           </section>
         </article>

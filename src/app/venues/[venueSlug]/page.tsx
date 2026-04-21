@@ -62,7 +62,7 @@ export async function generateMetadata(props: { params: Promise<{ venueSlug: str
     }
     const place = [venue.city, venue.region].filter(Boolean).join(", ");
     const title = place ? `${venue.name} open mic · ${place}` : `${venue.name} open mic schedule`;
-    const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules, slots, and who’s playing—on MicStage.`;
+    const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules, slots, and who is playing on MicStage.`;
     return {
       ...buildPublicMetadata({ title, description, path }),
       title: { absolute: `${title} | MicStage` },
@@ -242,12 +242,12 @@ export default async function VenuePublicPage(props: {
                 </Link>
                 <span className="text-white/40 md:hidden">
                   {" "}
-                  — rolls up when fewer than {MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY} venues; address above is exact.
+                  Rolls up when fewer than {MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY} venues; address above is exact.
                 </span>
                 <span className="hidden text-white/45 md:inline">
                   {" "}
-                  — artist discovery rolls up to metro/regional pages when your municipality has fewer than{" "}
-                  {MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY} MicStage venues; your address above is always exact.
+                  Artist discovery rolls up to metro/regional pages when your municipality has fewer than{" "}
+                  {MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY} MicStage venues. Your address above is always exact.
                 </span>
               </p>
             ) : null}
@@ -478,7 +478,7 @@ export default async function VenuePublicPage(props: {
                   </ul>
                 </div>
               ) : (
-                <div className="text-white/50">Equipment details not listed — check with the venue.</div>
+                <div className="text-white/50">Equipment details not listed. Check with the venue.</div>
               )}
               {websiteHref ? (
                 <div>
@@ -583,8 +583,8 @@ export default async function VenuePublicPage(props: {
               <h3 className="font-semibold text-white">How do artists reserve a slot here?</h3>
               <p className="mt-1">
                 Find an <span className="text-white/90">Open</span> row in the lineup, sign in (or create a free artist
-                account), and complete the reservation—your spot is confirmed against the same board everyone sees here and
-                on the shareable lineup link.
+                account), and complete the reservation. Your spot is confirmed against the same board everyone sees here and on
+                the shareable lineup link.
               </p>
             </div>
             <div>

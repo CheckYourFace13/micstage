@@ -314,7 +314,7 @@ export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
         <form action={async (fd) => go(await upgradeVenuePlan(fd))} className="mt-4 flex flex-wrap items-center gap-3">
           <input type="hidden" name="venueId" value={venue.id} />
           <FormSubmitButton
-            label="Upgrade to PRO (unlock longer booking windows)"
+            label="Upgrade to PRO (longer booking windows)"
             pendingLabel="Upgrading…"
             className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
           />

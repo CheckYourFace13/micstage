@@ -65,7 +65,7 @@ export default function ContactPage() {
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
                 artists by stage name
               </Link>
-              — each venue page may list website or social links when provided.
+              . Each venue page may list website or social links when provided.
             </p>
           </section>
 

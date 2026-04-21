@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic artist activity by metro & region",
   description:
-    "Discover open mic activity by metro and regional markets. Smaller towns roll into larger hubs until there are enough local venues for a dedicated market page—each venue still keeps its exact address on its profile.",
+    "Discover open mic activity by metro and regional markets. Smaller towns roll into larger hubs until there are enough local venues for a dedicated market page. Each venue still keeps its exact address on its profile.",
   path: "/locations",
 });
 
@@ -57,7 +57,7 @@ export default async function LocationsPage() {
         ) : null}
         <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide sm:text-4xl">Open mic discovery by market</h1>
         <p className="mt-1.5 text-xs leading-snug text-white/55 md:hidden">
-          Search hubs below—venue addresses stay exact on each profile.
+          Search hubs below. Venue addresses stay exact on each profile.
         </p>
 
         <div className="mt-3 flex flex-col gap-4 md:mt-6 md:gap-8">
@@ -69,7 +69,7 @@ export default async function LocationsPage() {
 
           <div className="order-2 flex flex-col gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-4 md:order-1 md:gap-4 md:rounded-none md:border-0 md:bg-transparent md:px-0 md:py-0">
             <p className="max-w-2xl text-xs leading-relaxed text-white/55 md:text-sm md:text-white/70">
-              Browse metro and regional hubs—not every small town gets its own directory page yet. When a place has fewer than{" "}
+              Browse metro and regional hubs. Not every small town gets its own directory page yet. When a place has fewer than{" "}
               <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> MicStage venues, we group it into a
               broader market (for example Chicagoland or Central Illinois) so discovery is easier. Addresses on each venue page
               stay exact.
@@ -103,7 +103,7 @@ export default async function LocationsPage() {
               <section className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
                 <h2 className="text-base font-semibold md:text-lg">Largest discovery markets</h2>
                 <p className="mt-1 text-xs text-white/55 md:text-sm md:text-white/70">
-                  Hubs with the most MicStage venues right now—often metros or dense cities.
+                  Hubs with the most MicStage venues right now, often metros or dense cities.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {featured.map((r) => (

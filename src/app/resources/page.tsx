@@ -102,13 +102,13 @@ export default function ResourcesIndexPage() {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }} />
         <h1 className="om-heading text-4xl tracking-wide">Open mic resources</h1>
         <p className="mt-2 max-w-3xl text-sm text-white/70">
-          Long-form, people-first guides for open mic venues, hosts, and performers—covering open mic nights from first
-          signup to repeat audiences in your local music scene. Every guide includes practical tips, FAQs, and direct links to
-          MicStage discovery (<Link href="/find-open-mics" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">find open mics</Link>,{" "}
+          Long-form guides for open mic venues, hosts, and performers: first signup, repeat nights, and how scenes actually run
+          week to week. Each guide includes practical tips, FAQs, and links into MicStage discovery (
+          <Link href="/find-open-mics" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">find open mics</Link>,{" "}
           <Link href="/map" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">map</Link>,{" "}
           <Link href="/venues" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">venues</Link>,{" "}
           <Link href="/locations" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">locations</Link>
-          ) so reading turns into a plan.
+          ) so you can go from reading to a concrete next step.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2 text-xs text-white/60">

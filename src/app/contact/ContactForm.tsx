@@ -17,11 +17,12 @@ export function ContactForm() {
       >
         <p className="font-semibold text-white">Message sent</p>
         <p className="mt-2 text-white/85">
-          Thanks — we received your note and will get back to you by email when we can.
+          Thanks. We received your note and will reply by email when we can.
         </p>
         {state.devLogged ? (
           <p className="mt-3 text-xs text-white/60">
-            Development: no Resend key or inbox — your message was logged on the server console instead of emailed.
+            Development: no Resend key or inbox configured, so your message was logged on the server console instead of being
+            emailed.
           </p>
         ) : null}
         <p className="mt-4 text-sm">

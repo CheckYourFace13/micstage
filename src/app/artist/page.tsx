@@ -271,12 +271,11 @@ export default async function ArtistPortalPage({
               <div className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Suggested next steps</div>
               <ol className="mt-2 list-decimal space-y-1.5 pl-5 marker:text-white/40">
                 <li>
-                  Complete your profile below—especially <span className="text-white/85">stage name</span> and where you
-                  play.
+                  Finish your profile below, especially <span className="text-white/85">stage name</span> and where you play.
                 </li>
                 <li>Track venues you like, or browse upcoming performers by discovery market.</li>
                 <li>
-                  Book a slot from any venue&apos;s public page while signed in—your upcoming gigs appear in{" "}
+                  Book a slot from any venue&apos;s public page while signed in. Your upcoming gigs show up in{" "}
                   <span className="text-white/85">Your upcoming bookings</span> below.
                 </li>
               </ol>
@@ -310,7 +309,7 @@ export default async function ArtistPortalPage({
         {q.profile === "saved" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
             <span className="font-semibold text-emerald-100/95">Profile saved.</span> Public search and venue discovery use
-            your stage-facing details—give it a moment to update everywhere.
+            your stage-facing details. Give it a moment to update everywhere.
           </div>
         ) : null}
         {q.profile === "imageUploaded" ? (
@@ -401,7 +400,7 @@ export default async function ArtistPortalPage({
         <section className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm font-semibold text-white">Your upcoming bookings</div>
           <p className="mt-1 text-xs text-white/50">
-            Confirmed reservations from venue pages show here—same live schedule the venue publishes.
+            Confirmed reservations from venue pages show here: same live schedule the venue publishes.
           </p>
           {(() => {
             const bookingRows = (musician.bookings ?? []).filter(isRenderableBooking);

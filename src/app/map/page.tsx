@@ -8,9 +8,9 @@ import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Open mic map — find venues by night on MicStage",
+  title: "Open mic map: find venues by night on MicStage",
   description:
-    "Map-first discovery for MicStage open mics: filter by weekday and format, see which venues take online bookings soon, then open any profile to reserve a slot. Complements city/ZIP search — not a duplicate directory.",
+    "Map-first discovery for MicStage open mics: filter by weekday and format, see which venues take online bookings soon, then open any profile to reserve a slot. Complements city or ZIP search; it is not a duplicate directory.",
   path: "/map",
 });
 
@@ -62,7 +62,7 @@ export default async function OpenMicMapPage() {
         </div>
 
         <p className="order-4 mt-0 max-w-2xl text-xs leading-snug text-white/55 md:order-2 md:mt-3 md:text-sm md:leading-relaxed md:text-white/70">
-          See where open mics actually happen — not just a list. Filter by the night you want to play, the kind of room
+          See where open mics actually happen, not just a list. Filter by the night you want to play, the kind of room
           (acoustic, full band, comedy, and more), and whether you can book online right now. Every pin links through to
           the venue&apos;s MicStage page to grab a slot. Recently active MicStage venues without a current public schedule
           still appear so discovery stays broad.
@@ -89,7 +89,7 @@ export default async function OpenMicMapPage() {
           </div>
         ) : venues.length === 0 ? (
           <div className="order-1 rounded-xl border border-white/15 bg-gradient-to-b from-zinc-900/50 to-zinc-950/80 px-5 py-6 text-sm leading-relaxed text-white/75 md:order-4">
-            <p className="font-medium text-white/90">The map is ready — we&apos;re waiting on mappable venues.</p>
+            <p className="font-medium text-white/90">The map is ready. We&apos;re waiting on mappable venues.</p>
             <p className="mt-2">
               Venues appear here once they have map coordinates from Google Places and at least one public open mic
               template. Meanwhile you can still browse by place or list.

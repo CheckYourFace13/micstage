@@ -51,7 +51,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
             <p className="font-medium text-white">You’re joining from MicStage outreach</p>
             <p className="mt-1 text-white/80">
               Claim your venue here so we can list your open mic, help performers find you, and give you tools to grow the
-              night — free to get started.
+              night. Free to get started.
             </p>
           </div>
         ) : null}
@@ -117,7 +117,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
           />
           <p className="text-xs text-white/50">
             This saves your venue using Google’s Place ID and coordinates so maps, distance search, and your public MicStage
-            pages all reference the correct location—making your open mic easier to find.
+            pages all reference the correct location, which makes your open mic easier to find.
           </p>
           <LineupSlotTypesHelp className="mt-4" />
         </form>

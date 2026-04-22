@@ -84,10 +84,8 @@ export default function MediaBrandImagesPage() {
           <section id="downloads" className="mt-8 scroll-mt-24 rounded-xl border border-white/10 bg-white/[0.04] p-4 sm:p-5 print:border-black/25">
             <h2 className="text-xl font-semibold">Downloads</h2>
             <p className="mt-2 text-sm leading-7 text-white/75 print:text-black">
-              Official MicStage brand files live at{" "}
-              <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/media/brand-images/</code> and are served from{" "}
-              <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">/media/brand-images/</code>. Previews use a neutral surface so
-              light and dark marks stay readable on this page; downloaded files are unchanged.
+              Download official MicStage brand assets below. Previews use neutral backgrounds so light and dark marks stay easy
+              to judge on screen; each download is the original file.
             </p>
 
             <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-white/55 print:text-black">Official brand kit</h3>
@@ -114,7 +112,6 @@ export default function MediaBrandImagesPage() {
                       />
                     </div>
                     <div className="mt-3 text-sm font-medium text-white print:text-black">{asset.displayName}</div>
-                    <div className="mt-1 font-mono text-[11px] text-white/45 print:text-black/60">{asset.publicPath}</div>
                     <div className="mt-1 text-[11px] text-white/40 print:text-black/55">{meta}</div>
                     <a
                       href={asset.publicPath}
@@ -131,7 +128,7 @@ export default function MediaBrandImagesPage() {
             {existingAssets.length > 0 ? (
               <>
                 <h3 className="mt-8 text-sm font-semibold uppercase tracking-wide text-white/55 print:text-black">
-                  Additional legacy paths
+                  Additional downloads
                 </h3>
                 <ul className="mt-3 grid gap-2 text-sm">
                   {existingAssets.map((asset) => (
@@ -143,7 +140,6 @@ export default function MediaBrandImagesPage() {
                       >
                         Download: {asset.label}
                       </a>
-                      <span className="ml-2 text-white/50 print:text-black/60">({asset.publicPath})</span>
                     </li>
                   ))}
                 </ul>
@@ -166,7 +162,7 @@ export default function MediaBrandImagesPage() {
               <li>Leave clear space around logos equal to at least the height of the “M” in MicStage.</li>
               <li>Use dark-mode logo variants on light backgrounds and light variants on dark backgrounds.</li>
               <li>When referencing MicStage in copy, use “MicStage” consistently as a proper noun.</li>
-              <li>For press use, include a direct link to https://micstage.com and the Media page source path when possible.</li>
+              <li>For press use, include a direct link to https://micstage.com and to this Media section when helpful.</li>
             </ul>
           </section>
 

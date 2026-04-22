@@ -81,39 +81,6 @@ export default function MediaBrandImagesPage() {
             decks, and venue communications related to the MicStage open mic platform.
           </p>
 
-          <section className="mt-7">
-            <h2 className="text-xl font-semibold">Logo area</h2>
-            {existingAssets.length > 0 ? (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {existingAssets.map((asset) => (
-                  <figure
-                    key={asset.publicPath}
-                    className="rounded-xl border border-white/10 bg-black/30 p-4 print:border-black/25 print:bg-white"
-                  >
-                    <div
-                      className={`rounded-lg p-4 print:border-black/25 ${asset.publicPath.includes("favicon") ? "bg-zinc-100 ring-1 ring-black/10" : "border border-dashed border-white/20 bg-black/20"}`}
-                    >
-                      <Image
-                        src={asset.publicPath}
-                        alt={`${asset.label} for MicStage`}
-                        width={260}
-                        height={110}
-                        className="h-auto max-h-28 w-auto object-contain"
-                      />
-                    </div>
-                    <figcaption className="mt-3 text-sm text-white/75 print:text-black">{asset.label}</figcaption>
-                    <div className="mt-1 text-xs text-white/50 print:text-black/70">{asset.publicPath}</div>
-                  </figure>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-white/75 print:text-black">
-                Optional legacy paths under <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/brand/</code> are empty. The official downloadable kit lives under{" "}
-                <code className="rounded bg-black/40 px-1 py-0.5 text-xs print:bg-zinc-200">public/media/brand-images/</code>.
-              </p>
-            )}
-          </section>
-
           <section id="downloads" className="mt-8 scroll-mt-24 rounded-xl border border-white/10 bg-white/[0.04] p-4 sm:p-5 print:border-black/25">
             <h2 className="text-xl font-semibold">Downloads</h2>
             <p className="mt-2 text-sm leading-7 text-white/75 print:text-black">

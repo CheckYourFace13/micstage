@@ -9,9 +9,9 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 
-/** Transaction-scoped Postgres advisory lock keys (unique to growth draft/outreach automation). */
-const GROWTH_DRAFT_PIPELINE_LOCK_K1 = 54_788_913;
-const GROWTH_DRAFT_PIPELINE_LOCK_K2 = 20_993_311;
+/** Transaction-scoped Postgres advisory lock keys (serialize full growth pipeline cron run). */
+const GROWTH_PIPELINE_LOCK_K1 = 54_788_913;
+const GROWTH_PIPELINE_LOCK_K2 = 20_993_311;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,42 +46,74 @@ async function handle(request: Request) {
   const draftEnabled = growthAutoDraftCronEnabled();
 
   try {
-    const discovery = discoveryEnabled ? await runGrowthLeadDiscovery(prisma) : null;
-    const sinceUtcDay = startOfUtcDay();
-    const growthLeadsCreatedUtcTodayBySourceKind = await prisma.growthLead.groupBy({
-      by: ["sourceKind"],
-      where: { createdAt: { gte: sinceUtcDay } },
-      _count: { _all: true },
-    });
-    const growthLeadsCreatedUtcToday = Object.fromEntries(
-      growthLeadsCreatedUtcTodayBySourceKind.map((r) => [r.sourceKind, r._count._all]),
+    const run = await prisma.$transaction(
+      async (tx) => {
+        const lockRows = await tx.$queryRawUnsafe<Array<{ locked: boolean }>>(
+          `SELECT pg_try_advisory_xact_lock(${GROWTH_PIPELINE_LOCK_K1}, ${GROWTH_PIPELINE_LOCK_K2}) AS locked`,
+        );
+        const lockAcquired = lockRows[0]?.locked === true;
+        if (!lockAcquired) {
+          return { busy: true as const };
+        }
+
+        let discovery: Awaited<ReturnType<typeof runGrowthLeadDiscovery>> | null = null;
+        let discoveryError: string | null = null;
+        if (discoveryEnabled) {
+          try {
+            discovery = await runGrowthLeadDiscovery(tx as unknown as PrismaClient);
+          } catch (e) {
+            discoveryError = e instanceof Error ? e.message : String(e);
+            console.error("[growth pipeline] discovery failed; continuing to draft/send phase", {
+              error: discoveryError,
+            });
+          }
+        }
+
+        const sinceUtcDay = startOfUtcDay();
+        const growthLeadsCreatedUtcTodayBySourceKind = await tx.growthLead.groupBy({
+          by: ["sourceKind"],
+          where: { createdAt: { gte: sinceUtcDay } },
+          _count: { _all: true },
+        });
+        const growthLeadsCreatedUtcToday = Object.fromEntries(
+          growthLeadsCreatedUtcTodayBySourceKind.map((r) => [r.sourceKind, r._count._all]),
+        );
+        const drafts = draftEnabled ? await runAutoGrowthOutreachDrafts(tx as unknown as PrismaClient) : null;
+
+        return {
+          busy: false as const,
+          discovery,
+          discoveryError,
+          drafts,
+          growthLeadsCreatedUtcToday,
+        };
+      },
+      { maxWait: 45_000, timeout: 360_000 },
     );
-    /**
-     * Serialize draft creation + outreach sends so overlapping cron invocations do not interleave
-     * (Postgres `pg_advisory_xact_lock` — held for the whole transaction on one pooled connection).
-     * Discovery above is not under this lock and may still overlap across instances.
-     */
-    const drafts = draftEnabled
-      ? await prisma.$transaction(
-          async (tx) => {
-            await tx.$executeRawUnsafe(
-              `SELECT pg_advisory_xact_lock(${GROWTH_DRAFT_PIPELINE_LOCK_K1}, ${GROWTH_DRAFT_PIPELINE_LOCK_K2})`,
-            );
-            return runAutoGrowthOutreachDrafts(tx as unknown as PrismaClient);
-          },
-          { maxWait: 45_000, timeout: 240_000 },
-        )
-      : null;
+
+    if (run.busy) {
+      return NextResponse.json(
+        {
+          ok: true,
+          skipped: true,
+          reason: "growth-pipeline already running",
+          discoveryEnabled,
+          draftEnabled,
+        },
+        { status: 202, headers: { "Cache-Control": "no-store" } },
+      );
+    }
 
     return NextResponse.json(
       {
         ok: true,
         discoveryEnabled,
         draftEnabled,
-        discovery,
-        autoDrafts: drafts,
+        discovery: run.discovery,
+        discoveryError: run.discoveryError,
+        autoDrafts: run.drafts,
         /** Uploads/imports use `sourceKind` (CSV_IMPORT, CLAUDE_CSV, …); discovery JSON `candidates_by_source` is adapter ids only. */
-        growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,
+        growthLeadsCreatedUtcTodayBySourceKind: run.growthLeadsCreatedUtcToday,
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );

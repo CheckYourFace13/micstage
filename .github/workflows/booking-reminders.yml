@@ -3,7 +3,6 @@ name: Booking reminders
 on:
   schedule:
     # Once per hour at :00 UTC. GitHub may delay runs slightly during high load.
-    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { FindOpenMicsClient } from "@/components/find-open-mics/FindOpenMicsClient";
 import { loadOpenMicFinderVenues, loadPublicDiscoveryLocationRows } from "@/lib/discoveryLocationRows";
+import { hasGoogleMapsBrowserKey } from "@/lib/env/publicGoogleMaps.server";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
@@ -31,6 +32,8 @@ export default async function FindOpenMicsPage() {
     console.error("find-open-mics load", e);
     loadError = true;
   }
+
+  const showGooglePlaceSuggestions = hasGoogleMapsBrowserKey();
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -78,7 +81,11 @@ export default async function FindOpenMicsPage() {
           ) : (
             <div className="order-1 md:order-4">
               <div className="rounded-xl ring-1 ring-white/10 md:rounded-none md:ring-0">
-                <FindOpenMicsClient locationRows={locationRows} venues={venues} />
+                <FindOpenMicsClient
+                  locationRows={locationRows}
+                  venues={venues}
+                  showGooglePlaceSuggestions={showGooglePlaceSuggestions}
+                />
               </div>
             </div>
           )}

@@ -22,8 +22,10 @@ type NearbyVenue = {
 export function FindOpenMicsClient(props: {
   locationRows: PublicDiscoveryLocationRow[];
   venues: OpenMicFinderVenue[];
+  /** From server only — whether Google Places suggestions UI may load. */
+  showGooglePlaceSuggestions?: boolean;
 }) {
-  const { locationRows, venues } = props;
+  const { locationRows, venues, showGooglePlaceSuggestions = false } = props;
   const [mode, setMode] = useState<"nearby" | "metro">("nearby");
   const [nearbyList, setNearbyList] = useState<NearbyVenue[] | null>(null);
   const [nearbyContext, setNearbyContext] = useState<string | null>(null);
@@ -33,8 +35,6 @@ export function FindOpenMicsClient(props: {
   const [cityQ, setCityQ] = useState("");
   const [metroFilter, setMetroFilter] = useState("");
   const [selectedMetroSlug, setSelectedMetroSlug] = useState<string | null>(null);
-
-  const googleKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim());
 
   const runNearby = useCallback(async (lat: number, lng: number, label: string | null, source: "geo" | "zip" | "city" | "place") => {
     setLoading(true);
@@ -236,12 +236,11 @@ export function FindOpenMicsClient(props: {
             </div>
           </div>
 
-          {googleKey ? (
+          {showGooglePlaceSuggestions ? (
             <div className="rounded-xl border border-white/10 bg-black/25 p-3 md:p-4">
               <div className="text-xs font-medium text-white/85 md:text-sm md:text-white/90">City or area (suggestions)</div>
               <p className="mt-1 text-[10px] leading-snug text-white/45 md:text-xs md:leading-relaxed md:text-white/50">
-                Optional: start typing a city, ZIP code, neighborhood, or venue name, then choose the best match from the
-                suggestions.
+                Optional: start typing a city, ZIP code, neighborhood, or venue name, then choose the best match.
               </p>
               <div className="mt-3">
                 <VenuePlacePicker

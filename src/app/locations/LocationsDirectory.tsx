@@ -32,18 +32,42 @@ export function LocationsDirectory({ rows }: { rows: PublicDiscoveryLocationRow[
         />
       </label>
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/65 md:p-6">
-          <p>
-            No MicStage venues have address data yet. When venues add a full address, they&apos;ll roll up into discovery
-            markets here.
+        <div className="rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/25 p-4 text-sm leading-relaxed text-white/75 md:p-6">
+          <p className="font-semibold text-white/90">Markets appear as venues go live with addresses</p>
+          <p className="mt-2">
+            MicStage groups cities into metro and regional hubs so artists can browse real rooms—not empty placeholders.
+            While listings ramp up, use{" "}
+            <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
+              Find open mics
+            </Link>
+            {" "}by ZIP or city, explore the{" "}
+            <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/map">
+              map
+            </Link>
+            , and scan the{" "}
+            <Link className="underline hover:text-white" href="/venues">
+              venue directory
+            </Link>
+            .
+          </p>
+          <p className="mt-4 rounded-lg border border-white/10 bg-black/30 px-4 py-3">
+            <span className="font-medium text-white">Hosting a room?</span> Add your venue free and show up in discovery
+            as soon as your address is on file.{" "}
+            <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
+              List your venue
+            </Link>
+            {" · "}
+            <Link className="underline hover:text-white" href="/resources">
+              Resources for venues
+            </Link>
+            {" · "}
+            <Link className="underline hover:text-white" href="/contact">
+              Contact
+            </Link>
           </p>
           <p className="mt-3">
-            <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
-              Register a venue
-            </Link>{" "}
-            ·{" "}
             <Link className="underline hover:text-white" href="/performers">
-              Browse artists
+              Browse artists by stage name
             </Link>
           </p>
         </div>

@@ -39,6 +39,20 @@ export function absoluteUrl(path: string): string {
   return `${base}${p}`;
 }
 
+/** Schema.org BreadcrumbList for public pages (inject via `<script type="application/ld+json">`). */
+export function jsonLdBreadcrumbList(items: { name: string; path: string }[]): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: it.name,
+      item: absoluteUrl(it.path),
+    })),
+  };
+}
+
 /** Absolute URL using `siteOriginForServerRedirect` (not `request.url`). */
 export function absoluteServerRedirectUrl(path: string): string {
   const base = siteOriginForServerRedirect();
@@ -47,22 +61,38 @@ export function absoluteServerRedirectUrl(path: string): string {
   return `${base}${p}`;
 }
 
+/** Default OG/Twitter preview (wide logo); override per route when needed. */
+export const DEFAULT_SITE_SOCIAL_IMAGE_PATH = "/media/brand-images/micstage-logo-light-bg-horizontal-1.png";
+
+export function defaultSocialImageAbsoluteUrls(): string[] {
+  return [absoluteUrl(DEFAULT_SITE_SOCIAL_IMAGE_PATH)];
+}
+
+function resolveSocialImageUrls(images?: string[]): string[] {
+  if (!images?.length) return defaultSocialImageAbsoluteUrls();
+  return images.map((u) => (u.startsWith("http://") || u.startsWith("https://") ? u : absoluteUrl(u)));
+}
+
 /** Canonical + Open Graph + Twitter for indexable public routes (not for private/auth). */
 export function buildPublicMetadata(opts: {
   title: string;
   description: string;
   path: string;
+  /** Absolute URLs or site-relative paths */
+  images?: string[];
+  /** When false: noindex,follow (e.g. thin discovery URLs). */
+  index?: boolean;
 }): Metadata {
   const canonical = absoluteUrl(opts.path);
+  const imageUrls = resolveSocialImageUrls(opts.images);
+  const index = opts.index !== false;
   return {
     title: opts.title,
     description: opts.description,
     alternates: { canonical },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: { index: true, follow: true },
-    },
+    robots: index
+      ? { index: true, follow: true, googleBot: { index: true, follow: true } }
+      : { index: false, follow: true, googleBot: { index: false, follow: true } },
     openGraph: {
       title: opts.title,
       description: opts.description,
@@ -70,11 +100,13 @@ export function buildPublicMetadata(opts: {
       siteName: "MicStage",
       type: "website",
       locale: "en_US",
+      images: imageUrls.map((url) => ({ url })),
     },
     twitter: {
       card: "summary_large_image",
       title: opts.title,
       description: opts.description,
+      images: imageUrls,
     },
   };
 }

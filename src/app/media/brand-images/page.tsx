@@ -9,7 +9,7 @@ import {
   getBrandKitAssetDiskPath,
   readPngDimensions,
 } from "@/lib/mediaBrandKit";
-import { buildPublicMetadata } from "@/lib/publicSeo";
+import { buildPublicMetadata, jsonLdBreadcrumbList } from "@/lib/publicSeo";
 
 const BRAND_IMAGE_CANDIDATES = [
   { publicPath: "/brand/logo-primary.png", label: "Primary logo" },
@@ -59,6 +59,17 @@ export default function MediaBrandImagesPage() {
         }
       `}</style>
       <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 print:max-w-none print:px-0">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(
+              jsonLdBreadcrumbList([
+                { name: "Media", path: "/media" },
+                { name: "Brand Images", path: "/media/brand-images" },
+              ]),
+            ),
+          }}
+        />
         <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-white/70 print:hidden">
           <Link href="/media" className="underline decoration-white/25 underline-offset-2 hover:text-white">
             Media

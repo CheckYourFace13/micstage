@@ -16,7 +16,6 @@ export default function robots(): MetadataRoute.Robots {
         "/logout",
         "/api",
         "/login",
-        "/register",
         "/reset",
         ...marketingRobotsDisallowExtra(),
       ],

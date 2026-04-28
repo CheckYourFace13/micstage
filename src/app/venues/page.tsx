@@ -126,8 +126,34 @@ export default async function VenuesDirectoryPage() {
         ) : null}
 
         {sections.length === 0 ? (
-          <div className="order-5 mt-2 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/70 md:order-4 md:mt-8 md:p-6">
-            No public venues are available yet.
+          <div className="order-5 mt-2 rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/20 p-5 text-sm leading-relaxed text-white/75 md:order-4 md:mt-8 md:p-7">
+            <p className="font-semibold text-white/90">Venue listings are growing—here&apos;s how to explore meanwhile</p>
+            <p className="mt-2">
+              Search by ZIP or city on{" "}
+              <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
+                Find open mics
+              </Link>
+              , browse the{" "}
+              <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/map">
+                map
+              </Link>
+              , or read{" "}
+              <Link className="underline hover:text-white" href="/resources">
+                open mic guides
+              </Link>{" "}
+              for artists and hosts. New rooms join MicStage every week as venues publish schedules.
+            </p>
+            <p className="mt-4 rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-white/80">
+              <span className="font-medium text-white">Run an open mic?</span> List your venue free—get bookable slots and a
+              public page artists can find.{" "}
+              <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
+                Register your venue
+              </Link>
+              {" · "}
+              <Link className="underline hover:text-white" href="/contact">
+                Contact us
+              </Link>
+            </p>
           </div>
         ) : (
           <div className="order-5 mt-2 grid gap-6 md:order-4 md:mt-8">

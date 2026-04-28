@@ -27,6 +27,25 @@ export default function MediaLandingPage() {
             <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">Open mic scheduling</span>
             <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1">Local talent and live events</span>
           </div>
+          <p className="mt-4 max-w-3xl text-xs leading-relaxed text-white/55 sm:text-sm">
+            Looking for rooms or booking? Start with{" "}
+            <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
+              find open mics
+            </Link>
+            , the{" "}
+            <Link className="underline hover:text-white" href="/map">
+              map
+            </Link>
+            ,{" "}
+            <Link className="underline hover:text-white" href="/venues">
+              venues
+            </Link>
+            , or{" "}
+            <Link className="underline hover:text-white" href="/register/venue">
+              list your venue
+            </Link>
+            .
+          </p>
         </header>
 
         <section className="mt-6 grid gap-4 sm:grid-cols-2" aria-label="Media categories">

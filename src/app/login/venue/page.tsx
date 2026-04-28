@@ -2,6 +2,7 @@ export const metadata = {
   title: "Venue login | MicStage",
 };
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { safeAfterAuthPath } from "@/lib/safeRedirect";
@@ -26,9 +27,9 @@ export default async function VenueLoginPage(props: {
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-4 py-12 sm:px-6 sm:py-16">
-        <a className="text-sm text-white/70 hover:text-white" href="/">
+        <Link className="text-sm text-white/70 hover:text-white" href="/">
           ← Back
-        </a>
+        </Link>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Venue login</h1>
         <p className="mt-2 text-sm text-white/70">Log in to manage your venue schedule and invite managers.</p>
@@ -40,14 +41,14 @@ export default async function VenueLoginPage(props: {
           footer={
             <div className="text-xs text-white/60">
               Forgot password?{" "}
-              <a className="underline hover:text-white" href="/reset/venue">
+              <Link className="underline hover:text-white" href="/reset/venue">
                 Reset it
-              </a>
+              </Link>
               .<br />
               New venue?{" "}
-              <a className="underline hover:text-white" href="/register/venue">
+              <Link className="underline hover:text-white" href="/register/venue">
                 Create an account
-              </a>
+              </Link>
               .
             </div>
           }
@@ -60,9 +61,9 @@ export default async function VenueLoginPage(props: {
           {showInvalid ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Invalid email or password.{" "}
-              <a className="underline hover:text-white" href="/reset/venue">
+              <Link className="underline hover:text-white" href="/reset/venue">
                 Reset password
-              </a>
+              </Link>
               .
             </div>
           ) : null}

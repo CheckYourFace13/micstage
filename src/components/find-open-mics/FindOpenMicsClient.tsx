@@ -238,10 +238,10 @@ export function FindOpenMicsClient(props: {
 
           {googleKey ? (
             <div className="rounded-xl border border-white/10 bg-black/25 p-3 md:p-4">
-              <div className="text-xs font-medium text-white/85 md:text-sm md:text-white/90">City or area (Google suggestions)</div>
+              <div className="text-xs font-medium text-white/85 md:text-sm md:text-white/90">City or area (suggestions)</div>
               <p className="mt-1 text-[10px] leading-snug text-white/45 md:text-xs md:leading-relaxed md:text-white/50">
-                Optional: pick a place from Google’s list when your project has{" "}
-                <span className="font-mono text-white/70">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</span> set.
+                Optional: start typing a city, ZIP code, neighborhood, or venue name, then choose the best match from the
+                suggestions.
               </p>
               <div className="mt-3">
                 <VenuePlacePicker

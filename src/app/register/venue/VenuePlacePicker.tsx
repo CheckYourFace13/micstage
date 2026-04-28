@@ -33,9 +33,14 @@ export function VenuePlacePicker(props: {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const [error, setError] = useState<string | null>(() =>
+    apiKey?.trim()
+      ? null
+      : "Address search isn’t available right now. Refresh and try again, or contact support if it keeps happening.",
+  );
+
   const scriptSrc = useMemo(() => {
     const key = apiKey ?? "";
     // NOTE: key must be defined in .env.local for this to work.
@@ -43,16 +48,12 @@ export function VenuePlacePicker(props: {
   }, [apiKey]);
 
   useEffect(() => {
-    if (!apiKey?.trim()) {
-      setError("Google Maps API key is not configured (NEXT_PUBLIC_GOOGLE_MAPS_API_KEY). Venue search will not work until it is set.");
-    }
-  }, [apiKey]);
-
-  useEffect(() => {
     if (!ready) return;
     if (!inputRef.current) return;
     if (!window.google?.maps?.places) {
-      setError("Google Places failed to load. Check your API key.");
+      queueMicrotask(() =>
+        setError("Places search didn’t load. Refresh and try again, or contact support if it keeps happening."),
+      );
       return;
     }
 
@@ -104,7 +105,11 @@ export function VenuePlacePicker(props: {
           src={scriptSrc}
           strategy="afterInteractive"
           onLoad={() => setReady(true)}
-          onError={() => setError("Failed to load Google Maps script. Check your API key and network.")}
+          onError={() =>
+            queueMicrotask(() =>
+              setError("Maps didn’t load. Check your connection and try again, or contact support if it keeps happening."),
+            )
+          }
         />
       ) : null}
 

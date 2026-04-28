@@ -168,8 +168,6 @@ export async function sendThroughMarketingPipeline(
     return d;
   }
 
-  let sendId: string;
-
   if (reasons.length > 0) {
     if (isOnlyTransientMarketingThrottle(reasons)) {
       return { ok: false, blocked: true, reasons };
@@ -211,7 +209,7 @@ export async function sendThroughMarketingPipeline(
   }
 
   const row = existing ?? (await prisma.marketingEmailSend.create({ data: queuedRowData() }));
-  sendId = row.id;
+  const sendId = row.id;
 
   let providerMessageId: string | null = null;
   try {

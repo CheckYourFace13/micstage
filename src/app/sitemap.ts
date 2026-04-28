@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { computeCitySlugVenueCounts, primaryDiscoverySlugForVenue } from "@/lib/discoveryMarket";
+import { mapDiscoverySlugIndexSignals, shouldIndexDiscoveryPage } from "@/lib/seo/discoveryIndex";
 import { siteOrigin } from "@/lib/publicSeo";
 import { getAllResourceArticles } from "@/lib/resourcesContent";
 import { marketingSitemapSupplements } from "@/lib/marketing/indexability";
@@ -21,6 +22,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/locations",
     "/venues",
     "/resources",
+    "/register/venue",
+    "/register/musician",
+    "/media",
+    "/media/how-to-artists",
+    "/media/how-to-venues",
+    "/media/brand-images",
+    "/media/press-releases",
     "/why/venue-controlled-structure",
     "/why/no-double-booking",
     "/why/marketing-and-seo",
@@ -33,7 +41,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${base}${path || "/"}`,
     lastModified: staticLastModified,
     changeFrequency: "weekly",
-    priority: path === "" ? 1 : path === "/find-open-mics" ? 0.95 : 0.85,
+    priority:
+      path === ""
+        ? 1
+        : path === "/find-open-mics"
+          ? 0.95
+          : path.startsWith("/register/")
+            ? 0.88
+            : 0.85,
   }));
 
   const prisma = getPrismaOrNull();
@@ -71,12 +86,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         locationUpdatedAt.set(slug, v.updatedAt);
       }
     }
-    const locationEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()].map(([slug, updatedAt]) => ({
-      url: `${base}/locations/${slug}/performers`,
-      lastModified: updatedAt,
-      changeFrequency: "weekly",
-      priority: 0.65,
-    }));
+
+    const indexBySlug = await mapDiscoverySlugIndexSignals(prisma);
+    const locationEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()]
+      .filter(([slug]) => {
+        const sig = indexBySlug.get(slug);
+        if (!sig) return false;
+        return shouldIndexDiscoveryPage(sig);
+      })
+      .map(([slug, updatedAt]) => ({
+        url: `${base}/locations/${slug}/performers`,
+        lastModified: updatedAt,
+        changeFrequency: "weekly" as const,
+        priority: 0.65,
+      }));
 
     return [...staticEntries, ...resourceEntries, ...venueEntries, ...locationEntries, ...marketingSitemapSupplements()];
   } catch {

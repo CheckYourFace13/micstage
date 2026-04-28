@@ -63,6 +63,12 @@ export default async function FindOpenMicsPage() {
             <Link href="/map" className="text-inherit underline hover:text-white">
               Open mic map
             </Link>
+            <Link href="/resources" className="text-inherit underline hover:text-white">
+              Resources &amp; guides
+            </Link>
+            <Link href="/register/venue" className="text-inherit underline hover:text-white">
+              List your venue
+            </Link>
           </div>
 
           {loadError ? (

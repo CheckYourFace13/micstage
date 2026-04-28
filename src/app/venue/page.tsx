@@ -643,7 +643,11 @@ export default async function VenuePortalPage({
                   : heroYmd;
               const lineupPath = selectedYmd ? `/venues/${v.slug}/lineup/${selectedYmd}` : null;
               const hDays = horizonDaysFor(v.subscriptionTier);
-              const bookingWindowMaxIso = toIsoDateOnly(new Date(Date.now() + hDays * 24 * 60 * 60 * 1000));
+              // Horizon date depends on "today" — intentional for booking-window UI (not derived from external snapshot).
+              const bookingWindowMaxIso = toIsoDateOnly(
+                // eslint-disable-next-line react-hooks/purity -- booking window is intentionally relative to render time
+                new Date(Date.now() + hDays * 24 * 60 * 60 * 1000),
+              );
               const lineupBadge =
                 operational && primary && selectedYmd && storageYmdUtc(primary.instance.date) === selectedYmd
                   ? primary.badge

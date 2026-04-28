@@ -13,6 +13,7 @@ import { getVenueCityDiscoveryCounts, venueIncludedInDiscoveryPage } from "@/lib
 import { minutesToTimeLabel } from "@/lib/time";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { relatedLocationsForLocationSlug } from "@/lib/relatedLocations";
+import { getDiscoveryMarketIndexSignals, shouldIndexDiscoveryPage } from "@/lib/seo/discoveryIndex";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +22,21 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
   const canonical = await canonicalLocationSlugOrNull(locationSlug);
   const slug = canonical ?? locationSlug;
   const place = await resolveLocationPlaceTitle(slug);
+  const prisma = getPrismaOrNull();
+  let index = true;
+  if (prisma) {
+    try {
+      const signals = await getDiscoveryMarketIndexSignals(prisma, slug);
+      index = shouldIndexDiscoveryPage(signals);
+    } catch {
+      index = true;
+    }
+  }
   return buildPublicMetadata({
     title: `${place} open mic artists`,
     description: `Upcoming open mic performers across the ${place} discovery market on MicStage: public, shareable artist list (venue addresses stay exact on each venue page).`,
     path: `/locations/${slug}/performers`,
+    index,
   });
 }
 

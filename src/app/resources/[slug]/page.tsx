@@ -11,25 +11,23 @@ export function generateStaticParams() {
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await props.params;
   const article = getResourceArticleBySlug(slug);
+  const path = `/resources/${slug}`;
   if (!article) {
     return buildPublicMetadata({
       title: "Resource not found",
       description: "This MicStage resource page could not be found.",
-      path: `/resources/${slug}`,
+      path,
     });
   }
+  const base = buildPublicMetadata({
+    title: `${article.title} | MicStage resources`,
+    description: article.description,
+    path: `/resources/${article.slug}`,
+  });
   return {
-    ...buildPublicMetadata({
-      title: `${article.title} | MicStage resources`,
-      description: article.description,
-      path: `/resources/${article.slug}`,
-    }),
+    ...base,
     openGraph: {
-      ...(buildPublicMetadata({
-        title: `${article.title} | MicStage resources`,
-        description: article.description,
-        path: `/resources/${article.slug}`,
-      }).openGraph ?? {}),
+      ...base.openGraph,
       type: "article",
     },
   };

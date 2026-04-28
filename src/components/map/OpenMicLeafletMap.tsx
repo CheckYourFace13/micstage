@@ -94,8 +94,11 @@ export function OpenMicLeafletMap(props: {
   const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const propsRef = useRef(props);
-  propsRef.current = props;
   const [mapReady, setMapReady] = useState(false);
+
+  useEffect(() => {
+    propsRef.current = props;
+  });
 
   const emitBounds = useCallback(() => {
     const map = mapRef.current;
@@ -130,7 +133,7 @@ export function OpenMicLeafletMap(props: {
     });
     cluster.addTo(map);
     clusterRef.current = cluster;
-    setMapReady(true);
+    queueMicrotask(() => setMapReady(true));
     requestAnimationFrame(() => map.invalidateSize());
 
     const scheduleEmit = () => {

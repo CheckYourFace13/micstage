@@ -2,6 +2,7 @@ export const metadata = {
   title: "Artist login | MicStage",
 };
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { safeAfterMusicianLoginPath } from "@/lib/safeRedirect";
@@ -26,17 +27,17 @@ export default async function MusicianLoginPage(props: {
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-4 py-12 sm:px-6 sm:py-16">
-        <a className="text-sm text-white/70 hover:text-white" href="/">
+        <Link className="text-sm text-white/70 hover:text-white" href="/">
           ← Back
-        </a>
+        </Link>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Artist login</h1>
         <p className="mt-2 text-sm text-white/70">
           Sign in with your <span className="text-white/90">email and password</span>. Your{" "}
           <span className="text-emerald-200/90">stage name</span> is what others see on MicStage and in{" "}
-          <a className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
+          <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
             artist search
-          </a>{" "}
+          </Link>{" "}
           — not your legal name.
         </p>
         <BetaNote className="mt-3" />
@@ -55,9 +56,9 @@ export default async function MusicianLoginPage(props: {
           {showInvalid ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Invalid email or password.{" "}
-              <a className="underline hover:text-white" href="/reset/musician">
+              <Link className="underline hover:text-white" href="/reset/musician">
                 Reset password
-              </a>
+              </Link>
               .
             </div>
           ) : null}
@@ -100,14 +101,14 @@ export default async function MusicianLoginPage(props: {
 
           <div className="text-xs text-white/60">
             Forgot password?{" "}
-            <a className="underline hover:text-white" href="/reset/musician">
+            <Link className="underline hover:text-white" href="/reset/musician">
               Reset it
-            </a>
+            </Link>
             .<br />
             New artist?{" "}
-            <a className="underline hover:text-white" href="/register/musician">
+            <Link className="underline hover:text-white" href="/register/musician">
               Create an account
-            </a>
+            </Link>
             .
           </div>
         </form>

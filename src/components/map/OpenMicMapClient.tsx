@@ -76,7 +76,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
       firstFilterEffect.current = false;
       return;
     }
-    setRefitNonce((n) => n + 1);
+    queueMicrotask(() => setRefitNonce((n) => n + 1));
   }, [filterSig]);
 
   /** Format + booking only — map pins always include every setup venue; weekday is highlight-only on the map. */

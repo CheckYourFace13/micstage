@@ -44,9 +44,16 @@ export default async function OpenMicMapPage() {
         }
       : null;
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [{ "@type": "ListItem", position: 1, name: "Map", item: absoluteUrl("/map") }],
+  };
+
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
         {itemListLd ? (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }} />
         ) : null}
@@ -89,17 +96,35 @@ export default async function OpenMicMapPage() {
           </div>
         ) : venues.length === 0 ? (
           <div className="order-1 rounded-xl border border-white/15 bg-gradient-to-b from-zinc-900/50 to-zinc-950/80 px-5 py-6 text-sm leading-relaxed text-white/75 md:order-4">
-            <p className="font-medium text-white/90">The map is ready. We&apos;re waiting on mappable venues.</p>
+            <p className="font-semibold text-white/90">Map-first discovery fills in as venues go live</p>
             <p className="mt-2">
-              Venues appear here once they have map coordinates from Google Places and at least one public open mic
-              template. Meanwhile you can still browse by place or list.
+              Pins appear when venues have coordinates on file and a public schedule to browse. That keeps the map honest—only
+              real rooms you can visit. Until your area has pins, search by ZIP or city, browse markets, or scan all venue
+              pages; listings grow as more rooms join.
             </p>
             <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
               <Link href="/find-open-mics" className="font-semibold text-[rgb(var(--om-neon))] underline">
                 Find open mics by location
               </Link>
+              <Link href="/locations" className="font-semibold underline hover:text-white">
+                Markets directory
+              </Link>
+              <Link href="/venues" className="font-semibold underline hover:text-white">
+                All venues
+              </Link>
+              <Link href="/resources" className="font-semibold underline hover:text-white">
+                Resources
+              </Link>
+            </p>
+            <p className="mt-4 rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-white/85">
+              <span className="font-medium text-white">Run an open mic?</span> List your venue free and show up on the map when
+              your address and schedule are published.{" "}
               <Link href="/register/venue" className="font-semibold text-[rgb(var(--om-neon))] underline">
-                List your venue on MicStage
+                Register your venue
+              </Link>
+              {" · "}
+              <Link href="/contact" className="underline hover:text-white">
+                Contact
               </Link>
             </p>
           </div>

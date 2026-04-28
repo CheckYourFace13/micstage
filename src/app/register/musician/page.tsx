@@ -1,7 +1,5 @@
-export const metadata = {
-  title: "Artist registration | MicStage",
-};
-
+import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
@@ -10,6 +8,14 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { MUSICIAN_REGISTER_SUBMIT_PATH } from "./actions";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
+import { buildPublicMetadata } from "@/lib/publicSeo";
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Artist registration",
+  description:
+    "Create your MicStage artist account with email and password. Set a public stage name, find open mics, and book slots.",
+  path: "/register/musician",
+});
 
 export default async function MusicianRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await props.searchParams;
@@ -23,9 +29,9 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-6 py-16">
-        <a className="text-sm text-white/70 hover:text-white" href="/">
+        <Link className="text-sm text-white/70 hover:text-white" href="/">
           ← Back
-        </a>
+        </Link>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Artist registration</h1>
         <p className="mt-2 text-sm text-white/70">

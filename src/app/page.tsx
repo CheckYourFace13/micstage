@@ -113,7 +113,49 @@ export default function Home() {
                     <span className="text-white/50 group-hover:text-white">→</span>
                   </div>
                 </Link>
+                <Link
+                  href="/map"
+                  className="group rounded-xl border border-white/10 bg-black/30 p-3.5 hover:bg-black/40 md:p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold md:text-base">Open mic map</div>
+                      <div className="mt-0.5 text-xs text-white/55 md:mt-1 md:text-sm md:text-white/65">
+                        Pins by night, format, and bookable slots.
+                      </div>
+                    </div>
+                    <span className="text-white/50 group-hover:text-white">→</span>
+                  </div>
+                </Link>
+                <Link
+                  href="/venues"
+                  className="group rounded-xl border border-white/10 bg-black/30 p-3.5 hover:bg-black/40 md:p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold md:text-base">Venue directory</div>
+                      <div className="mt-0.5 text-xs text-white/55 md:mt-1 md:text-sm md:text-white/65">
+                        Every public MicStage venue page, searchable by city.
+                      </div>
+                    </div>
+                    <span className="text-white/50 group-hover:text-white">→</span>
+                  </div>
+                </Link>
               </div>
+              <p className="mt-3 text-[11px] leading-snug text-white/45 md:text-xs md:text-white/55">
+                Guides &amp; growth:{" "}
+                <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/resources">
+                  Resources
+                </Link>
+                {" · "}
+                <Link className="underline hover:text-white" href="/register/venue">
+                  List your venue (free)
+                </Link>
+                {" · "}
+                <Link className="underline hover:text-white" href="/contact">
+                  Contact
+                </Link>
+              </p>
             </div>
           </div>
         </header>

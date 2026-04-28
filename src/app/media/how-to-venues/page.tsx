@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { MediaPrintOnQuery } from "@/components/MediaPrintOnQuery";
-import { buildPublicMetadata } from "@/lib/publicSeo";
+import { buildPublicMetadata, jsonLdBreadcrumbList } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "MicStage How-To for Venues | Open mic operations guide",
@@ -23,6 +23,17 @@ export default function MediaHowToVenuesPage() {
         }
       `}</style>
       <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 print:max-w-none print:px-0">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(
+              jsonLdBreadcrumbList([
+                { name: "Media", path: "/media" },
+                { name: "How-To for Venues", path: "/media/how-to-venues" },
+              ]),
+            ),
+          }}
+        />
         <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-white/70 print:hidden">
           <Link href="/media" className="underline decoration-white/25 underline-offset-2 hover:text-white">
             Media

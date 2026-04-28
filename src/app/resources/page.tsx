@@ -127,6 +127,12 @@ export default function ResourcesIndexPage() {
           <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/performers">
             Performers
           </Link>
+          <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/register/venue">
+            List your venue
+          </Link>
+          <Link className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white" href="/contact">
+            Contact
+          </Link>
         </div>
 
         <section className="mt-10" aria-labelledby="featured-guides">

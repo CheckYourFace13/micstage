@@ -1,7 +1,5 @@
-export const metadata = {
-  title: "Venue registration | MicStage",
-};
-
+import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { getPrismaOrNull } from "@/lib/prisma";
@@ -12,6 +10,14 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { VenuePlaceFields } from "./venuePlaceFields";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
+import { buildPublicMetadata } from "@/lib/publicSeo";
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Venue registration",
+  description:
+    "Create a free MicStage venue account, publish your open mic schedule, and share bookable slots with artists. List your room and grow attendance.",
+  path: "/register/venue",
+});
 
 const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
 
@@ -37,9 +43,9 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-6 py-16">
-        <a className="text-sm text-white/70 hover:text-white" href="/">
+        <Link className="text-sm text-white/70 hover:text-white" href="/">
           ← Back
-        </a>
+        </Link>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Venue registration</h1>
         <p className="mt-2 text-sm text-white/70">
@@ -65,9 +71,12 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
           {traceId ? <input type="hidden" name="growthTraceLeadId" value={traceId} /> : null}
           {showPlace ? (
             <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white">
-              Choose your venue from the Google suggestions dropdown before creating your account. If the map search
-              does not load, confirm <span className="font-mono text-white/90">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</span> is
-              set for this environment.
+              Choose your venue from the suggestions list before creating your account. If address search doesn&apos;t load,
+              try again in a moment or contact{" "}
+              <a className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/contact">
+                support
+              </a>
+              .
             </div>
           ) : null}
           {showRate ? (
@@ -120,6 +129,16 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
             pages all reference the correct location, which makes your open mic easier to find.
           </p>
           <LineupSlotTypesHelp className="mt-4" />
+          <p className="text-xs leading-relaxed text-white/50">
+            Why run an open mic?{" "}
+            <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/why/marketing-and-seo">
+              Discovery and SEO on MicStage
+            </Link>
+            {" · "}
+            <Link className="underline hover:text-white" href="/resources">
+              Open mic guides for venues
+            </Link>
+          </p>
         </form>
       </main>
     </div>

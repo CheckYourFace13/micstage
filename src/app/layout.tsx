@@ -8,7 +8,7 @@ import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics"
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { isAnalyticsDisabled } from "@/lib/productAnalytics";
-import { absoluteUrl, siteOrigin } from "@/lib/publicSeo";
+import { absoluteUrl, defaultSocialImageAbsoluteUrls, siteOrigin } from "@/lib/publicSeo";
 import "./globals.css";
 
 const heading = Bebas_Neue({
@@ -26,6 +26,7 @@ const origin = siteOrigin();
 const siteTagline = "Find open mics · Book slots · Grow your room";
 const defaultDescription =
   "MicStage helps you find local open mics and helps venues run bookable schedules, with public pages that make discovery and marketing easier for rooms and artists.";
+const defaultOgImageUrls = defaultSocialImageAbsoluteUrls();
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -51,11 +52,13 @@ export const metadata: Metadata = {
     url: absoluteUrl("/"),
     title: "MicStage",
     description: defaultDescription,
+    images: defaultOgImageUrls.map((url) => ({ url })),
   },
   twitter: {
     card: "summary_large_image",
     title: "MicStage",
     description: defaultDescription,
+    images: defaultOgImageUrls,
   },
 };
 
@@ -71,6 +74,7 @@ export default async function RootLayout({
     name: "MicStage",
     url: absoluteUrl("/"),
     logo: absoluteUrl("/favicon.png"),
+    image: defaultOgImageUrls[0] ?? absoluteUrl("/favicon.png"),
   };
   const siteJsonLd = {
     "@context": "https://schema.org",

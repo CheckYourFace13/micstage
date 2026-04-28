@@ -39,8 +39,8 @@ export default function WhyVenueControlledStructurePage() {
         <section className="mt-6 grid gap-5 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-white">Why this helps signups and traffic</h2>
           <p className="text-sm text-white/75">
-            Structured venue pages improve discoverability for searches like “open mic near me,” “open mic in [metro or
-            region],” and “[venue name] open mic schedule.” When your listing is clear and updated, artists trust the page,
+            Structured venue pages improve discoverability for searches like &quot;open mic near me,&quot; &quot;open mic in [metro or
+            region],&quot; and &quot;[venue name] open mic schedule.&quot; When your listing is clear and updated, artists trust the page,
             click-through improves, and repeat attendance becomes easier.
           </p>
         </section>
@@ -48,7 +48,7 @@ export default function WhyVenueControlledStructurePage() {
         <section className="mt-6 grid gap-5 rounded-2xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.06)] p-6">
           <h2 className="text-lg font-semibold text-white">On-site booking lock (phone proximity)</h2>
           <p className="text-sm text-white/75">
-            Venues can enforce “book on site only.” In this mode, MicStage checks the artist’s phone location against
+            Venues can enforce &quot;book on site only.&quot; In this mode, MicStage checks the artist&apos;s phone location against
             the venue location before allowing the reservation. This keeps remote no-shows from grabbing spots and helps
             protect fairness for people physically at the event.
           </p>

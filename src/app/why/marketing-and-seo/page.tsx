@@ -41,7 +41,7 @@ export default function WhyMarketingAndDiscoveryPage() {
             week, your promo links keep working after the post scrolls away.
           </p>
           <p className="text-sm text-white/75">
-            In practice, that usually means fewer “is this still the right link?” messages and more repeat visits from people who
+            In practice, that usually means fewer &quot;is this still the right link?&quot; messages and more repeat visits from people who
             trust the page.
           </p>
         </section>

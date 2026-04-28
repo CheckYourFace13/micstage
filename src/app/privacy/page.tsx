@@ -16,7 +16,7 @@ export default function PrivacyPage() {
   return (
     <LegalDocument title="Privacy Policy" updated={updated}>
       <p>
-        MicStage (“we,” “us”) operates an online platform that helps open mic venues and artists coordinate schedules
+        MicStage (&quot;we,&quot; &quot;us&quot;) operates an online platform that helps open mic venues and artists coordinate schedules
         and bookings. This policy explains what information we handle and how we use it.
       </p>
 
@@ -98,8 +98,8 @@ export default function PrivacyPage() {
 
       <h2>Changes</h2>
       <p>
-        We may update this policy from time to time. We will post the updated version on this page and adjust the “Last
-        updated” date above.
+        We may update this policy from time to time. We will post the updated version on this page and adjust the &quot;Last
+        updated&quot; date above.
       </p>
 
       <h2>Contact</h2>

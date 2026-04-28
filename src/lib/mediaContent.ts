@@ -38,5 +38,5 @@ export const PRESS_RELEASE_META = {
   headline: "MicStage Open Mic Platform Launches in Beta on April 20, 2026",
   subheadline:
     "MicStage helps venues publish open mic schedules, helps performers get found, and gives audiences a clearer way to discover local shows.",
-  releaseLine: "CHICAGO, IL · April 20, 2026",
+  releaseLine: "CHICAGO, IL | April 20, 2026",
 };

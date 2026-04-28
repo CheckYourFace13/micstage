@@ -119,7 +119,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
 
   const emptyMessage = queryFailed
-    ? "We couldn’t load upcoming bookings for this market. Try again in a moment."
+    ? "We could not load upcoming bookings for this market. Try again in a moment."
     : "No upcoming artists listed for this market yet.";
   const nearbyLocations = await relatedLocationsForLocationSlug(locationSlug, 6);
   const uniqueVenueCount = new Set(bookings.map((b) => b.slot.instance.template.venue.id)).size;
@@ -235,7 +235,7 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 className="text-lg font-semibold">{b.performerName}</h2>
                     <div className="text-xs text-white/60">
-                      {inst.date.toISOString().slice(0, 10)} · {minutesToTimeLabel(b.slot.startMin)}-
+                      {inst.date.toISOString().slice(0, 10)} | {minutesToTimeLabel(b.slot.startMin)}-
                       {minutesToTimeLabel(b.slot.endMin)}
                     </div>
                   </div>

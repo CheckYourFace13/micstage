@@ -22,7 +22,7 @@ type NearbyVenue = {
 export function FindOpenMicsClient(props: {
   locationRows: PublicDiscoveryLocationRow[];
   venues: OpenMicFinderVenue[];
-  /** From server only — whether Google Places suggestions UI may load. */
+  /** From server only - whether Google Places suggestions UI may load. */
   showGooglePlaceSuggestions?: boolean;
 }) {
   const { locationRows, venues, showGooglePlaceSuggestions = false } = props;
@@ -63,7 +63,7 @@ export function FindOpenMicsClient(props: {
 
   const onUseLocation = () => {
     if (!navigator.geolocation) {
-      setError("Location isn’t available in this browser. Try ZIP or city below.");
+      setError("Location is not available in this browser. Try ZIP or city below.");
       return;
     }
     setLoading(true);
@@ -74,7 +74,7 @@ export function FindOpenMicsClient(props: {
       },
       () => {
         setLoading(false);
-        setError("We couldn’t read your location. Enable permission, or use ZIP / city search.");
+        setError("We could not read your location. Enable permission, or use ZIP / city search.");
       },
       { enableHighAccuracy: false, timeout: 12_000, maximumAge: 60_000 },
     );
@@ -246,7 +246,7 @@ export function FindOpenMicsClient(props: {
                 <VenuePlacePicker
                   types={["(cities)"]}
                   label="Start typing a city or region"
-                  placeholder="e.g. Nashville, Austin…"
+                  placeholder="e.g. Nashville, Austin..."
                   onPlace={(p) => void runNearby(p.lat, p.lng, p.formattedAddress, "place")}
                 />
               </div>
@@ -280,7 +280,7 @@ export function FindOpenMicsClient(props: {
                       </div>
                       <p className="mt-1 text-xs text-white/55">{v.formattedAddress}</p>
                       <p className="mt-2 text-xs text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2">
-                        View schedule &amp; lineup →
+                        {"View schedule and lineup ->"}
                       </p>
                     </Link>
                   </li>
@@ -306,7 +306,7 @@ export function FindOpenMicsClient(props: {
               type="search"
               value={metroFilter}
               onChange={(e) => setMetroFilter(e.target.value)}
-              placeholder="e.g. Chicagoland, Texas…"
+              placeholder="e.g. Chicagoland, Texas..."
               className="h-11 rounded-md border border-white/15 bg-black/40 px-3 text-white placeholder:text-white/40"
             />
           </label>
@@ -357,7 +357,7 @@ export function FindOpenMicsClient(props: {
                           {[v.city, v.region].filter(Boolean).join(", ") || "MicStage venue"}
                         </div>
                         <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">
-                          View lineup →
+                          {"View lineup ->"}
                         </span>
                       </Link>
                     </li>
@@ -367,7 +367,7 @@ export function FindOpenMicsClient(props: {
               <p className="mt-3 text-xs text-white/45 md:mt-4 md:text-sm md:text-white/55">
                 Upcoming artists in this market:{" "}
                 <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href={`/locations/${selectedMetroSlug}/performers`}>
-                  See who’s booking slots →
+                  {"See who is booking slots ->"}
                 </Link>
               </p>
             </div>

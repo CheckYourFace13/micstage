@@ -17,14 +17,14 @@ export default function ContactPage() {
         <p className="text-xs font-medium uppercase tracking-widest text-white/50">MicStage</p>
         <h1 className="om-heading mt-2 text-4xl tracking-wide text-white">Contact &amp; support</h1>
         <p className="mt-3 text-sm leading-relaxed text-white/70">
-          We’re here for questions about using MicStage as a product. For on-the-night or venue-specific matters, your
+          We are here for questions about using MicStage as a product. For on-the-night or venue-specific matters, your
           room is usually the best first stop.
         </p>
 
         <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6 sm:p-8">
           <h2 className="text-sm font-semibold text-white">Send us a message</h2>
           <p className="mt-2 text-sm text-white/70">
-            Tell us how we can help. We’ll reply to the email address you provide.
+            Tell us how we can help. We will reply to the email address you provide.
           </p>
           <div className="mt-6">
             <ContactForm />
@@ -45,7 +45,7 @@ export default function ContactPage() {
           <section>
             <h2 className="text-base font-semibold text-white">Contact the venue for</h2>
             <p className="mt-3 text-white/75">
-              Open mics set their own house rules, schedules, and how cancellations work. MicStage doesn’t run the room.
+              Open mics set their own house rules, schedules, and how cancellations work. MicStage does not run the room.
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>Whether you can book a specific slot, waitlists, or same-day changes</li>

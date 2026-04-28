@@ -44,7 +44,7 @@ export default function WhyNoDoubleBookingPage() {
         <section className="mt-6 grid gap-5 rounded-2xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.06)] p-6">
           <h2 className="text-lg font-semibold text-white">Optional on-premise booking enforcement</h2>
           <p className="text-sm text-white/75">
-            For high-demand nights, venues can require on-site booking only. MicStage uses the artist’s phone location
+            For high-demand nights, venues can require on-site booking only. MicStage uses the artist&apos;s phone location
             and the venue coordinates to verify proximity before confirming the slot. This reduces gaming and keeps your
             list accurate for people actually at the mic.
           </p>

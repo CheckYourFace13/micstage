@@ -88,7 +88,7 @@ export default async function VenuesDirectoryPage() {
         <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide md:text-4xl">Open mic venues</h1>
         <div className="mt-2 flex flex-col gap-3 md:gap-4">
         <p className="order-2 text-xs leading-snug text-white/55 md:hidden">
-          Grouped by city and state on file—tap a venue for the full public page.
+          Grouped by city and state on file; tap a venue for the full public page.
         </p>
         <p className="order-6 max-w-3xl text-xs leading-relaxed text-white/55 md:order-1 md:text-sm md:text-white/70">
           Venues are grouped below by the city and state on file. Your address on each venue page is always the source of
@@ -127,7 +127,7 @@ export default async function VenuesDirectoryPage() {
 
         {sections.length === 0 ? (
           <div className="order-5 mt-2 rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/20 p-5 text-sm leading-relaxed text-white/75 md:order-4 md:mt-8 md:p-7">
-            <p className="font-semibold text-white/90">Venue listings are growing—here&apos;s how to explore meanwhile</p>
+            <p className="font-semibold text-white/90">Venue listings are growing; here&apos;s how to explore meanwhile</p>
             <p className="mt-2">
               Search by ZIP or city on{" "}
               <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
@@ -144,12 +144,12 @@ export default async function VenuesDirectoryPage() {
               for artists and hosts. New rooms join MicStage every week as venues publish schedules.
             </p>
             <p className="mt-4 rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-white/80">
-              <span className="font-medium text-white">Run an open mic?</span> List your venue free—get bookable slots and a
+              <span className="font-medium text-white">Run an open mic?</span> List your venue free: get bookable slots and a
               public page artists can find.{" "}
               <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
                 Register your venue
               </Link>
-              {" · "}
+              {" | "}
               <Link className="underline hover:text-white" href="/contact">
                 Contact us
               </Link>

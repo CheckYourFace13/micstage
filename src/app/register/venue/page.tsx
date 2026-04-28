@@ -44,7 +44,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-6 py-16">
         <Link className="text-sm text-white/70 hover:text-white" href="/">
-          ← Back
+          &lt;- Back
         </Link>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Venue registration</h1>
@@ -54,7 +54,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
         </p>
         {traceId ? (
           <div className="mt-4 rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
-            <p className="font-medium text-white">You’re joining from MicStage outreach</p>
+            <p className="font-medium text-white">You are joining from MicStage outreach</p>
             <p className="mt-1 text-white/80">
               Claim your venue here so we can list your open mic, help performers find you, and give you tools to grow the
               night. Free to get started.
@@ -121,11 +121,11 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
 
           <FormSubmitButton
             label="Create venue account"
-            pendingLabel="Creating account…"
+            pendingLabel="Creating account..."
             className="mt-2 inline-flex h-11 min-w-[200px] items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
           />
           <p className="text-xs text-white/50">
-            This saves your venue using Google’s Place ID and coordinates so maps, distance search, and your public MicStage
+            This saves your venue using Google&apos;s Place ID and coordinates so maps, distance search, and your public MicStage
             pages all reference the correct location, which makes your open mic easier to find.
           </p>
           <LineupSlotTypesHelp className="mt-4" />
@@ -134,7 +134,7 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
             <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/why/marketing-and-seo">
               Discovery and SEO on MicStage
             </Link>
-            {" · "}
+            {" | "}
             <Link className="underline hover:text-white" href="/resources">
               Open mic guides for venues
             </Link>

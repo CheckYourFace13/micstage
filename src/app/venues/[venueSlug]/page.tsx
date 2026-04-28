@@ -61,7 +61,7 @@ export async function generateMetadata(props: { params: Promise<{ venueSlug: str
       });
     }
     const place = [venue.city, venue.region].filter(Boolean).join(", ");
-    const title = place ? `${venue.name} open mic · ${place}` : `${venue.name} open mic schedule`;
+    const title = place ? `${venue.name} open mic | ${place}` : `${venue.name} open mic schedule`;
     const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules, slots, and who is playing on MicStage.`;
     return {
       ...buildPublicMetadata({ title, description, path }),
@@ -99,7 +99,7 @@ export default async function VenuePublicPage(props: {
     console.error("[public venue] loadPublicVenueForLineup failed", venueSlug, e);
     return (
       <PublicDataUnavailable
-        title="This venue page couldn’t load"
+        title="This venue page could not load"
         description="The live schedule query failed. If you just deployed, apply pending Prisma migrations (slot override columns) and run prisma generate, then redeploy."
       />
     );
@@ -331,7 +331,7 @@ export default async function VenuePublicPage(props: {
               ) : null}
             </div>
             <p className="mt-2 hidden text-sm text-white/60 md:block">
-              <span className="text-white/80">Open</span> slots can be claimed by artists — tap{" "}
+              <span className="text-white/80">Open</span> slots can be claimed by artists; tap{" "}
               <span className="font-medium text-white/85">Perform</span> (sign in or create a free profile if needed).
             </p>
             <p className="mt-2 text-sm text-white/60 md:hidden">
@@ -515,8 +515,8 @@ export default async function VenuePublicPage(props: {
                 {venue.seriesStartDate || venue.seriesEndDate ? (
                   <>
                     Open mic series:{" "}
-                    {venue.seriesStartDate ? venue.seriesStartDate.toISOString().slice(0, 10) : "—"} →{" "}
-                    {venue.seriesEndDate ? venue.seriesEndDate.toISOString().slice(0, 10) : "—"}
+                    {venue.seriesStartDate ? venue.seriesStartDate.toISOString().slice(0, 10) : "-"} to{" "}
+                    {venue.seriesEndDate ? venue.seriesEndDate.toISOString().slice(0, 10) : "-"}
                     <br />
                   </>
                 ) : null}

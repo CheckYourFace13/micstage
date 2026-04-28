@@ -49,7 +49,7 @@ const BROWSE_GOALS: { label: string; slug: string; blurb: string }[] = [
     blurb: "Neighborhood impact, local music scenes, and beginner-friendly culture",
   },
   {
-    label: "Performers’ priorities",
+    label: "Performers' priorities",
     slug: "what-performers-look-for-in-open-mics",
     blurb: "Fair signups, technical honesty, and how artists choose an open mic venue",
   },
@@ -151,7 +151,9 @@ export default function ResourcesIndexPage() {
               >
                 <h3 className="font-semibold text-emerald-50">{a.title}</h3>
                 <p className="mt-2 text-sm text-white/70">{a.description}</p>
-                <div className="mt-3 text-xs text-emerald-200/80">{a.readingMinutes} min read · {CATEGORY_LABEL[a.category]}</div>
+                <div className="mt-3 text-xs text-emerald-200/80">
+                  {a.readingMinutes} min read | {CATEGORY_LABEL[a.category]}
+                </div>
               </Link>
             ))}
           </div>

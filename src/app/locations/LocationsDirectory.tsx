@@ -26,7 +26,7 @@ export function LocationsDirectory({ rows }: { rows: PublicDiscoveryLocationRow[
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="e.g. Chicagoland, Austin TX, Central Illinois…"
+          placeholder="e.g. Chicagoland, Austin TX, Central Illinois..."
           className="h-11 rounded-md border border-white/15 bg-black/50 px-3 text-base text-white placeholder:text-white/35 md:text-sm md:placeholder:text-white/40"
           autoComplete="off"
         />
@@ -35,7 +35,7 @@ export function LocationsDirectory({ rows }: { rows: PublicDiscoveryLocationRow[
         <div className="rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/25 p-4 text-sm leading-relaxed text-white/75 md:p-6">
           <p className="font-semibold text-white/90">Markets appear as venues go live with addresses</p>
           <p className="mt-2">
-            MicStage groups cities into metro and regional hubs so artists can browse real rooms—not empty placeholders.
+            MicStage groups cities into metro and regional hubs so artists can browse real rooms, not empty placeholders.
             While listings ramp up, use{" "}
             <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
               Find open mics
@@ -56,11 +56,11 @@ export function LocationsDirectory({ rows }: { rows: PublicDiscoveryLocationRow[
             <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
               List your venue
             </Link>
-            {" · "}
+            {" | "}
             <Link className="underline hover:text-white" href="/resources">
               Resources for venues
             </Link>
-            {" · "}
+            {" | "}
             <Link className="underline hover:text-white" href="/contact">
               Contact
             </Link>

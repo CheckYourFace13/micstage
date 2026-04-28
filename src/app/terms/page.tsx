@@ -16,7 +16,7 @@ export default function TermsPage() {
   return (
     <LegalDocument title="Terms of Service" updated={updated}>
       <p>
-        These Terms of Service (“Terms”) govern your use of MicStage’s websites and services. By creating an account
+        These Terms of Service (&quot;Terms&quot;) govern your use of MicStage&apos;s websites and services. By creating an account
         or using MicStage, you agree to these Terms.
       </p>
 
@@ -43,7 +43,7 @@ export default function TermsPage() {
           requests for the slot, and complying with venue rules and applicable law.
         </li>
         <li>
-          Cancellations and changes should follow the venue’s stated process and any in-product rules. MicStage does
+          Cancellations and changes should follow the venue&apos;s stated process and any in-product rules. MicStage does
           not guarantee a particular outcome if a dispute arises between users.
         </li>
       </ul>
@@ -56,7 +56,7 @@ export default function TermsPage() {
           service except as allowed by law.
         </li>
         <li>
-          Content you submit (for example, bios, names shown on public pages) must not infringe others’ rights or
+          Content you submit (for example, bios, names shown on public pages) must not infringe others&apos; rights or
           violate law.
         </li>
       </ul>
@@ -64,7 +64,7 @@ export default function TermsPage() {
       <h2>Public information</h2>
       <p>
         Features may display information publicly (for example, venue pages, artist discovery, or metro/regional discovery
-        listings). You choose what to publish within the product’s options; assume public-facing fields may be visible
+        listings). You choose what to publish within the product&apos;s options; assume public-facing fields may be visible
         on the web or in search engines.
       </p>
 
@@ -84,7 +84,7 @@ export default function TermsPage() {
       <p>
         You grant MicStage a worldwide, non-exclusive, royalty-free license to host, store, reproduce, display,
         distribute, and otherwise use those submitted materials to operate, improve, and promote the platform and
-        MicStage’s products and community, including on the site, in email or in-app communications about the service,
+        MicStage&apos;s products and community, including on the site, in email or in-app communications about the service,
         and in marketing or educational materials that reference MicStage (for example, showcasing how the platform
         works or highlighting public listings). Where reasonable, we will use good faith efforts to present your
         materials in a truthful, context-appropriate way. You may remove or update much of this content through the
@@ -106,7 +106,7 @@ export default function TermsPage() {
 
       <h2>Disclaimers</h2>
       <p>
-        The service is provided <strong>“as is”</strong> to the fullest extent permitted by law. We do not warrant
+        The service is provided <strong>&quot;as is&quot;</strong> to the fullest extent permitted by law. We do not warrant
         uninterrupted or error-free operation. We are not responsible for third-party venues, artists, audiences, or
         off-platform conduct.
       </p>
@@ -122,7 +122,7 @@ export default function TermsPage() {
 
       <h2>Changes</h2>
       <p>
-        We may modify these Terms or the service. We will post updated Terms on this page and update the “Last updated”
+        We may modify these Terms or the service. We will post updated Terms on this page and update the &quot;Last updated&quot;
         date. Continued use after changes become effective constitutes acceptance of the revised Terms where allowed by
         law.
       </p>

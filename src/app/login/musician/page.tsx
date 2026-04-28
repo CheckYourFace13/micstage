@@ -28,7 +28,7 @@ export default async function MusicianLoginPage(props: {
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-4 py-12 sm:px-6 sm:py-16">
         <Link className="text-sm text-white/70 hover:text-white" href="/">
-          ← Back
+          &lt;- Back
         </Link>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Artist login</h1>
@@ -38,7 +38,7 @@ export default async function MusicianLoginPage(props: {
           <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/performers">
             artist search
           </Link>{" "}
-          — not your legal name.
+          (not your legal name).
         </p>
         <BetaNote className="mt-3" />
 
@@ -95,7 +95,7 @@ export default async function MusicianLoginPage(props: {
 
           <FormSubmitButton
             label="Log in"
-            pendingLabel="Signing in…"
+            pendingLabel="Signing in..."
             className="mt-2 inline-flex h-11 min-w-[120px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
           />
 

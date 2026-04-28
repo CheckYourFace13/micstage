@@ -79,7 +79,7 @@ export default async function PerformersPage({
   }
 
   const emptyMessage = queryFailed
-    ? "We couldn’t load the artist directory. Try again in a moment."
+    ? "We could not load the artist directory. Try again in a moment."
     : query
       ? "No artists match that search yet."
       : "No artists listed yet. Join MicStage to appear here.";
@@ -96,7 +96,7 @@ export default async function PerformersPage({
               from artist accounts are private and never appear here.
             </p>
             <p className="mt-2 text-sm text-white/65 md:hidden">
-              Public directory uses <span className="text-white/85">stage names only</span>—legal names stay private.
+              Public directory uses <span className="text-white/85">stage names only</span>; legal names stay private.
             </p>
           </div>
           <Link
@@ -114,7 +114,7 @@ export default async function PerformersPage({
               name="q"
               type="search"
               defaultValue={query}
-              placeholder="e.g. Neon, The Duo…"
+              placeholder="e.g. Neon, The Duo..."
               className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
             />
           </label>
@@ -128,7 +128,7 @@ export default async function PerformersPage({
 
         {!query ? (
           <p className="mt-6 text-sm text-white/50">
-            Enter part of an artist’s stage name, or leave blank to browse (up to 80 listings, A–Z).
+            Enter part of an artist&apos;s stage name, or leave blank to browse (up to 80 listings, A-Z).
           </p>
         ) : null}
 
@@ -144,7 +144,7 @@ export default async function PerformersPage({
               const secLoc = [m.secondaryCity, m.secondaryRegion].filter(Boolean).join(", ");
               const rateLine =
                 m.hireRateDescription?.trim() ||
-                (m.openToHire ? "Open to hire — contact via socials / website on full profile (coming soon)." : null);
+                (m.openToHire ? "Open to hire - contact via socials / website on full profile (coming soon)." : null);
 
               return (
                 <article key={m.id} className="rounded-xl border border-white/10 bg-white/5 p-5">
@@ -170,13 +170,13 @@ export default async function PerformersPage({
                   {homeLoc ? (
                     <p className="mt-2 text-sm text-white/70">
                       <span className="text-white/50">Home base:</span> {homeLoc}
-                      {m.travelRadiusMiles != null ? ` · up to ${m.travelRadiusMiles} mi` : null}
+                      {m.travelRadiusMiles != null ? ` | up to ${m.travelRadiusMiles} mi` : null}
                     </p>
                   ) : null}
                   {secLoc ? (
                     <p className="mt-1 text-sm text-white/65">
                       <span className="text-white/50">Also plays near:</span> {secLoc}
-                      {m.secondaryRadiusMiles != null ? ` · up to ${m.secondaryRadiusMiles} mi` : null}
+                      {m.secondaryRadiusMiles != null ? ` | up to ${m.secondaryRadiusMiles} mi` : null}
                     </p>
                   ) : null}
 
@@ -185,7 +185,7 @@ export default async function PerformersPage({
                   {(specs.length > 0 || insts.length > 0) && (
                     <p className="mt-2 text-xs text-white/50">
                       {specs.length > 0 ? <span>Specialties: {specs.join(", ")}</span> : null}
-                      {specs.length > 0 && insts.length > 0 ? " · " : null}
+                      {specs.length > 0 && insts.length > 0 ? " | " : null}
                       {insts.length > 0 ? <span>Instruments: {insts.join(", ")}</span> : null}
                     </p>
                   )}
@@ -194,7 +194,7 @@ export default async function PerformersPage({
                     <p className="mt-2 text-sm text-white/70">
                       <span className="text-white/50">Rate / fee:</span> {rateLine}
                       {m.setLengthMinutes != null ? (
-                        <span className="text-white/50"> · ~{m.setLengthMinutes} min set for that rate</span>
+                        <span className="text-white/50"> | ~{m.setLengthMinutes} min set for that rate</span>
                       ) : null}
                     </p>
                   ) : m.setLengthMinutes != null ? (

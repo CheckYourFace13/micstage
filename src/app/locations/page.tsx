@@ -121,7 +121,7 @@ export default async function LocationsPage() {
 
             {queryFailed ? (
               <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white/85">
-                We couldn’t load discovery markets. Try again in a moment.
+                We could not load discovery markets. Try again in a moment.
               </div>
             ) : null}
           </div>

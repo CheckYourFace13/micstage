@@ -28,7 +28,7 @@ export default async function VenueLoginPage(props: {
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-4 py-12 sm:px-6 sm:py-16">
         <Link className="text-sm text-white/70 hover:text-white" href="/">
-          ← Back
+          &lt;- Back
         </Link>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Venue login</h1>

@@ -29,7 +29,7 @@ export function VenuePlacePicker(props: {
 }) {
   const types = props.types ?? DEFAULT_ESTABLISHMENT_TYPES;
   const label = props.label ?? "Search your venue on Google";
-  const placeholder = props.placeholder ?? "Start typing the venue name + city…";
+  const placeholder = props.placeholder ?? "Start typing the venue name + city...";
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -38,7 +38,7 @@ export function VenuePlacePicker(props: {
   const [error, setError] = useState<string | null>(() =>
     apiKey?.trim()
       ? null
-      : "Address search isn’t available right now. Refresh and try again, or contact support if it keeps happening.",
+      : "Address search is not available right now. Refresh and try again, or contact support if it keeps happening.",
   );
 
   const scriptSrc = useMemo(() => {
@@ -107,7 +107,7 @@ export function VenuePlacePicker(props: {
           onLoad={() => setReady(true)}
           onError={() =>
             queueMicrotask(() =>
-              setError("Maps didn’t load. Check your connection and try again, or contact support if it keeps happening."),
+              setError("Maps did not load. Check your connection and try again, or contact support if it keeps happening."),
             )
           }
         />

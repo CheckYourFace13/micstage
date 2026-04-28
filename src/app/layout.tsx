@@ -23,7 +23,7 @@ const body = Inter({
 });
 
 const origin = siteOrigin();
-const siteTagline = "Find open mics · Book slots · Grow your room";
+const siteTagline = "Find open mics | Book slots | Grow your room";
 const defaultDescription =
   "MicStage helps you find local open mics and helps venues run bookable schedules, with public pages that make discovery and marketing easier for rooms and artists.";
 const defaultOgImageUrls = defaultSocialImageAbsoluteUrls();
@@ -90,6 +90,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${heading.variable} ${body.variable} h-full antialiased`}>
       <head>
+        <meta charSet="utf-8" />
         <link rel="icon" href="/favicon.png" type="image/png" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />

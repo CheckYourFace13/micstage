@@ -39,7 +39,7 @@ export default function MediaPressReleasesPage() {
           <Link href="/media" className="underline decoration-white/25 underline-offset-2 hover:text-white">
             Media
           </Link>
-          <span>·</span>
+          <span>|</span>
           <span>Press Releases</span>
           <Link
             href="/media/press-releases?pdf=1"
@@ -75,7 +75,7 @@ export default function MediaPressReleasesPage() {
               and booking status mean less back-and-forth in inboxes and comment threads, and more time on stage prep.
             </p>
             <p>
-              For audiences, the pitch is simple: fewer “is it happening?” dead ends. When a venue keeps MicStage updated, fans can
+              For audiences, the pitch is simple: fewer &quot;is it happening?&quot; dead ends. When a venue keeps MicStage updated, fans can
               trust the date-specific lineup link the same way performers do.
             </p>
             <p>

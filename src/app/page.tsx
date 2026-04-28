@@ -35,7 +35,7 @@ export default function Home() {
                 Open mics near you
               </div>
               <div className="inline-flex items-center rounded-full border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-3 py-1 text-xs font-medium text-white/85">
-                Free · Built for venues &amp; artists
+                Free | Built for venues &amp; artists
               </div>
             </div>
             <h1 className="om-heading order-1 mt-4 text-4xl leading-[0.95] tracking-wide sm:text-5xl md:text-6xl">
@@ -72,7 +72,7 @@ export default function Home() {
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/login/musician">
                 Artist login
               </Link>
-              {" · "}
+              {" | "}
               <Link className="underline hover:text-white" href="/login/venue">
                 Venue login
               </Link>
@@ -96,7 +96,7 @@ export default function Home() {
                         Search the public artist directory.
                       </div>
                     </div>
-                    <span className="text-white/50 group-hover:text-white">→</span>
+                    <span className="text-white/50 group-hover:text-white">{"->"}</span>
                   </div>
                 </Link>
                 <Link
@@ -110,7 +110,7 @@ export default function Home() {
                         Markets and roll-up hubs for discovery.
                       </div>
                     </div>
-                    <span className="text-white/50 group-hover:text-white">→</span>
+                    <span className="text-white/50 group-hover:text-white">{"->"}</span>
                   </div>
                 </Link>
                 <Link
@@ -124,7 +124,7 @@ export default function Home() {
                         Pins by night, format, and bookable slots.
                       </div>
                     </div>
-                    <span className="text-white/50 group-hover:text-white">→</span>
+                    <span className="text-white/50 group-hover:text-white">{"->"}</span>
                   </div>
                 </Link>
                 <Link
@@ -138,7 +138,7 @@ export default function Home() {
                         Every public MicStage venue page, searchable by city.
                       </div>
                     </div>
-                    <span className="text-white/50 group-hover:text-white">→</span>
+                    <span className="text-white/50 group-hover:text-white">{"->"}</span>
                   </div>
                 </Link>
               </div>
@@ -147,11 +147,11 @@ export default function Home() {
                 <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/resources">
                   Resources
                 </Link>
-                {" · "}
+                {" | "}
                 <Link className="underline hover:text-white" href="/register/venue">
                   List your venue (free)
                 </Link>
-                {" · "}
+                {" | "}
                 <Link className="underline hover:text-white" href="/contact">
                   Contact
                 </Link>
@@ -169,17 +169,17 @@ export default function Home() {
             <div className="font-semibold text-white">Venue-controlled structure</div>
             <div className="mt-1">Set day and time, set slot length, and let the schedule build from there.</div>
             <div className="mt-3 inline-flex text-sm text-[rgb(var(--om-neon))] hover:brightness-110">
-              Learn more →
+              {"Learn more ->"}
             </div>
           </Link>
           <Link
             href="/why/no-double-booking"
             className="rounded-xl border border-white/10 bg-white/5 p-3.5 transition hover:border-[rgb(var(--om-neon))]/40 hover:bg-white/10 md:p-4"
           >
-            <div className="font-semibold text-white">Booking that doesn’t double-book</div>
+            <div className="font-semibold text-white">Booking that does not double-book</div>
             <div className="mt-1">Slots lock when reserved.</div>
             <div className="mt-3 inline-flex text-sm text-[rgb(var(--om-neon))] hover:brightness-110">
-              Learn more →
+              {"Learn more ->"}
             </div>
           </Link>
           <Link
@@ -189,7 +189,7 @@ export default function Home() {
             <div className="font-semibold text-white">Discovery &amp; marketing built in</div>
             <div className="mt-1">Show up where people search, without treating your room like a separate website project.</div>
             <div className="mt-3 inline-flex text-sm text-[rgb(var(--om-neon))] hover:brightness-110">
-              Learn more →
+              {"Learn more ->"}
             </div>
           </Link>
         </section>

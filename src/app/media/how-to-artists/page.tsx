@@ -38,7 +38,7 @@ export default function MediaHowToArtistsPage() {
           <Link href="/media" className="underline decoration-white/25 underline-offset-2 hover:text-white">
             Media
           </Link>
-          <span>·</span>
+          <span>|</span>
           <span>How-To for Artists</span>
           <Link
             href="/media/how-to-artists?pdf=1"

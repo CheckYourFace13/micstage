@@ -52,7 +52,7 @@ export async function SiteHeader() {
             </span>
           </span>
           <span className="min-w-0 truncate text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 sm:text-[11px]">
-            Find open mics · Artists · Venues
+            Find open mics | Artists | Venues
           </span>
         </Link>
 

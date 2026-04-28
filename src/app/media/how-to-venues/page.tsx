@@ -38,7 +38,7 @@ export default function MediaHowToVenuesPage() {
           <Link href="/media" className="underline decoration-white/25 underline-offset-2 hover:text-white">
             Media
           </Link>
-          <span>·</span>
+          <span>|</span>
           <span>How-To for Venues</span>
           <Link
             href="/media/how-to-venues?pdf=1"

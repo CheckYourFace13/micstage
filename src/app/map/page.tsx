@@ -85,7 +85,7 @@ export default async function OpenMicMapPage() {
             Markets directory
           </Link>
           <Link href="/venues" className="text-inherit underline decoration-white/25 underline-offset-2 hover:text-white">
-            All venues A–Z
+            Full venue list
           </Link>
         </div>
 
@@ -98,7 +98,7 @@ export default async function OpenMicMapPage() {
           <div className="order-1 rounded-xl border border-white/15 bg-gradient-to-b from-zinc-900/50 to-zinc-950/80 px-5 py-6 text-sm leading-relaxed text-white/75 md:order-4">
             <p className="font-semibold text-white/90">Map-first discovery fills in as venues go live</p>
             <p className="mt-2">
-              Pins appear when venues have coordinates on file and a public schedule to browse. That keeps the map honest—only
+              Pins appear when venues have coordinates on file and a public schedule to browse. That keeps the map honest: only
               real rooms you can visit. Until your area has pins, search by ZIP or city, browse markets, or scan all venue
               pages; listings grow as more rooms join.
             </p>
@@ -122,7 +122,7 @@ export default async function OpenMicMapPage() {
               <Link href="/register/venue" className="font-semibold text-[rgb(var(--om-neon))] underline">
                 Register your venue
               </Link>
-              {" · "}
+              {" | "}
               <Link href="/contact" className="underline hover:text-white">
                 Contact
               </Link>

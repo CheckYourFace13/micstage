@@ -30,12 +30,12 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-6 py-16">
         <Link className="text-sm text-white/70 hover:text-white" href="/">
-          ← Back
+          &lt;- Back
         </Link>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Artist registration</h1>
         <p className="mt-2 text-sm text-white/70">
-          Create your artist account with <span className="text-white/90">email + password</span> (private). You’ll set a{" "}
+          Create your artist account with <span className="text-white/90">email + password</span> (private). You will set a{" "}
           <span className="text-white/90">stage name</span> that is <span className="text-emerald-200/90">public</span>. That is
           what venues and fans see, and how you show up in artist search.
         </p>
@@ -97,10 +97,10 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
 
           <FormSubmitButton
             label="Create artist account"
-            pendingLabel="Creating account…"
+            pendingLabel="Creating account..."
             className="mt-2 inline-flex h-11 min-w-[200px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
           />
-          <p className="text-xs text-white/50">After signup, you’ll be able to book slots and track your upcoming sets.</p>
+          <p className="text-xs text-white/50">After signup, you will be able to book slots and track your upcoming sets.</p>
           <LineupSlotTypesHelp className="mt-4" />
         </form>
       </main>

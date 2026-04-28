@@ -74,7 +74,7 @@ export default function MediaBrandImagesPage() {
           <Link href="/media" className="underline decoration-white/25 underline-offset-2 hover:text-white">
             Media
           </Link>
-          <span>·</span>
+          <span>|</span>
           <span>Brand Images</span>
           <Link
             href="/media/brand-images#downloads"
@@ -106,7 +106,7 @@ export default function MediaBrandImagesPage() {
                 const ratio = asset.dims ? asset.dims.height / asset.dims.width : 0.35;
                 const h = asset.dims ? Math.max(1, Math.round(maxW * ratio)) : 100;
                 const meta =
-                  asset.dims != null ? `PNG · ${asset.dims.width}×${asset.dims.height}px` : "PNG";
+                  asset.dims != null ? `PNG | ${asset.dims.width}x${asset.dims.height}px` : "PNG";
 
                 return (
                   <div
@@ -170,9 +170,9 @@ export default function MediaBrandImagesPage() {
             <h2 className="text-xl font-semibold">Brand usage notes</h2>
             <ul className="mt-3 list-inside list-disc space-y-2 text-sm leading-7 text-white/80 print:text-black">
               <li>Keep the MicStage name and mark legible; do not stretch, recolor, or add visual effects.</li>
-              <li>Leave clear space around logos equal to at least the height of the “M” in MicStage.</li>
+              <li>Leave clear space around logos equal to at least the height of the letter M in MicStage.</li>
               <li>Use dark-mode logo variants on light backgrounds and light variants on dark backgrounds.</li>
-              <li>When referencing MicStage in copy, use “MicStage” consistently as a proper noun.</li>
+              <li>When referencing MicStage in copy, use MicStage consistently as a proper noun.</li>
               <li>For press use, include a direct link to https://micstage.com and to this Media section when helpful.</li>
             </ul>
           </section>

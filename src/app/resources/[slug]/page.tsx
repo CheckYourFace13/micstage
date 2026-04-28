@@ -72,7 +72,7 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
           <Link href="/resources" className="underline hover:text-white">
             Resources
           </Link>
-          {" · "}
+          {" | "}
           {article.readingMinutes} min read
         </div>
         <h1 className="om-heading mt-3 text-4xl tracking-wide">{article.title}</h1>

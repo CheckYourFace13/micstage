@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Find local open mics near you",
   description:
-    "Search MicStage open mic venues by your location, ZIP, city, or metro area. See distance-sorted results and open each venue’s public schedule and lineup.",
+    "Search MicStage open mic venues by your location, ZIP, city, or metro area. See distance-sorted results and open each venue's public schedule and lineup.",
   path: "/find-open-mics",
 });
 
@@ -61,7 +61,7 @@ export default async function FindOpenMicsPage() {
               All markets directory
             </Link>
             <Link href="/venues" className="text-inherit underline hover:text-white">
-              Full venue A–Z list
+              Full venue list
             </Link>
             <Link href="/map" className="text-inherit underline hover:text-white">
               Open mic map
@@ -76,7 +76,7 @@ export default async function FindOpenMicsPage() {
 
           {loadError ? (
             <div className="order-1 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white/90 md:order-4">
-              We couldn’t load venue data. Try again shortly.
+              We could not load venue data. Try again shortly.
             </div>
           ) : (
             <div className="order-1 md:order-4">

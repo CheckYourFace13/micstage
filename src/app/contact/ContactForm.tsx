@@ -125,7 +125,7 @@ export function ContactForm() {
         disabled={pending}
         className="inline-flex h-12 items-center justify-center rounded-lg bg-[rgb(var(--om-neon))] px-6 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-50"
       >
-        {pending ? "Sending…" : "Send message"}
+        {pending ? "Sending..." : "Send message"}
       </button>
     </form>
   );

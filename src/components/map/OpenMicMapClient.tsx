@@ -22,8 +22,10 @@ const OpenMicLeafletMap = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-[min(60vh,520px)] min-h-[280px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-white/15 bg-zinc-900/50 px-4 text-center sm:h-[min(52vh,440px)] sm:min-h-[320px]">
-        <span className="text-sm font-medium text-white/70">Loading map…</span>
-        <span className="max-w-xs text-xs text-white/45">Tiles and pins load after this panel — a moment on slow connections is normal.</span>
+        <span className="text-sm font-medium text-white/70">Loading map...</span>
+        <span className="max-w-xs text-xs text-white/45">
+          Tiles and pins load after this panel - a moment on slow connections is normal.
+        </span>
       </div>
     ),
   },
@@ -88,7 +90,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
     });
   }, [allVenues, formatFilter, acceptingOnly]);
 
-  /** Weekday + format + booking — sidebar list stays filter-driven. */
+  /** Weekday + format + booking - sidebar list stays filter-driven. */
   const filtered = useMemo(() => {
     return allVenues.filter((v) => {
       if (dayFilter && !v.weekdays.includes(dayFilter)) return false;
@@ -145,7 +147,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
         setGeoHint(null);
       },
       () => {
-        setGeoHint("We couldn’t read your location. You can still pan and zoom the map.");
+        setGeoHint("We could not read your location. You can still pan and zoom the map.");
       },
       { enableHighAccuracy: false, timeout: 12_000, maximumAge: 60_000 },
     );
@@ -172,7 +174,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
             Weekday highlights matching pins on the map; the list still filters by night, format, and booking.
           </p>
           <p className="mt-1 hidden text-xs leading-relaxed text-white/55 md:block">
-            Pick a weekday to highlight pins that run that night—every venue stays on the map. Leave it on &ldquo;Any
+            Pick a weekday to highlight pins that run that night; every venue stays on the map. Leave it on &ldquo;Any
             day&rdquo; for MicStage pink pins when a venue runs multiple nights. The list on the right still reflects your
             weekday, format, and booking filters. Recently active MicStage venues without a current public schedule are
             still shown, so you can discover and follow up early.
@@ -325,7 +327,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
           <p className="mt-1 text-xs leading-relaxed text-white/50 md:hidden">Tap a row to zoom; tap a pin for a quick summary.</p>
           <p className="mt-1 hidden text-xs leading-relaxed text-white/50 md:block">
             The map shows every venue in view for your format &amp; booking filters (weekday highlights matching pins). The
-            list also applies your weekday filter — sorted by distance from the center of what you&apos;re looking at. Tap
+            list also applies your weekday filter, sorted by distance from the center of what you&apos;re looking at. Tap
             a row to zoom the map; tap a pin for a quick summary.
           </p>
           <div className="mt-2 flex max-h-[min(46vh,420px)] flex-col gap-2 overflow-y-auto overscroll-contain pr-1 pb-2 [-webkit-overflow-scrolling:touch] sm:mt-3 sm:max-h-[min(52vh,520px)] lg:max-h-[520px]">

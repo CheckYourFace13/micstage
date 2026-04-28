@@ -65,7 +65,7 @@ export default function MediaLandingPage() {
               <p className="mt-2 text-sm leading-6 text-white/75">{item.description}</p>
               <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold">
                 <Link className="text-[rgb(var(--om-neon))] hover:brightness-110" href={item.href}>
-                  Open section →
+                  {"Open section ->"}
                 </Link>
                 {item.href === "/media/brand-images" ? (
                   <Link

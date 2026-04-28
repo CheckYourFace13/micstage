@@ -16,7 +16,7 @@ export async function SiteFooter() {
               Contact
             </Link>
             <Link className="hover:text-white" href="/resources">
-              Open Mic Resources
+              Resources and guides
             </Link>
             <Link className="hover:text-white" href="/privacy">
               Privacy Policy
@@ -38,7 +38,9 @@ export async function SiteFooter() {
             )}
           </nav>
           <div className="text-xs text-white/45">
-            <span>© {new Date().getFullYear()} MicStage</span>
+            <span>
+              (c) {new Date().getFullYear()} MicStage
+            </span>
           </div>
         </div>
       </div>

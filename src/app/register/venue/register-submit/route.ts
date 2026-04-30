@@ -8,7 +8,6 @@ import { slugify } from "@/lib/slug";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { JOINED_VENUE, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
-import { sendVenueWelcomeEmailAfterRegistration } from "@/lib/marketing/venueWelcomeSend";
 import { sendVenueSignupThankYouEmailIfNeeded } from "@/lib/venueSignupThankYouEmail";
 import {
   REGISTRATION_CONTENT_CONSENT_VERSION,
@@ -157,7 +156,6 @@ export async function POST(request: Request) {
     });
 
     if (newVenueId) {
-      await sendVenueWelcomeEmailAfterRegistration(prisma, newVenueId, email);
       await sendVenueSignupThankYouEmailIfNeeded(prisma, newVenueId, email);
     }
 

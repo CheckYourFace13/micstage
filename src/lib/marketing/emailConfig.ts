@@ -68,7 +68,7 @@ export function marketingDailyCap(category: MicStageEmailCategory): number {
 /**
  * Per recipient-domain daily caps (UTC day, SENT rows only).
  * - OUTREACH: default 3 (MARKETING_CAP_PER_DOMAIN_DAILY_OUTREACH, or legacy MARKETING_CAP_PER_DOMAIN_DAILY).
- * - MARKETING: separate default 15 so venue welcome bursts are less likely to hit the outreach domain budget.
+ * - MARKETING: separate default 15 so marketing bursts are less likely to hit the outreach domain budget.
  */
 export function marketingPerDomainDailyCap(category: MarketingEmailCategory): number {
   const legacyShared = parseIntEnv("MARKETING_CAP_PER_DOMAIN_DAILY", 3);
@@ -111,10 +111,6 @@ export function marketingUnsubscribeMailto(): string | undefined {
 
 export function appBaseUrl(): string {
   return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-}
-
-export function venueWelcomeEmailEnabled(): boolean {
-  return process.env.MARKETING_AUTO_VENUE_WELCOME_EMAIL === "true";
 }
 
 export function performerLifecycleEmailEnabled(): boolean {

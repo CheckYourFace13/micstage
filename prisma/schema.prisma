@@ -112,6 +112,9 @@ model Venue {
   lng              Float?
   timeZone         String  @default("America/Chicago")
 
+  /// Set once after the post-registration thank-you email is delivered (prevents duplicate sends).
+  signupThankYouEmailSentAt DateTime?
+
   // Profile (searchable later)
   about String?
   // Direct media fields for public profile

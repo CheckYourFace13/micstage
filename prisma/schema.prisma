@@ -64,6 +64,17 @@ enum PasswordResetAccountType {
   MUSICIAN
 }
 
+enum PromoterApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PromoterReviewAction {
+  APPROVE
+  REJECT
+}
+
 /// Row in venue performer history: linked MicStage artist vs manual lineup-only name.
 enum VenuePerformerHistoryKind {
   MUSICIAN
@@ -89,6 +100,44 @@ model VenueOwner {
   registrationContentConsentVersion String?
 
   venues Venue[]
+}
+
+model PromoterApplication {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  status     PromoterApplicationStatus @default(PENDING)
+  reviewedAt DateTime?
+  reviewNote String?
+
+  contactName String
+  email       String
+  cityRegion  String?
+  brandName   String?
+  socialUrl   String?
+  notes       String?
+
+  reviewTokens PromoterApplicationReviewToken[]
+
+  @@index([status, createdAt])
+  @@index([email, createdAt])
+}
+
+model PromoterApplicationReviewToken {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  action    PromoterReviewAction
+  tokenHash String @unique
+
+  application   PromoterApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  applicationId String
+
+  @@index([applicationId, usedAt])
+  @@index([expiresAt])
 }
 
 model Venue {

@@ -24,6 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/resources",
     "/register/venue",
     "/register/musician",
+    "/promoter/apply",
     "/media",
     "/media/how-to-artists",
     "/media/how-to-venues",

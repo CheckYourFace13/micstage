@@ -1,0 +1,53 @@
+import type { Metadata } from "next";
+import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { finalizePromoterPasswordReset } from "../actions";
+import { verifyResetToken } from "@/lib/passwordReset";
+import { privateNoIndexMetadata } from "@/lib/privateSeo";
+
+export async function generateMetadata(_props: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  return {
+    title: "Set new promoter password | MicStage",
+    ...privateNoIndexMetadata,
+  };
+}
+
+export default async function PromoterResetTokenPage(props: { params: Promise<{ token: string }> }) {
+  const { token } = await props.params;
+  const valid = await verifyResetToken({ accountType: "PROMOTER", token });
+
+  return (
+    <div className="min-h-dvh bg-black text-white">
+      <main className="mx-auto w-full max-w-xl px-6 py-16">
+        <a className="text-sm text-white/70 hover:text-white" href="/login/promoter">
+          ← Back to promoter login
+        </a>
+
+        <h1 className="om-heading mt-6 text-4xl tracking-wide">Set new password</h1>
+        {!valid ? (
+          <div className="mt-6 rounded-xl border border-violet-400/35 bg-violet-500/10 px-4 py-3 text-sm text-white">
+            This reset link is invalid or expired.
+          </div>
+        ) : (
+          <form action={finalizePromoterPasswordReset} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+            <input type="hidden" name="token" value={token} />
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">New password</span>
+              <input
+                name="newPassword"
+                type="password"
+                required
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                placeholder="New password"
+              />
+            </label>
+            <FormSubmitButton
+              label="Save new password"
+              pendingLabel="Saving…"
+              className="mt-2 inline-flex h-11 min-w-[180px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+            />
+          </form>
+        )}
+      </main>
+    </div>
+  );
+}

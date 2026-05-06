@@ -393,7 +393,7 @@ export async function adminDeleteVenuePerformerHistory(formData: FormData) {
 }
 
 function accountTypeFromForm(v: FormDataEntryValue | null): PasswordResetAccountType | null {
-  if (v === "VENUE" || v === "MUSICIAN") return v;
+  if (v === "VENUE" || v === "MUSICIAN" || v === "PROMOTER") return v;
   return null;
 }
 

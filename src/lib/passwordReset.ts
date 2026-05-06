@@ -47,6 +47,10 @@ async function accountExistsForReset(accountType: PasswordResetAccountType, emai
     const manager = await prisma.venueManager.findUnique({ where: { email } });
     return !!manager;
   }
+  if (accountType === "PROMOTER") {
+    const promoter = await prisma.promoterUser.findUnique({ where: { email } });
+    return !!promoter;
+  }
   const user = await prisma.musicianUser.findUnique({ where: { email } });
   return !!user;
 }
@@ -75,7 +79,11 @@ async function issuePasswordResetToken(input: {
   });
 
   const path =
-    input.accountType === "VENUE" ? `/reset/venue/${rawToken}` : `/reset/musician/${rawToken}`;
+    input.accountType === "VENUE"
+      ? `/reset/venue/${rawToken}`
+      : input.accountType === "PROMOTER"
+        ? `/reset/promoter/${rawToken}`
+        : `/reset/musician/${rawToken}`;
   return { rawToken, path };
 }
 
@@ -107,7 +115,10 @@ export async function createPasswordResetLinkForAdmin(input: {
   const email = input.email.trim().toLowerCase();
   const issued = await issuePasswordResetToken({ accountType: input.accountType, email });
   if (!issued) {
-    return { ok: false, error: "No account found for that email and type (venue vs artist)." };
+    return {
+      ok: false,
+      error: "No account found for that email and type (venue, artist, or promoter).",
+    };
   }
   return { ok: true, link: `${appUrl()}${issued.path}` };
 }
@@ -120,7 +131,10 @@ export async function sendPasswordResetEmailForAdmin(input: {
   const email = input.email.trim().toLowerCase();
   const issued = await issuePasswordResetToken({ accountType: input.accountType, email });
   if (!issued) {
-    return { ok: false, error: "No account found for that email and type (venue vs artist)." };
+    return {
+      ok: false,
+      error: "No account found for that email and type (venue, artist, or promoter).",
+    };
   }
   const link = `${appUrl()}${issued.path}`;
   const content = passwordResetEmailContent(link);
@@ -181,6 +195,13 @@ export async function consumeResetToken(input: {
           return false;
         }
       }
+    } else if (input.accountType === "PROMOTER") {
+      const promoter = await tx.promoterUser.findUnique({ where: { email: rec.email } });
+      if (!promoter) return false;
+      await tx.promoterUser.update({
+        where: { email: rec.email },
+        data: { passwordHash: input.newPasswordHash },
+      });
     } else {
       const user = await tx.musicianUser.findUnique({ where: { email: rec.email } });
       if (!user) return false;

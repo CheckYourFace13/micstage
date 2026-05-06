@@ -11,9 +11,9 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { PROMOTER_LOGIN_SUBMIT_PATH } from "./serverActions";
 
 export default async function PromoterLoginPage(props: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
 }) {
-  const { error, next } = await props.searchParams;
+  const { error, next, reset } = await props.searchParams;
   const session = await getSession();
   if (session?.kind === "promoter") {
     redirect(safeAfterAuthPath(next, PROMOTER_DASHBOARD_HREF));
@@ -22,6 +22,7 @@ export default async function PromoterLoginPage(props: {
   const showInvalid = error === "invalid";
   const showRate = error === "rate";
   const showUnavailable = error === "unavailable";
+  const showResetSuccess = reset === "success";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -43,6 +44,11 @@ export default async function PromoterLoginPage(props: {
           className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6"
         >
           <input type="hidden" name="next" value={next ?? ""} />
+          {showResetSuccess ? (
+            <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+              Password updated successfully. You can log in now.
+            </div>
+          ) : null}
           {showInvalid ? (
             <div className="rounded-xl border border-violet-400/35 bg-violet-500/10 px-4 py-3 text-sm text-white">
               Invalid email or password.
@@ -86,6 +92,11 @@ export default async function PromoterLoginPage(props: {
           />
 
           <div className="text-xs text-white/60">
+            Forgot password?{" "}
+            <Link className="underline hover:text-white" href="/reset/promoter">
+              Reset it
+            </Link>
+            .<br />
             Need access?{" "}
             <Link className="underline hover:text-white" href="/promoter/apply">
               Apply as a promoter

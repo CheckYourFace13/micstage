@@ -241,6 +241,7 @@ export default async function AdminOverviewPage(props: {
               <select name="accountType" className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-white">
                 <option value="MUSICIAN">Artist (musician)</option>
                 <option value="VENUE">Venue (owner or manager email)</option>
+                <option value="PROMOTER">Promoter</option>
               </select>
             </label>
             <button
@@ -261,6 +262,7 @@ export default async function AdminOverviewPage(props: {
               <select name="accountType" className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-white">
                 <option value="MUSICIAN">Artist (musician)</option>
                 <option value="VENUE">Venue (owner or manager email)</option>
+                <option value="PROMOTER">Promoter</option>
               </select>
             </label>
             <button

@@ -26,6 +26,7 @@ import { VenueAddRecurringNightFormFields } from "./VenueAddRecurringNightForm";
 import { VenueProfileForm } from "./VenueProfileForm";
 import { WeeklyScheduleForm } from "./WeeklyScheduleForm";
 import { isVenueLineupTestCleanupUiEnabled } from "@/lib/venueTestLineupCleanup";
+import { PromoterVenueAccessPanel, type PromoterVenueAccessPanelRow } from "./PromoterVenueAccessPanel";
 
 type VenueScheduleTemplateInclude = {
   instances: {
@@ -224,6 +225,7 @@ export default async function VenuePortalPage({
     bulkMsg?: string;
     sent?: string;
     failed?: string;
+    promoterAccess?: string;
   }>;
 }) {
   const q = await searchParams;
@@ -271,6 +273,20 @@ export default async function VenuePortalPage({
     logVenuePortalFailure("loadLineupTemplatesByVenueIds", e);
   }
   const anyVenueOperational = operationalVenueIds.length > 0;
+
+  let pendingPromoterAccessRows: PromoterVenueAccessPanelRow[] = [];
+  if (venues.length > 0) {
+    try {
+      const prisma = requirePrisma();
+      pendingPromoterAccessRows = await prisma.promoterVenueAccess.findMany({
+        where: { venueId: { in: venues.map((v) => v.id) }, status: "PENDING" },
+        include: { promoter: { select: { email: true } }, venue: { select: { name: true, slug: true } } },
+        orderBy: { createdAt: "asc" },
+      });
+    } catch (e) {
+      logVenuePortalFailure("promoterVenueAccess.pending", e);
+    }
+  }
 
   const todayIso = toIsoDateOnly(new Date());
   const horizonDaysFor = (tier: "FREE" | "PRO") => (tier === "FREE" ? 60 : 90);
@@ -597,6 +613,26 @@ export default async function VenuePortalPage({
         {q.bulkMsg === "invalid" || q.bulkMsg === "forbidden" ? (
           <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
             Could not send bulk message ({q.bulkMsg}). Refresh and try again.
+          </div>
+        ) : null}
+        {q.promoterAccess === "approved" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            Promoter access approved for that request. They can plan nights for your venue from their promoter dashboard.
+          </div>
+        ) : null}
+        {q.promoterAccess === "rejected" ? (
+          <div className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/85">
+            That promoter access request was declined.
+          </div>
+        ) : null}
+        {q.promoterAccess === "invalid" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            That access request is no longer pending. Refresh the page.
+          </div>
+        ) : null}
+        {q.promoterAccess === "forbidden" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            You can&apos;t act on that request for this login. Refresh if your venue access changed.
           </div>
         ) : null}
 

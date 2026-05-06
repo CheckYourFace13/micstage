@@ -102,6 +102,20 @@ export async function SiteHeader() {
                 />
               </>
             ) : null}
+            {auth === "promoter" && signedInLine && signedInHref ? (
+              <>
+                <Link
+                  href={signedInHref}
+                  className="max-w-[min(100%,20rem)] truncate text-right text-[12px] font-medium leading-snug text-violet-100/95 underline decoration-violet-400/40 decoration-1 underline-offset-2 hover:decoration-violet-300/70 sm:max-w-md sm:text-sm"
+                >
+                  {signedInLine}
+                </Link>
+                <LogoutVenueArtistButton
+                  label="Sign out"
+                  className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10 hover:text-white sm:text-xs"
+                />
+              </>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-x-6 sm:gap-y-2">
@@ -146,6 +160,14 @@ export async function SiteHeader() {
                   ) : null}
                 </Link>
               ) : null}
+              {auth === "promoter" ? (
+                <Link
+                  className="inline-flex min-h-11 items-center rounded-md border border-violet-400/30 bg-violet-500/10 px-3 py-2 font-medium text-violet-100 hover:border-violet-400/50 hover:bg-violet-500/15 sm:min-h-0 sm:px-3 sm:py-1.5"
+                  href="/promoter"
+                >
+                  Promoter
+                </Link>
+              ) : null}
             </nav>
             {auth === "public" ? (
               <nav
@@ -163,6 +185,12 @@ export async function SiteHeader() {
                   href="/login/venue"
                 >
                   Venue login
+                </Link>
+                <Link
+                  className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
+                  href="/login/promoter"
+                >
+                  Promoter login
                 </Link>
               </nav>
             ) : null}

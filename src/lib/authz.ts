@@ -1,12 +1,12 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requirePrisma } from "@/lib/prisma";
-import { ARTIST_DASHBOARD_HREF, safeLoginNextPath } from "@/lib/safeRedirect";
+import { ARTIST_DASHBOARD_HREF, PROMOTER_DASHBOARD_HREF, safeLoginNextPath } from "@/lib/safeRedirect";
 import { getSession, type Session } from "@/lib/session";
 
 async function loginRedirectPath(
-  loginBase: "/login/venue" | "/login/musician",
-  fallback: "/venue" | typeof ARTIST_DASHBOARD_HREF,
+  loginBase: "/login/venue" | "/login/musician" | "/login/promoter",
+  fallback: "/venue" | typeof ARTIST_DASHBOARD_HREF | typeof PROMOTER_DASHBOARD_HREF,
 ) {
   const h = await headers();
   const fromHeader = h.get("x-micstage-pathname");
@@ -34,6 +34,17 @@ export async function getVenueSessionOrNull() {
 export async function getMusicianSessionOrNull() {
   const s = await getSession();
   return s && s.kind === "musician" ? s : null;
+}
+
+export async function requirePromoterSession() {
+  const s = await getSession();
+  if (!s || s.kind !== "promoter") redirect(await loginRedirectPath("/login/promoter", PROMOTER_DASHBOARD_HREF));
+  return s;
+}
+
+export async function getPromoterSessionOrNull() {
+  const s = await getSession();
+  return s && s.kind === "promoter" ? s : null;
 }
 
 /** Venue IDs the signed-in venue owner/manager may act for; empty if not a venue session. */

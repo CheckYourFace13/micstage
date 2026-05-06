@@ -1,9 +1,9 @@
 import { isAdminSessionCookieValid } from "@/lib/adminAuth";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
+import { ARTIST_DASHBOARD_HREF, PROMOTER_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession, type Session } from "@/lib/session";
 
-export type AuthUiRole = "admin" | "venue" | "artist" | "public";
+export type AuthUiRole = "admin" | "venue" | "artist" | "promoter" | "public";
 
 export type AuthUiState = {
   role: AuthUiRole;
@@ -102,6 +102,17 @@ async function resolveVenueLine(session: Extract<Session, { kind: "venue" }>): P
   }
 }
 
+async function resolvePromoterLine(session: Extract<Session, { kind: "promoter" }>): Promise<{
+  signedInLine: string;
+  signedInHref: string;
+}> {
+  const name = emailLocalPart(session.email) || "promoter";
+  return {
+    signedInLine: `You're organizing nights, ${name}`,
+    signedInHref: PROMOTER_DASHBOARD_HREF,
+  };
+}
+
 /** Single source of truth for header/footer: one active role (admin wins over om_session). */
 export async function getAuthUiState(): Promise<AuthUiState> {
   const [session, adminOk] = await Promise.all([getSession(), isAdminSessionCookieValid()]);
@@ -115,6 +126,10 @@ export async function getAuthUiState(): Promise<AuthUiState> {
   if (session?.kind === "musician") {
     const { signedInLine, signedInHref } = await resolveArtistLine(session);
     return { role: "artist", signedInLine, signedInHref, venueSessionEmail: null };
+  }
+  if (session?.kind === "promoter") {
+    const { signedInLine, signedInHref } = await resolvePromoterLine(session);
+    return { role: "promoter", signedInLine, signedInHref, venueSessionEmail: null };
   }
   return { role: "public", signedInLine: null, signedInHref: null, venueSessionEmail: null };
 }

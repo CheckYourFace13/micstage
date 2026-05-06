@@ -4,6 +4,9 @@ export const ARTIST_DASHBOARD_HREF = "/artist" as const;
 /** Canonical venue dashboard & schedule setup (`VenueProfileForm` / `WeeklyScheduleForm` on this route). */
 export const VENUE_DASHBOARD_HREF = "/venue" as const;
 
+/** Promoter dashboard (series, venue access, scheduled nights). */
+export const PROMOTER_DASHBOARD_HREF = "/promoter" as const;
+
 /**
  * Sanitize `next` / return URLs after auth to same-origin paths only.
  * Prevents open redirects (e.g. //evil.com) and post-login loops via /login, /register, etc.

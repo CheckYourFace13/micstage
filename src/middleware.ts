@@ -18,9 +18,14 @@ import {
 } from "@/lib/adminEdge";
 import { isAdminEmailAllowed } from "@/lib/adminAuthShared";
 import { OM_SESSION_COOKIE_NAME } from "@/lib/authCookieNames";
-import { ARTIST_DASHBOARD_HREF, VENUE_DASHBOARD_HREF, safeLoginNextPath } from "@/lib/safeRedirect";
+import {
+  ARTIST_DASHBOARD_HREF,
+  PROMOTER_DASHBOARD_HREF,
+  VENUE_DASHBOARD_HREF,
+  safeLoginNextPath,
+} from "@/lib/safeRedirect";
 
-type SessionKind = "venue" | "musician";
+type SessionKind = "venue" | "musician" | "promoter";
 
 function getAuthSecretForMiddleware(): string {
   const fromEnv = process.env.AUTH_SECRET?.trim();
@@ -44,7 +49,7 @@ async function sessionKindFromRequest(request: NextRequest): Promise<SessionKind
   try {
     const { payload } = await jwtVerify(token, authSecretKey());
     const kind = payload?.kind;
-    if (kind === "venue" || kind === "musician") return kind;
+    if (kind === "venue" || kind === "musician" || kind === "promoter") return kind;
     return null;
   } catch {
     return null;
@@ -53,7 +58,7 @@ async function sessionKindFromRequest(request: NextRequest): Promise<SessionKind
 
 function authRedirectForRequest(
   request: NextRequest,
-  loginBase: "/login/venue" | "/login/musician",
+  loginBase: "/login/venue" | "/login/musician" | "/login/promoter",
   fallback: string,
 ): NextResponse {
   const next = safeLoginNextPath(
@@ -84,9 +89,35 @@ async function appPortalAuthGuard(request: NextRequest): Promise<NextResponse | 
       ? null
       : authRedirectForRequest(request, "/login/venue", VENUE_DASHBOARD_HREF);
   }
-  return kind === "musician" || kind === "venue"
-    ? null
-    : authRedirectForRequest(request, "/login/musician", "/messages");
+  if (pathname === "/messages") {
+    if (kind === "promoter") {
+      const u = request.nextUrl.clone();
+      u.pathname = PROMOTER_DASHBOARD_HREF;
+      u.search = "";
+      u.searchParams.set("notice", "messages");
+      return NextResponse.redirect(u);
+    }
+    return kind === "musician" || kind === "venue"
+      ? null
+      : authRedirectForRequest(request, "/login/musician", "/messages");
+  }
+  return null;
+}
+
+function isPublicPromoterPath(pathname: string): boolean {
+  if (pathname === "/promoter/apply") return true;
+  if (pathname.startsWith("/promoter/apply/")) return true;
+  return false;
+}
+
+async function promoterPortalAuthGuard(request: NextRequest): Promise<NextResponse | null> {
+  const pathname = request.nextUrl.pathname;
+  if (!pathname.startsWith("/promoter")) return null;
+  if (isPublicPromoterPath(pathname)) return null;
+
+  const kind = await sessionKindFromRequest(request);
+  if (kind === "promoter") return null;
+  return authRedirectForRequest(request, "/login/promoter", PROMOTER_DASHBOARD_HREF);
 }
 async function adminSessionTokenOrNull(secret: string): Promise<string | null> {
   try {
@@ -135,6 +166,9 @@ async function runMiddleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const appPortalGuard = await appPortalAuthGuard(request);
   if (appPortalGuard) return appPortalGuard;
+
+  const promoterGuard = await promoterPortalAuthGuard(request);
+  if (promoterGuard) return promoterGuard;
 
   if (
     process.env.MICSTAGE_ADMIN_LOGOUT_DEBUG === "1" &&

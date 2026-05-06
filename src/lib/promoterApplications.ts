@@ -137,13 +137,17 @@ async function sendApplicantDecisionEmail(input: {
   const subject = approved
     ? "MicStage promoter application approved"
     : "MicStage promoter application update";
+  const registerUrl = absoluteUrl("/register/promoter");
   const text = approved
     ? [
         "Thanks for applying to run promoter-led nights through MicStage.",
         "",
         "Your promoter application is approved.",
         "",
-        `Next step: ${absoluteUrl("/contact")} and mention promoter onboarding so we can help you launch your first nights.`,
+        "Next step: create your promoter account with the same email you applied with:",
+        registerUrl,
+        "",
+        `If you need help launching your first nights, contact us: ${absoluteUrl("/contact")}`,
       ].join("\n")
     : [
         "Thanks for applying to run promoter-led nights through MicStage.",
@@ -152,7 +156,19 @@ async function sendApplicantDecisionEmail(input: {
         "",
         `If you want to share more details, reply through ${absoluteUrl("/contact")}.`,
       ].join("\n");
-  const html = `<p>${escapeHtml(text).replace(/\n/g, "<br/>")}</p>`;
+  const html = approved
+    ? `<p>${escapeHtml(
+        [
+          "Thanks for applying to run promoter-led nights through MicStage.",
+          "",
+          "Your promoter application is approved.",
+          "",
+          "Next: create your promoter account with the same email you applied with.",
+        ].join("\n"),
+      ).replace(/\n/g, "<br/>")}</p><p><a href="${escapeHtml(registerUrl)}">${escapeHtml(registerUrl)}</a></p><p>${escapeHtml(
+        `Questions? ${absoluteUrl("/contact")}`,
+      )}</p>`
+    : `<p>${escapeHtml(text).replace(/\n/g, "<br/>")}</p>`;
 
   await deliverResendEmail({
     to: input.to,

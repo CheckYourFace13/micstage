@@ -75,6 +75,12 @@ enum PromoterReviewAction {
   REJECT
 }
 
+enum PromoterVenueAccessStatus {
+  PENDING
+  APPROVED
+  REVOKED
+}
+
 /// Row in venue performer history: linked MicStage artist vs manual lineup-only name.
 enum VenuePerformerHistoryKind {
   MUSICIAN
@@ -119,9 +125,86 @@ model PromoterApplication {
   notes       String?
 
   reviewTokens PromoterApplicationReviewToken[]
+  promoterUser PromoterUser?
 
   @@index([status, createdAt])
   @@index([email, createdAt])
+}
+
+model PromoterUser {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email        String @unique
+  passwordHash String
+
+  registrationContentConsentAt      DateTime?
+  registrationContentConsentVersion String?
+
+  application   PromoterApplication? @relation(fields: [applicationId], references: [id])
+  applicationId String?              @unique
+
+  series       PromoterSeries[]
+  venueAccess  PromoterVenueAccess[]
+}
+
+model PromoterSeries {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  promoter   PromoterUser @relation(fields: [promoterId], references: [id], onDelete: Cascade)
+  promoterId String
+
+  name        String
+  slug        String
+  description String?
+
+  nights PromoterNight[]
+
+  @@unique([promoterId, slug])
+  @@index([promoterId, updatedAt])
+}
+
+model PromoterVenueAccess {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  respondedAt DateTime?
+
+  promoter   PromoterUser @relation(fields: [promoterId], references: [id], onDelete: Cascade)
+  promoterId String
+
+  venue   Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueId String
+
+  status PromoterVenueAccessStatus @default(PENDING)
+
+  @@unique([promoterId, venueId])
+  @@index([venueId, status])
+}
+
+model PromoterNight {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series   PromoterSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId String
+
+  venue   Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueId String
+
+  /// Local calendar day stored as UTC midnight (same convention as EventInstance.date).
+  date DateTime
+
+  title String?
+  notes String?
+
+  @@unique([seriesId, venueId, date])
+  @@index([seriesId, date])
+  @@index([venueId, date])
 }
 
 model PromoterApplicationReviewToken {
@@ -225,6 +308,9 @@ model Venue {
   marketingEmailSends     MarketingEmailSend[]
   marketingOutreachDrafts MarketingOutreachDraft[]
   messageThreads        MessageThread[]
+
+  promoterVenueAccess PromoterVenueAccess[]
+  promoterNights      PromoterNight[]
 }
 
 model VenueManager {

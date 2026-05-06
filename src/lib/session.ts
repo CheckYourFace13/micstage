@@ -18,7 +18,13 @@ type MusicianSession = {
   email: string;
 };
 
-export type Session = VenueSession | MusicianSession;
+type PromoterSession = {
+  kind: "promoter";
+  promoterId: string;
+  email: string;
+};
+
+export type Session = VenueSession | MusicianSession | PromoterSession;
 
 function getAuthSecret(): string {
   const fromEnv = process.env.AUTH_SECRET?.trim();

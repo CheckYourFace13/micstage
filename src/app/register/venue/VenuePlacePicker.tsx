@@ -27,9 +27,10 @@ export function VenuePlacePicker(props: {
   label?: string;
   placeholder?: string;
 }) {
-  const types = props.types ?? DEFAULT_ESTABLISHMENT_TYPES;
-  const label = props.label ?? "Search your venue on Google";
-  const placeholder = props.placeholder ?? "Start typing the venue name + city...";
+  const { onPlace, types: propTypes, label: propLabel, placeholder: propPlaceholder } = props;
+  const types = propTypes ?? DEFAULT_ESTABLISHMENT_TYPES;
+  const label = propLabel ?? "Search your venue on Google";
+  const placeholder = propPlaceholder ?? "Start typing the venue name + city...";
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -52,7 +53,7 @@ export function VenuePlacePicker(props: {
     if (!inputRef.current) return;
     if (!window.google?.maps?.places) {
       queueMicrotask(() =>
-        setError("Places search didn’t load. Refresh and try again, or contact support if it keeps happening."),
+        setError("Places search did not load. Refresh and try again, or contact support if it keeps happening."),
       );
       return;
     }
@@ -80,7 +81,7 @@ export function VenuePlacePicker(props: {
       const region = getComponent(comps, "administrative_area_level_1");
       const country = getComponent(comps, "country");
 
-      props.onPlace({
+      onPlace({
         venueName: place.name ?? undefined,
         placeId: place.place_id,
         formattedAddress: place.formatted_address,
@@ -96,7 +97,7 @@ export function VenuePlacePicker(props: {
     return () => {
       window.google.maps.event.removeListener(listener);
     };
-  }, [ready, props.onPlace, types]);
+  }, [onPlace, ready, types]);
 
   return (
     <div className="grid gap-2">

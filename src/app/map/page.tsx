@@ -110,10 +110,10 @@ export default async function OpenMicMapPage() {
                 Markets directory
               </Link>
               <Link href="/venues" className="font-semibold underline hover:text-white">
-                All venues
+                Full venue list
               </Link>
               <Link href="/resources" className="font-semibold underline hover:text-white">
-                Resources
+                Resources and guides
               </Link>
             </p>
             <p className="mt-4 rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-white/85">

@@ -35,7 +35,7 @@ export default function Home() {
                 Open mics near you
               </div>
               <div className="inline-flex items-center rounded-full border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-3 py-1 text-xs font-medium text-white/85">
-                Free | Built for venues &amp; artists
+                Free | Built for venues &amp; artists | MicStage is currently in beta
               </div>
             </div>
             <h1 className="om-heading order-1 mt-4 text-4xl leading-[0.95] tracking-wide sm:text-5xl md:text-6xl">
@@ -52,22 +52,22 @@ export default function Home() {
                 href="/find-open-mics"
                 className="inline-flex min-h-12 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-6 text-base font-semibold text-black shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_10px_30px_rgba(255,45,149,0.25)] hover:brightness-110"
               >
-                Find Local Open Mic&apos;s
+                Find local open mics
               </Link>
               <Link
                 href="/register/musician"
-                className="inline-flex min-h-12 items-center justify-center rounded-md border-2 border-white/25 bg-white/10 px-6 text-base font-semibold text-white hover:bg-white/15"
+                className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/25 bg-white/8 px-6 text-base font-semibold text-white hover:bg-white/15"
               >
-                Artists: Sign Up
+                Artists: Sign up
               </Link>
               <Link
                 href="/register/venue"
                 className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/20 bg-transparent px-6 text-base font-semibold text-white hover:bg-white/10"
               >
-                Venues: Sign Up
+                Venues: Sign up
               </Link>
             </div>
-            <p className="order-4 mt-3 text-xs text-white/45 md:mt-4 md:text-sm md:text-white/50">
+            <p className="order-4 mt-3 text-xs text-white/60 md:mt-4 md:text-sm md:text-white/65">
               Already have an account?{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/login/musician">
                 Artist login
@@ -93,7 +93,7 @@ export default function Home() {
                     <div>
                       <div className="text-sm font-semibold md:text-base">Find artists by stage name</div>
                       <div className="mt-0.5 text-xs text-white/55 md:mt-1 md:text-sm md:text-white/65">
-                        Search the public artist directory.
+                        Best for finding performers by stage name.
                       </div>
                     </div>
                     <span className="text-white/50 group-hover:text-white">{"->"}</span>
@@ -107,7 +107,7 @@ export default function Home() {
                     <div>
                       <div className="text-sm font-semibold md:text-base">Browse by metro &amp; region</div>
                       <div className="mt-0.5 text-xs text-white/55 md:mt-1 md:text-sm md:text-white/65">
-                        Markets and roll-up hubs for discovery.
+                        Best for browsing by metro and region.
                       </div>
                     </div>
                     <span className="text-white/50 group-hover:text-white">{"->"}</span>
@@ -121,7 +121,7 @@ export default function Home() {
                     <div>
                       <div className="text-sm font-semibold md:text-base">Open mic map</div>
                       <div className="mt-0.5 text-xs text-white/55 md:mt-1 md:text-sm md:text-white/65">
-                        Pins by night, format, and bookable slots.
+                        Best for finding tonight&apos;s options on a map.
                       </div>
                     </div>
                     <span className="text-white/50 group-hover:text-white">{"->"}</span>
@@ -135,7 +135,7 @@ export default function Home() {
                     <div>
                       <div className="text-sm font-semibold md:text-base">Venue directory</div>
                       <div className="mt-0.5 text-xs text-white/55 md:mt-1 md:text-sm md:text-white/65">
-                        Every public MicStage venue page, searchable by city.
+                        Best for the full venue list across MicStage.
                       </div>
                     </div>
                     <span className="text-white/50 group-hover:text-white">{"->"}</span>
@@ -145,7 +145,7 @@ export default function Home() {
               <p className="mt-3 text-[11px] leading-snug text-white/45 md:text-xs md:text-white/55">
                 Guides &amp; growth:{" "}
                 <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/resources">
-                  Resources
+                  Resources and guides
                 </Link>
                 {" | "}
                 <Link className="underline hover:text-white" href="/register/venue">
@@ -194,7 +194,7 @@ export default function Home() {
           </Link>
         </section>
 
-        <section className="order-2 max-w-3xl border-t border-white/[0.06] pt-6 text-xs leading-relaxed text-white/50 md:order-1 md:border-t-0 md:pt-0 md:text-sm md:text-white/65">
+        <section className="order-2 max-w-3xl border-t border-white/[0.06] pt-6 text-xs leading-relaxed text-white/60 md:order-1 md:border-t-0 md:pt-0 md:text-sm md:text-white/70">
           <h2 className="text-sm font-semibold text-white/80 md:text-base md:text-white/90">How MicStage helps</h2>
           <p className="mt-1.5 md:mt-2">
             Venues get structured open mic nights, shareable lineup links, and public pages with clear titles and stable URLs

@@ -43,7 +43,7 @@ export default async function FindOpenMicsPage() {
             <p className="text-[10px] font-medium uppercase tracking-widest text-white/45 md:text-xs md:text-white/55">
               Discovery
             </p>
-            <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide sm:text-4xl">Find Local Open Mic&apos;s</h1>
+            <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide sm:text-4xl">Find local open mics</h1>
             <p className="text-xs leading-snug text-white/55 md:hidden">
               Search by location, ZIP, city, or metro, then open a venue for schedule and booking.
             </p>
@@ -67,7 +67,7 @@ export default async function FindOpenMicsPage() {
               Open mic map
             </Link>
             <Link href="/resources" className="text-inherit underline hover:text-white">
-              Resources &amp; guides
+              Resources and guides
             </Link>
             <Link href="/register/venue" className="text-inherit underline hover:text-white">
               List your venue

@@ -113,7 +113,7 @@ export async function SiteHeader() {
                 className="inline-flex min-h-11 items-center rounded-md px-3 py-2 font-semibold text-[rgb(var(--om-neon))] hover:bg-white/10 hover:brightness-110 sm:min-h-0 sm:px-3 sm:py-1.5"
                 href="/find-open-mics"
               >
-                Find Local Open Mic&apos;s
+                Find local open mics
               </Link>
               <Link
                 className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"

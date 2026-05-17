@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import Script from "next/script";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { Bebas_Neue, Inter } from "next/font/google";
-import { ADSENSE_PUBLISHER_ID } from "@/lib/adsense";
 import { MarketingTrackingClient } from "@/components/MarketingTrackingClient";
 import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -93,14 +91,12 @@ export default async function RootLayout({
     <html lang="en" className={`${heading.variable} ${body.variable} h-full antialiased`}>
       <head>
         <meta charSet="utf-8" />
-        <meta name="google-adsense-account" content={ADSENSE_PUBLISHER_ID} />
+        <meta name="google-adsense-account" content="ca-pub-9572509189594279" />
         <link rel="icon" href="/favicon.png" type="image/png" />
-        <Script
-          id="adsense-script"
+        <script
           async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_PUBLISHER_ID}`}
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9572509189594279"
           crossOrigin="anonymous"
-          strategy="afterInteractive"
         />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />

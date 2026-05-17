@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { AdSenseDisplayAd } from "@/components/ads/AdSenseDisplayAd";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { getAllResourceArticles, getResourceArticleBySlug } from "@/lib/resourcesContent";
 
@@ -37,6 +39,10 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
   const { slug } = await props.params;
   const article = getResourceArticleBySlug(slug);
   if (!article) notFound();
+
+  const midIndex = Math.ceil(article.sections.length / 2);
+  const sectionsBeforeMid = article.sections.slice(0, midIndex);
+  const sectionsAfterMid = article.sections.slice(midIndex);
 
   const articleLd = {
     "@context": "https://schema.org",
@@ -89,8 +95,10 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
           </section>
         ) : null}
 
+        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleTop} minHeight={100} />
+
         <div className="mt-8 grid gap-8">
-          {article.sections.map((s) => (
+          {sectionsBeforeMid.map((s) => (
             <section key={s.heading}>
               <h2 className="text-2xl font-semibold">{s.heading}</h2>
               <div className="mt-3 grid gap-3 text-sm leading-6 text-white/80">
@@ -101,6 +109,23 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
             </section>
           ))}
         </div>
+
+        {sectionsAfterMid.length > 0 ? <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleMid} minHeight={100} /> : null}
+
+        {sectionsAfterMid.length > 0 ? (
+          <div className="mt-8 grid gap-8">
+            {sectionsAfterMid.map((s) => (
+              <section key={s.heading}>
+                <h2 className="text-2xl font-semibold">{s.heading}</h2>
+                <div className="mt-3 grid gap-3 text-sm leading-6 text-white/80">
+                  {s.paragraphs.map((p, idx) => (
+                    <p key={idx}>{p}</p>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : null}
 
         {article.faq?.length ? (
           <section className="mt-10">
@@ -142,6 +167,8 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
             </ul>
           </section>
         ) : null}
+
+        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleBottom} minHeight={100} />
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-xl font-semibold">Explore MicStage discovery pages</h2>

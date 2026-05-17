@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { AdSenseDisplayAd } from "@/components/ads/AdSenseDisplayAd";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import type { ResourceArticle } from "@/lib/resourcesContent";
 import { getAllResourceArticles } from "@/lib/resourcesContent";
@@ -207,6 +209,8 @@ export default function ResourcesIndexPage() {
             </section>
           ))}
         </div>
+
+        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.directoryBottom} minHeight={100} />
       </main>
     </div>
   );

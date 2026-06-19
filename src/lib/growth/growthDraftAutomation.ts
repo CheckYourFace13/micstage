@@ -8,14 +8,17 @@ import type {
 import {
   growthAutoDraftBatchLimit,
   growthAutoDraftFitMin,
+  growthOutreachMaxSendsPerMarketPerDay,
   growthOutreachSendsPerCronRun,
 } from "@/lib/growth/expansionConfig";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { sendApprovedGrowthLeadDraft } from "@/lib/growth/growthLeadDraftSend";
 import {
+  countOutreachSendsTodayByMarket,
   isOnlyTransientMarketingThrottle,
   reasonsIncludeGlobalCategoryDailyCap,
   remainingGrowthOutreachAutomationBudget,
+  startOfUtcDay,
 } from "@/lib/marketing/sendCaps";
 
 type GrowthDraftWithLead = GrowthLeadOutreachDraft & { lead: GrowthLead };
@@ -34,12 +37,39 @@ function sourceSkipsDiscoveredStrictGate(sourceKind: GrowthLeadSourceKind): bool
   return IMPORT_LIKE_DISCOVERED_SOURCE_KINDS.includes(sourceKind);
 }
 
+function draftMarketSlug(d: { lead: { discoveryMarketSlug: string | null }; discoveryMarketSlug?: string | null }): string {
+  return (d.lead.discoveryMarketSlug ?? d.discoveryMarketSlug ?? "unknown").trim().toLowerCase();
+}
+
 function sortDraftsByFitThenCreated<T extends { lead: { fitScore: number | null }; createdAt: Date }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
     const df = (b.lead.fitScore ?? 0) - (a.lead.fitScore ?? 0);
     if (df !== 0) return df;
     return a.createdAt.getTime() - b.createdAt.getTime();
   });
+}
+
+/** Prefer markets with fewer sends today so one city does not consume the daily cap. */
+function sortDraftsForGeographicSpread<T extends GrowthDraftWithLead>(
+  rows: T[],
+  marketSendsToday: Map<string, number>,
+): T[] {
+  return [...rows].sort((a, b) => {
+    const dm = (marketSendsToday.get(draftMarketSlug(a)) ?? 0) - (marketSendsToday.get(draftMarketSlug(b)) ?? 0);
+    if (dm !== 0) return dm;
+    const df = (b.lead.fitScore ?? 0) - (a.lead.fitScore ?? 0);
+    if (df !== 0) return df;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+}
+
+function marketUnderOutreachCap(
+  d: GrowthDraftWithLead,
+  marketSendsToday: Map<string, number>,
+  perMarketCap: number,
+): boolean {
+  if (perMarketCap <= 0) return true;
+  return (marketSendsToday.get(draftMarketSlug(d)) ?? 0) < perMarketCap;
 }
 
 /** Pending venue drafts that may enter automation (never LOW / missing confidence). */
@@ -228,11 +258,22 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   });
 
   const outreachAutomationBudget = await remainingGrowthOutreachAutomationBudget(prisma);
+  const perMarketSendCap = growthOutreachMaxSendsPerMarketPerDay();
+  const marketSendsToday =
+    perMarketSendCap > 0
+      ? await countOutreachSendsTodayByMarket(prisma, startOfUtcDay())
+      : new Map<string, number>();
   const outreachSendCapPerRun = Math.min(
     outreachAutomationBudget.remainingToEffectiveMax,
     perCronSendCeiling,
   );
   let remainingHeadroom = outreachAutomationBudget.remainingToEffectiveMax;
+
+  const bumpMarketSendCount = (d: GrowthDraftWithLead) => {
+    if (perMarketSendCap <= 0) return;
+    const slug = draftMarketSlug(d);
+    marketSendsToday.set(slug, (marketSendsToday.get(slug) ?? 0) + 1);
+  };
 
   const outreachSendsByFallbackWave = {
     venuePendingHigh: 0,
@@ -245,10 +286,13 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     backlogOtherMedium: 0,
   };
 
-  const eligiblePendingVenue = sortDraftsByFitThenCreated(
-    (venuePriority as GrowthDraftWithLead[]).filter((d) =>
-      venuePendingPassesAutomationGate(d, venueAutoFitMin, activeMarketSet, allowMediumOutreach),
+  const eligiblePendingVenue = sortDraftsForGeographicSpread(
+    (venuePriority as GrowthDraftWithLead[]).filter(
+      (d) =>
+        venuePendingPassesAutomationGate(d, venueAutoFitMin, activeMarketSet, allowMediumOutreach) &&
+        marketUnderOutreachCap(d, marketSendsToday, perMarketSendCap),
     ),
+    marketSendsToday,
   );
   const pendingHigh = eligiblePendingVenue.filter((d) => d.lead.contactEmailConfidence === "HIGH");
   const pendingMedium = allowMediumOutreach
@@ -277,6 +321,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       outreachSendsThisRun++;
       remainingHeadroom--;
       outreachSendsByFallbackWave[wave]++;
+      bumpMarketSendCount(d);
     } else {
       for (const reason of sent.reasons) {
         bumpReason(`send_blocked: ${reason}`);
@@ -294,8 +339,13 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     await approveAndTrySendPendingDraft(d, "venuePendingMedium", "auto-venue-priority", true);
   }
 
-  const eligibleNonVenuePending = sortDraftsByFitThenCreated(
-    (nonVenuePending as GrowthDraftWithLead[]).filter((d) => nonVenuePendingPassesAutomationGate(d, allowMediumOutreach)),
+  const eligibleNonVenuePending = sortDraftsForGeographicSpread(
+    (nonVenuePending as GrowthDraftWithLead[]).filter(
+      (d) =>
+        nonVenuePendingPassesAutomationGate(d, allowMediumOutreach) &&
+        marketUnderOutreachCap(d, marketSendsToday, perMarketSendCap),
+    ),
+    marketSendsToday,
   );
   const nonVenueHigh = eligibleNonVenuePending.filter((d) => d.lead.contactEmailConfidence === "HIGH");
   const nonVenueMedium = allowMediumOutreach
@@ -320,8 +370,13 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       orderBy: { createdAt: "asc" },
       take: backlogTake,
     });
-    const backlogAll = (backlogRaw as GrowthDraftWithLead[]).filter((d) =>
-      backlogPassesAutomationGate(d, activeMarketSet, allowMediumOutreach),
+    const backlogAll = sortDraftsForGeographicSpread(
+      (backlogRaw as GrowthDraftWithLead[]).filter(
+        (d) =>
+          backlogPassesAutomationGate(d, activeMarketSet, allowMediumOutreach) &&
+          marketUnderOutreachCap(d, marketSendsToday, perMarketSendCap),
+      ),
+      marketSendsToday,
     );
     const waveReviewedApproved = backlogAll.filter(
       (d) => d.lead.status === "REVIEWED" || d.lead.status === "APPROVED",
@@ -365,6 +420,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
           remainingHeadroom--;
           outreachSendsThisRun++;
           outreachSendsByFallbackWave[wave]++;
+          bumpMarketSendCount(d);
         } else if (reasonsIncludeGlobalCategoryDailyCap(sent.reasons)) {
           abortBacklogForGlobalCap = true;
           break;

@@ -27,6 +27,29 @@ export async function countSendsToday(
   });
 }
 
+/** UTC-day outreach sends grouped by `discoveryMarketSlug` (for geographic spread caps). */
+export async function countOutreachSendsTodayByMarket(
+  prisma: PrismaClient,
+  since: Date,
+): Promise<Map<string, number>> {
+  const rows = await prisma.marketingEmailSend.groupBy({
+    by: ["discoveryMarketSlug"],
+    where: {
+      category: "OUTREACH",
+      status: "SENT",
+      sentAt: { gte: since },
+      discoveryMarketSlug: { not: null },
+    },
+    _count: { _all: true },
+  });
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const slug = row.discoveryMarketSlug?.trim().toLowerCase();
+    if (slug) counts.set(slug, row._count._all);
+  }
+  return counts;
+}
+
 export async function countSendsTodayToDomain(
   prisma: PrismaClient,
   category: MarketingEmailCategory,

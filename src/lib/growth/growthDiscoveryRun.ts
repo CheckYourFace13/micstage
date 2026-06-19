@@ -18,7 +18,6 @@ import { readSerpApiMetricsForMarket } from "@/lib/growth/discovery/webSearch";
 import {
   growthDiscoveryMarketSlugs,
   growthDiscoveryMarketsForCronRun,
-  growthDiscoveryWebSearchMarketPriority,
   isGrowthDiscoveryWebSearchMarket,
   nationalDiscoveryMarketSlug,
 } from "@/lib/growth/marketsConfig";
@@ -196,14 +195,8 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
   }
 
   if (webSearchAdapter) {
-    const marketSetLower = new Set(markets.map((m) => m.trim().toLowerCase()));
-    let webPriority = process.env.GROWTH_DISCOVERY_MARKET_SLUGS?.trim()
-      ? growthDiscoveryWebSearchMarketPriority().filter((s) => marketSetLower.has(s.toLowerCase()))
-      : [...growthDiscoveryWebSearchMarketPriority()];
-    const national = nationalDiscoveryMarketSlug();
-    if (!webPriority.some((s) => s.toLowerCase() === national.toLowerCase())) {
-      webPriority = [national, ...webPriority];
-    }
+    // Always use the nationwide lane — geo scopes rotate through 40+ US metros via search cursor.
+    const webPriority = [nationalDiscoveryMarketSlug()];
     let pickedSlug: string | null = null;
     for (const slug of webPriority) {
       try {

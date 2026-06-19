@@ -77,6 +77,12 @@ export function marketingSocialPayloadBatchPerCron(): number {
   return Math.min(50, Math.max(1, n));
 }
 
+/** Max outreach sends per discovery market slug per UTC day (0 = no market cap). Spreads volume nationally. */
+export function growthOutreachMaxSendsPerMarketPerDay(): number {
+  const n = parseIntEnv("GROWTH_OUTREACH_MAX_SENDS_PER_MARKET_PER_DAY", 10);
+  return Math.min(50, Math.max(0, n));
+}
+
 export type ExpansionThresholds = {
   minApprovedLeads: number;
   minSentEmails: number;

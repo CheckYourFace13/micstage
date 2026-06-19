@@ -20,14 +20,18 @@ import {
 
 type GrowthDraftWithLead = GrowthLeadOutreachDraft & { lead: GrowthLead };
 
-/** CSV / admin uploads often stay DISCOVERED with no open-mic tier — still eligible for automation when email is strong. */
+/** CSV / mined / listing leads often stay DISCOVERED with no open-mic tier — still eligible when email is strong. */
+const IMPORT_LIKE_DISCOVERED_SOURCE_KINDS: GrowthLeadSourceKind[] = [
+  "MANUAL_ADMIN",
+  "CSV_IMPORT",
+  "CLAUDE_CSV",
+  "WEBSITE_CONTACT",
+  "EVENT_LISTING",
+  "SOCIAL_PROFILE",
+];
+
 function sourceSkipsDiscoveredStrictGate(sourceKind: GrowthLeadSourceKind): boolean {
-  return (
-    sourceKind === "MANUAL_ADMIN" ||
-    sourceKind === "CSV_IMPORT" ||
-    sourceKind === "CLAUDE_CSV" ||
-    sourceKind === "WEBSITE_CONTACT"
-  );
+  return IMPORT_LIKE_DISCOVERED_SOURCE_KINDS.includes(sourceKind);
 }
 
 function sortDraftsByFitThenCreated<T extends { lead: { fitScore: number | null }; createdAt: Date }>(rows: T[]): T[] {
@@ -143,6 +147,12 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
           status: "DISCOVERED",
           fitScore: { gte: venueAutoFitMin },
           openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] },
+        },
+        // Mined / imported venues with email — no open-mic tier required.
+        {
+          leadType: "VENUE",
+          status: "DISCOVERED",
+          sourceKind: { in: IMPORT_LIKE_DISCOVERED_SOURCE_KINDS },
         },
       ],
       outreachDrafts: { none: { status: { in: ["PENDING_REVIEW", "APPROVED"] } } },

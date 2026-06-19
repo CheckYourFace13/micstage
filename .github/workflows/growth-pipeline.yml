@@ -2,8 +2,10 @@ name: Growth pipeline
 
 on:
   schedule:
-    # Every 30 minutes UTC. Split phases to avoid Hostinger 504 gateway timeouts.
-    - cron: "*/30 * * * *"
+    # Every 15 minutes: email mining + outreach in one call.
+    - cron: "*/15 * * * *"
+    # Hourly: nationwide venue discovery.
+    - cron: "5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -18,16 +20,30 @@ jobs:
             exit 1
           fi
 
-      - name: POST outreach (send invites — fast)
+      - name: POST growth tick (emails + outreach)
+        if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
         run: |
-          curl -v -f -S -X POST \
+          HTTP_CODE=$(curl -sS -o /tmp/cron-body.txt -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -m 120 \
-            "https://micstage.com/api/cron/growth-pipeline?phase=outreach"
+            -H "User-Agent: MicStage-GitHub-Cron/1.0" \
+            -m 360 \
+            "https://micstage.com/api/cron/growth-pipeline?phase=tick") || true
+          cat /tmp/cron-body.txt || true
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::HTTP $HTTP_CODE (403 = Hostinger CDN blocked GitHub IP; use Hostinger hPanel cron or scripts/run-production-crons.ps1)"
+            exit 1
+          fi
 
-      - name: POST discovery (find venues — slower)
+      - name: POST discovery (nationwide venues)
+        if: github.event.schedule == '5 * * * *' || github.event_name == 'workflow_dispatch'
         run: |
-          curl -v -f -S -X POST \
+          HTTP_CODE=$(curl -sS -o /tmp/cron-body.txt -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "User-Agent: MicStage-GitHub-Cron/1.0" \
             -m 300 \
-            "https://micstage.com/api/cron/growth-pipeline?phase=discovery"
+            "https://micstage.com/api/cron/growth-pipeline?phase=discovery") || true
+          cat /tmp/cron-body.txt || true
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::HTTP $HTTP_CODE (403 = Hostinger CDN blocked GitHub IP; use Hostinger hPanel cron or scripts/run-production-crons.ps1)"
+            exit 1
+          fi

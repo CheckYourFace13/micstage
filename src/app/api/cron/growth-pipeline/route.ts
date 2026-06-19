@@ -5,6 +5,10 @@ import {
 } from "@/lib/growth/expansionConfig";
 import { runAutoGrowthOutreachDrafts } from "@/lib/growth/growthDraftAutomation";
 import { runGrowthLeadDiscovery } from "@/lib/growth/growthDiscoveryRun";
+import {
+  resolveMarketingSocialPayloadBatchSize,
+  runMarketingSocialPayloadBatch,
+} from "@/lib/growth/marketingSocialPayloadBatch";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
@@ -16,7 +20,7 @@ const GROWTH_OUTREACH_LOCK_K2 = 20_993_312;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type GrowthPipelinePhase = "all" | "discovery" | "outreach";
+type GrowthPipelinePhase = "all" | "discovery" | "outreach" | "tick";
 
 function authorize(request: Request): boolean {
   const expected = process.env.CRON_SECRET?.trim() || process.env.MICSTAGE_CRON_SECRET?.trim();
@@ -28,7 +32,7 @@ function authorize(request: Request): boolean {
 
 function parsePhase(request: Request): GrowthPipelinePhase {
   const p = new URL(request.url).searchParams.get("phase")?.trim().toLowerCase();
-  if (p === "discovery" || p === "outreach") return p;
+  if (p === "discovery" || p === "outreach" || p === "tick") return p;
   return "all";
 }
 
@@ -63,14 +67,21 @@ async function handle(request: Request) {
   }
 
   const phase = parsePhase(request);
-  const discoveryEnabled = growthLeadDiscoveryCronEnabled() && phase !== "outreach";
+  const discoveryEnabled = growthLeadDiscoveryCronEnabled() && phase !== "outreach" && phase !== "tick";
   const draftEnabled = growthAutoDraftCronEnabled() && phase !== "discovery";
+  const emailMiningEnabled = phase === "tick";
 
   try {
     let discovery: Awaited<ReturnType<typeof runGrowthLeadDiscovery>> | null = null;
     let discoveryError: string | null = null;
     let drafts: Awaited<ReturnType<typeof runAutoGrowthOutreachDrafts>> | null = null;
+    let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
     let outreachSkippedReason: string | null = null;
+
+    if (emailMiningEnabled) {
+      const batchSize = resolveMarketingSocialPayloadBatchSize(request);
+      emailMining = await runMarketingSocialPayloadBatch(prisma, batchSize);
+    }
 
     // Outreach first on combined runs so invites still send if discovery is slow (Hostinger 504).
     if (draftEnabled) {
@@ -128,12 +139,15 @@ async function handle(request: Request) {
         outreachSkippedReason,
         discovery,
         discoveryError,
+        emailMining,
         autoDrafts: drafts,
         growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,
         hint:
-          phase === "all"
-            ? "On Hostinger, prefer ?phase=outreach and ?phase=discovery as separate cron calls to avoid 504 gateway timeouts."
-            : undefined,
+          phase === "tick"
+            ? "One cron call: mine venue emails then draft/send outreach. Schedule every 15 min on Hostinger. Use ?phase=discovery hourly for nationwide venue discovery."
+            : phase === "all"
+              ? "On Hostinger, prefer ?phase=tick (every 15 min) and ?phase=discovery (hourly) as separate cron calls to avoid 504 gateway timeouts."
+              : undefined,
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );

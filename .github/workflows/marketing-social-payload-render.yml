@@ -20,7 +20,16 @@ jobs:
 
       - name: POST email mining batch (25 venues per tick)
         run: |
-          curl -v -f -S -X POST \
+          # Hostinger CDN (hcdn) may return 403 for GitHub datacenter IPs. If this fails, use
+          # scripts/run-production-crons.ps1 on your PC or Hostinger hPanel cron instead.
+          HTTP_CODE=$(curl -sS -o /tmp/cron-body.txt -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "User-Agent: MicStage-GitHub-Cron/1.0" \
+            -H "Accept: application/json" \
             -m 300 \
-            "https://micstage.com/api/cron/marketing-social-payload-render?batch=25"
+            "https://micstage.com/api/cron/marketing-social-payload-render?batch=25") || true
+          cat /tmp/cron-body.txt || true
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::HTTP $HTTP_CODE from Hostinger (403 = CDN blocked GitHub IP; run scripts/run-production-crons.ps1 locally or Hostinger cron)"
+            exit 1
+          fi

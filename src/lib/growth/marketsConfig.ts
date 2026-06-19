@@ -60,13 +60,13 @@ export function isNationalDiscoveryMarket(slug: string | null | undefined): bool
   return slug.trim().toLowerCase() === nationalDiscoveryMarketSlug();
 }
 
-/** Illinois rollup + nationwide lane used for Serp/Brave venue web discovery (scoped queries per slug). */
+/** Nationwide + regional lanes for Serp/Brave venue web discovery (national runs first). */
 export function growthDiscoveryWebSearchMarketPriority(): readonly string[] {
   return [
+    nationalDiscoveryMarketSlug(),
     primaryLaunchDiscoveryMarketSlug(),
     "illinois-regional",
     "central-illinois-il",
-    nationalDiscoveryMarketSlug(),
   ] as const;
 }
 

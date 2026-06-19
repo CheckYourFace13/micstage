@@ -71,6 +71,12 @@ export function growthDiscoveryMarketsPerCronRun(): number {
   return Math.min(20, Math.max(1, n));
 }
 
+/** Website email-mining jobs processed per cron tick (SOCIAL_PAYLOAD_RENDER queue). */
+export function marketingSocialPayloadBatchPerCron(): number {
+  const n = parseIntEnv("MARKETING_SOCIAL_PAYLOAD_BATCH_PER_CRON", 50);
+  return Math.min(50, Math.max(1, n));
+}
+
 export type ExpansionThresholds = {
   minApprovedLeads: number;
   minSentEmails: number;

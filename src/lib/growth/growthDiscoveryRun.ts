@@ -197,9 +197,13 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
 
   if (webSearchAdapter) {
     const marketSetLower = new Set(markets.map((m) => m.trim().toLowerCase()));
-    const webPriority = process.env.GROWTH_DISCOVERY_MARKET_SLUGS?.trim()
+    let webPriority = process.env.GROWTH_DISCOVERY_MARKET_SLUGS?.trim()
       ? growthDiscoveryWebSearchMarketPriority().filter((s) => marketSetLower.has(s.toLowerCase()))
       : [...growthDiscoveryWebSearchMarketPriority()];
+    const national = nationalDiscoveryMarketSlug();
+    if (!webPriority.some((s) => s.toLowerCase() === national.toLowerCase())) {
+      webPriority = [national, ...webPriority];
+    }
     let pickedSlug: string | null = null;
     for (const slug of webPriority) {
       try {

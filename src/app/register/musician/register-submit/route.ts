@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
@@ -21,6 +23,12 @@ function reqString(formData: FormData, key: string): string {
 
 function redirectTo(path: string) {
   return NextResponse.redirect(absoluteServerRedirectUrl(path));
+}
+
+function optString(formData: FormData, key: string): string | null {
+  const v = formData.get(key);
+  if (typeof v !== "string" || !v.trim()) return null;
+  return v.trim();
 }
 
 export async function POST(request: Request) {
@@ -55,6 +63,7 @@ export async function POST(request: Request) {
   if (!rl.allowed) return redirectTo("/register/musician?error=rate");
 
   const passwordHash = await bcrypt.hash(password, 12);
+  const growthTraceLeadId = optString(formData, "growthTraceLeadId");
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
@@ -78,6 +87,25 @@ export async function POST(request: Request) {
     });
 
     await setSession({ kind: "musician", musicianId: musician.id, email: musician.email });
+
+    if (growthTraceLeadId) {
+      const lead = await prisma.growthLead.findFirst({
+        where: { id: growthTraceLeadId, leadType: "ARTIST" },
+        select: { id: true, contactEmailNormalized: true },
+      });
+      if (lead) {
+        await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "ACCOUNT_CREATED", { leadType: "ARTIST" });
+        const regEmail = normalizeMarketingEmail(email);
+        const leadEmail = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
+        if (leadEmail && leadEmail === regEmail) {
+          await prisma.growthLead.update({
+            where: { id: lead.id },
+            data: { status: "JOINED" },
+          });
+        }
+      }
+    }
+
     return redirectTo(`${ARTIST_DASHBOARD_HREF}?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_MUSICIAN}`);
   } catch (e) {
     console.error("[registerMusician]", e);

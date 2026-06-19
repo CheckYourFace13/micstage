@@ -1,0 +1,33 @@
+name: Growth pipeline
+
+on:
+  schedule:
+    # Every 30 minutes UTC. Split phases to avoid Hostinger 504 gateway timeouts.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require CRON_SECRET
+        run: |
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "::error::Add GitHub repo secret CRON_SECRET (Settings → Secrets → Actions). Use the same value as Hostinger CRON_SECRET / MICSTAGE_CRON_SECRET."
+            exit 1
+          fi
+
+      - name: POST outreach (send invites — fast)
+        run: |
+          curl -v -f -S -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -m 120 \
+            "https://micstage.com/api/cron/growth-pipeline?phase=outreach"
+
+      - name: POST discovery (find venues — slower)
+        run: |
+          curl -v -f -S -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -m 300 \
+            "https://micstage.com/api/cron/growth-pipeline?phase=discovery"

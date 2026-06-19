@@ -136,6 +136,31 @@ if (production) {
   } else {
     warn("DATABASE_URL format not recognized.");
   }
+
+  if (!process.env.CRON_SECRET?.trim() && !process.env.MICSTAGE_CRON_SECRET?.trim()) {
+    warn(
+      "CRON_SECRET / MICSTAGE_CRON_SECRET not set — booking reminders and growth outreach crons will return 401.",
+    );
+  } else {
+    ok("CRON_SECRET (or MICSTAGE_CRON_SECRET) is set");
+  }
+
+  const growthDraft = process.env.GROWTH_AUTO_DRAFT_CRON_ENABLED?.trim().toLowerCase();
+  const growthDiscovery = process.env.GROWTH_LEAD_DISCOVERY_CRON_ENABLED?.trim().toLowerCase();
+  if (growthDraft !== "true" && growthDraft !== "1") {
+    warn(
+      "GROWTH_AUTO_DRAFT_CRON_ENABLED is not true — venue/artist outreach invites will not auto-send (see docs/GROWTH_PIPELINE.md).",
+    );
+  } else {
+    ok("GROWTH_AUTO_DRAFT_CRON_ENABLED is true");
+  }
+  if (growthDiscovery !== "true" && growthDiscovery !== "1") {
+    warn(
+      "GROWTH_LEAD_DISCOVERY_CRON_ENABLED is not true — discovery cron will skip finding new leads.",
+    );
+  } else {
+    ok("GROWTH_LEAD_DISCOVERY_CRON_ENABLED is true");
+  }
 } else {
   console.log("[check-production-env] Run with --production before final deploy for strict checks.");
 }

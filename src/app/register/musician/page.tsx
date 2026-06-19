@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { getPrismaOrNull } from "@/lib/prisma";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
 import { BetaNote } from "@/components/BetaNote";
@@ -17,10 +19,23 @@ export const metadata: Metadata = buildPublicMetadata({
   path: "/register/musician",
 });
 
-export default async function MusicianRegisterPage(props: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await props.searchParams;
+const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
+
+export default async function MusicianRegisterPage(props: {
+  searchParams: Promise<{ error?: string; growthLead?: string }>;
+}) {
+  const { error, growthLead } = await props.searchParams;
   const session = await getSession();
   if (session?.kind === "musician") redirect(ARTIST_DASHBOARD_HREF);
+
+  const traceId = typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim()) ? growthLead.trim() : "";
+  if (traceId) {
+    const prisma = getPrismaOrNull();
+    if (prisma) {
+      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: "ARTIST" });
+      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "SIGNUP_STARTED", { leadType: "ARTIST" });
+    }
+  }
 
   const showRate = error === "rate";
   const showUnavailable = error === "unavailable";
@@ -46,6 +61,7 @@ export default async function MusicianRegisterPage(props: { searchParams: Promis
           action={MUSICIAN_REGISTER_SUBMIT_PATH}
           className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6"
         >
+          {traceId ? <input type="hidden" name="growthTraceLeadId" value={traceId} /> : null}
           {showRate ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Too many signup attempts. Please try again later.

@@ -62,6 +62,15 @@ export function growthOutreachDailyMax(): number {
   return parseIntEnv("GROWTH_OUTREACH_DAILY_MAX", 50);
 }
 
+/**
+ * How many discovery market slugs to process per cron tick (rotates through the full list).
+ * Keeps Hostinger/nginx from 504-ing on combined discovery + outreach in one HTTP request.
+ */
+export function growthDiscoveryMarketsPerCronRun(): number {
+  const n = parseIntEnv("GROWTH_DISCOVERY_MARKETS_PER_CRON_RUN", 2);
+  return Math.min(20, Math.max(1, n));
+}
+
 export type ExpansionThresholds = {
   minApprovedLeads: number;
   minSentEmails: number;

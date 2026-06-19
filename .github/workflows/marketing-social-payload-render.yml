@@ -1,9 +1,9 @@
-name: Booking reminders
+name: Marketing social payload render
 
 on:
   schedule:
-    # Once per hour at :00 UTC. GitHub may delay runs slightly during high load.
-    - cron: "0 * * * *"
+    # Every 15 minutes UTC — mines venue websites for contact emails (batch=25).
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -18,9 +18,9 @@ jobs:
             exit 1
           fi
 
-      - name: POST /api/cron/booking-reminders
+      - name: POST email mining batch (25 venues per tick)
         run: |
           curl -v -f -S -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -m 120 \
-            "https://micstage.com/api/cron/booking-reminders"
+            -m 300 \
+            "https://micstage.com/api/cron/marketing-social-payload-render?batch=25"

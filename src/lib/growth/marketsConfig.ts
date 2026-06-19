@@ -1,3 +1,5 @@
+import { growthDiscoveryMarketsPerCronRun } from "@/lib/growth/expansionConfig";
+
 /**
  * Market-first growth ops — **single source of truth for launch scope** (code):
  *
@@ -135,4 +137,22 @@ export function growthDiscoveryMarketSlugs(): string[] {
     return [...new Set(growthDiscoveryMarketSlugsDefaultOrder())];
   }
   return [...new Set(raw.split(",").map((s) => canonicalDiscoveryMarketSlug(s)).filter(Boolean))];
+}
+
+/** Rotate through configured markets — 2 per 30-min cron by default (avoids Hostinger gateway 504 timeouts). */
+export function growthDiscoveryMarketsForCronRun(now = new Date()): {
+  marketsThisRun: string[];
+  allMarkets: string[];
+  rotationOffset: number;
+} {
+  const allMarkets = growthDiscoveryMarketSlugs();
+  const perRun = growthDiscoveryMarketsPerCronRun();
+  if (allMarkets.length <= perRun) {
+    return { marketsThisRun: allMarkets, allMarkets, rotationOffset: 0 };
+  }
+  const slotMs = 30 * 60 * 1000;
+  const slot = Math.floor(now.getTime() / slotMs);
+  const rotationOffset = slot % allMarkets.length;
+  const rotated = [...allMarkets.slice(rotationOffset), ...allMarkets.slice(0, rotationOffset)];
+  return { marketsThisRun: rotated.slice(0, perRun), allMarkets, rotationOffset };
 }

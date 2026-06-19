@@ -17,6 +17,7 @@ import {
 import { readSerpApiMetricsForMarket } from "@/lib/growth/discovery/webSearch";
 import {
   growthDiscoveryMarketSlugs,
+  growthDiscoveryMarketsForCronRun,
   growthDiscoveryWebSearchMarketPriority,
   isGrowthDiscoveryWebSearchMarket,
   nationalDiscoveryMarketSlug,
@@ -25,6 +26,10 @@ import { allGrowthDiscoveryAdapters } from "@/lib/growth/sources/growthDiscovery
 
 export type GrowthDiscoveryRunResult = {
   markets: string[];
+  /** Full configured market list (env / defaults). */
+  allMarkets: string[];
+  /** Index into `allMarkets` where this run started (30-min slot rotation). */
+  rotationOffset: number;
   created: number;
   duplicates: number;
   skipped: number;
@@ -114,7 +119,9 @@ async function persistGrowthDiscoveryRun(prisma: PrismaClient, r: GrowthDiscover
  * Runs all discovery adapters for configured markets and lead types; inserts DISCOVERED rows with dedupe.
  */
 export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<GrowthDiscoveryRunResult> {
-  const markets = growthDiscoveryMarketSlugs();
+  const { marketsThisRun, allMarkets, rotationOffset } = growthDiscoveryMarketsForCronRun();
+  const markets = marketsThisRun;
+  console.info("[growth discovery] markets this run", { markets, allMarkets, rotationOffset });
   const adapters = allGrowthDiscoveryAdapters();
   const byAdapter: Record<string, { created: number; duplicates: number; skipped: number }> = {};
   const candidatesEmittedByAdapter: Record<string, number> = {};
@@ -321,6 +328,8 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
 
   const result: GrowthDiscoveryRunResult = {
     markets,
+    allMarkets,
+    rotationOffset,
     created,
     duplicates,
     skipped,

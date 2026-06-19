@@ -68,7 +68,7 @@ If the panel cannot send `Authorization` headers, use **Windows Task Scheduler**
 
 ## GitHub Actions
 
-`.github/workflows/growth-pipeline.yml` — tick every 15 min, discovery hourly. Requires `CRON_SECRET` repo secret. Often blocked (403) by Hostinger CDN; Hostinger cron or PC script is more reliable.
+Scheduled GitHub workflows are **disabled** — Hostinger CDN returns **403** to GitHub datacenter IPs. Use **hPanel cron** (above). Workflows remain available for manual `workflow_dispatch` testing only.
 
 ## Diagnose low volume
 

@@ -22,8 +22,7 @@ export function growthLeadDiscoveryCronEnabled(): boolean {
  * Keeps discovery throttled on large stub JSON batches.
  */
 export function growthDiscoveryMaxCandidatesPerAdapterPerMarket(): number {
-  /** High-volume autonomous runs: raise to 400–800; combine with frequent cron for 500+ new leads/day (dedupe reduces net). */
-  return parseIntEnv("GROWTH_DISCOVERY_MAX_CANDIDATES_PER_ADAPTER", 250);
+  return parseIntEnv("GROWTH_DISCOVERY_MAX_CANDIDATES_PER_ADAPTER", 400);
 }
 
 /** When true, cron may auto-create drafts; top VENUE leads may auto-approve/send in ACTIVE launch markets. */
@@ -48,7 +47,7 @@ export function growthAutoDraftBatchLimit(): number {
  * Default 3; clamp 1–50 so frequent crons can drain a 50/day budget without huge bursts per tick.
  */
 export function growthOutreachSendsPerCronRun(): number {
-  const n = parseIntEnv("GROWTH_OUTREACH_SENDS_PER_CRON_RUN", 3);
+  const n = parseIntEnv("GROWTH_OUTREACH_SENDS_PER_CRON_RUN", 20);
   return Math.min(50, Math.max(1, n));
 }
 
@@ -59,7 +58,7 @@ export function growthOutreachDailyTarget(): number {
 
 /** Hard daily ceiling for growth outreach automation (combined with MARKETING_CAP_DAILY_OUTREACH via min). */
 export function growthOutreachDailyMax(): number {
-  return parseIntEnv("GROWTH_OUTREACH_DAILY_MAX", 50);
+  return parseIntEnv("GROWTH_OUTREACH_DAILY_MAX", 100);
 }
 
 /**
@@ -79,7 +78,7 @@ export function marketingSocialPayloadBatchPerCron(): number {
 
 /** Max outreach sends per discovery market slug per UTC day (0 = no market cap). Spreads volume nationally. */
 export function growthOutreachMaxSendsPerMarketPerDay(): number {
-  const n = parseIntEnv("GROWTH_OUTREACH_MAX_SENDS_PER_MARKET_PER_DAY", 10);
+  const n = parseIntEnv("GROWTH_OUTREACH_MAX_SENDS_PER_MARKET_PER_DAY", 25);
   return Math.min(50, Math.max(0, n));
 }
 

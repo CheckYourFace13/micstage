@@ -67,22 +67,42 @@ export async function claimNextPendingMarketingJob(prisma: PrismaClient) {
   });
 }
 
-/** Claim the next due PENDING job for a specific kind. */
+const LOW_VALUE_SOCIAL_URL = /instagram\.com|facebook\.com|fb\.com|twitter\.com|x\.com/i;
+
+function socialPayloadTargetUrl(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const url = (payload as { targetUrl?: string }).targetUrl;
+  return typeof url === "string" ? url.trim() : "";
+}
+
+function isLowValueSocialPayloadUrl(url: string): boolean {
+  return LOW_VALUE_SOCIAL_URL.test(url);
+}
+
+/** Prefer venue website/contact URLs over Instagram/Facebook (rarely yield emails). */
 export async function claimNextPendingMarketingJobOfKind(
   prisma: PrismaClient,
   kind: MarketingJobKind,
 ) {
   const now = new Date();
   return prisma.$transaction(async (tx) => {
-    const next = await tx.marketingJob.findFirst({
+    const pending = await tx.marketingJob.findMany({
       where: {
         kind,
         status: "PENDING",
         OR: [{ runAfter: null }, { runAfter: { lte: now } }],
       },
       orderBy: [{ createdAt: "asc" }],
+      take: 40,
     });
-    if (!next) return null;
+    if (pending.length === 0) return null;
+
+    const websiteFirst = pending.find((j) => {
+      const url = socialPayloadTargetUrl(j.payload);
+      return url.length > 0 && !isLowValueSocialPayloadUrl(url);
+    });
+    const next = websiteFirst ?? pending[0]!;
+
     return tx.marketingJob.update({
       where: { id: next.id },
       data: { status: "PROCESSING", attempts: { increment: 1 } },

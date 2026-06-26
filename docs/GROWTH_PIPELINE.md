@@ -21,13 +21,31 @@ curl -fsS -m 360 -X POST \
 
 Schedule **every 15 minutes** in Hostinger hPanel. See `scripts/hostinger-growth-cron.sh` for copy-paste.
 
-Discovery (nationwide venue search) — **hourly**, separate cron:
+Discovery (nationwide venue search) — **every 30 minutes** recommended (`*/30 * * * *` at minute `5` and `35`):
 
 ```bash
 curl -fsS -m 300 -X POST \
   -H "Authorization: Bearer YOUR_CRON_SECRET" \
   "https://micstage.com/api/cron/growth-pipeline?phase=discovery"
 ```
+
+## Volume tuning (more venues + more emails)
+
+After the first Chicago scrape, **most new URLs are duplicates** — that is normal. To keep net-new leads and outreach high:
+
+| Knob | Suggested production value |
+|------|---------------------------|
+| `MARKETING_CAP_DAILY_OUTREACH` | `100` |
+| `GROWTH_OUTREACH_DAILY_MAX` | `100` |
+| `GROWTH_OUTREACH_SENDS_PER_CRON_RUN` | `20` |
+| `GROWTH_OUTREACH_MAX_SENDS_PER_MARKET_PER_DAY` | `25` |
+| `GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN` | `20` |
+| `GROWTH_SERPAPI_DAILY_MAX` | `24` |
+| `GROWTH_BRAVE_SEARCH_API_KEY` | required when Serp quota is low |
+
+Email mining now **prioritizes venue websites** over Instagram/Facebook in the queue (social URLs rarely yield emails).
+
+Run `node scripts/diagnose-growth-outreach.mjs` (with `DATABASE_URL`) to see pending emails, drafts, and sends today.
 
 ## Required production env
 

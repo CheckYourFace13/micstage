@@ -154,5 +154,10 @@ export function growthDiscoveryMarketsForCronRun(now = new Date()): {
   const slot = Math.floor(now.getTime() / slotMs);
   const rotationOffset = slot % allMarkets.length;
   const rotated = [...allMarkets.slice(rotationOffset), ...allMarkets.slice(0, rotationOffset)];
-  return { marketsThisRun: rotated.slice(0, perRun), allMarkets, rotationOffset };
+  let marketsThisRun = rotated.slice(0, perRun);
+  const national = nationalDiscoveryMarketSlug();
+  if (!marketsThisRun.some((m) => m.toLowerCase() === national.toLowerCase())) {
+    marketsThisRun = [national, ...marketsThisRun.slice(0, Math.max(0, perRun - 1))];
+  }
+  return { marketsThisRun, allMarkets, rotationOffset };
 }

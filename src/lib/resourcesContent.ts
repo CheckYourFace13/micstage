@@ -1,22 +1,7 @@
-export type ResourceArticle = {
-  slug: string;
-  title: string;
-  description: string;
-  category: "venue-ops" | "community" | "performer" | "strategy";
-  readingMinutes: number;
-  publishedAt: string;
-  updatedAt: string;
-  intro: string;
-  sections: { heading: string; paragraphs: string[] }[];
-  /** Short, actionable bullets after the intro. */
-  practicalTips?: string[];
-  /** People-first Q&A for long-tail queries. */
-  faq?: { q: string; a: string }[];
-  /** Cross-links to other `/resources/[slug]` guides. */
-  relatedGuides?: { slug: string; label: string }[];
-  keyTakeaways: string[];
-  relatedDiscoveryLinks: { href: string; label: string }[];
-};
+import { getPublishedScheduledArticles } from "@/lib/seo/contentEngine/publish";
+import type { ResourceArticle } from "@/lib/resources/articleTypes";
+
+export type { ResourceArticle } from "@/lib/resources/articleTypes";
 
 const ARTICLES: ResourceArticle[] = [
   {
@@ -825,9 +810,9 @@ const ARTICLES: ResourceArticle[] = [
 ];
 
 export function getAllResourceArticles(): ResourceArticle[] {
-  return [...ARTICLES];
+  return [...ARTICLES, ...getPublishedScheduledArticles()];
 }
 
 export function getResourceArticleBySlug(slug: string): ResourceArticle | null {
-  return ARTICLES.find((a) => a.slug === slug) ?? null;
+  return getAllResourceArticles().find((a) => a.slug === slug) ?? null;
 }

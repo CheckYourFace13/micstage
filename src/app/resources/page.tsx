@@ -9,7 +9,7 @@ import { getAllResourceArticles } from "@/lib/resourcesContent";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic resources and guides",
   description:
-    "In-depth MicStage guides for open mic venues, hosts, and performers: weeknight programming, open mic signups, formats, loyalty, neighborhood impact, and how to find open mics near you.",
+    "Guides for open mic venues and performers: find open mic nights near you, run signups, list your room on MicStage, and grow your local scene. Not stage sound or theater mic placement.",
   path: "/resources",
 });
 

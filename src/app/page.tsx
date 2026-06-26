@@ -44,7 +44,8 @@ export default function Home() {
               Fill the room.
             </h1>
             <p className="order-3 mt-3 max-w-xl text-sm font-normal leading-snug text-white/55 md:order-2 md:mt-4 md:text-base md:font-medium md:text-white/85 lg:text-lg">
-              MicStage helps people discover local open mics and helps venues run a clear schedule with bookable slots.
+              MicStage is an open mic night platform for performers and venues — find local shows, book slots, and list
+              your room. Not stage sound equipment.
             </p>
 
             <div className="order-2 mt-3 flex flex-col gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.04] p-3 sm:flex-row sm:flex-wrap md:order-3 md:mt-8 md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">

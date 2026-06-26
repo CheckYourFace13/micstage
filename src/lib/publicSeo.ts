@@ -20,6 +20,10 @@ function normalizeSiteOrigin(raw: string): string {
 }
 
 /** Production default; override with APP_URL / NEXT_PUBLIC_APP_URL in env (metadata / OG). */
+/** Shared copy: MicStage = open mic platform (not stage sound / theater micing). */
+export const OPEN_MIC_PLATFORM_DESCRIPTION =
+  "MicStage is an open mic night platform for performers and venues — find local open mics, book slots, and list your room. Not stage sound equipment or theater microphone placement.";
+
 export function siteOrigin(): string {
   return normalizeSiteOrigin(process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://micstage.com");
 }
@@ -71,6 +75,23 @@ export function defaultSocialImageAbsoluteUrls(): string[] {
 function resolveSocialImageUrls(images?: string[]): string[] {
   if (!images?.length) return defaultSocialImageAbsoluteUrls();
   return images.map((u) => (u.startsWith("http://") || u.startsWith("https://") ? u : absoluteUrl(u)));
+}
+
+export function buildWebSiteJsonLd(): Record<string, unknown> {
+  const origin = siteOrigin();
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "MicStage",
+    alternateName: "MicStage open mic platform",
+    url: origin,
+    description: OPEN_MIC_PLATFORM_DESCRIPTION,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${origin}/find-open-mics?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
 }
 
 /** Canonical + Open Graph + Twitter for indexable public routes (not for private/auth). */

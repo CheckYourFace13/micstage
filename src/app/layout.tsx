@@ -8,7 +8,7 @@ import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics"
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { isAnalyticsDisabled } from "@/lib/productAnalytics";
-import { absoluteUrl, defaultSocialImageAbsoluteUrls, siteOrigin } from "@/lib/publicSeo";
+import { absoluteUrl, buildWebSiteJsonLd, defaultSocialImageAbsoluteUrls, OPEN_MIC_PLATFORM_DESCRIPTION, siteOrigin } from "@/lib/publicSeo";
 import "./globals.css";
 
 const heading = Bebas_Neue({
@@ -23,9 +23,8 @@ const body = Inter({
 });
 
 const origin = siteOrigin();
-const siteTagline = "Find open mics | Book slots | Grow your room";
-const defaultDescription =
-  "MicStage helps you find local open mics and helps venues run bookable schedules, with public pages that make discovery and marketing easier for rooms and artists.";
+const siteTagline = "Open mic nights for performers & venues";
+const defaultDescription = OPEN_MIC_PLATFORM_DESCRIPTION;
 const defaultOgImageUrls = defaultSocialImageAbsoluteUrls();
 
 export const viewport: Viewport = {
@@ -72,21 +71,12 @@ export default async function RootLayout({
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "MicStage",
+    description: OPEN_MIC_PLATFORM_DESCRIPTION,
     url: absoluteUrl("/"),
     logo: absoluteUrl("/favicon.png"),
     image: defaultOgImageUrls[0] ?? absoluteUrl("/favicon.png"),
   };
-  const siteJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: "MicStage",
-    url: absoluteUrl("/"),
-    potentialAction: {
-      "@type": "SearchAction",
-      target: `${absoluteUrl("/find-open-mics")}?q={search_term_string}`,
-      "query-input": "required name=search_term_string",
-    },
-  };
+  const siteJsonLd = buildWebSiteJsonLd();
   return (
     <html lang="en" className={`${heading.variable} ${body.variable} h-full antialiased`}>
       <head>

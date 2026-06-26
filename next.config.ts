@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
     workerThreads: false,
     cpus: 1,
   },
+  async rewrites() {
+    const key = process.env.INDEXNOW_API_KEY?.trim();
+    if (!key) return [];
+    return [{ source: `/${key}.txt`, destination: "/api/seo/indexnow-key" }];
+  },
 };
 
 export default withSentryConfig(nextConfig, {

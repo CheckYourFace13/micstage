@@ -8,9 +8,9 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Find open mic artists by stage name",
+  title: "Open mic performers & artists directory",
   description:
-    "Search MicStage artists by public stage name, not by town directory. For upcoming performers grouped by metro or region, start from MicStage discovery markets.",
+    "Find singers, comedians, and poets who play open mic nights on MicStage. Browse by stage name and discover artists in your local open mic scene.",
   path: "/performers",
 });
 

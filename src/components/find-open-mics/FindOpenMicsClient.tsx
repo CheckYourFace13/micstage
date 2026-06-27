@@ -314,7 +314,7 @@ export function FindOpenMicsClient(props: {
               type="search"
               value={metroFilter}
               onChange={(e) => setMetroFilter(e.target.value)}
-              placeholder="e.g. Chicagoland, Texas..."
+              placeholder="e.g. Austin TX, Denver CO..."
               className="h-11 rounded-md border border-white/15 bg-black/40 px-3 text-white placeholder:text-white/40"
             />
           </label>
@@ -351,7 +351,9 @@ export function FindOpenMicsClient(props: {
                 Each venue has its own public page with schedules and booking.
               </p>
               {metroVenues.length === 0 ? (
-                <p className="mt-3 text-sm text-white/55">No venues mapped to this market in the directory.</p>
+                <div className="mt-3">
+                  <EmptyDiscoveryActions context={`metro ${selectedMetroSlug}`} />
+                </div>
               ) : (
                 <ul className="mt-3 grid gap-2 sm:grid-cols-2 sm:mt-4 sm:gap-3">
                   {metroVenues.map((v) => (

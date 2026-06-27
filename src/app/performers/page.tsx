@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { asStringArrayJson } from "@/lib/musicianProfile";
 import { safeExternalHref } from "@/lib/externalUrl";
+import { PerformersEmptyState } from "@/components/publicListings/PerformersEmptyState";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
@@ -78,11 +79,7 @@ export default async function PerformersPage({
     queryFailed = true;
   }
 
-  const emptyMessage = queryFailed
-    ? "We could not load the artist directory. Try again in a moment."
-    : query
-      ? "No artists match that search yet."
-      : "No artists listed yet. Join MicStage to appear here.";
+  const emptyMessage = queryFailed ? "We could not load the artist directory. Try again in a moment." : null;
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -134,7 +131,11 @@ export default async function PerformersPage({
 
         <div className="mt-8 grid gap-4">
           {musicians.length === 0 ? (
-            <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">{emptyMessage}</div>
+            queryFailed ? (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">{emptyMessage}</div>
+            ) : (
+              <PerformersEmptyState query={query || undefined} />
+            )
           ) : (
             musicians.map((m) => {
               const imageSrc = safeExternalHref(m.imageUrl);

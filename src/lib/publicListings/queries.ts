@@ -86,8 +86,12 @@ export async function loadPublicOpenMicListingBySlug(
 export async function loadDiscoveryHomeStats(prisma: PrismaClient) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const weekEnd = new Date();
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  weekEnd.setUTCHours(23, 59, 59, 999);
 
-  const [verifiedListings, bookableVenues, recentlyVerified] = await Promise.all([
+  const [verifiedListings, bookableVenues, recentlyVerified, openSlotsThisWeek, listingRegions, venueRegions] =
+    await Promise.all([
     prisma.publicOpenMicListing.count({
       where: {
         ...publicListingWhereDiscoverable(),
@@ -101,21 +105,41 @@ export async function loadDiscoveryHomeStats(prisma: PrismaClient) {
         lastVerifiedAt: { gte: thirtyDaysAgo },
       },
     }),
+    prisma.slot.count({
+      where: {
+        status: "AVAILABLE",
+        instance: {
+          isCancelled: false,
+          date: { gte: new Date(), lte: weekEnd },
+        },
+      },
+    }),
+    prisma.publicOpenMicListing.groupBy({
+      by: ["region"],
+      where: { ...publicListingWhereDiscoverable(), region: { not: null } },
+    }),
+    prisma.venue.groupBy({
+      by: ["region"],
+      where: { region: { not: null } },
+    }),
   ]);
 
-  return { verifiedListings, bookableVenues, recentlyVerified };
+  const metroMarkets = new Set(
+    [...listingRegions, ...venueRegions].map((r) => (r.region ?? "").trim().toUpperCase()).filter(Boolean),
+  ).size;
+
+  return { verifiedListings, bookableVenues, recentlyVerified, openSlotsThisWeek, metroMarkets };
 }
 
 export async function loadFeaturedPublicListings(
   prisma: PrismaClient,
-  opts: { region?: string; limit?: number } = {},
+  opts: { limit?: number } = {},
 ): Promise<PublicOpenMicListingPayload[]> {
-  const { region = "IL", limit = 4 } = opts;
+  const { limit = 4 } = opts;
   return prisma.publicOpenMicListing.findMany({
     where: {
       ...publicListingWhereDiscoverable(),
       verificationStatus: { in: ["VERIFIED", "NEEDS_REVIEW"] },
-      region: { equals: region, mode: "insensitive" },
     },
     orderBy: [{ lastVerifiedAt: "desc" }, { name: "asc" }],
     take: limit,

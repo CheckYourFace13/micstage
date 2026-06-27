@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { OpenMicDemandRequestKind } from "@/generated/prisma/client";
+import { attachDemandToGrowthLead } from "@/lib/publicListings/demandToGrowthLead";
 import { getPrismaOrNull } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -52,7 +53,14 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, id: row.id });
+    let growthLeadId: string | null = null;
+    try {
+      growthLeadId = await attachDemandToGrowthLead(prisma, row);
+    } catch {
+      // Demand row saved; growth mirror is best-effort.
+    }
+
+    return NextResponse.json({ ok: true, id: row.id, growthLeadId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });

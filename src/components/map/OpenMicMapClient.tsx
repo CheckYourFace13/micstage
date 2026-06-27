@@ -323,7 +323,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
         </section>
 
         <aside className="flex w-full flex-col border-t border-white/10 pt-3 lg:w-[min(100%,400px)] lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-          <h2 className="text-xs font-semibold text-white md:text-sm">Venues on this map</h2>
+          <h2 className="text-xs font-semibold text-white md:text-sm">Listings on this map</h2>
           <p className="mt-1 text-xs leading-relaxed text-white/50 md:hidden">Tap a row to zoom; tap a pin for a quick summary.</p>
           <p className="mt-1 hidden text-xs leading-relaxed text-white/50 md:block">
             The map shows every venue in view for your format &amp; booking filters (weekday highlights matching pins). The

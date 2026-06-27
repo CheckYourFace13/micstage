@@ -3,13 +3,13 @@ import type { Metadata } from "next";
 import { HomeDiscoveryPanel } from "@/components/home/HomeDiscoveryPanel";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
-const homeTitle = "Find open mics in Chicagoland | MicStage";
+const homeTitle = "Find open mics near you | MicStage";
 
 export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
-      "Find open mics in Chicagoland and beyond. Verified listings, bookable venues, and maps — MicStage helps performers find a slot and helps hosts claim their room.",
+      "Find open mics near you — verified listings, bookable venues, and a map built for your local scene. MicStage helps performers find a slot and helps hosts claim their room.",
     path: "/",
   }),
   title: { absolute: homeTitle },
@@ -29,15 +29,16 @@ export default function Home() {
           <div className="lg:col-span-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
               <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--om-neon))]" />
-              Chicagoland launch market
+              Local open mic discovery
             </div>
             <h1 className="om-heading mt-4 text-4xl leading-[0.95] tracking-wide sm:text-5xl md:text-6xl">
               Find open mics
               <br />
-              in Chicagoland
+              near you
             </h1>
             <p className="mt-4 max-w-xl text-sm text-white/70 md:text-base">
-              Verified open mic listings you can browse today — plus bookable MicStage venues when hosts claim their page.
+              Browse verified listings in your area, book slots where venues use MicStage, and claim your room if you
+              run the mic.
             </p>
 
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
@@ -64,11 +65,11 @@ export default function Home() {
               <div className="mt-3 grid gap-2.5">
                 <Link href="/map" className="rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40">
                   <div className="font-semibold">Open mic map</div>
-                  <div className="mt-1 text-xs text-white/55">Filter by night — verified listings and bookable venues</div>
+                  <div className="mt-1 text-xs text-white/55">Filter by night — listings and bookable venues near you</div>
                 </Link>
                 <Link href="/locations" className="rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40">
                   <div className="font-semibold">Browse by metro</div>
-                  <div className="mt-1 text-xs text-white/55">Chicagoland, Illinois, and more</div>
+                  <div className="mt-1 text-xs text-white/55">Your city, state, and regional hubs</div>
                 </Link>
                 <Link href="/performers" className="rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40">
                   <div className="font-semibold">Find artists</div>

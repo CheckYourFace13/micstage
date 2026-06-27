@@ -129,10 +129,22 @@ try {
 
     await prisma.publicOpenMicListing.create({ data });
     created += 1;
-    console.log("created", slug);
+    console.log("created", slug, "(claim invite will send on next growth cron tick if lead has email)");
   }
 
-  console.log(JSON.stringify({ ok: true, created, dryRun, candidates: leads.length }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        created,
+        dryRun,
+        candidates: leads.length,
+        note: "Claim invite emails send via /api/cron/growth-pipeline (runPendingListingClaimInvites)",
+      },
+      null,
+      2,
+    ),
+  );
 } finally {
   await prisma.$disconnect();
 }

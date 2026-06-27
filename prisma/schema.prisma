@@ -1328,6 +1328,12 @@ model PublicOpenMicListing {
   accessibilityNotes  String? @db.Text
   internalNotes       String? @db.Text
 
+  /// Idempotent owner invite to claim this listing (not growth cold outreach).
+  claimInviteEmailSentAt DateTime?
+  claimInviteEmail         String?
+  /// Set when linked venue publishes a public schedule — unlocks proactive marketing.
+  promotionEligibleAt    DateTime?
+
   schedules      PublicOpenMicSchedule[]
   claimRequests  ListingClaimRequest[]
   corrections    ListingCorrection[]

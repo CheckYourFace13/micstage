@@ -6,6 +6,7 @@ import { venueLeadMailboxForOutreach } from "@/lib/growth/leadEmailValidation";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { isOnlyTransientMarketingThrottle } from "@/lib/marketing/sendCaps";
 import { sendThroughMarketingPipeline, type MarketingSendResult } from "@/lib/marketing/sendPipeline";
+import { leadBlocksGrowthOutreach } from "@/lib/publicListings/listingClaimInviteEmail";
 
 /**
  * Sends an outreach draft. APPROVED sends normally; PENDING_REVIEW sends only when the lead’s launch market
@@ -106,6 +107,14 @@ export async function sendApprovedGrowthLeadDraft(
       return { ok: false, blocked: true, reasons: ["Invalid draft recipient email"] };
     }
     email = n;
+  }
+
+  if (draft.lead.leadType === "VENUE" && (await leadBlocksGrowthOutreach(prisma, draft.leadId))) {
+    return {
+      ok: false,
+      blocked: true,
+      reasons: ["Venue has a public listing awaiting claim or go-live — cold outreach blocked"],
+    };
   }
 
   const contact = await prisma.marketingContact.findUnique({ where: { emailNormalized: email } });

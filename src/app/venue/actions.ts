@@ -46,6 +46,7 @@ import {
 import { storeProfileImage } from "@/lib/profileAssetStorage";
 import { getSession } from "@/lib/session";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { refreshListingPromotionEligible } from "@/lib/publicListings/listingClaimInviteEmail";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 
 /** Missing/tampered fields → friendly portal message instead of generic error UI. */
@@ -126,6 +127,14 @@ async function advanceVenueGrowthListingLive(venueId: string): Promise<void> {
   });
   if (!lead) return;
   await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "LISTING_LIVE", { leadType: "VENUE" });
+
+  const linkedListings = await prisma.publicOpenMicListing.findMany({
+    where: { claimedVenueId: venueId },
+    select: { id: true },
+  });
+  for (const listing of linkedListings) {
+    await refreshListingPromotionEligible(prisma, listing.id);
+  }
 }
 
 /**

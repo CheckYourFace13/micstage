@@ -33,6 +33,16 @@ const IMPORT_LIKE_DISCOVERED_SOURCE_KINDS: GrowthLeadSourceKind[] = [
   "SOCIAL_PROFILE",
 ];
 
+/** Skip cold outreach when a live public listing exists but the venue has not gone live on MicStage yet. */
+const LISTING_BLOCKS_OUTREACH = {
+  publicListings: {
+    none: {
+      verificationStatus: { not: "OUTDATED" as const },
+      promotionEligibleAt: null,
+    },
+  },
+} as const;
+
 function sourceSkipsDiscoveredStrictGate(sourceKind: GrowthLeadSourceKind): boolean {
   return IMPORT_LIKE_DISCOVERED_SOURCE_KINDS.includes(sourceKind);
 }
@@ -166,6 +176,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     where: {
       contactEmailNormalized: { not: null },
       contactEmailConfidence: { in: emailReadyLevels },
+      ...LISTING_BLOCKS_OUTREACH,
       OR: [
         // Keep existing non-venue behavior.
         { status: "APPROVED" },
@@ -233,6 +244,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       status: "PENDING_REVIEW",
       lead: {
         leadType: "VENUE",
+        ...LISTING_BLOCKS_OUTREACH,
         AND: [
           { OR: [{ status: "DISCOVERED" }, { status: "REVIEWED" }, { status: "APPROVED" }] },
           { OR: [{ fitScore: { gte: venueAutoFitMin } }, { fitScore: null }] },

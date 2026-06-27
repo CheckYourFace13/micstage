@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { isValidPublicSlug } from "@/lib/locationSlugValidation";
+import { sendListingClaimReceivedEmail } from "@/lib/publicListings/listingClaimInviteEmail";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,7 @@ export async function POST(
 
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { slug: listingSlug },
-    select: { id: true, claimStatus: true, claimedVenueId: true },
+    select: { id: true, slug: true, name: true, claimStatus: true, claimedVenueId: true },
   });
   if (!listing) {
     return NextResponse.json({ ok: false, error: "Listing not found" }, { status: 404 });
@@ -68,6 +69,14 @@ export async function POST(
         data: { claimStatus: "CLAIM_PENDING" },
       }),
     ]);
+
+    void sendListingClaimReceivedEmail({
+      to: email,
+      contactName,
+      listingName: listing.name,
+      listingSlug: listing.slug,
+    }).catch((e) => console.error("[claim submit] confirmation email failed", e));
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";

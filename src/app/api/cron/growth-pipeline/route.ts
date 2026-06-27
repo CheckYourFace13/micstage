@@ -5,6 +5,7 @@ import {
 } from "@/lib/growth/expansionConfig";
 import { runAutoGrowthOutreachDrafts } from "@/lib/growth/growthDraftAutomation";
 import { runGrowthLeadDiscovery } from "@/lib/growth/growthDiscoveryRun";
+import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
 import {
   resolveMarketingSocialPayloadBatchSize,
   runMarketingSocialPayloadBatch,
@@ -76,11 +77,16 @@ async function handle(request: Request) {
     let discoveryError: string | null = null;
     let drafts: Awaited<ReturnType<typeof runAutoGrowthOutreachDrafts>> | null = null;
     let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
+    let listingClaimInvites: Awaited<ReturnType<typeof runPendingListingClaimInvites>> | null = null;
     let outreachSkippedReason: string | null = null;
 
     if (emailMiningEnabled) {
       const batchSize = resolveMarketingSocialPayloadBatchSize(request);
       emailMining = await runMarketingSocialPayloadBatch(prisma, batchSize);
+    }
+
+    if (draftEnabled) {
+      listingClaimInvites = await runPendingListingClaimInvites(prisma, 20);
     }
 
     // Outreach first on combined runs so invites still send if discovery is slow (Hostinger 504).
@@ -140,6 +146,7 @@ async function handle(request: Request) {
         discovery,
         discoveryError,
         emailMining,
+        listingClaimInvites,
         autoDrafts: drafts,
         growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,
         hint:

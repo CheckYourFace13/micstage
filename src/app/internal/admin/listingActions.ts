@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getOptionalAdminEmailFromLoginForm, assertAdminSession } from "@/lib/adminAuth";
 import { requirePrisma } from "@/lib/prisma";
+import {
+  refreshListingPromotionEligible,
+  sendListingClaimApprovedEmail,
+} from "@/lib/publicListings/listingClaimInviteEmail";
 
 const LISTINGS_PATH = "/internal/admin/growth/listings";
 
@@ -15,7 +19,7 @@ export async function adminApproveListingClaim(formData: FormData) {
   await assertAdminSession();
   const adminEmail = (await getOptionalAdminEmailFromLoginForm()) ?? "admin";
   const claimId = String(formData.get("claimId") ?? "").trim();
-  const venueSlug = String(formData.get("venueSlug") ?? "").trim();
+  const venueSlugInput = String(formData.get("venueSlug") ?? "").trim();
   if (!claimId) redirectListings("err=missing_claim");
 
   const prisma = requirePrisma();
@@ -29,13 +33,18 @@ export async function adminApproveListingClaim(formData: FormData) {
   }
 
   let venueId: string | null = null;
-  if (venueSlug) {
-    const venue = await prisma.venue.findUnique({ where: { slug: venueSlug }, select: { id: true } });
+  let venueSlug: string | null = null;
+  if (venueSlugInput) {
+    const venue = await prisma.venue.findUnique({
+      where: { slug: venueSlugInput },
+      select: { id: true, slug: true },
+    });
     if (!venue) {
       redirectListings("err=venue_not_found");
       return;
     }
     venueId = venue.id;
+    venueSlug = venue.slug;
   }
 
   await prisma.$transaction([
@@ -55,6 +64,17 @@ export async function adminApproveListingClaim(formData: FormData) {
       },
     }),
   ]);
+
+  if (venueId) {
+    await refreshListingPromotionEligible(prisma, claim.listingId);
+  }
+
+  void sendListingClaimApprovedEmail({
+    to: claim.email,
+    listingName: claim.listing.name,
+    listingSlug: claim.listing.slug,
+    venueSlug,
+  }).catch((e) => console.error("[adminApproveListingClaim] approval email failed", e));
 
   revalidatePath(LISTINGS_PATH);
   revalidatePath(`/open-mics/${claim.listing.slug}`);
@@ -114,8 +134,10 @@ export async function adminLinkListingToVenue(formData: FormData) {
   const listing = await prisma.publicOpenMicListing.update({
     where: { id: listingId },
     data: { claimedVenueId: venue.id, claimStatus: "CLAIMED" },
-    select: { slug: true },
+    select: { id: true, slug: true },
   });
+
+  await refreshListingPromotionEligible(prisma, listing.id);
 
   revalidatePath(LISTINGS_PATH);
   revalidatePath(`/open-mics/${listing.slug}`);

@@ -6,6 +6,7 @@ import { venueLeadMailboxForOutreach } from "@/lib/growth/leadEmailValidation";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { checkContactSendSpacing } from "@/lib/marketing/sendCaps";
 import type { GrowthOutreachSequenceStep } from "@/lib/marketing/outreachTemplates";
+import { leadBlocksGrowthOutreach } from "@/lib/publicListings/listingClaimInviteEmail";
 
 /**
  * Creates a PENDING_REVIEW growth outreach draft (sequence steps 1–3) when the lead has email,
@@ -39,6 +40,13 @@ export async function createPendingGrowthLeadOutreachDraft(
 
   if (lead.contactEmailConfidence === "LOW" && !opts?.allowLowConfidenceEmail) {
     return { ok: false, reason: "Lead email is LOW confidence (skipped for automation)" };
+  }
+
+  if (lead.leadType === "VENUE" && (await leadBlocksGrowthOutreach(prisma, lead.id))) {
+    return {
+      ok: false,
+      reason: "Lead has public listing awaiting claim or go-live — claim invite sent instead of cold outreach",
+    };
   }
 
   const openDraft = await prisma.growthLeadOutreachDraft.findFirst({

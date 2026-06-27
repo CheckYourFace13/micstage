@@ -426,10 +426,10 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
                     </button>
                     <div className="border-t border-white/10 px-3 py-2.5">
                       <Link
-                        href={`/venues/${v.slug}`}
+                        href={v.href ?? `/venues/${v.slug}`}
                         className="text-xs font-semibold text-[rgb(var(--om-neon))] underline decoration-[rgb(var(--om-neon))]/35 underline-offset-2 hover:brightness-110"
                       >
-                        Open venue page to book →
+                        {v.isPublicListing ? "View verified listing →" : "Open venue page to book →"}
                       </Link>
                     </div>
                   </div>

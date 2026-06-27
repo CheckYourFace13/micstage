@@ -85,7 +85,7 @@ export default async function LocationsPage() {
             <p className="text-xs leading-snug text-white/50 md:text-sm md:leading-normal md:text-white/65">
               Looking for venues near you? Start with{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
-                Find Local Open Mic&apos;s
+                Find Local Open Mics
               </Link>
               , the{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/map">

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { formatMiles, haversineDistanceMiles } from "@/lib/geo";
+import { loadNearbyDiscoveryRows } from "@/lib/publicListings/discoveryMerge";
 import { getPrismaOrNull } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 /**
  * GET /api/public/venues/nearby?lat=..&lng=..
- * Returns MicStage venues sorted by distance. Venues without coordinates are listed last (no distance).
+ * Returns claimed venues and verified public listings sorted by distance.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -28,64 +28,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const venues = await prisma.venue.findMany({
-      orderBy: { name: "asc" },
-      select: {
-        slug: true,
-        name: true,
-        city: true,
-        region: true,
-        formattedAddress: true,
-        lat: true,
-        lng: true,
-      },
-    });
-
-    type Row = {
-      slug: string;
-      name: string;
-      city: string | null;
-      region: string | null;
-      formattedAddress: string;
-      distanceMiles: number | null;
-      distanceLabel: string;
-    };
-
-    const withDist: Row[] = [];
-    const noCoord: Row[] = [];
-
-    for (const v of venues) {
-      const base = {
-        slug: v.slug,
-        name: v.name,
-        city: v.city,
-        region: v.region,
-        formattedAddress: v.formattedAddress,
-      };
-      if (v.lat != null && v.lng != null && Number.isFinite(v.lat) && Number.isFinite(v.lng)) {
-        const d = haversineDistanceMiles(lat, lng, v.lat, v.lng);
-        withDist.push({
-          ...base,
-          distanceMiles: d,
-          distanceLabel: formatMiles(d),
-        });
-      } else {
-        noCoord.push({
-          ...base,
-          distanceMiles: null,
-          distanceLabel: "—",
-        });
-      }
-    }
-
-    withDist.sort((a, b) => (a.distanceMiles ?? 0) - (b.distanceMiles ?? 0));
-    noCoord.sort((a, b) => a.name.localeCompare(b.name));
-
+    const venues = await loadNearbyDiscoveryRows(prisma, lat, lng);
     return NextResponse.json(
-      {
-        ok: true,
-        venues: [...withDist, ...noCoord],
-      },
+      { ok: true, venues },
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {

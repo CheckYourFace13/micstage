@@ -40,6 +40,9 @@ export type OpenMicMapNextEventDto = {
 
 export type OpenMicMapVenueDto = {
   slug: string;
+  /** Public page path — `/venues/…` or `/open-mics/…`. */
+  href?: string;
+  isPublicListing?: boolean;
   name: string;
   city: string | null;
   region: string | null;

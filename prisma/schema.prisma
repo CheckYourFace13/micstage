@@ -312,6 +312,9 @@ model Venue {
 
   promoterVenueAccess PromoterVenueAccess[]
   promoterNights      PromoterNight[]
+
+  /// Set when this venue was created or linked from a verified public listing claim.
+  claimedFromListing PublicOpenMicListing?
 }
 
 model VenueManager {
@@ -1082,6 +1085,9 @@ model GrowthLead {
   responses       GrowthLeadResponse[]
   followUpSchedules GrowthLeadFollowUpSchedule[]
 
+  publicListings    PublicOpenMicListing[]
+  demandRequests    OpenMicDemandRequest[]
+
   @@index([leadType, status])
   @@index([discoveryMarketSlug])
   @@index([suburb])
@@ -1234,4 +1240,199 @@ model GrowthLaunchMarket {
   notes String?
 
   @@index([status, sortOrder])
+}
+
+// --- Public open mic listings (inventory-first discovery; claim → Venue upgrade) ---
+
+enum PublicListingVerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  NEEDS_REVIEW
+  OUTDATED
+}
+
+enum PublicListingClaimStatus {
+  UNCLAIMED
+  CLAIM_PENDING
+  CLAIMED
+}
+
+enum ListingClaimRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ListingCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+enum OpenMicDemandRequestKind {
+  REQUEST_CITY
+  REMINDER_NEARBY
+  ADD_VENUE
+  REQUEST_VENUE
+  PERFORM_HERE
+}
+
+enum OpenMicDemandRequestStatus {
+  NEW
+  REVIEWED
+  CLOSED
+}
+
+/// MicStage-curated open mic listing shown before a venue registers. Claim links to `Venue`.
+model PublicOpenMicListing {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name             String
+  slug             String @unique
+  formattedAddress String
+  city             String?
+  region           String?
+  country          String?
+  lat              Float?
+  lng              Float?
+  timeZone         String  @default("America/Chicago")
+
+  websiteUrl   String?
+  facebookUrl  String?
+  instagramUrl String?
+  tiktokUrl    String?
+  youtubeUrl   String?
+
+  sourceUrl  String?
+  sourceName String?
+
+  lastVerifiedAt     DateTime?
+  verificationStatus PublicListingVerificationStatus @default(UNVERIFIED)
+  claimStatus        PublicListingClaimStatus        @default(UNCLAIMED)
+
+  claimedVenue   Venue?  @relation(fields: [claimedVenueId], references: [id], onDelete: SetNull)
+  claimedVenueId String? @unique
+
+  growthLeadId String?
+  growthLead   GrowthLead? @relation(fields: [growthLeadId], references: [id], onDelete: SetNull)
+
+  about               String? @db.Text
+  hostName            String?
+  signupMethod        String?
+  cost                String?
+  ageRestriction      String?
+  equipmentNotes      String? @db.Text
+  accessibilityNotes  String? @db.Text
+  internalNotes       String? @db.Text
+
+  schedules      PublicOpenMicSchedule[]
+  claimRequests  ListingClaimRequest[]
+  corrections    ListingCorrection[]
+
+  @@index([city, region])
+  @@index([verificationStatus, claimStatus])
+  @@index([lastVerifiedAt])
+}
+
+model PublicOpenMicSchedule {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing   PublicOpenMicListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+
+  weekday       Weekday
+  startTimeMin  Int
+  endTimeMin    Int
+  timeZone      String
+  title         String?
+  description   String? @db.Text
+  performanceFormat VenuePerformanceFormat @default(OPEN_VARIETY)
+  isActive      Boolean @default(true)
+  signupMethod  String?
+  sourceUrl     String?
+  lastVerifiedAt DateTime?
+
+  @@index([listingId, weekday])
+}
+
+model ListingClaimRequest {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing   PublicOpenMicListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+
+  contactName       String
+  role              String
+  email             String
+  phone             String?
+  proofUrl          String?
+  notes             String? @db.Text
+  desiredLoginEmail String?
+
+  status ListingClaimRequestStatus @default(PENDING)
+
+  reviewedAt      DateTime?
+  reviewedByEmail String?
+  reviewNotes     String? @db.Text
+
+  @@index([listingId, status])
+  @@index([status, createdAt])
+}
+
+model ListingCorrection {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing   PublicOpenMicListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+
+  reporterEmail String?
+  reporterName  String?
+  kind          String
+  message       String @db.Text
+
+  status ListingCorrectionStatus @default(PENDING)
+
+  reviewedAt      DateTime?
+  reviewedByEmail String?
+  reviewNotes     String? @db.Text
+
+  @@index([listingId, status])
+  @@index([status, createdAt])
+}
+
+model OpenMicDemandRequest {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  kind   OpenMicDemandRequestKind
+  status OpenMicDemandRequestStatus @default(NEW)
+
+  email String?
+  name  String?
+
+  city    String?
+  region  String?
+  country String?
+  lat     Float?
+  lng     Float?
+
+  venueName   String?
+  listingSlug String?
+  message     String? @db.Text
+
+  growthLeadId String?
+  growthLead   GrowthLead? @relation(fields: [growthLeadId], references: [id], onDelete: SetNull)
+
+  @@index([kind, status])
+  @@index([createdAt])
 }

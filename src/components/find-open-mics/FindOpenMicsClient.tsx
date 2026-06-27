@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { VenuePlacePicker } from "@/app/register/venue/VenuePlacePicker";
+import { DiscoveryListingBadge } from "@/components/discovery/DiscoveryListingBadge";
+import { EmptyDiscoveryActions } from "@/components/publicListings/EmptyDiscoveryActions";
 import type { OpenMicFinderVenue, PublicDiscoveryLocationRow } from "@/lib/discoveryLocationRows";
 import { trackMarketingEvent } from "@/lib/marketingTracking";
 
@@ -11,6 +13,9 @@ const MIN_VENUES_FOR_PRIMARY_CITY_PAGE = 10;
 
 type NearbyVenue = {
   slug: string;
+  href: string;
+  kind: "claimed" | "verified" | "unclaimed";
+  bookable: boolean;
   name: string;
   city: string | null;
   region: string | null;
@@ -269,18 +274,21 @@ export function FindOpenMicsClient(props: {
               ) : null}
               <ul className="mt-3 grid gap-2 md:mt-4 md:gap-3">
                 {nearbyList.map((v) => (
-                  <li key={v.slug}>
+                  <li key={`${v.href}-${v.slug}`}>
                     <Link
-                      href={`/venues/${v.slug}`}
+                      href={v.href}
                       className="block rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[rgb(var(--om-neon))]/40 hover:bg-black/45"
                     >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-semibold text-white">{v.name}</span>
                         <span className="font-mono text-xs text-[rgb(var(--om-neon))]">{v.distanceLabel}</span>
                       </div>
-                      <p className="mt-1 text-xs text-white/55">{v.formattedAddress}</p>
+                      <div className="mt-2">
+                        <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} />
+                      </div>
+                      <p className="mt-2 text-xs text-white/55">{v.formattedAddress}</p>
                       <p className="mt-2 text-xs text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2">
-                        {"View schedule and lineup ->"}
+                        {v.bookable ? "View schedule and book →" : "View verified listing →"}
                       </p>
                     </Link>
                   </li>
@@ -288,7 +296,7 @@ export function FindOpenMicsClient(props: {
               </ul>
             </div>
           ) : nearbyList && nearbyList.length === 0 ? (
-            <p className="text-sm text-white/60">No venues on MicStage yet.</p>
+            <EmptyDiscoveryActions context="nearby search returned zero results" />
           ) : null}
         </section>
       ) : (
@@ -327,7 +335,7 @@ export function FindOpenMicsClient(props: {
               >
                 <div className="font-semibold text-white">{m.label}</div>
                 <div className="mt-1 text-xs text-white/55">
-                  {m.count} venue{m.count === 1 ? "" : "s"}
+                  {m.count} listing{m.count === 1 ? "" : "s"}
                 </div>
               </button>
             ))}
@@ -347,17 +355,20 @@ export function FindOpenMicsClient(props: {
               ) : (
                 <ul className="mt-3 grid gap-2 sm:grid-cols-2 sm:mt-4 sm:gap-3">
                   {metroVenues.map((v) => (
-                    <li key={v.slug}>
+                    <li key={`${v.href}-${v.slug}`}>
                       <Link
-                        href={`/venues/${v.slug}`}
+                        href={v.href}
                         className="block rounded-xl border border-white/10 bg-black/30 p-4 hover:border-white/20 hover:bg-black/45"
                       >
-                        <div className="font-semibold text-white">{v.name}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-semibold text-white">{v.name}</div>
+                          <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} />
+                        </div>
                         <div className="mt-1 text-xs text-white/55">
-                          {[v.city, v.region].filter(Boolean).join(", ") || "MicStage venue"}
+                          {[v.city, v.region].filter(Boolean).join(", ") || "MicStage listing"}
                         </div>
                         <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">
-                          {"View lineup ->"}
+                          {v.bookable ? "View lineup →" : "View listing →"}
                         </span>
                       </Link>
                     </li>

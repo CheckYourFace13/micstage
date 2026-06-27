@@ -412,11 +412,17 @@ export const getDiscoveryValidationFromDb = cache(async (): Promise<DiscoveryVal
   const prisma = getPrismaOrNull();
   if (!prisma) return null;
   try {
-    const venues = await prisma.venue.findMany({
-      where: { city: { not: null } },
-      select: { city: true, region: true },
-    });
-    return buildDiscoveryValidationData(venues);
+    const [venues, listings] = await Promise.all([
+      prisma.venue.findMany({
+        where: { city: { not: null } },
+        select: { city: true, region: true },
+      }),
+      prisma.publicOpenMicListing.findMany({
+        where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+        select: { city: true, region: true },
+      }),
+    ]);
+    return buildDiscoveryValidationData([...venues, ...listings]);
   } catch {
     return null;
   }
@@ -426,11 +432,17 @@ export const getVenueCityDiscoveryCounts = cache(async (): Promise<Map<string, n
   const prisma = getPrismaOrNull();
   if (!prisma) return new Map();
   try {
-    const venues = await prisma.venue.findMany({
-      where: { city: { not: null } },
-      select: { city: true, region: true },
-    });
-    return computeCitySlugVenueCounts(venues);
+    const [venues, listings] = await Promise.all([
+      prisma.venue.findMany({
+        where: { city: { not: null } },
+        select: { city: true, region: true },
+      }),
+      prisma.publicOpenMicListing.findMany({
+        where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+        select: { city: true, region: true },
+      }),
+    ]);
+    return computeCitySlugVenueCounts([...venues, ...listings]);
   } catch {
     return new Map();
   }

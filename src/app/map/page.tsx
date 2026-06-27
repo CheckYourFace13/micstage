@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { OpenMicMapClient } from "@/components/map/OpenMicMapClient";
-import { loadOpenMicMapVenues } from "@/lib/map/loadOpenMicMapVenues";
+import type { OpenMicMapVenueDto } from "@/lib/map/openMicMapTypes";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 
@@ -16,12 +16,13 @@ export const metadata: Metadata = buildPublicMetadata({
 
 export default async function OpenMicMapPage() {
   const prisma = getPrismaOrNull();
-  let venues: Awaited<ReturnType<typeof loadOpenMicMapVenues>> = [];
+  let venues: OpenMicMapVenueDto[] = [];
   let loadError = false;
 
   try {
     if (prisma) {
-      venues = await loadOpenMicMapVenues(prisma);
+      const { loadMergedOpenMicMapVenues } = await import("@/lib/map/loadPublicListingMapVenues");
+      venues = await loadMergedOpenMicMapVenues(prisma);
     }
   } catch (e) {
     console.error("[map page] loadOpenMicMapVenues", e);
@@ -39,7 +40,7 @@ export default async function OpenMicMapPage() {
             "@type": "ListItem",
             position: i + 1,
             name: v.name,
-            url: absoluteUrl(`/venues/${v.slug}`),
+            url: absoluteUrl(v.href ?? `/venues/${v.slug}`),
           })),
         }
       : null;

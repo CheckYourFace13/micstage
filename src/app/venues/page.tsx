@@ -5,6 +5,8 @@ import { ADSENSE_SLOTS } from "@/lib/adsense";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { getVenueCityDiscoveryCounts, primaryDiscoverySlugForVenue } from "@/lib/discoveryMarket";
+import { loadDiscoverablePublicListings } from "@/lib/publicListings/queries";
+import { listingPublicHref } from "@/lib/publicListings/types";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,7 @@ export default async function VenuesDirectoryPage() {
     region: string | null;
     updatedAt: Date;
   }[] = [];
+  let listings: Awaited<ReturnType<typeof loadDiscoverablePublicListings>> = [];
   let queryFailed = false;
 
   try {
@@ -40,6 +43,7 @@ export default async function VenuesDirectoryPage() {
           updatedAt: true,
         },
       });
+      listings = await loadDiscoverablePublicListings(prisma);
     }
   } catch {
     queryFailed = true;
@@ -62,6 +66,8 @@ export default async function VenuesDirectoryPage() {
   const discoveryCounts = await getVenueCityDiscoveryCounts();
   const totalLocations = sections.length;
   const totalVenues = venues.length;
+  const totalListings = listings.length;
+  const totalCombined = totalVenues + totalListings;
   const recentlyUpdated = [...venues]
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
     .slice(0, 6);
@@ -99,7 +105,7 @@ export default async function VenuesDirectoryPage() {
         </p>
         <div className="order-3 flex flex-wrap gap-2 text-[10px] text-white/50 md:order-2 md:gap-2 md:text-xs md:text-white/60">
           <span className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 md:min-h-0">
-            {totalVenues} public venues
+            {totalCombined} listings (venues + verified)
           </span>
           <span className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 md:min-h-0">
             {totalLocations} city/state groupings
@@ -127,7 +133,7 @@ export default async function VenuesDirectoryPage() {
           </div>
         ) : null}
 
-        {sections.length === 0 ? (
+        {sections.length === 0 && listings.length === 0 ? (
           <div className="order-5 mt-2 rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-black/20 p-5 text-sm leading-relaxed text-white/75 md:order-4 md:mt-8 md:p-7">
             <p className="font-semibold text-white/90">Venue listings are growing; here&apos;s how to explore meanwhile</p>
             <p className="mt-2">
@@ -159,6 +165,26 @@ export default async function VenuesDirectoryPage() {
           </div>
         ) : (
           <div className="order-5 mt-2 grid gap-6 md:order-4 md:mt-8">
+            {listings.length > 0 ? (
+              <section className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4 md:p-5">
+                <h2 className="text-lg font-semibold md:text-xl">Verified open mic listings</h2>
+                <p className="mt-1 text-xs text-white/55 md:text-sm">Not yet managed on MicStage — claim to enable booking.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {listings.slice(0, 24).map((l) => (
+                    <Link
+                      key={l.id}
+                      href={listingPublicHref(l.slug)}
+                      className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm hover:bg-black/40"
+                    >
+                      {l.name}
+                      <span className="ml-2 text-xs text-white/55">
+                        {[l.city, l.region].filter(Boolean).join(", ")}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            ) : null}
             {recentlyUpdated.length > 0 ? (
               <section className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
                 <h2 className="text-lg font-semibold md:text-xl">Recently updated venues</h2>

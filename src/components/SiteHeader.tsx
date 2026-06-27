@@ -127,7 +127,7 @@ export async function SiteHeader() {
                 className="inline-flex min-h-11 items-center rounded-md px-3 py-2 font-semibold text-[rgb(var(--om-neon))] hover:bg-white/10 hover:brightness-110 sm:min-h-0 sm:px-3 sm:py-1.5"
                 href="/find-open-mics"
               >
-                Find local open mics
+                Find Mics
               </Link>
               <Link
                 className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
@@ -137,15 +137,21 @@ export async function SiteHeader() {
               </Link>
               <Link
                 className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
-                href="/performers"
+                href="/register/venue"
               >
-                Find Artists
+                For Venues
               </Link>
               <Link
                 className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
-                href="/locations"
+                href="/register/musician"
               >
-                By area
+                For Artists
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
+                href="/resources"
+              >
+                Resources
               </Link>
               {auth === "artist" || auth === "venue" ? (
                 <Link
@@ -175,22 +181,10 @@ export async function SiteHeader() {
                 aria-label="Account"
               >
                 <Link
-                  className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
-                  href="/login/musician"
+                  className="inline-flex min-h-11 items-center rounded-md border border-white/20 bg-white/5 px-3 py-2 font-semibold text-white hover:bg-white/10 sm:min-h-0 sm:px-3 sm:py-1.5"
+                  href="/login"
                 >
-                  Artist login
-                </Link>
-                <Link
-                  className="inline-flex min-h-11 items-center rounded-md border border-white/20 bg-white/5 px-3 py-2 text-white hover:bg-white/10 sm:min-h-0 sm:px-3 sm:py-1.5"
-                  href="/login/venue"
-                >
-                  Venue login
-                </Link>
-                <Link
-                  className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
-                  href="/login/promoter"
-                >
-                  Promoter login
+                  Sign In
                 </Link>
               </nav>
             ) : null}

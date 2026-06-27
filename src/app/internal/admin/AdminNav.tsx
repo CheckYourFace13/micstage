@@ -13,6 +13,7 @@ const links: { href: string; label: string }[] = [
   { href: "/internal/admin/marketing", label: "Marketing" },
   { href: "/internal/admin/owner-summary", label: "Owner summary" },
   { href: "/internal/admin/growth", label: "Growth" },
+  { href: "/internal/admin/growth/listings", label: "Listings" },
   { href: "/internal/admin/growth/expansion", label: "Launch markets" },
 ];
 

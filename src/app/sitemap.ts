@@ -5,6 +5,7 @@ import { mapDiscoverySlugIndexSignals, shouldIndexDiscoveryPage } from "@/lib/se
 import { siteOrigin } from "@/lib/publicSeo";
 import { getAllResourceArticles } from "@/lib/resourcesContent";
 import { marketingSitemapSupplements } from "@/lib/marketing/indexability";
+import { publicListingWhereDiscoverable } from "@/lib/publicListings/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -67,9 +68,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    const venues = await prisma.venue.findMany({
-      select: { slug: true, updatedAt: true, city: true, region: true },
-    });
+    const [venues, listings] = await Promise.all([
+      prisma.venue.findMany({
+        select: { slug: true, updatedAt: true, city: true, region: true },
+      }),
+      prisma.publicOpenMicListing.findMany({
+        where: publicListingWhereDiscoverable(),
+        select: { slug: true, updatedAt: true, city: true, region: true },
+      }),
+    ]);
 
     const venueEntries: MetadataRoute.Sitemap = venues.map((v) => ({
       url: `${base}/venues/${v.slug}`,
@@ -78,9 +85,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.75,
     }));
 
-    const counts = computeCitySlugVenueCounts(venues);
+    const listingEntries: MetadataRoute.Sitemap = listings.map((l) => ({
+      url: `${base}/open-mics/${l.slug}`,
+      lastModified: l.updatedAt,
+      changeFrequency: "weekly",
+      priority: 0.72,
+    }));
+
+    const combinedLocations = [
+      ...venues.map((v) => ({ city: v.city, region: v.region, updatedAt: v.updatedAt })),
+      ...listings.map((l) => ({ city: l.city, region: l.region, updatedAt: l.updatedAt })),
+    ];
+    const counts = computeCitySlugVenueCounts(combinedLocations);
     const locationUpdatedAt = new Map<string, Date>();
-    for (const v of venues) {
+    for (const v of combinedLocations) {
       const city = (v.city ?? "").trim();
       if (!city) continue;
       const slug = primaryDiscoverySlugForVenue(city, v.region, counts);
@@ -105,7 +123,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.65,
       }));
 
-    return [...staticEntries, ...resourceEntries, ...venueEntries, ...locationEntries, ...marketingSitemapSupplements()];
+    return [...staticEntries, ...resourceEntries, ...venueEntries, ...listingEntries, ...locationEntries, ...marketingSitemapSupplements()];
   } catch {
     return [...staticEntries, ...resourceEntries, ...marketingSitemapSupplements()];
   }

@@ -68,7 +68,7 @@ function popupHtml(v: OpenMicMapVenueDto): string {
       <div style="margin-bottom:4px"><strong>Format</strong> | ${formatLine}</div>
       <div style="margin-bottom:6px"><strong>Next</strong> | ${next}</div>
       <div style="margin-bottom:10px;font-size:12px">${signup}</div>
-      <a href="/venues/${escHtml(v.slug)}" style="display:inline-block;background:${OPEN_MIC_MAP_NEUTRAL_MARKER_HEX};color:#fff;text-decoration:none;font-weight:600;padding:8px 12px;border-radius:8px;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,.2)">View venue &amp; book</a>
+      <a href="${escHtml(v.href ?? `/venues/${v.slug}`)}" style="display:inline-block;background:${OPEN_MIC_MAP_NEUTRAL_MARKER_HEX};color:#fff;text-decoration:none;font-weight:600;padding:8px 12px;border-radius:8px;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,.2)">${v.isPublicListing ? "View listing" : "View venue &amp; book"}</a>
     </div>
   `;
 }

@@ -39,7 +39,6 @@ export function FindOpenMicsClient(props: {
   const [zip, setZip] = useState("");
   const [cityQ, setCityQ] = useState("");
   const [metroFilter, setMetroFilter] = useState("");
-  const [selectedMetroSlug, setSelectedMetroSlug] = useState<string | null>(null);
 
   const runNearby = useCallback(async (lat: number, lng: number, label: string | null, source: "geo" | "zip" | "city" | "place") => {
     setLoading(true);
@@ -138,15 +137,6 @@ export function FindOpenMicsClient(props: {
     if (!s) return locationRows;
     return locationRows.filter((r) => r.label.toLowerCase().includes(s));
   }, [locationRows, metroFilter]);
-
-  const metroVenues = useMemo(() => {
-    if (!selectedMetroSlug) return [];
-    return venues
-      .filter((v) => v.discoverySlug === selectedMetroSlug)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [venues, selectedMetroSlug]);
-
-  const selectedMetroLabel = locationRows.find((r) => r.slug === selectedMetroSlug)?.label ?? null;
 
   return (
     <div className="mt-0 grid gap-5 md:gap-8">
@@ -320,70 +310,22 @@ export function FindOpenMicsClient(props: {
           </label>
           <div className="grid gap-2 sm:grid-cols-2">
             {filteredMetros.map((m) => (
-              <button
+              <Link
                 key={m.key}
-                type="button"
-                onClick={() => {
-                  setSelectedMetroSlug(m.slug);
-                  trackMarketingEvent("filter_used", { filter: "metro_slug", value: m.slug });
-                }}
-                className={`rounded-xl border p-4 text-left transition ${
-                  selectedMetroSlug === m.slug
-                    ? "border-[rgb(var(--om-neon))]/50 bg-[rgba(var(--om-neon),0.08)]"
-                    : "border-white/10 bg-black/25 hover:bg-black/40"
-                }`}
+                href={`/locations/${m.slug}/open-mics`}
+                onClick={() => trackMarketingEvent("filter_used", { filter: "metro_slug", value: m.slug })}
+                className="rounded-xl border border-white/10 bg-black/25 p-4 text-left transition hover:border-[rgb(var(--om-neon))]/40 hover:bg-black/40"
               >
                 <div className="font-semibold text-white">{m.label}</div>
                 <div className="mt-1 text-xs text-white/55">
-                  {m.count} listing{m.count === 1 ? "" : "s"}
+                  {m.count} open mic listing{m.count === 1 ? "" : "s"}
                 </div>
-              </button>
+                <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">Browse listings →</span>
+              </Link>
             ))}
           </div>
           {filteredMetros.length === 0 ? (
             <p className="text-sm text-white/60">No markets match that filter.</p>
-          ) : null}
-
-          {selectedMetroSlug && selectedMetroLabel ? (
-            <div className="border-t border-white/10 pt-4 md:pt-6">
-              <h3 className="text-sm font-semibold text-white md:text-base">Open mics in {selectedMetroLabel}</h3>
-              <p className="mt-1 text-xs text-white/50 md:text-sm md:text-white/60">
-                Each venue has its own public page with schedules and booking.
-              </p>
-              {metroVenues.length === 0 ? (
-                <div className="mt-3">
-                  <EmptyDiscoveryActions context={`metro ${selectedMetroSlug}`} />
-                </div>
-              ) : (
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2 sm:mt-4 sm:gap-3">
-                  {metroVenues.map((v) => (
-                    <li key={`${v.href}-${v.slug}`}>
-                      <Link
-                        href={v.href}
-                        className="block rounded-xl border border-white/10 bg-black/30 p-4 hover:border-white/20 hover:bg-black/45"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="font-semibold text-white">{v.name}</div>
-                          <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} />
-                        </div>
-                        <div className="mt-1 text-xs text-white/55">
-                          {[v.city, v.region].filter(Boolean).join(", ") || "MicStage listing"}
-                        </div>
-                        <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">
-                          {v.bookable ? "View lineup →" : "View listing →"}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="mt-3 text-xs text-white/45 md:mt-4 md:text-sm md:text-white/55">
-                Upcoming artists in this market:{" "}
-                <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href={`/locations/${selectedMetroSlug}/performers`}>
-                  {"See who is booking slots ->"}
-                </Link>
-              </p>
-            </div>
           ) : null}
         </section>
       )}

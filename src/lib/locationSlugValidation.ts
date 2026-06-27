@@ -30,11 +30,17 @@ export const getValidLocationSlugs = cache(async (): Promise<Set<string> | null>
   const prisma = getPrismaOrNull();
   if (!prisma) return null;
   try {
-    const venues = await prisma.venue.findMany({
-      where: { city: { not: null } },
-      select: { city: true, region: true },
-    });
-    return buildDiscoveryValidationData(venues).validSlugs;
+    const [venues, listings] = await Promise.all([
+      prisma.venue.findMany({
+        where: { city: { not: null } },
+        select: { city: true, region: true },
+      }),
+      prisma.publicOpenMicListing.findMany({
+        where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+        select: { city: true, region: true },
+      }),
+    ]);
+    return buildDiscoveryValidationData([...venues, ...listings]).validSlugs;
   } catch {
     return null;
   }
@@ -50,11 +56,17 @@ export const getLocationAliasToCanonicalMap = cache(async (): Promise<Map<string
   const prisma = getPrismaOrNull();
   if (!prisma) return null;
   try {
-    const venues = await prisma.venue.findMany({
-      where: { city: { not: null } },
-      select: { city: true, region: true },
-    });
-    return buildDiscoveryValidationData(venues).aliasToCanonical;
+    const [venues, listings] = await Promise.all([
+      prisma.venue.findMany({
+        where: { city: { not: null } },
+        select: { city: true, region: true },
+      }),
+      prisma.publicOpenMicListing.findMany({
+        where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+        select: { city: true, region: true },
+      }),
+    ]);
+    return buildDiscoveryValidationData([...venues, ...listings]).aliasToCanonical;
   } catch {
     return null;
   }

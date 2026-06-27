@@ -3,6 +3,7 @@ import {
   computeCitySlugVenueCounts,
   primaryDiscoverySlugForVenue,
   rollupDiscoveryLabel,
+  venueIncludedInDiscoveryPage,
 } from "@/lib/discoveryMarket";
 import { formatMiles, haversineDistanceMiles } from "@/lib/geo";
 import { loadDiscoverablePublicListings } from "@/lib/publicListings/queries";
@@ -228,4 +229,20 @@ export async function loadNearbyDiscoveryRows(
   withDist.sort((a, b) => (a.distanceMiles ?? 0) - (b.distanceMiles ?? 0));
   noCoord.sort((a, b) => a.name.localeCompare(b.name));
   return [...withDist, ...noCoord];
+}
+
+/** Claimed venues + public listings for a discovery market slug (e.g. chicago-il). */
+export async function loadDiscoveryMarketOpenMics(
+  prisma: PrismaClient,
+  locationSlug: string,
+): Promise<OpenMicFinderVenue[]> {
+  const counts = await getDiscoveryLocationCounts(prisma);
+  const all = await loadOpenMicFinderVenues(prisma);
+  return all
+    .filter((row) => {
+      const city = (row.city ?? "").trim();
+      if (!city) return false;
+      return venueIncludedInDiscoveryPage({ city, region: row.region }, locationSlug, counts);
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

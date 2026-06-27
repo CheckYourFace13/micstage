@@ -109,8 +109,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
 
+    const locationOpenMicEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()].map(
+      ([slug, updatedAt]) => ({
+        url: `${base}/locations/${slug}/open-mics`,
+        lastModified: updatedAt,
+        changeFrequency: "weekly" as const,
+        priority: 0.68,
+      }),
+    );
+
     const indexBySlug = await mapDiscoverySlugIndexSignals(prisma);
-    const locationEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()]
+    const locationPerformerEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()]
       .filter(([slug]) => {
         const sig = indexBySlug.get(slug);
         if (!sig) return false;
@@ -123,7 +132,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.65,
       }));
 
-    return [...staticEntries, ...resourceEntries, ...venueEntries, ...listingEntries, ...locationEntries, ...marketingSitemapSupplements()];
+    return [
+      ...staticEntries,
+      ...resourceEntries,
+      ...venueEntries,
+      ...listingEntries,
+      ...locationOpenMicEntries,
+      ...locationPerformerEntries,
+      ...marketingSitemapSupplements(),
+    ];
   } catch {
     return [...staticEntries, ...resourceEntries, ...marketingSitemapSupplements()];
   }

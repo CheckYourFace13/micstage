@@ -189,7 +189,16 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
         </div>
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="grid gap-1 text-xs text-white/65 sm:grid-cols-3">
+          <p className="text-sm text-white/75">
+            Looking for rooms in {placeTitle}?{" "}
+            <Link
+              href={`/locations/${locationSlug}/open-mics`}
+              className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110"
+            >
+              Browse open mic listings in {placeTitle}
+            </Link>
+          </p>
+          <div className="mt-4 grid gap-1 text-xs text-white/65 sm:grid-cols-3">
             <div>{uniquePerformerCount} upcoming performers</div>
             <div>{uniqueVenueCount} active venues</div>
             <div>{upcomingDateCount} upcoming schedule dates</div>

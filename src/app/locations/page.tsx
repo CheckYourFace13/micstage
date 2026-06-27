@@ -45,7 +45,7 @@ export default async function LocationsPage() {
       "@type": "ListItem",
       position: i + 1,
       name: r.label,
-      url: absoluteUrl(`/locations/${r.slug}/performers`),
+      url: absoluteUrl(`/locations/${r.slug}/open-mics`),
     })),
   };
   const featured = [...rows].sort((a, b) => b.count - a.count).slice(0, 8);
@@ -111,7 +111,7 @@ export default async function LocationsPage() {
                   {featured.map((r) => (
                     <Link
                       key={r.key}
-                      href={`/locations/${r.slug}/performers`}
+                      href={`/locations/${r.slug}/open-mics`}
                       className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-black/25 px-2.5 py-1 text-xs hover:bg-black/40 md:min-h-0 md:px-3 md:py-1.5 md:text-sm"
                     >
                       {r.label} ({r.count})

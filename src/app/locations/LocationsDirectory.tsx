@@ -80,11 +80,11 @@ export function LocationsDirectory({ rows }: { rows: PublicDiscoveryLocationRow[
           {filtered.map((l) => (
             <Link
               key={l.key}
-              href={`/locations/${l.slug}/performers`}
+              href={`/locations/${l.slug}/open-mics`}
               className="rounded-xl border border-white/10 bg-white/5 p-3.5 hover:bg-white/10 md:p-4"
             >
               <div className="font-semibold">{l.label}</div>
-              <div className="mt-1 text-xs text-white/55">{l.count} venue{l.count === 1 ? "" : "s"} on MicStage</div>
+              <div className="mt-1 text-xs text-white/55">{l.count} open mic listing{l.count === 1 ? "" : "s"}</div>
             </Link>
           ))}
         </div>

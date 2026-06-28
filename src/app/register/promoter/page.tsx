@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PROMOTER_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
-import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
 import { buildPublicMetadata } from "@/lib/publicSeo";
@@ -38,7 +37,6 @@ export default async function PromoterRegisterPage(props: { searchParams: Promis
           For organizers whose <span className="text-white/90">promoter application is approved</span>. Use the same email as
           your application. You will set a private password — this account is separate from artist and venue logins.
         </p>
-        <BetaNote className="mt-3" />
 
         <form
           method="post"

@@ -9,6 +9,7 @@ import { safeExternalHref } from "@/lib/externalUrl";
 import { isValidPublicSlug } from "@/lib/locationSlugValidation";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { loadPublicOpenMicListingBySlug } from "@/lib/publicListings/queries";
+import { listingIsPubliclyIndexable } from "@/lib/publicListings/listingQuality";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
@@ -33,10 +34,12 @@ export async function generateMetadata(props: { params: Promise<{ listingSlug: s
   }
   const place = [listing.city, listing.region].filter(Boolean).join(", ");
   const title = place ? `${listing.name} open mic | ${place}` : `${listing.name} open mic`;
-  const description = `Open mic at ${listing.name}${place ? ` in ${place}` : ""}. Schedule, signup info, and host details — verified listing on MicStage.`;
+  const description = `Open mic listing: ${listing.name}${place ? ` in ${place}` : ""}. Schedule, signup info, and host details on MicStage.`;
+  const indexable = listingIsPubliclyIndexable(listing);
   return {
     ...buildPublicMetadata({ title, description, path }),
     title: { absolute: `${title} | MicStage` },
+    robots: indexable ? undefined : { index: false, follow: true },
   };
 }
 
@@ -125,7 +128,7 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
 
         <header className="mt-4">
           <div className="flex flex-wrap items-center gap-2">
-            <DiscoveryListingBadge kind={kind} bookable={false} />
+            <DiscoveryListingBadge kind={kind} bookable={false} hasSchedule={listing.schedules.length > 0} />
             {listing.lastVerifiedAt ? (
               <span className="text-xs text-white/50">
                 Verified {listing.lastVerifiedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
@@ -151,7 +154,7 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Schedule</h2>
           {listing.schedules.length === 0 ? (
-            <p className="mt-2 text-sm text-white/60">Schedule details coming soon.</p>
+            <p className="mt-2 text-sm text-white/60">Schedule details are still being verified.</p>
           ) : (
             <ul className="mt-3 grid gap-3">
               {listing.schedules.map((s) => (

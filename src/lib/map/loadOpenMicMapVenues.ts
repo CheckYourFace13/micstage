@@ -4,6 +4,7 @@ import { isDateInSeriesRange, isWithinBookingWindow } from "@/lib/venueBookingRu
 import { pickPrimaryLineup, storageYmdUtc } from "@/lib/venuePublicLineup";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import type { OpenMicMapVenueDto } from "@/lib/map/openMicMapTypes";
+import { discoveryBadgeLabel } from "@/lib/publicListings/types";
 
 const MAP_ACTIVE_WINDOW_DAYS = 120;
 
@@ -197,6 +198,9 @@ export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMi
       hasPublicSchedule,
       nextEvent,
       acceptingSignups,
+      isPublicListing: false,
+      mapKind: "claimed",
+      badgeLabel: discoveryBadgeLabel("claimed", acceptingSignups, { hasSchedule: hasPublicSchedule }),
     });
   }
 

@@ -1,13 +1,28 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { CONTACT_CATEGORIES } from "./categories";
 import { submitContactForm, type ContactFormState } from "./actions";
 
 const initial: ContactFormState = { status: "idle" };
 
-export function ContactForm() {
+export function ContactForm(props: { defaultCategory?: string; defaultDetails?: string }) {
   const [state, formAction, pending] = useActionState(submitContactForm, initial);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (!props.defaultCategory && !props.defaultDetails) return;
+    const form = formRef.current;
+    if (!form) return;
+    if (props.defaultCategory) {
+      const radio = form.querySelector<HTMLInputElement>(`input[name="category"][value="${props.defaultCategory}"]`);
+      if (radio) radio.checked = true;
+    }
+    if (props.defaultDetails) {
+      const details = form.querySelector<HTMLTextAreaElement>('textarea[name="details"]');
+      if (details && !details.value) details.value = props.defaultDetails;
+    }
+  }, [props.defaultCategory, props.defaultDetails]);
 
   if (state.status === "success") {
     return (
@@ -35,7 +50,7 @@ export function ContactForm() {
   }
 
   return (
-    <form action={formAction} className="grid gap-6">
+    <form ref={formRef} action={formAction} className="grid gap-6">
       {state.status === "error" && state.message ? (
         <p
           className="rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-100"

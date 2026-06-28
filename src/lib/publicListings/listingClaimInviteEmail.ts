@@ -3,6 +3,7 @@ import { deliverResendEmail } from "@/lib/mailer";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { transactionalFromAddress } from "@/lib/marketing/emailConfig";
+import { resendDailyBudgetSnapshot } from "@/lib/resendDailyBudget";
 
 const REPLY_TO = "drummer@micstage.com";
 
@@ -326,11 +327,16 @@ export async function leadHasUnclaimedPublicListing(
   return n > 0;
 }
 
-/** Sends pending claim invites (bounded batch). Safe to run on every growth cron tick. */
+/** Sends pending claim invites (bounded batch). Respects {@link resendDailyBudgetSnapshot}. */
 export async function runPendingListingClaimInvites(
   prisma: PrismaClient,
-  limit = 20,
-): Promise<{ sent: number; skipped: number; candidates: number }> {
+  limit = 5,
+): Promise<{ sent: number; skipped: number; candidates: number; budgetBlocked?: boolean }> {
+  const { remaining } = await resendDailyBudgetSnapshot(prisma);
+  if (remaining <= 0) {
+    return { sent: 0, skipped: 0, candidates: 0, budgetBlocked: true };
+  }
+  const effectiveLimit = Math.min(limit, remaining);
   const pending = await prisma.publicOpenMicListing.findMany({
     where: {
       claimInviteEmailSentAt: null,
@@ -341,12 +347,15 @@ export async function runPendingListingClaimInvites(
     },
     select: { id: true, growthLead: { select: { contactEmailNormalized: true } } },
     orderBy: { createdAt: "asc" },
-    take: limit,
+    take: effectiveLimit,
   });
 
   let sent = 0;
   let skipped = 0;
   for (const row of pending) {
+    const budget = await resendDailyBudgetSnapshot(prisma);
+    if (budget.remaining <= 0) break;
+
     const result = await sendListingClaimInviteIfNeeded(
       prisma,
       row.id,

@@ -6,7 +6,7 @@ import {
   venueIncludedInDiscoveryPage,
 } from "@/lib/discoveryMarket";
 import { formatMiles, haversineDistanceMiles } from "@/lib/geo";
-import { loadDiscoverablePublicListings } from "@/lib/publicListings/queries";
+import { loadDiscoverablePublicListings, publicListingWhereDiscoverable } from "@/lib/publicListings/queries";
 import type {
   DiscoveryListingKind,
   NearbyDiscoveryRow,
@@ -41,7 +41,7 @@ function toFinderRow(
     lat: number | null;
     lng: number | null;
   },
-  opts: { href: string; kind: DiscoveryListingKind; bookable: boolean },
+  opts: { href: string; kind: DiscoveryListingKind; bookable: boolean; hasSchedule?: boolean },
   counts: ReadonlyMap<string, number>,
 ): OpenMicFinderVenue {
   const city = (base.city ?? "").trim();
@@ -51,7 +51,8 @@ function toFinderRow(
     href: opts.href,
     kind: opts.kind,
     bookable: opts.bookable,
-    badgeLabel: discoveryBadgeLabel(opts.kind, opts.bookable),
+    hasSchedule: opts.hasSchedule ?? true,
+    badgeLabel: discoveryBadgeLabel(opts.kind, opts.bookable, { hasSchedule: opts.hasSchedule }),
     name: base.name,
     city: base.city,
     region: base.region,
@@ -68,7 +69,7 @@ async function combinedCityRegionRows(prisma: PrismaClient): Promise<CityRegionR
       select: { city: true, region: true },
     }),
     prisma.publicOpenMicListing.findMany({
-      where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+      where: { city: { not: null }, ...publicListingWhereDiscoverable() },
       select: { city: true, region: true },
     }),
   ]);
@@ -125,9 +126,10 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
 
   const unclaimed = listings.map((l) => {
     const kind = listingKind(l.verificationStatus);
+    const hasSchedule = l.schedules.length > 0;
     return toFinderRow(
       l,
-      { href: listingPublicHref(l.slug), kind, bookable: false },
+      { href: listingPublicHref(l.slug), kind, bookable: false, hasSchedule },
       counts,
     );
   });
@@ -153,20 +155,7 @@ export async function loadNearbyDiscoveryRows(
         lng: true,
       },
     }),
-    prisma.publicOpenMicListing.findMany({
-      where: { claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
-      orderBy: { name: "asc" },
-      select: {
-        slug: true,
-        name: true,
-        city: true,
-        region: true,
-        formattedAddress: true,
-        lat: true,
-        lng: true,
-        verificationStatus: true,
-      },
-    }),
+    loadDiscoverablePublicListings(prisma),
   ]);
 
   const withDist: NearbyDiscoveryRow[] = [];
@@ -183,6 +172,7 @@ export async function loadNearbyDiscoveryRows(
     href: string;
     kind: DiscoveryListingKind;
     bookable: boolean;
+    hasSchedule?: boolean;
   };
 
   const rows: Raw[] = [
@@ -203,6 +193,7 @@ export async function loadNearbyDiscoveryRows(
       href: listingPublicHref(l.slug),
       kind: listingKind(l.verificationStatus),
       bookable: false,
+      hasSchedule: l.schedules.length > 0,
     })),
   ];
 
@@ -212,7 +203,10 @@ export async function loadNearbyDiscoveryRows(
       href: v.href,
       kind: v.kind,
       bookable: v.bookable,
-      badgeLabel: discoveryBadgeLabel(v.kind, v.bookable),
+      hasSchedule: "hasSchedule" in v ? Boolean(v.hasSchedule) : true,
+      badgeLabel: discoveryBadgeLabel(v.kind, v.bookable, {
+        hasSchedule: "hasSchedule" in v ? Boolean(v.hasSchedule) : true,
+      }),
       name: v.name,
       city: v.city,
       region: v.region,

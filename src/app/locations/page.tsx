@@ -8,6 +8,7 @@ import { loadPublicDiscoveryLocationRows, type PublicDiscoveryLocationRow } from
 import { MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY } from "@/lib/discoveryMarket";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { LocationsDirectory } from "./LocationsDirectory";
+import { DiscoveryInventorySummary } from "@/components/discovery/DiscoveryInventorySummary";
 
 export const dynamic = "force-dynamic";
 
@@ -76,16 +77,11 @@ export default async function LocationsPage() {
               broader market (for example Chicagoland or Central Illinois) so discovery is easier. Addresses on each venue page
               stay exact.
             </p>
-            <div className="flex flex-wrap gap-2 text-[10px] text-white/50 md:text-xs md:text-white/60">
-              <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">{rows.length} discovery markets</span>
-              <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1">
-                {rows.reduce((sum, r) => sum + r.count, 0)} venue profiles
-              </span>
-            </div>
+            <DiscoveryInventorySummary className="mb-3" />
             <p className="text-xs leading-snug text-white/50 md:text-sm md:leading-normal md:text-white/65">
               Looking for venues near you? Start with{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">
-                Find Local Open Mics
+                Find open mics
               </Link>
               , the{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/map">
@@ -105,7 +101,7 @@ export default async function LocationsPage() {
               <section className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
                 <h2 className="text-base font-semibold md:text-lg">Largest discovery markets</h2>
                 <p className="mt-1 text-xs text-white/55 md:text-sm md:text-white/70">
-                  Hubs with the most MicStage venues right now, often metros or dense cities.
+                  Hubs with the most open mic listings right now, often metros or dense cities.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {featured.map((r) => (

@@ -16,6 +16,7 @@ type NearbyVenue = {
   href: string;
   kind: "claimed" | "verified" | "unclaimed";
   bookable: boolean;
+  hasSchedule?: boolean;
   name: string;
   city: string | null;
   region: string | null;
@@ -274,7 +275,7 @@ export function FindOpenMicsClient(props: {
                         <span className="font-mono text-xs text-[rgb(var(--om-neon))]">{v.distanceLabel}</span>
                       </div>
                       <div className="mt-2">
-                        <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} />
+                        <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} hasSchedule={v.hasSchedule !== false} />
                       </div>
                       <p className="mt-2 text-xs text-white/55">{v.formattedAddress}</p>
                       <p className="mt-2 text-xs text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2">

@@ -5,7 +5,6 @@ import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquis
 import { getPrismaOrNull } from "@/lib/prisma";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
-import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { MUSICIAN_REGISTER_SUBMIT_PATH } from "./actions";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
@@ -50,11 +49,9 @@ export default async function MusicianRegisterPage(props: {
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Artist registration</h1>
         <p className="mt-2 text-sm text-white/70">
-          Create your artist account with <span className="text-white/90">email + password</span> (private). You will set a{" "}
-          <span className="text-white/90">stage name</span> that is <span className="text-emerald-200/90">public</span>. That is
-          what venues and fans see, and how you show up in artist search.
+          Book open mic slots, save and follow venues, get nearby alerts, and appear publicly by stage name. Your legal
+          name and login email stay private — only your stage name shows in search.
         </p>
-        <BetaNote className="mt-3" />
 
         <form
           method="post"

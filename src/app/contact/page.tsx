@@ -10,7 +10,12 @@ export const metadata: Metadata = buildPublicMetadata({
   path: "/contact",
 });
 
-export default function ContactPage() {
+export default async function ContactPage(props: { searchParams: Promise<{ category?: string; listing?: string }> }) {
+  const params = await props.searchParams;
+  const category = params.category?.trim();
+  const listing = params.listing?.trim();
+  const defaultDetails = listing ? `Listing: ${listing}\n\n` : undefined;
+
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto max-w-2xl px-6 py-14 pb-24">
@@ -27,7 +32,7 @@ export default function ContactPage() {
             Tell us how we can help. We will reply to the email address you provide.
           </p>
           <div className="mt-6">
-            <ContactForm />
+            <ContactForm defaultCategory={category} defaultDetails={defaultDetails} />
           </div>
         </div>
 

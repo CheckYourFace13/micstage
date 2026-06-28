@@ -1,16 +1,13 @@
 import type { Prisma, PrismaClient, PublicListingVerificationStatus } from "@/generated/prisma/client";
+import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 
-/** Listings shown in public discovery (exclude claimed duplicates and outdated). */
-export const PUBLIC_DISCOVERY_VERIFICATION: PublicListingVerificationStatus[] = [
-  "VERIFIED",
-  "NEEDS_REVIEW",
-  "UNVERIFIED",
-];
+/** Listings shown in public discovery (exclude claimed duplicates, outdated, and unverified). */
+export const PUBLIC_DISCOVERY_VERIFICATION = ["VERIFIED", "NEEDS_REVIEW"] as const;
 
 export function publicListingWhereDiscoverable() {
   return {
     claimedVenueId: null,
-    verificationStatus: { not: "OUTDATED" as const },
+    verificationStatus: { in: [...PUBLIC_DISCOVERY_VERIFICATION] },
   };
 }
 
@@ -66,11 +63,12 @@ export type PublicOpenMicListingPayload = Prisma.PublicOpenMicListingGetPayload<
 export async function loadDiscoverablePublicListings(
   prisma: PrismaClient,
 ): Promise<PublicOpenMicListingPayload[]> {
-  return prisma.publicOpenMicListing.findMany({
+  const rows = await prisma.publicOpenMicListing.findMany({
     where: publicListingWhereDiscoverable(),
     orderBy: [{ name: "asc" }],
     select: listingSelect,
   });
+  return rows.filter((l) => isPublicListingNameOk(l.name));
 }
 
 export async function loadPublicOpenMicListingBySlug(

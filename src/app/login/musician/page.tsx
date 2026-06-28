@@ -6,7 +6,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { safeAfterMusicianLoginPath } from "@/lib/safeRedirect";
-import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { MUSICIAN_LOGIN_SUBMIT_PATH } from "./serverActions";
 
@@ -40,7 +39,6 @@ export default async function MusicianLoginPage(props: {
           </Link>{" "}
           (not your legal name).
         </p>
-        <BetaNote className="mt-3" />
 
         <form
           method="post"

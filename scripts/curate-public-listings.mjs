@@ -41,6 +41,9 @@ const dryRun = process.argv.includes("--dry-run");
 const JUNK =
   /\b(karaoke|trivia|best bars|nightlife guide|review:|must-chicago|bandmix|pub trivia|private events|how to mic|blog|list of all|top ten live|live music trail|comedy clubs shows in)\b/i;
 
+const GENERIC_ARTIFACT =
+  /^(write|events|stand|home|local events|event venue|open mic night|open mic|home-\d+)$/i;
+
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 
 try {
@@ -52,7 +55,8 @@ try {
   let marked = 0;
   for (const row of rows) {
     const n = row.name.trim();
-    if (!JUNK.test(n) && !/^home(-\d+)?$/i.test(n) && n.length >= 4) continue;
+    const junk = JUNK.test(n) || GENERIC_ARTIFACT.test(n) || /^home(-\d+)?$/i.test(n) || n.length < 4;
+    if (!junk) continue;
     if (dryRun) {
       console.log("[dry-run] OUTDATED", row.slug, n);
       marked += 1;

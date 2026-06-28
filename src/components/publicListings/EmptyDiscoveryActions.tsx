@@ -30,14 +30,14 @@ export function EmptyDiscoveryActions(props: { context?: string }) {
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 p-4 md:p-5">
-      <p className="text-sm font-semibold text-white">Nothing nearby yet?</p>
+      <p className="text-sm font-semibold text-white">No open mic listings near this search yet.</p>
       <p className="mt-1 text-xs text-white/60 md:text-sm">
-        MicStage is adding verified open mic listings city by city. You can help fill the map.
+        Request this city, suggest a venue, or get alerts when listings are added.
       </p>
       <ul className="mt-3 grid gap-2 text-sm">
         <li>
-          <Link href="/contact" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">
-            Know a venue? Add it
+          <Link href="/contact?category=partnership" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">
+            Suggest a venue
           </Link>
         </li>
         <li>

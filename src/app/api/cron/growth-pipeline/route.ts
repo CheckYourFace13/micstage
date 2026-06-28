@@ -7,6 +7,12 @@ import { runAutoGrowthOutreachDrafts } from "@/lib/growth/growthDraftAutomation"
 import { runGrowthLeadDiscovery } from "@/lib/growth/growthDiscoveryRun";
 import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
 import {
+  countPendingListingClaimInvitesWithEmail,
+  growthOutreachPausedWhileClaimInvitesPending,
+  listingClaimInvitesPerCron,
+  resendDailyBudgetSnapshot,
+} from "@/lib/resendDailyBudget";
+import {
   resolveMarketingSocialPayloadBatchSize,
   runMarketingSocialPayloadBatch,
 } from "@/lib/growth/marketingSocialPayloadBatch";
@@ -78,6 +84,8 @@ async function handle(request: Request) {
     let drafts: Awaited<ReturnType<typeof runAutoGrowthOutreachDrafts>> | null = null;
     let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
     let listingClaimInvites: Awaited<ReturnType<typeof runPendingListingClaimInvites>> | null = null;
+    let resendBudget: Awaited<ReturnType<typeof resendDailyBudgetSnapshot>> | null = null;
+    let pendingClaimInvites: number | null = null;
     let outreachSkippedReason: string | null = null;
 
     if (emailMiningEnabled) {
@@ -86,19 +94,36 @@ async function handle(request: Request) {
     }
 
     if (draftEnabled) {
-      listingClaimInvites = await runPendingListingClaimInvites(prisma, 20);
+      resendBudget = await resendDailyBudgetSnapshot(prisma);
+      pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
+      const inviteBatch = Math.min(listingClaimInvitesPerCron(), resendBudget.remaining);
+      if (inviteBatch > 0) {
+        listingClaimInvites = await runPendingListingClaimInvites(prisma, inviteBatch);
+        resendBudget = await resendDailyBudgetSnapshot(prisma);
+      } else {
+        listingClaimInvites = { sent: 0, skipped: 0, candidates: 0 };
+      }
     }
 
-    // Outreach first on combined runs so invites still send if discovery is slow (Hostinger 504).
     if (draftEnabled) {
-      const lock = await tryOutreachLock(prisma);
-      if (!lock) {
-        outreachSkippedReason = "growth-outreach already running";
+      if (resendBudget && resendBudget.remaining <= 0) {
+        outreachSkippedReason = "resend daily budget exhausted";
+      } else if (
+        pendingClaimInvites != null &&
+        pendingClaimInvites > 0 &&
+        growthOutreachPausedWhileClaimInvitesPending()
+      ) {
+        outreachSkippedReason = "outreach paused while claim invites pending";
       } else {
-        try {
-          drafts = await runAutoGrowthOutreachDrafts(prisma);
-        } finally {
-          await lock.release();
+        const lock = await tryOutreachLock(prisma);
+        if (!lock) {
+          outreachSkippedReason = "growth-outreach already running";
+        } else {
+          try {
+            drafts = await runAutoGrowthOutreachDrafts(prisma);
+          } finally {
+            await lock.release();
+          }
         }
       }
     }
@@ -146,6 +171,8 @@ async function handle(request: Request) {
         discovery,
         discoveryError,
         emailMining,
+        resendBudget,
+        pendingClaimInvites,
         listingClaimInvites,
         autoDrafts: drafts,
         growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,

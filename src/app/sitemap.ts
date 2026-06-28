@@ -6,6 +6,7 @@ import { siteOrigin } from "@/lib/publicSeo";
 import { getAllResourceArticles } from "@/lib/resourcesContent";
 import { marketingSitemapSupplements } from "@/lib/marketing/indexability";
 import { publicListingWhereDiscoverable } from "@/lib/publicListings/queries";
+import { listingIsPubliclyIndexable } from "@/lib/publicListings/listingQuality";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }),
       prisma.publicOpenMicListing.findMany({
         where: publicListingWhereDiscoverable(),
-        select: { slug: true, updatedAt: true, city: true, region: true },
+        select: {
+          slug: true,
+          updatedAt: true,
+          city: true,
+          region: true,
+          name: true,
+          verificationStatus: true,
+          formattedAddress: true,
+          lastVerifiedAt: true,
+          schedules: { where: { isActive: true }, select: { id: true } },
+        },
       }),
     ]);
 
@@ -85,7 +96,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.75,
     }));
 
-    const listingEntries: MetadataRoute.Sitemap = listings.map((l) => ({
+    const indexableListings = listings.filter((l) => listingIsPubliclyIndexable(l));
+
+    const listingEntries: MetadataRoute.Sitemap = indexableListings.map((l) => ({
       url: `${base}/open-mics/${l.slug}`,
       lastModified: l.updatedAt,
       changeFrequency: "weekly",

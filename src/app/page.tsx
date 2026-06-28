@@ -46,7 +46,7 @@ export default function Home() {
                 href="/find-open-mics"
                 className="inline-flex min-h-12 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-6 text-base font-semibold text-black hover:brightness-110"
               >
-                Find a slot tonight
+                Find Mics
               </Link>
               <Link
                 href="/register/venue"

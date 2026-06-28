@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DiscoveryInventorySummary } from "@/components/discovery/DiscoveryInventorySummary";
 import { OpenMicMapClient } from "@/components/map/OpenMicMapClient";
 import type { OpenMicMapVenueDto } from "@/lib/map/openMicMapTypes";
 import { getPrismaOrNull } from "@/lib/prisma";
@@ -131,6 +132,7 @@ export default async function OpenMicMapPage() {
           </div>
         ) : (
           <div className="order-1 md:order-4">
+            <DiscoveryInventorySummary className="mb-4" />
             <div className="rounded-xl ring-1 ring-white/10 md:rounded-none md:ring-0">
               <OpenMicMapClient venues={venues} />
             </div>

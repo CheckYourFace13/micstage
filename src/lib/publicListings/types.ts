@@ -8,6 +8,7 @@ export type OpenMicFinderVenue = {
   href: string;
   kind: DiscoveryListingKind;
   bookable: boolean;
+  hasSchedule?: boolean;
   badgeLabel: string;
   name: string;
   city: string | null;
@@ -22,6 +23,7 @@ export type NearbyDiscoveryRow = {
   href: string;
   kind: DiscoveryListingKind;
   bookable: boolean;
+  hasSchedule?: boolean;
   badgeLabel: string;
   name: string;
   city: string | null;
@@ -31,10 +33,17 @@ export type NearbyDiscoveryRow = {
   distanceLabel: string;
 };
 
-export function discoveryBadgeLabel(kind: DiscoveryListingKind, bookable: boolean): string {
+export function discoveryBadgeLabel(
+  kind: DiscoveryListingKind,
+  bookable: boolean,
+  opts?: { hasSchedule?: boolean },
+): string {
   if (bookable) return "Bookable on MicStage";
-  if (kind === "verified") return "Verified listing";
-  return "Unclaimed";
+  if (kind === "claimed") return "MicStage venue";
+  if (kind === "verified") {
+    return opts?.hasSchedule === false ? "Schedule details needed" : "Verified listing";
+  }
+  return "Unclaimed listing";
 }
 
 export function listingPublicHref(slug: string): string {

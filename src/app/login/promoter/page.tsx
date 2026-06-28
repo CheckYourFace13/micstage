@@ -6,7 +6,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { PROMOTER_DASHBOARD_HREF, safeAfterAuthPath } from "@/lib/safeRedirect";
-import { BetaNote } from "@/components/BetaNote";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { PROMOTER_LOGIN_SUBMIT_PATH } from "./serverActions";
 
@@ -36,7 +35,6 @@ export default async function PromoterLoginPage(props: {
           Sign in with the <span className="text-white/90">email and password</span> you used when you created your promoter
           account after application approval.
         </p>
-        <BetaNote className="mt-3" />
 
         <form
           method="post"

@@ -5,7 +5,7 @@ import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquis
 import { getPrismaOrNull } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { VENUE_REGISTER_SUBMIT_PATH } from "./actions";
-import { BetaNote } from "@/components/BetaNote";
+import { VenueSetupRequestForm } from "@/components/register/VenueSetupRequestForm";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { VenuePlaceFields } from "./venuePlaceFields";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
@@ -61,7 +61,10 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
             </p>
           </div>
         ) : null}
-        <BetaNote className="mt-3" />
+
+        <div className="mt-8">
+          <VenueSetupRequestForm />
+        </div>
 
         <form
           method="post"

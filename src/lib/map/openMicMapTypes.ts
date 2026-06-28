@@ -1,4 +1,5 @@
 import type { VenuePerformanceFormat, Weekday } from "@/generated/prisma/client";
+import type { DiscoveryListingKind } from "@/lib/publicListings/types";
 
 /**
  * Subtle brand-safe tints used only when a weekday filter is active.
@@ -57,4 +58,7 @@ export type OpenMicMapVenueDto = {
   nextEvent: OpenMicMapNextEventDto | null;
   /** Has at least one non–house-only template with an AVAILABLE slot on a bookable future instance. */
   acceptingSignups: boolean;
+  /** Precomputed label for map/finder cards. */
+  badgeLabel?: string;
+  mapKind?: DiscoveryListingKind;
 };

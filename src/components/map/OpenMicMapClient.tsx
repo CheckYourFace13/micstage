@@ -295,7 +295,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
           <span className="font-medium text-white/65">List:</span>{" "}
           <span className="tabular-nums text-white/80">{filtered.length}</span> match filters ·{" "}
           <span className="font-medium text-white/65">Total:</span>{" "}
-          <span className="tabular-nums text-white/80">{allVenues.length}</span> on MicStage
+          <span className="tabular-nums text-white/80">{allVenues.length}</span> on map
         </p>
       </section>
 
@@ -394,10 +394,14 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
                         <div className="min-w-0">
                           <div className="truncate font-medium text-white">{v.name}</div>
                           <div className="mt-0.5 text-xs text-white/55">
-                            {[v.city, v.region].filter(Boolean).join(", ") || "Full address on venue page"}
+                            {[v.city, v.region].filter(Boolean).join(", ") || "Full address on listing page"}
                           </div>
                         </div>
-                        {v.nextEvent ? (
+                        {v.badgeLabel ? (
+                          <span className="shrink-0 rounded-md border border-white/20 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/75">
+                            {v.badgeLabel}
+                          </span>
+                        ) : v.nextEvent ? (
                           <span
                             className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${nextBadgeClass(v.nextEvent.badge)}`}
                           >
@@ -408,6 +412,8 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
                       <p className="mt-2 text-xs text-white/60">
                         {v.hasPublicSchedule ? (
                           <span className="text-white/75">Open mic: {days}</span>
+                        ) : v.isPublicListing ? (
+                          <span className="text-white/75">Verified listing · schedule being confirmed</span>
                         ) : (
                           <span className="text-white/75">MicStage venue · recently active</span>
                         )}
@@ -415,7 +421,9 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
                           <span className="text-white/40"> · {v.templates.length} recurring nights</span>
                         ) : null}
                       </p>
-                      <p className="mt-1 text-xs text-white/55">{v.hasPublicSchedule ? formats : "Schedule details coming soon"}</p>
+                      <p className="mt-1 text-xs text-white/55">
+                        {v.hasPublicSchedule ? formats : "Schedule details are still being verified."}
+                      </p>
                       {v.nextEvent && v.hasPublicSchedule ? (
                         <p className="mt-1 text-xs text-white/75">{v.nextEvent.timeLabel}</p>
                       ) : (
@@ -429,7 +437,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
                         href={v.href ?? `/venues/${v.slug}`}
                         className="text-xs font-semibold text-[rgb(var(--om-neon))] underline decoration-[rgb(var(--om-neon))]/35 underline-offset-2 hover:brightness-110"
                       >
-                        {v.isPublicListing ? "View verified listing →" : "Open venue page to book →"}
+                        {v.isPublicListing ? "View verified listing →" : v.acceptingSignups ? "Open venue page to book →" : "Open venue page →"}
                       </Link>
                     </div>
                   </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FindOpenMicsClient } from "@/components/find-open-mics/FindOpenMicsClient";
+import { DiscoveryInventorySummary } from "@/components/discovery/DiscoveryInventorySummary";
 import { loadOpenMicFinderVenues, loadPublicDiscoveryLocationRows } from "@/lib/discoveryLocationRows";
 import { hasGoogleMapsBrowserKey } from "@/lib/env/publicGoogleMaps.server";
 import { getPrismaOrNull } from "@/lib/prisma";
@@ -80,6 +81,7 @@ export default async function FindOpenMicsPage() {
             </div>
           ) : (
             <div className="order-1 md:order-4">
+              <DiscoveryInventorySummary className="mb-4" />
               <div className="rounded-xl ring-1 ring-white/10 md:rounded-none md:ring-0">
                 <FindOpenMicsClient
                   locationRows={locationRows}

@@ -57,7 +57,7 @@ export default function WhyMarketingAndDiscoveryPage() {
             href="/find-open-mics"
             className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Find Local Open Mic&apos;s
+            Find Local Open Mics
           </Link>
         </div>
 

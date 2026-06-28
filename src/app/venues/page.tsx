@@ -5,6 +5,7 @@ import { ADSENSE_SLOTS } from "@/lib/adsense";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { getVenueCityDiscoveryCounts, primaryDiscoverySlugForVenue } from "@/lib/discoveryMarket";
+import { DiscoveryInventorySummary } from "@/components/discovery/DiscoveryInventorySummary";
 import { loadDiscoverablePublicListings } from "@/lib/publicListings/queries";
 import { listingPublicHref } from "@/lib/publicListings/types";
 
@@ -103,13 +104,8 @@ export default async function VenuesDirectoryPage() {
           truth. For artist discovery, MicStage prefers metro and regional markets until a city reaches enough venues to
           earn its own directory.
         </p>
-        <div className="order-3 flex flex-wrap gap-2 text-[10px] text-white/50 md:order-2 md:gap-2 md:text-xs md:text-white/60">
-          <span className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 md:min-h-0">
-            {totalCombined} listings (venues + verified)
-          </span>
-          <span className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 md:min-h-0">
-            {totalLocations} city/state groupings
-          </span>
+        <DiscoveryInventorySummary className="mt-3" />
+        <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-white/50 md:order-2 md:gap-2 md:text-xs md:text-white/60">
           <Link
             className="inline-flex min-h-9 items-center rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white md:min-h-0"
             href="/locations"

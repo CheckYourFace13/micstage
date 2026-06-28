@@ -5,10 +5,10 @@ export function PerformersEmptyState(props: { query?: string }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
       <p className="font-semibold text-white/90">
-        {query ? "No artists match that search yet." : "Be the first artist in your market."}
+        {query ? "No artists match that search yet." : "No artists are listed here yet."}
       </p>
       <p className="mt-2 text-white/65">
-        MicStage lists stage names so performers get discovered when they book local open mics.
+        Create a free artist profile to appear by stage name, or browse open mics near you.
       </p>
       <ul className="mt-4 grid gap-2">
         <li>
@@ -18,12 +18,7 @@ export function PerformersEmptyState(props: { query?: string }) {
         </li>
         <li>
           <Link href="/find-open-mics" className="text-[rgb(var(--om-neon))] underline">
-            Browse open mics near you
-          </Link>
-        </li>
-        <li>
-          <Link href="/locations" className="text-[rgb(var(--om-neon))] underline">
-            See who is booking by metro
+            Find open mics
           </Link>
         </li>
       </ul>

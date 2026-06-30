@@ -1,5 +1,9 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { chicagoLast24hWindow } from "@/lib/ownerSummary/chicagoWindow";
+import { loadDiscoveryInventoryStats } from "@/lib/publicListings/inventoryStats";
+import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { PUBLIC_DISCOVERY_VERIFICATION } from "@/lib/publicListings/queries";
+import { countPendingListingClaimInvitesWithEmail } from "@/lib/resendDailyBudget";
 
 export type OwnerSummarySignupRow = {
   kind: "venue" | "artist";
@@ -17,6 +21,20 @@ export type OwnerSummaryLeadHighlight = {
   detail: string;
 };
 
+export type OwnerSummaryListingRow = {
+  name: string;
+  slug: string;
+  cityState: string | null;
+  verificationStatus: string;
+  claimStatus: string;
+  scheduleCount: number;
+  claimInviteSent: boolean;
+  ownerEmail: string | null;
+  websiteUrl: string | null;
+  aboutPreview: string | null;
+  createdAt: Date;
+};
+
 export type OwnerDailySummaryData = {
   windowLabel: string;
   reportChicagoDate: string;
@@ -31,6 +49,22 @@ export type OwnerDailySummaryData = {
   growthRepliesCount: number;
   repliesNote: string;
   topItems: OwnerSummaryLeadHighlight[];
+  /** Public open mic inventory (registered + unclaimed listings). */
+  listingsInventory: {
+    totalListings: number;
+    verifiedListings: number;
+    unclaimedListings: number;
+    bookableVenues: number;
+    claimedVenues: number;
+    discoveryMarkets: number;
+    listingsCreatedCount: number;
+    claimInvitesSentCount: number;
+    pendingClaimInvites: number;
+    leadsAwaitingPublish: number;
+    googleVerifiedListings: number;
+    listingsNote: string;
+  };
+  recentListings: OwnerSummaryListingRow[];
 };
 
 function cityState(city: string | null | undefined, region: string | null | undefined): string | null {
@@ -253,6 +287,109 @@ export async function buildOwnerDailySummary(
     });
   }
 
+  const [
+    inventory,
+    pendingClaimInvites,
+    listingsCreatedCount,
+    claimInvitesSentCount,
+    leadsAwaitingPublish,
+    unclaimedListings,
+    googleVerifiedListings,
+    listingsCreatedInWindow,
+    recentListingsFallback,
+  ] = await Promise.all([
+    loadDiscoveryInventoryStats(prisma),
+    countPendingListingClaimInvitesWithEmail(prisma),
+    prisma.publicOpenMicListing.count({
+      where: { createdAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.publicOpenMicListing.count({
+      where: { claimInviteEmailSentAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.growthLead.count({
+      where: {
+        leadType: "VENUE",
+        openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] },
+        NOT: { publicListings: { some: {} } },
+      },
+    }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        claimStatus: "UNCLAIMED",
+        claimedVenueId: null,
+        verificationStatus: { in: [...PUBLIC_DISCOVERY_VERIFICATION] },
+      },
+    }),
+    prisma.publicOpenMicListing.count({
+      where: { googlePlaceId: { not: null }, verificationStatus: { not: "OUTDATED" } },
+    }),
+    prisma.publicOpenMicListing.findMany({
+      where: { createdAt: { gte: startUtc, lt: endUtc } },
+      select: {
+        name: true,
+        slug: true,
+        city: true,
+        region: true,
+        verificationStatus: true,
+        claimStatus: true,
+        claimInviteEmailSentAt: true,
+        claimInviteEmail: true,
+        websiteUrl: true,
+        about: true,
+        createdAt: true,
+        growthLead: { select: { contactEmailNormalized: true } },
+        schedules: { where: { isActive: true }, select: { id: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 15,
+    }),
+    prisma.publicOpenMicListing.findMany({
+      where: {
+        verificationStatus: { in: [...PUBLIC_DISCOVERY_VERIFICATION] },
+        claimedVenueId: null,
+      },
+      select: {
+        name: true,
+        slug: true,
+        city: true,
+        region: true,
+        verificationStatus: true,
+        claimStatus: true,
+        claimInviteEmailSentAt: true,
+        claimInviteEmail: true,
+        websiteUrl: true,
+        about: true,
+        createdAt: true,
+        growthLead: { select: { contactEmailNormalized: true } },
+        schedules: { where: { isActive: true }, select: { id: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+  ]);
+
+  const listingSource =
+    listingsCreatedInWindow.length > 0 ? listingsCreatedInWindow : recentListingsFallback;
+
+  const recentListings: OwnerSummaryListingRow[] = listingSource
+    .filter((l) => isPublicListingNameOk(l.name))
+    .map((l) => ({
+      name: l.name,
+      slug: l.slug,
+      cityState: cityState(l.city, l.region),
+      verificationStatus: l.verificationStatus,
+      claimStatus: l.claimStatus,
+      scheduleCount: l.schedules.length,
+      claimInviteSent: Boolean(l.claimInviteEmailSentAt),
+      ownerEmail: l.claimInviteEmail ?? l.growthLead?.contactEmailNormalized ?? null,
+      websiteUrl: l.websiteUrl,
+      aboutPreview: l.about?.trim() ? l.about.trim().slice(0, 160) : null,
+      createdAt: l.createdAt,
+    }));
+
+  const listingsNote =
+    "Inventory includes unclaimed public listings (not just registered venues). Discovery cron auto-publishes eligible venue leads each run; claim invites drip at LISTING_CLAIM_INVITES_PER_CRON (Resend daily cap). Run geocode-public-listings.mjs for map pins when addresses are vague.";
+
   return {
     windowLabel: `${reportLabel} (America/Chicago, last 24h through end of window)`,
     reportChicagoDate,
@@ -266,5 +403,20 @@ export async function buildOwnerDailySummary(
     growthRepliesCount: responses,
     repliesNote,
     topItems: topItems.slice(0, 20),
+    listingsInventory: {
+      totalListings: inventory.totalListings,
+      verifiedListings: inventory.verifiedListings,
+      unclaimedListings,
+      bookableVenues: inventory.bookableVenues,
+      claimedVenues: inventory.claimedVenues,
+      discoveryMarkets: inventory.discoveryMarkets,
+      listingsCreatedCount,
+      claimInvitesSentCount,
+      pendingClaimInvites,
+      leadsAwaitingPublish,
+      googleVerifiedListings,
+      listingsNote,
+    },
+    recentListings,
   };
 }

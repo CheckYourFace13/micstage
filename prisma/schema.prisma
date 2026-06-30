@@ -1309,6 +1309,10 @@ model PublicOpenMicListing {
   sourceUrl  String?
   sourceName String?
 
+  /// Matched Google Business / Places establishment (verification + map pin).
+  googlePlaceId         String?   @unique
+  googlePlaceVerifiedAt DateTime?
+
   lastVerifiedAt     DateTime?
   verificationStatus PublicListingVerificationStatus @default(UNVERIFIED)
   claimStatus        PublicListingClaimStatus        @default(UNCLAIMED)

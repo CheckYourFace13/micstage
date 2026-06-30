@@ -5,6 +5,7 @@ import {
 } from "@/lib/growth/expansionConfig";
 import { runAutoGrowthOutreachDrafts } from "@/lib/growth/growthDraftAutomation";
 import { runGrowthLeadDiscovery } from "@/lib/growth/growthDiscoveryRun";
+import { autoPublishGrowthLeadsAsListings } from "@/lib/publicListings/autoPublishGrowthLeadsAsListings";
 import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
 import {
   countPendingListingClaimInvitesWithEmail,
@@ -81,6 +82,7 @@ async function handle(request: Request) {
   try {
     let discovery: Awaited<ReturnType<typeof runGrowthLeadDiscovery>> | null = null;
     let discoveryError: string | null = null;
+    let listingAutoPublish: Awaited<ReturnType<typeof autoPublishGrowthLeadsAsListings>> | null = null;
     let drafts: Awaited<ReturnType<typeof runAutoGrowthOutreachDrafts>> | null = null;
     let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
     let listingClaimInvites: Awaited<ReturnType<typeof runPendingListingClaimInvites>> | null = null;
@@ -135,6 +137,13 @@ async function handle(request: Request) {
         discoveryError = e instanceof Error ? e.message : String(e);
         console.error("[growth pipeline] discovery failed", { error: discoveryError, phase });
       }
+      try {
+        listingAutoPublish = await autoPublishGrowthLeadsAsListings(prisma);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[growth pipeline] listing auto-publish failed", { error: msg, phase });
+        if (!discoveryError) discoveryError = `listing auto-publish: ${msg}`;
+      }
     }
 
     const sinceUtcDay = startOfUtcDay();
@@ -170,6 +179,7 @@ async function handle(request: Request) {
         outreachSkippedReason,
         discovery,
         discoveryError,
+        listingAutoPublish,
         emailMining,
         resendBudget,
         pendingClaimInvites,

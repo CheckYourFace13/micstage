@@ -1,6 +1,13 @@
-import type { PrismaClient, PublicListingVerificationStatus } from "@/generated/prisma/client";
+import type {
+  GrowthLeadOpenMicSignalTier,
+  GrowthLeadPerformanceTag,
+  PrismaClient,
+  PublicListingVerificationStatus,
+} from "@/generated/prisma/client";
 import { slugify } from "@/lib/slug";
+import { buildListingAboutFromLead } from "@/lib/publicListings/listingAboutFromLead";
 import { sendListingClaimInviteIfNeeded } from "@/lib/publicListings/listingClaimInviteEmail";
+import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 
 function uniqueSlug(base: string, used: Set<string>): string {
   let slug = base;
@@ -11,17 +18,6 @@ function uniqueSlug(base: string, used: Set<string>): string {
   }
   used.add(slug);
   return slug;
-}
-
-const JUNK_NAME =
-  /\b(karaoke|trivia|best bars|nightlife guide|review:|must-chicago|bandmix|pub trivia|private events|how to|blog|list of all)\b/i;
-
-function looksLikeOpenMic(name: string): boolean {
-  const n = name.trim();
-  if (!n || n.length < 3) return false;
-  if (JUNK_NAME.test(n)) return false;
-  if (/^home(-\d+)?$/i.test(n)) return false;
-  return true;
 }
 
 export async function publishGrowthLeadAsListing(
@@ -38,14 +34,18 @@ export async function publishGrowthLeadAsListing(
     tiktokUrl: string | null;
     youtubeUrl: string | null;
     source: string | null;
-    openMicSignalTier: string | null;
+    openMicSignalTier: GrowthLeadOpenMicSignalTier | null;
     contactEmailNormalized: string | null;
+    contactUrl?: string | null;
+    performanceTags?: GrowthLeadPerformanceTag[];
+    internalNotes?: string | null;
+    discoveryHints?: unknown;
   },
   existingSlugs: Set<string>,
 ): Promise<{ created: boolean; slug?: string; inviteSent?: boolean }> {
   const city = (lead.city ?? lead.suburb ?? "").trim();
   const baseName = lead.name.trim();
-  if (!baseName || !looksLikeOpenMic(baseName)) return { created: false };
+  if (!baseName || !isPublicListingNameOk(baseName)) return { created: false };
 
   const slugBase =
     slugify(city ? `${baseName}-${city}` : baseName) || slugify(baseName) || `listing-${lead.id.slice(0, 8)}`;
@@ -54,6 +54,14 @@ export async function publishGrowthLeadAsListing(
   const formattedAddress = [baseName, city, lead.region].filter(Boolean).join(", ") || baseName;
   const verificationStatus: PublicListingVerificationStatus =
     lead.openMicSignalTier === "EXPLICIT_OPEN_MIC" ? "VERIFIED" : "NEEDS_REVIEW";
+
+  const about = buildListingAboutFromLead({
+    openMicSignalTier: lead.openMicSignalTier,
+    performanceTags: lead.performanceTags ?? [],
+    internalNotes: lead.internalNotes ?? null,
+    discoveryHints: lead.discoveryHints ?? null,
+    source: lead.source,
+  });
 
   const listing = await prisma.publicOpenMicListing.create({
     data: {
@@ -68,10 +76,12 @@ export async function publishGrowthLeadAsListing(
       instagramUrl: lead.instagramUrl,
       tiktokUrl: lead.tiktokUrl,
       youtubeUrl: lead.youtubeUrl,
+      sourceUrl: lead.contactUrl?.trim() || null,
       sourceName: lead.source ?? "MicStage growth discovery",
       verificationStatus,
       lastVerifiedAt: new Date(),
       growthLeadId: lead.id,
+      about,
       internalNotes: `Auto-published from growth lead ${lead.id}`,
     },
   });

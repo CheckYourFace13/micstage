@@ -13,7 +13,8 @@
     "check:env:production": "node scripts/check-production-env.mjs --production",
     "audit:open-mic-listings": "node scripts/audit-public-open-mic-listings.mjs",
     "audit:verified-open-mic-evidence": "node scripts/audit-verified-open-mic-evidence.mjs",
-    "promote:reviewed-open-mic-listings": "node scripts/promote-reviewed-open-mic-listings.mjs"
+    "promote:reviewed-open-mic-listings": "node scripts/promote-reviewed-open-mic-listings.mjs",
+    "test:listing-names": "node scripts/check-listing-name-classifier.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.5.0",

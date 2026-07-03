@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/index.js";
+import { isPublicListingNameOk } from "./lib/listingNameClassifier.mjs";
 
 function loadEnvFile(name) {
   if (!fs.existsSync(name)) return;
@@ -136,10 +137,10 @@ function extractDiscoverySnippet(internalNotes) {
 function evaluateOpenMicEvidence(input) {
   const kindTrusted = input.sourceKind && TRUSTED_SOURCE_KINDS.has(input.sourceKind);
   const onDomain = sourceOnVenueDomain(input.sourceUrl, input.websiteUrl);
-  const validName = !!input.listingName && !LISTICLE_OR_ARTICLE.test(input.listingName);
+  const validName = !!input.listingName && isPublicListingNameOk(input.listingName);
   const structuredTrust = validName && (kindTrusted || onDomain);
 
-  const nameMatch = explicitOpenMicMatch(input.listingName);
+  const nameMatch = validName ? explicitOpenMicMatch(input.listingName) : null;
   if (nameMatch) return { hasEvidence: true, trusted: true, field: "name", snippet: nameMatch };
 
   for (const s of input.schedules ?? []) {

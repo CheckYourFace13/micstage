@@ -219,8 +219,10 @@ export function evaluateOpenMicEvidence(input: OpenMicEvidenceInput): OpenMicEvi
   // Structured extracted evidence can be trusted; raw SERP snippets cannot.
   const structuredTrust = validName && (kindTrusted || onDomain);
 
-  // 1) Listing name — durable and tied to the listing (always trusted).
-  const nameMatch = explicitOpenMicMatch(input.listingName);
+  // 1) Listing name — durable and tied to the listing, but only when the name is
+  //    a real venue/event name. Aggregator/directory names ("Open Mic Portland")
+  //    contain the phrase yet are not evidence of a specific venue's open mic.
+  const nameMatch = validName ? explicitOpenMicMatch(input.listingName) : null;
   if (nameMatch && input.listingName) {
     return {
       hasEvidence: true,

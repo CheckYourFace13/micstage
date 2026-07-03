@@ -5,10 +5,10 @@
  *   A) Verified place identity  -> googlePlaceId + googlePlaceVerifiedAt set
  *   B) Trusted, venue-tied open-mic evidence -> evaluateOpenMicEvidence().trusted
  *
- * Extra guard: the listing NAME must look like an actual venue/event, not an
- * article / listicle / aggregator / directory page ("Open Mics", "Venues With
- * Open Mic Nights", "Open Mic Nights in <city> for Musicians", ...). This keeps
- * the promote pass safe even before the shared name classifier is tightened.
+ * Extra guard: the listing NAME must pass the shared name classifier
+ * (scripts/lib/listingNameClassifier.mjs), which rejects article / listicle /
+ * aggregator / directory / bare-city open-mic names ("Open Mics", "Open Mic
+ * Portland", "Open Mic Nights in <city>", ...).
  *
  * Non-destructive: dry-run by default. Claimed listings are never touched.
  *
@@ -23,6 +23,7 @@
 import fs from "node:fs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/index.js";
+import { isPublicListingNameOk } from "./lib/listingNameClassifier.mjs";
 
 function loadEnvFile(name) {
   if (!fs.existsSync(name)) return;
@@ -133,10 +134,10 @@ function extractDiscoverySnippet(internalNotes) {
 function evaluateOpenMicEvidence(input) {
   const kindTrusted = input.sourceKind && TRUSTED_SOURCE_KINDS.has(input.sourceKind);
   const onDomain = sourceOnVenueDomain(input.sourceUrl, input.websiteUrl);
-  const validName = !!input.listingName && !LISTICLE_OR_ARTICLE.test(input.listingName);
+  const validName = !!input.listingName && isPublicListingNameOk(input.listingName);
   const structuredTrust = validName && (kindTrusted || onDomain);
 
-  const nameMatch = explicitOpenMicMatch(input.listingName);
+  const nameMatch = validName ? explicitOpenMicMatch(input.listingName) : null;
   if (nameMatch) return { hasEvidence: true, trusted: true, field: "name", snippet: nameMatch };
 
   for (const s of input.schedules ?? []) {
@@ -173,17 +174,11 @@ function buildEvidenceInput(row) {
   };
 }
 
-// Names that read like an article / aggregator / directory rather than a single
-// venue or recurring event. Promotion-only guard (stricter than ingest gate).
-const NAME_NOT_A_VENUE =
-  /(\bopen\s+mics\b)|(\bopen[\s-]?mic\s+nights\b)|(\bopen[\s-]?mic\s+in\b)|(\bfor\s+open[\s-]?mic\b)|(\bvenues?\s+with\b)|(\bfor\s+(musicians|comedians|performers|singers)\b)|(\bnights?\s+in\b)|(\bopen[\s-]?mic\s+(events?|schedule|calendar|info|list|listings?|guide|roundup|meetup|group|directory|near)\b)|(\bmeetup\s+group\b)|(\bevery\s+night\b)|(\barts\s+agenda\b)|(\bnavigating\b)|(\bwhere\s+and\s+when\b)|(\bhow\s+to\b)|(\bguide\s+to\b)|(\bnear\s+(you|me)\b)|(\bthings\s+to\s+do\b)|(\bbest\b)|(\blist\s+of\b)|(\bflourish\b)|(\bjoin\s+us\b)|(\btonight\b)|(\bget\s+on\s+stage\b)|(\bthis\s+(friday|saturday|sunday|monday|tuesday|wednesday|thursday|weekend|week)\b)|(^\s*open\s+mics?\s*$)|(^\s*event:\s)/i;
-
+// Promotion-only name guard now delegates to the shared classifier
+// (scripts/lib/listingNameClassifier.mjs), which rejects article / listicle /
+// aggregator / directory / bare-city open-mic names.
 function isPromotableVenueName(name) {
-  const n = (name ?? "").trim();
-  if (n.length < 4) return false;
-  if (LISTICLE_OR_ARTICLE.test(n)) return false;
-  if (NAME_NOT_A_VENUE.test(n)) return false;
-  return true;
+  return isPublicListingNameOk((name ?? "").trim());
 }
 
 function appendNote(existing, reason) {

@@ -418,7 +418,7 @@ export const getDiscoveryValidationFromDb = cache(async (): Promise<DiscoveryVal
         select: { city: true, region: true },
       }),
       prisma.publicOpenMicListing.findMany({
-        where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+        where: { city: { not: null }, claimedVenueId: null, verificationStatus: "VERIFIED" },
         select: { city: true, region: true },
       }),
     ]);
@@ -438,7 +438,7 @@ export const getVenueCityDiscoveryCounts = cache(async (): Promise<Map<string, n
         select: { city: true, region: true },
       }),
       prisma.publicOpenMicListing.findMany({
-        where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+        where: { city: { not: null }, claimedVenueId: null, verificationStatus: "VERIFIED" },
         select: { city: true, region: true },
       }),
     ]);

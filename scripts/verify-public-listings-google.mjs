@@ -191,6 +191,14 @@ function noteLine(existing, reason) {
   return existing?.trim() ? `${existing.trim()}\n${line}` : line;
 }
 
+async function placeIdInUseByOther(prisma, placeId, rowId) {
+  if (!placeId) return null;
+  return prisma.publicOpenMicListing.findFirst({
+    where: { googlePlaceId: placeId, NOT: { id: rowId } },
+    select: { slug: true },
+  });
+}
+
 const key = googleKey();
 if (!key) {
   console.error("No Google Maps API key — set GOOGLE_MAPS_SERVER_API_KEY or NEXT_PUBLIC_GOOGLE_MAPS_API_KEY");
@@ -274,10 +282,7 @@ try {
       });
       outdated += 1;
     } else if (result.outcome === "verified") {
-      const dup = await prisma.publicOpenMicListing.findFirst({
-        where: { googlePlaceId: result.place.place_id, NOT: { id: row.id } },
-        select: { slug: true },
-      });
+      const dup = await placeIdInUseByOther(prisma, result.place.place_id, row.id);
       if (dup) {
         await prisma.publicOpenMicListing.update({
           where: { id: row.id },
@@ -309,16 +314,21 @@ try {
         verified += 1;
       }
     } else {
-      await prisma.publicOpenMicListing.update({
-        where: { id: row.id },
-        data: {
-          verificationStatus: row.verificationStatus === "VERIFIED" ? "NEEDS_REVIEW" : row.verificationStatus,
-          googlePlaceId: result.place.place_id ?? undefined,
-          googlePlaceVerifiedAt: result.place.place_id ? new Date() : undefined,
-          lastVerifiedAt: new Date(),
-          internalNotes: noteLine(row.internalNotes, result.reason),
-        },
-      });
+      const placeId = result.place.place_id ?? null;
+      const dup = await placeIdInUseByOther(prisma, placeId, row.id);
+      const data = {
+        verificationStatus: row.verificationStatus === "VERIFIED" ? "NEEDS_REVIEW" : row.verificationStatus,
+        lastVerifiedAt: new Date(),
+        internalNotes: noteLine(
+          row.internalNotes,
+          dup ? `${result.reason}; duplicate Google place (${dup.slug})` : result.reason,
+        ),
+      };
+      if (placeId && !dup) {
+        data.googlePlaceId = placeId;
+        data.googlePlaceVerifiedAt = new Date();
+      }
+      await prisma.publicOpenMicListing.update({ where: { id: row.id }, data });
       needsReview += 1;
     }
 

@@ -52,8 +52,12 @@ export async function publishGrowthLeadAsListing(
   const slug = uniqueSlug(slugBase, existingSlugs);
 
   const formattedAddress = [baseName, city, lead.region].filter(Boolean).join(", ") || baseName;
-  const verificationStatus: PublicListingVerificationStatus =
-    lead.openMicSignalTier === "EXPLICIT_OPEN_MIC" ? "VERIFIED" : "NEEDS_REVIEW";
+  // Auto-published discoveries are never publicly VERIFIED on creation: the
+  // "open mic" signal comes from page-body text (which listicles also contain),
+  // so at best this is medium-confidence and must be held for review. Google
+  // Places verification (runs right after in the growth cron) or an admin
+  // promotes genuine venues to VERIFIED before they appear on public surfaces.
+  const verificationStatus: PublicListingVerificationStatus = "NEEDS_REVIEW";
 
   const about = buildListingAboutFromLead({
     openMicSignalTier: lead.openMicSignalTier,
@@ -82,7 +86,7 @@ export async function publishGrowthLeadAsListing(
       lastVerifiedAt: new Date(),
       growthLeadId: lead.id,
       about,
-      internalNotes: `Auto-published from growth lead ${lead.id}`,
+      internalNotes: `Auto-published from growth lead ${lead.id}; held NEEDS_REVIEW pending verification`,
     },
   });
 

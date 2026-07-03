@@ -7,6 +7,7 @@ import {
 } from "@/lib/discoveryMarket";
 import { formatMiles, haversineDistanceMiles } from "@/lib/geo";
 import { loadDiscoverablePublicListings, publicListingWhereDiscoverable } from "@/lib/publicListings/queries";
+import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 import type {
   DiscoveryListingKind,
   NearbyDiscoveryRow,
@@ -70,10 +71,13 @@ async function combinedCityRegionRows(prisma: PrismaClient): Promise<CityRegionR
     }),
     prisma.publicOpenMicListing.findMany({
       where: { city: { not: null }, ...publicListingWhereDiscoverable() },
-      select: { city: true, region: true },
+      select: { name: true, city: true, region: true },
     }),
   ]);
-  return [...venues, ...listings];
+  const qualityListings = listings
+    .filter((l) => isPublicListingNameOk(l.name))
+    .map((l) => ({ city: l.city, region: l.region }));
+  return [...venues, ...qualityListings];
 }
 
 export async function getDiscoveryLocationCounts(prisma: PrismaClient): Promise<Map<string, number>> {

@@ -1,8 +1,12 @@
-import type { Prisma, PrismaClient, PublicListingVerificationStatus } from "@/generated/prisma/client";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 
-/** Listings shown in public discovery (exclude claimed duplicates, outdated, and unverified). */
-export const PUBLIC_DISCOVERY_VERIFICATION = ["VERIFIED", "NEEDS_REVIEW"] as const;
+/**
+ * Listings shown in public discovery. Only fully VERIFIED, unclaimed listings
+ * are public. NEEDS_REVIEW (held for admin review), UNVERIFIED (discovered),
+ * and OUTDATED (rejected/stale) rows are hidden from every browse surface.
+ */
+export const PUBLIC_DISCOVERY_VERIFICATION = ["VERIFIED"] as const;
 
 export function publicListingWhereDiscoverable() {
   return {
@@ -134,13 +138,11 @@ export async function loadFeaturedPublicListings(
   opts: { limit?: number } = {},
 ): Promise<PublicOpenMicListingPayload[]> {
   const { limit = 4 } = opts;
-  return prisma.publicOpenMicListing.findMany({
-    where: {
-      ...publicListingWhereDiscoverable(),
-      verificationStatus: { in: ["VERIFIED", "NEEDS_REVIEW"] },
-    },
+  const rows = await prisma.publicOpenMicListing.findMany({
+    where: publicListingWhereDiscoverable(),
     orderBy: [{ lastVerifiedAt: "desc" }, { name: "asc" }],
-    take: limit,
+    take: limit * 3,
     select: listingSelect,
   });
+  return rows.filter((l) => isPublicListingNameOk(l.name)).slice(0, limit);
 }

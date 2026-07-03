@@ -3,10 +3,13 @@ import { assertAdminSession } from "@/lib/adminAuth";
 import {
   adminApproveListingClaim,
   adminLinkListingToVenue,
+  adminRejectListing,
   adminRejectListingClaim,
   adminResolveListingCorrection,
   adminSetListingVerification,
+  adminUpdateListingDetails,
 } from "@/app/internal/admin/listingActions";
+import { safeExternalHref } from "@/lib/externalUrl";
 import { requirePrisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +21,25 @@ export default async function AdminListingsPage(props: {
   const { ok, err } = await props.searchParams;
   const prisma = requirePrisma();
 
-  const [listings, pendingClaims, pendingCorrections, venues] = await Promise.all([
+  const [reviewQueue, listings, pendingClaims, pendingCorrections, venues] = await Promise.all([
+    prisma.publicOpenMicListing.findMany({
+      where: { claimedVenueId: null, verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED"] } },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 100,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        city: true,
+        region: true,
+        verificationStatus: true,
+        sourceUrl: true,
+        sourceName: true,
+        internalNotes: true,
+        lastVerifiedAt: true,
+        _count: { select: { schedules: true } },
+      },
+    }),
     prisma.publicOpenMicListing.findMany({
       orderBy: [{ updatedAt: "desc" }],
       take: 100,
@@ -63,14 +84,110 @@ export default async function AdminListingsPage(props: {
         </Link>
         <h1 className="mt-2 text-2xl font-semibold">Public open mic listings</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Approve claims, link to venues, mark junk as OUTDATED. Scripts:{" "}
-          <code className="text-zinc-300">publish-growth-leads-as-listings.mjs</code>,{" "}
-          <code className="text-zinc-300">geocode-public-listings.mjs</code>,{" "}
-          <code className="text-zinc-300">curate-public-listings.mjs</code>
+          Only <span className="text-emerald-300">VERIFIED</span> unclaimed listings appear on public
+          map/finder/directory/sitemap. Review the queue below to approve real venues or reject junk.
+          Scripts:{" "}
+          <code className="text-zinc-300">audit-public-open-mic-listings.mjs</code>,{" "}
+          <code className="text-zinc-300">verify-public-listings-google.mjs</code>,{" "}
+          <code className="text-zinc-300">geocode-public-listings.mjs</code>
         </p>
         {ok ? <p className="mt-2 text-sm text-emerald-400">Saved ({ok}).</p> : null}
         {err ? <p className="mt-2 text-sm text-amber-400">Error: {err}</p> : null}
       </div>
+
+      <section>
+        <h2 className="text-lg font-medium">
+          Review queue ({reviewQueue.length}) <span className="text-sm text-zinc-500">— hidden from public until approved</span>
+        </h2>
+        {reviewQueue.length === 0 ? (
+          <p className="mt-2 text-sm text-zinc-500">Nothing waiting for review.</p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {reviewQueue.map((l) => {
+              const sourceHref = safeExternalHref(l.sourceUrl);
+              return (
+                <li key={l.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/open-mics/${l.slug}`} className="font-medium text-sky-300 hover:underline">
+                      {l.name}
+                    </Link>
+                    <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-amber-300">{l.verificationStatus}</span>
+                    <span className="text-xs text-zinc-500">
+                      {[l.city, l.region].filter(Boolean).join(", ") || "no location"} · {l._count.schedules} schedule(s)
+                    </span>
+                    {sourceHref ? (
+                      <a href={sourceHref} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-400 underline">
+                        Source ↗
+                      </a>
+                    ) : null}
+                  </div>
+                  {l.internalNotes ? (
+                    <p className="mt-1 whitespace-pre-wrap text-xs text-zinc-500">{l.internalNotes.slice(0, 300)}</p>
+                  ) : null}
+
+                  <div className="mt-2 flex flex-wrap items-end gap-2">
+                    <form action={adminSetListingVerification}>
+                      <input type="hidden" name="listingId" value={l.id} />
+                      <input type="hidden" name="verificationStatus" value="VERIFIED" />
+                      <button type="submit" className="h-8 rounded bg-emerald-700 px-3 text-xs font-semibold hover:bg-emerald-600">
+                        Approve (publish)
+                      </button>
+                    </form>
+                    <form action={adminRejectListing} className="flex items-end gap-1">
+                      <input type="hidden" name="listingId" value={l.id} />
+                      <input
+                        name="reason"
+                        placeholder="reason"
+                        defaultValue="ARTICLE_OR_LISTICLE"
+                        className="h-8 w-40 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                      />
+                      <button type="submit" className="h-8 rounded bg-zinc-700 px-3 text-xs hover:bg-zinc-600">
+                        Reject
+                      </button>
+                    </form>
+                    <form action={adminLinkListingToVenue} className="flex items-end gap-1">
+                      <input type="hidden" name="listingId" value={l.id} />
+                      <input
+                        name="venueSlug"
+                        list="venue-slugs"
+                        placeholder="merge → venue slug"
+                        className="h-8 w-44 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                      />
+                      <button type="submit" className="h-8 rounded bg-sky-800 px-3 text-xs hover:bg-sky-700">
+                        Merge
+                      </button>
+                    </form>
+                  </div>
+
+                  <form action={adminUpdateListingDetails} className="mt-2 flex flex-wrap items-end gap-1">
+                    <input type="hidden" name="listingId" value={l.id} />
+                    <input
+                      name="name"
+                      defaultValue={l.name}
+                      className="h-8 w-56 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                    />
+                    <input
+                      name="city"
+                      defaultValue={l.city ?? ""}
+                      placeholder="city"
+                      className="h-8 w-32 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                    />
+                    <input
+                      name="region"
+                      defaultValue={l.region ?? ""}
+                      placeholder="state"
+                      className="h-8 w-20 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                    />
+                    <button type="submit" className="h-8 rounded bg-zinc-700 px-3 text-xs hover:bg-zinc-600">
+                      Save edits
+                    </button>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <section>
         <h2 className="text-lg font-medium">Pending claims ({pendingClaims.length})</h2>

@@ -167,6 +167,62 @@ export async function adminSetListingVerification(formData: FormData) {
   redirectListings("ok=listing_updated");
 }
 
+export async function adminRejectListing(formData: FormData) {
+  await assertAdminSession();
+  const listingId = String(formData.get("listingId") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim() || "manual admin reject";
+  if (!listingId) redirectListings("err=missing_listing");
+
+  const prisma = requirePrisma();
+  const existing = await prisma.publicOpenMicListing.findUnique({
+    where: { id: listingId },
+    select: { internalNotes: true, slug: true },
+  });
+  if (!existing) {
+    redirectListings("err=listing_not_found");
+    return;
+  }
+  const stamp = new Date().toISOString().slice(0, 10);
+  const note = `[${stamp}] rejected: ${reason}`;
+  const internalNotes = existing.internalNotes?.trim()
+    ? `${existing.internalNotes.trim()}\n${note}`
+    : note;
+
+  await prisma.publicOpenMicListing.update({
+    where: { id: listingId },
+    data: { verificationStatus: "OUTDATED", internalNotes },
+  });
+
+  revalidatePath(LISTINGS_PATH);
+  revalidatePath(`/open-mics/${existing.slug}`);
+  redirectListings("ok=listing_rejected");
+}
+
+export async function adminUpdateListingDetails(formData: FormData) {
+  await assertAdminSession();
+  const listingId = String(formData.get("listingId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const city = String(formData.get("city") ?? "").trim();
+  const region = String(formData.get("region") ?? "").trim();
+  if (!listingId) redirectListings("err=missing_listing");
+  if (!name || name.length < 2) redirectListings("err=bad_name");
+
+  const prisma = requirePrisma();
+  const listing = await prisma.publicOpenMicListing.update({
+    where: { id: listingId },
+    data: {
+      name,
+      city: city || null,
+      region: region || null,
+    },
+    select: { slug: true },
+  });
+
+  revalidatePath(LISTINGS_PATH);
+  revalidatePath(`/open-mics/${listing.slug}`);
+  redirectListings("ok=listing_details_saved");
+}
+
 export async function adminResolveListingCorrection(formData: FormData) {
   await assertAdminSession();
   const adminEmail = (await getOptionalAdminEmailFromLoginForm()) ?? "admin";

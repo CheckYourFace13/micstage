@@ -9,7 +9,7 @@ import { safeExternalHref } from "@/lib/externalUrl";
 import { isValidPublicSlug } from "@/lib/locationSlugValidation";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { loadPublicOpenMicListingBySlug } from "@/lib/publicListings/queries";
-import { listingIsPubliclyIndexable } from "@/lib/publicListings/listingQuality";
+import { isPublicListingRenderable, listingIsPubliclyIndexable } from "@/lib/publicListings/listingQuality";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
@@ -61,12 +61,14 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
     if (venue) redirect(`/venues/${venue.slug}`);
   }
 
+  // Hide rejected/stale (OUTDATED), undiscovered (UNVERIFIED), and junk-named
+  // rows entirely. VERIFIED renders publicly; NEEDS_REVIEW renders (noindexed,
+  // absent from browse) so claim-invite recipients can still reach it.
+  if (!isPublicListingRenderable(listing)) notFound();
+
   const place = [listing.city, listing.region].filter(Boolean).join(", ");
   const path = `/open-mics/${listing.slug}`;
-  const kind =
-    listing.verificationStatus === "VERIFIED" || listing.verificationStatus === "NEEDS_REVIEW"
-      ? "verified"
-      : "unclaimed";
+  const kind = listing.verificationStatus === "VERIFIED" ? "verified" : "unclaimed";
 
   const socials = [
     { label: "Website", href: safeExternalHref(listing.websiteUrl) },

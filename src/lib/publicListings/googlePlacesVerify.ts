@@ -431,16 +431,33 @@ export async function verifyPublicListingsWithGoogle(
         verified += 1;
       }
     } else {
-      await prisma.publicOpenMicListing.update({
-        where: { id: row.id },
-        data: {
-          verificationStatus: row.verificationStatus === "VERIFIED" ? "NEEDS_REVIEW" : row.verificationStatus,
-          googlePlaceId: result.placeId ?? undefined,
-          googlePlaceVerifiedAt: result.placeId ? new Date() : undefined,
-          lastVerifiedAt: new Date(),
-          internalNotes: appendInternalNote(row.internalNotes, result.reason),
-        },
-      });
+      const duplicate = result.placeId
+        ? await prisma.publicOpenMicListing.findFirst({
+            where: { googlePlaceId: result.placeId, NOT: { id: row.id } },
+            select: { slug: true },
+          })
+        : null;
+      const data: {
+        verificationStatus: typeof row.verificationStatus;
+        lastVerifiedAt: Date;
+        internalNotes: string;
+        googlePlaceId?: string;
+        googlePlaceVerifiedAt?: Date;
+      } = {
+        verificationStatus: row.verificationStatus === "VERIFIED" ? "NEEDS_REVIEW" : row.verificationStatus,
+        lastVerifiedAt: new Date(),
+        internalNotes: appendInternalNote(
+          row.internalNotes,
+          duplicate
+            ? `${result.reason}; duplicate Google place (${duplicate.slug})`
+            : result.reason,
+        ),
+      };
+      if (result.placeId && !duplicate) {
+        data.googlePlaceId = result.placeId;
+        data.googlePlaceVerifiedAt = new Date();
+      }
+      await prisma.publicOpenMicListing.update({ where: { id: row.id }, data });
       needsReview += 1;
     }
 

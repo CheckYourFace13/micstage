@@ -36,7 +36,7 @@ export const getValidLocationSlugs = cache(async (): Promise<Set<string> | null>
         select: { city: true, region: true },
       }),
       prisma.publicOpenMicListing.findMany({
-        where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+        where: { city: { not: null }, claimedVenueId: null, verificationStatus: "VERIFIED" },
         select: { city: true, region: true },
       }),
     ]);
@@ -62,7 +62,7 @@ export const getLocationAliasToCanonicalMap = cache(async (): Promise<Map<string
         select: { city: true, region: true },
       }),
       prisma.publicOpenMicListing.findMany({
-        where: { city: { not: null }, claimedVenueId: null, verificationStatus: { not: "OUTDATED" } },
+        where: { city: { not: null }, claimedVenueId: null, verificationStatus: "VERIFIED" },
         select: { city: true, region: true },
       }),
     ]);

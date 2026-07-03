@@ -52,6 +52,34 @@ function googleKey() {
   );
 }
 
+// Keep in sync with src/lib/publicListings/openMicEvidence.ts
+const OPEN_MIC_EVIDENCE_REASON = {
+  CONFIRMED: "EXPLICIT_OPEN_MIC_EVIDENCE_CONFIRMED",
+  PLACE_ONLY: "GOOGLE_PLACE_CONFIRMED_OPEN_MIC_EVIDENCE_MISSING",
+};
+
+const EXPLICIT_OPEN_MIC_PATTERN =
+  /(\bopen[\s-]?mic(?:s|e|rophone)?\b)|(\bopen[\s-]?mike\b)|(\bopen[\s-]?mic\s*(?:night|signup|sign[\s-]?up)\b)|(\bopen\s+jam\b)|(\bopen\s+blues\s+jam\b)|(\bopen\s+stage\b)|(\bjam\s+night\b)|(\bsongwriter\s+(?:open\s*mic|night)\b)|(\bspoken\s+word\s+open\s*mic\b)/i;
+
+function explicitOpenMicMatch(text) {
+  if (!text) return null;
+  const m = EXPLICIT_OPEN_MIC_PATTERN.exec(text);
+  return m ? m[0].trim() : null;
+}
+
+// Reliable, venue-tied evidence lives in the listing NAME and real SCHEDULE
+// titles/descriptions. `about` and raw discovery snippets are excluded (they
+// contain "open mic" boilerplate for every live-event lead).
+function detectOpenMicEvidence(listing) {
+  const nameMatch = explicitOpenMicMatch(listing.name);
+  if (nameMatch) return { hasEvidence: true, source: "name", snippet: nameMatch };
+  for (const s of listing.schedules ?? []) {
+    const m = explicitOpenMicMatch(s.title) ?? explicitOpenMicMatch(s.description);
+    if (m) return { hasEvidence: true, source: "schedule", snippet: m };
+  }
+  return { hasEvidence: false, source: null, snippet: null };
+}
+
 const NON_VENUE_TYPES = new Set([
   "locality",
   "political",
@@ -225,6 +253,7 @@ try {
       websiteUrl: true,
       verificationStatus: true,
       internalNotes: true,
+      schedules: { select: { title: true, description: true } },
     },
     orderBy: [{ googlePlaceVerifiedAt: "asc" }, { updatedAt: "desc" }],
     take: Number.isFinite(limit) ? limit : 50,
@@ -261,10 +290,15 @@ try {
     }
 
     const result = evaluate(row, place);
-    console.log(dryRun ? "[dry-run]" : result.outcome, row.slug, result.reason);
+    const evidence = result.outcome === "verified" ? detectOpenMicEvidence(row) : null;
+    const projected =
+      result.outcome === "verified" && !evidence?.hasEvidence
+        ? "needs_review (place only, no open mic evidence)"
+        : result.outcome;
+    console.log(dryRun ? "[dry-run]" : projected, row.slug, result.reason);
 
     if (dryRun) {
-      if (result.outcome === "verified") verified += 1;
+      if (result.outcome === "verified" && evidence?.hasEvidence) verified += 1;
       else if (result.outcome === "outdated") outdated += 1;
       else needsReview += 1;
       await sleep(300);
@@ -295,23 +329,46 @@ try {
         needsReview += 1;
       } else {
         const addr = parseAddressComponents(result.place.address_components);
-        await prisma.publicOpenMicListing.update({
-          where: { id: row.id },
-          data: {
-            googlePlaceId: result.place.place_id,
-            googlePlaceVerifiedAt: new Date(),
-            verificationStatus: "VERIFIED",
-            lastVerifiedAt: new Date(),
-            formattedAddress: result.place.formatted_address,
-            lat: result.place.geometry.location.lat,
-            lng: result.place.geometry.location.lng,
-            city: addr.city ?? row.city,
-            region: addr.region ?? row.region,
-            websiteUrl: row.websiteUrl?.trim() ? row.websiteUrl : result.place.website ?? row.websiteUrl,
-            internalNotes: noteLine(row.internalNotes, result.reason),
-          },
-        });
-        verified += 1;
+        // Save place fields + coordinates either way, but only publish (VERIFIED)
+        // when there is explicit open-mic evidence tied to the listing.
+        const placeData = {
+          googlePlaceId: result.place.place_id,
+          googlePlaceVerifiedAt: new Date(),
+          lastVerifiedAt: new Date(),
+          formattedAddress: result.place.formatted_address,
+          lat: result.place.geometry.location.lat,
+          lng: result.place.geometry.location.lng,
+          city: addr.city ?? row.city,
+          region: addr.region ?? row.region,
+          websiteUrl: row.websiteUrl?.trim() ? row.websiteUrl : result.place.website ?? row.websiteUrl,
+        };
+        if (evidence?.hasEvidence) {
+          await prisma.publicOpenMicListing.update({
+            where: { id: row.id },
+            data: {
+              ...placeData,
+              verificationStatus: "VERIFIED",
+              internalNotes: noteLine(
+                row.internalNotes,
+                `${result.reason}; ${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (${evidence.source}: "${evidence.snippet}")`,
+              ),
+            },
+          });
+          verified += 1;
+        } else {
+          await prisma.publicOpenMicListing.update({
+            where: { id: row.id },
+            data: {
+              ...placeData,
+              verificationStatus: "NEEDS_REVIEW",
+              internalNotes: noteLine(
+                row.internalNotes,
+                `${result.reason}; ${OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY}`,
+              ),
+            },
+          });
+          needsReview += 1;
+        }
       }
     } else {
       const placeId = result.place.place_id ?? null;

@@ -11,7 +11,8 @@
     "postinstall": "npx prisma generate --schema=prisma/schema.prisma",
     "check:env": "node scripts/check-production-env.mjs",
     "check:env:production": "node scripts/check-production-env.mjs --production",
-    "audit:open-mic-listings": "node scripts/audit-public-open-mic-listings.mjs"
+    "audit:open-mic-listings": "node scripts/audit-public-open-mic-listings.mjs",
+    "audit:verified-open-mic-evidence": "node scripts/audit-verified-open-mic-evidence.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.5.0",

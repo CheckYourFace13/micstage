@@ -1,5 +1,6 @@
 import type { PrismaClient, PublicListingVerificationStatus } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
+import { detectOpenMicEvidence, OPEN_MIC_EVIDENCE_REASON } from "@/lib/publicListings/openMicEvidence";
 
 type GoogleTextSearchResult = {
   place_id?: string;
@@ -356,6 +357,7 @@ export async function verifyPublicListingsWithGoogle(
       websiteUrl: true,
       verificationStatus: true,
       internalNotes: true,
+      schedules: { select: { title: true, description: true } },
     },
     orderBy: [{ googlePlaceVerifiedAt: "asc" }, { updatedAt: "desc" }],
     take: limit,
@@ -375,8 +377,11 @@ export async function verifyPublicListingsWithGoogle(
     }
 
     if (opts?.dryRun) {
-      console.info("[google verify dry-run]", row.slug, result.outcome, result.reason);
-      if (result.outcome === "verified") verified += 1;
+      const evidence = result.outcome === "verified" ? detectOpenMicEvidence(row) : null;
+      const projected =
+        result.outcome === "verified" && !evidence?.hasEvidence ? "needs_review (place only)" : result.outcome;
+      console.info("[google verify dry-run]", row.slug, projected, result.reason);
+      if (result.outcome === "verified" && evidence?.hasEvidence) verified += 1;
       else if (result.outcome === "outdated") outdated += 1;
       else needsReview += 1;
       await sleep(250);
@@ -412,23 +417,48 @@ export async function verifyPublicListingsWithGoogle(
         });
         needsReview += 1;
       } else {
-        await prisma.publicOpenMicListing.update({
-          where: { id: row.id },
-          data: {
-            googlePlaceId: result.placeId,
-            googlePlaceVerifiedAt: new Date(),
-            verificationStatus: "VERIFIED" satisfies PublicListingVerificationStatus,
-            lastVerifiedAt: new Date(),
-            formattedAddress: result.formattedAddress ?? undefined,
-            lat: result.lat,
-            lng: result.lng,
-            city: result.city ?? row.city,
-            region: result.region ?? row.region,
-            websiteUrl: row.websiteUrl?.trim() ? row.websiteUrl : result.website ?? row.websiteUrl,
-            internalNotes: appendInternalNote(row.internalNotes, result.reason),
-          },
-        });
-        verified += 1;
+        // Google confirmed the place exists. Only publish (VERIFIED) if there is
+        // ALSO explicit open-mic evidence tied to the listing (name/schedule).
+        // Otherwise save the place fields + coordinates but hold for review.
+        const evidence = detectOpenMicEvidence(row);
+        const placeData = {
+          googlePlaceId: result.placeId,
+          googlePlaceVerifiedAt: new Date(),
+          lastVerifiedAt: new Date(),
+          formattedAddress: result.formattedAddress ?? undefined,
+          lat: result.lat,
+          lng: result.lng,
+          city: result.city ?? row.city,
+          region: result.region ?? row.region,
+          websiteUrl: row.websiteUrl?.trim() ? row.websiteUrl : result.website ?? row.websiteUrl,
+        };
+        if (evidence.hasEvidence) {
+          await prisma.publicOpenMicListing.update({
+            where: { id: row.id },
+            data: {
+              ...placeData,
+              verificationStatus: "VERIFIED" satisfies PublicListingVerificationStatus,
+              internalNotes: appendInternalNote(
+                row.internalNotes,
+                `${result.reason}; ${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (${evidence.source}: "${evidence.snippet}")`,
+              ),
+            },
+          });
+          verified += 1;
+        } else {
+          await prisma.publicOpenMicListing.update({
+            where: { id: row.id },
+            data: {
+              ...placeData,
+              verificationStatus: "NEEDS_REVIEW" satisfies PublicListingVerificationStatus,
+              internalNotes: appendInternalNote(
+                row.internalNotes,
+                `${result.reason}; ${OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY}`,
+              ),
+            },
+          });
+          needsReview += 1;
+        }
       }
     } else {
       const duplicate = result.placeId

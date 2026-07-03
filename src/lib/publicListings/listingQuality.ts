@@ -83,7 +83,7 @@ const OPEN_MIC_DIRECTORY =
  * like "Live Music & Open Mic at The Wolf Cafe" are preserved.
  */
 const AGGREGATOR_PHRASE =
-  /(\bmeetup\s+group\b)|(\barts\s+agenda\b)|(\bget\s+on\s+stage\b)|(\bflourish\b)|(\bevery\s+night\b)|(\btonight\b)|(\bjoin\s+us\b)|(\bnavigating\b)|(\bwhere\s+and\s+when\b)|(\bmost\s+best\b)|(\bopen\s+mics\b\s*(?:&|and)\b)|(\b(?:and|&)\s+open\s+mics\b)|(\b(?:area|county|region|metro|greater)\s+open\s+mics?\b)|(\bopen\s+mics\b[\s\S]*\b(?:classes|slams|communities|directory|guides?|resources?|calendars?|roundup|support)\b)/i;
+  /(\bmeetup\s+group\b)|(\barts\s+agenda\b)|(\bget\s+on\s+stage\b)|(\bflourish\b)|(\bevery\s+night\b)|(\btonight\b)|(\bjoin\s+us\b)|(\bnavigating\b)|(\bwhere\s+and\s+when\b)|(\bmost\s+best\b)|(\bopen\s+mics\b\s*(?:&|and)\b)|(\b(?:and|&)\s+open\s+mics\b)|(\b(?:area|county|region|metro|greater)\s+open\s+mics?\b)|(\bopen\s+mics\b[\s\S]*\b(?:classes|slams|communities|directory|guides?|resources?|calendars?|roundup|support)\b)|(\bopen[\s-]?mics?\s+(?:nights?\s+)?(?:showcases?|highlights?|brings?|offers?|returns?|flourish(?:es)?|features?|celebrates?|draws?|attracts?)\b)|(\bshowcase\s+talent\s+in\b)/i;
 
 /** Open-mic wording, performance categories, filler, and directory words — never distinctive on their own. */
 const AGG_GENERIC_TOKENS = new Set([

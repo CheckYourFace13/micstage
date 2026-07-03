@@ -46,6 +46,11 @@ const MUST_REJECT = [
   "Open Mic Comedy Denver: Get on Stage Tonight!",
   "An Open Mic for Every Night of the Week",
   "Most Best Open Mic",
+  // article / headline sentences (verb after "open mic(s)")
+  "Open Mic Nights Showcase Talent in the Philadelphia Suburbs",
+  "Open Mic Nights Flourish at South Evanston Venues",
+  "Open Mics Showcase Local Talent",
+  "Open Mics Bring Community Together",
 ];
 
 // Real venue / event names — must pass.
@@ -58,6 +63,7 @@ const MUST_ALLOW = [
   "Live Music & Open Mic at The Wolf Cafe",
   "New Orleans Youth Open Mic Night",
   "Rambling House Open Mic",
+  "Avalon Park Open Mic Night & Community Kick Back",
 ];
 
 const failures = [];

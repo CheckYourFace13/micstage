@@ -1,6 +1,11 @@
 import type { PrismaClient, PublicListingVerificationStatus } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
-import { detectOpenMicEvidence, OPEN_MIC_EVIDENCE_REASON } from "@/lib/publicListings/openMicEvidence";
+import {
+  evaluateOpenMicEvidence,
+  extractDiscoverySnippet,
+  OPEN_MIC_EVIDENCE_REASON,
+  type OpenMicEvidenceInput,
+} from "@/lib/publicListings/openMicEvidence";
 
 type GoogleTextSearchResult = {
   place_id?: string;
@@ -319,6 +324,26 @@ function appendInternalNote(existing: string | null | undefined, reason: string)
   return base ? `${base}\n${line}` : line;
 }
 
+type VerifyRowEvidence = {
+  name: string;
+  websiteUrl: string | null;
+  sourceUrl: string | null;
+  schedules: Array<{ title: string | null; description: string | null }>;
+  growthLead: { sourceKind: string | null; internalNotes: string | null; discoveryHints: unknown } | null;
+};
+
+function buildEvidenceInput(row: VerifyRowEvidence): OpenMicEvidenceInput {
+  return {
+    listingName: row.name,
+    schedules: row.schedules,
+    sourceSnippet: extractDiscoverySnippet(row.growthLead?.internalNotes),
+    sourceUrl: row.sourceUrl,
+    websiteUrl: row.websiteUrl,
+    discoveryHints: row.growthLead?.discoveryHints,
+    sourceKind: row.growthLead?.sourceKind ?? null,
+  };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -357,7 +382,9 @@ export async function verifyPublicListingsWithGoogle(
       websiteUrl: true,
       verificationStatus: true,
       internalNotes: true,
+      sourceUrl: true,
       schedules: { select: { title: true, description: true } },
+      growthLead: { select: { sourceKind: true, internalNotes: true, discoveryHints: true } },
     },
     orderBy: [{ googlePlaceVerifiedAt: "asc" }, { updatedAt: "desc" }],
     take: limit,
@@ -377,11 +404,13 @@ export async function verifyPublicListingsWithGoogle(
     }
 
     if (opts?.dryRun) {
-      const evidence = result.outcome === "verified" ? detectOpenMicEvidence(row) : null;
+      const evidence = result.outcome === "verified" ? evaluateOpenMicEvidence(buildEvidenceInput(row)) : null;
       const projected =
-        result.outcome === "verified" && !evidence?.hasEvidence ? "needs_review (place only)" : result.outcome;
+        result.outcome === "verified" && !evidence?.trusted
+          ? `needs_review (${evidence?.hasEvidence ? "untrusted evidence" : "place only"})`
+          : result.outcome;
       console.info("[google verify dry-run]", row.slug, projected, result.reason);
-      if (result.outcome === "verified" && evidence?.hasEvidence) verified += 1;
+      if (result.outcome === "verified" && evidence?.trusted) verified += 1;
       else if (result.outcome === "outdated") outdated += 1;
       else needsReview += 1;
       await sleep(250);
@@ -417,10 +446,11 @@ export async function verifyPublicListingsWithGoogle(
         });
         needsReview += 1;
       } else {
-        // Google confirmed the place exists. Only publish (VERIFIED) if there is
-        // ALSO explicit open-mic evidence tied to the listing (name/schedule).
+        // Google confirmed the place exists. Only publish (VERIFIED) when there is
+        // ALSO explicit open-mic evidence from a trusted, venue-tied source
+        // (name/schedule, venue/event/admin source, or the venue's own domain).
         // Otherwise save the place fields + coordinates but hold for review.
-        const evidence = detectOpenMicEvidence(row);
+        const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
         const placeData = {
           googlePlaceId: result.placeId,
           googlePlaceVerifiedAt: new Date(),
@@ -432,7 +462,7 @@ export async function verifyPublicListingsWithGoogle(
           region: result.region ?? row.region,
           websiteUrl: row.websiteUrl?.trim() ? row.websiteUrl : result.website ?? row.websiteUrl,
         };
-        if (evidence.hasEvidence) {
+        if (evidence.trusted) {
           await prisma.publicOpenMicListing.update({
             where: { id: row.id },
             data: {
@@ -440,21 +470,21 @@ export async function verifyPublicListingsWithGoogle(
               verificationStatus: "VERIFIED" satisfies PublicListingVerificationStatus,
               internalNotes: appendInternalNote(
                 row.internalNotes,
-                `${result.reason}; ${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (${evidence.source}: "${evidence.snippet}")`,
+                `${result.reason}; ${evidence.reason} (${evidence.field}: "${evidence.snippet}")`,
               ),
             },
           });
           verified += 1;
         } else {
+          const evNote = evidence.hasEvidence
+            ? `${OPEN_MIC_EVIDENCE_REASON.UNTRUSTED} (${evidence.field}: "${evidence.snippet}")`
+            : OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY;
           await prisma.publicOpenMicListing.update({
             where: { id: row.id },
             data: {
               ...placeData,
               verificationStatus: "NEEDS_REVIEW" satisfies PublicListingVerificationStatus,
-              internalNotes: appendInternalNote(
-                row.internalNotes,
-                `${result.reason}; ${OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY}`,
-              ),
+              internalNotes: appendInternalNote(row.internalNotes, `${result.reason}; ${evNote}`),
             },
           });
           needsReview += 1;

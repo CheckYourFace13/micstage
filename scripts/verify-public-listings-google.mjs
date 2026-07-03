@@ -52,32 +52,141 @@ function googleKey() {
   );
 }
 
-// Keep in sync with src/lib/publicListings/openMicEvidence.ts
+// --- Open-mic evidence model (keep in sync with src/lib/publicListings/openMicEvidence.ts) ---
 const OPEN_MIC_EVIDENCE_REASON = {
   CONFIRMED: "EXPLICIT_OPEN_MIC_EVIDENCE_CONFIRMED",
+  UNTRUSTED: "OPEN_MIC_EVIDENCE_UNTRUSTED_SOURCE",
+  MISSING: "NO_EXPLICIT_OPEN_MIC_EVIDENCE",
   PLACE_ONLY: "GOOGLE_PLACE_CONFIRMED_OPEN_MIC_EVIDENCE_MISSING",
 };
 
 const EXPLICIT_OPEN_MIC_PATTERN =
   /(\bopen[\s-]?mic(?:s|e|rophone)?\b)|(\bopen[\s-]?mike\b)|(\bopen[\s-]?mic\s*(?:night|signup|sign[\s-]?up)\b)|(\bopen\s+jam\b)|(\bopen\s+blues\s+jam\b)|(\bopen\s+stage\b)|(\bjam\s+night\b)|(\bsongwriter\s+(?:open\s*mic|night)\b)|(\bspoken\s+word\s+open\s*mic\b)/i;
 
+const NON_EVIDENCE_NOISE = [
+  /open[\s-]?mic venue identified from public listings and web search\.?/gi,
+  /live music venue with open mic or performer signup signals\.?/gi,
+  /open[\s\u2013-]?mic[\s\u2013-]*targeted nationwide discovery\.?/gi,
+  /\bquery:\s*[^.]*\.?/gi,
+  /\btier\s+[a-z0-9_]+\b/gi,
+  /\bmarket\s+[a-z0-9-]+\b/gi,
+  /discovered via [^.]*\.?/gi,
+  /\[micstage_email_meta\][^.]*\.?/gi,
+];
+const LISTICLE_OR_ARTICLE =
+  /(^\s*\d{1,3}\s*\+?\s+(best|top|great|things?|reasons?|ways?|places?|venues?|clubs?|mics?|spots?|bars?)\b)|(\bthings\s+to\s+do\b)|(\bbest\s+(live\s+music|bars|comedy|places|things)\b)|(\bguide\s+to\b)/i;
+const TRUSTED_SOURCE_KINDS = new Set([
+  "WEBSITE_CONTACT",
+  "SOCIAL_PROFILE",
+  "EVENT_LISTING",
+  "CSV_IMPORT",
+  "CLAUDE_CSV",
+  "MANUAL_ADMIN",
+]);
+const HINT_EVIDENCE_KEYS = ["eventTitle", "eventDescription", "evidenceSnippet", "openMicEvidence", "pageTitle", "sourceTitle"];
+
+function stripNonEvidenceNoise(text) {
+  let t = ` ${text} `;
+  for (const re of NON_EVIDENCE_NOISE) t = t.replace(re, " ");
+  return t.replace(/\s+/g, " ").trim();
+}
 function explicitOpenMicMatch(text) {
   if (!text) return null;
   const m = EXPLICIT_OPEN_MIC_PATTERN.exec(text);
   return m ? m[0].trim() : null;
 }
-
-// Reliable, venue-tied evidence lives in the listing NAME and real SCHEDULE
-// titles/descriptions. `about` and raw discovery snippets are excluded (they
-// contain "open mic" boilerplate for every live-event lead).
-function detectOpenMicEvidence(listing) {
-  const nameMatch = explicitOpenMicMatch(listing.name);
-  if (nameMatch) return { hasEvidence: true, source: "name", snippet: nameMatch };
-  for (const s of listing.schedules ?? []) {
-    const m = explicitOpenMicMatch(s.title) ?? explicitOpenMicMatch(s.description);
-    if (m) return { hasEvidence: true, source: "schedule", snippet: m };
+function explicitOpenMicMatchClean(text) {
+  if (!text) return null;
+  return explicitOpenMicMatch(stripNonEvidenceNoise(text));
+}
+function hostOf(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(url.includes("://") ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./i, "").toLowerCase() || null;
+  } catch {
+    return null;
   }
-  return { hasEvidence: false, source: null, snippet: null };
+}
+function sourceOnVenueDomain(sourceUrl, websiteUrl) {
+  const a = hostOf(sourceUrl);
+  const b = hostOf(websiteUrl);
+  if (!a || !b) return false;
+  return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+}
+function collectHintEvidenceStrings(hints) {
+  if (!hints || typeof hints !== "object" || Array.isArray(hints)) return [];
+  const out = [];
+  for (const k of HINT_EVIDENCE_KEYS) {
+    const v = hints[k];
+    if (typeof v === "string" && v.trim()) out.push(v);
+  }
+  return out;
+}
+function extractDiscoverySnippet(internalNotes) {
+  if (!internalNotes) return null;
+  const idx = internalNotes.indexOf("Snippet:");
+  if (idx === -1) return null;
+  let s = internalNotes.slice(idx + "Snippet:".length).trim();
+  s = s.replace(/Page fetch failed[^.]*\.?/i, "").replace(/scored from SERP only\.?/i, "").trim();
+  s = s.replace(/^["'\s]+|["'\s.]+$/g, "").trim();
+  return s.length >= 3 ? s : null;
+}
+
+// Evidence lives in listing NAME + SCHEDULE (always trusted), and in real source
+// text (snippet / extracted hints) which is trusted only from a venue/event/admin
+// source or the venue's own domain. Generated boilerplate is stripped first.
+function evaluateOpenMicEvidence(input) {
+  const kindTrusted = input.sourceKind && TRUSTED_SOURCE_KINDS.has(input.sourceKind);
+  const onDomain = sourceOnVenueDomain(input.sourceUrl, input.websiteUrl);
+  const validName = !!input.listingName && !LISTICLE_OR_ARTICLE.test(input.listingName);
+  const structuredTrust = validName && (kindTrusted || onDomain);
+
+  const nameMatch = explicitOpenMicMatch(input.listingName);
+  if (nameMatch)
+    return { hasEvidence: true, trusted: true, field: "name", snippet: nameMatch, reason: OPEN_MIC_EVIDENCE_REASON.CONFIRMED };
+
+  for (const s of input.schedules ?? []) {
+    const text = [s.title, s.description].filter(Boolean).join(" — ");
+    const m = explicitOpenMicMatchClean(text);
+    if (m)
+      return { hasEvidence: true, trusted: true, field: "schedule", snippet: m, reason: OPEN_MIC_EVIDENCE_REASON.CONFIRMED };
+  }
+
+  // Structured extracted evidence can be trusted; raw SERP snippet is review-only.
+  let untrusted = null;
+  const candidates = [];
+  for (const t of collectHintEvidenceStrings(input.discoveryHints))
+    candidates.push({ field: "discoveryHints", text: t, titleLike: true, canTrust: structuredTrust });
+  if (input.sourceSnippet) candidates.push({ field: "sourceSnippet", text: input.sourceSnippet, titleLike: false, canTrust: false });
+
+  for (const c of candidates) {
+    if (c.titleLike && LISTICLE_OR_ARTICLE.test(c.text)) continue;
+    const m = explicitOpenMicMatchClean(c.text);
+    if (!m) continue;
+    const res = {
+      hasEvidence: true,
+      trusted: c.canTrust,
+      field: c.field,
+      snippet: m,
+      reason: c.canTrust ? OPEN_MIC_EVIDENCE_REASON.CONFIRMED : OPEN_MIC_EVIDENCE_REASON.UNTRUSTED,
+    };
+    if (res.trusted) return res;
+    if (!untrusted) untrusted = res;
+  }
+  return untrusted ?? { hasEvidence: false, trusted: false, field: null, snippet: null, reason: OPEN_MIC_EVIDENCE_REASON.MISSING };
+}
+
+function buildEvidenceInput(row) {
+  return {
+    listingName: row.name,
+    schedules: row.schedules,
+    sourceSnippet: extractDiscoverySnippet(row.growthLead?.internalNotes),
+    sourceUrl: row.sourceUrl,
+    websiteUrl: row.websiteUrl,
+    discoveryHints: row.growthLead?.discoveryHints,
+    sourceKind: row.growthLead?.sourceKind ?? null,
+  };
 }
 
 const NON_VENUE_TYPES = new Set([
@@ -185,7 +294,6 @@ function evaluate(listing, place) {
   const placeName = place.name?.trim() ?? "";
   const matchScore = nameMatchScore(listing.name, placeName);
   const typeClass = classifyTypes(place.types);
-  const addr = parseAddressComponents(place.address_components);
 
   if (place.business_status === "CLOSED_PERMANENTLY") {
     return { outcome: "outdated", reason: "Permanently closed on Google", matchScore, place };
@@ -253,7 +361,9 @@ try {
       websiteUrl: true,
       verificationStatus: true,
       internalNotes: true,
+      sourceUrl: true,
       schedules: { select: { title: true, description: true } },
+      growthLead: { select: { sourceKind: true, internalNotes: true, discoveryHints: true } },
     },
     orderBy: [{ googlePlaceVerifiedAt: "asc" }, { updatedAt: "desc" }],
     take: Number.isFinite(limit) ? limit : 50,
@@ -290,15 +400,15 @@ try {
     }
 
     const result = evaluate(row, place);
-    const evidence = result.outcome === "verified" ? detectOpenMicEvidence(row) : null;
+    const evidence = result.outcome === "verified" ? evaluateOpenMicEvidence(buildEvidenceInput(row)) : null;
     const projected =
-      result.outcome === "verified" && !evidence?.hasEvidence
-        ? "needs_review (place only, no open mic evidence)"
+      result.outcome === "verified" && !evidence?.trusted
+        ? `needs_review (${evidence?.hasEvidence ? "untrusted evidence" : "place only, no open mic evidence"})`
         : result.outcome;
     console.log(dryRun ? "[dry-run]" : projected, row.slug, result.reason);
 
     if (dryRun) {
-      if (result.outcome === "verified" && evidence?.hasEvidence) verified += 1;
+      if (result.outcome === "verified" && evidence?.trusted) verified += 1;
       else if (result.outcome === "outdated") outdated += 1;
       else needsReview += 1;
       await sleep(300);
@@ -342,7 +452,7 @@ try {
           region: addr.region ?? row.region,
           websiteUrl: row.websiteUrl?.trim() ? row.websiteUrl : result.place.website ?? row.websiteUrl,
         };
-        if (evidence?.hasEvidence) {
+        if (evidence?.trusted) {
           await prisma.publicOpenMicListing.update({
             where: { id: row.id },
             data: {
@@ -350,21 +460,21 @@ try {
               verificationStatus: "VERIFIED",
               internalNotes: noteLine(
                 row.internalNotes,
-                `${result.reason}; ${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (${evidence.source}: "${evidence.snippet}")`,
+                `${result.reason}; ${evidence.reason} (${evidence.field}: "${evidence.snippet}")`,
               ),
             },
           });
           verified += 1;
         } else {
+          const evNote = evidence?.hasEvidence
+            ? `${OPEN_MIC_EVIDENCE_REASON.UNTRUSTED} (${evidence.field}: "${evidence.snippet}")`
+            : OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY;
           await prisma.publicOpenMicListing.update({
             where: { id: row.id },
             data: {
               ...placeData,
               verificationStatus: "NEEDS_REVIEW",
-              internalNotes: noteLine(
-                row.internalNotes,
-                `${result.reason}; ${OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY}`,
-              ),
+              internalNotes: noteLine(row.internalNotes, `${result.reason}; ${evNote}`),
             },
           });
           needsReview += 1;

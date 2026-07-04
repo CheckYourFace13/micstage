@@ -23,3 +23,6 @@ public/uploads/micstage-profiles/*
 exports/*.csv
 
 openmic/
+
+# Local cron script contains CRON_SECRET
+run-micstage-discovery.cmd

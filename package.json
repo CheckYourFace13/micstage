@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma generate --schema=prisma/schema.prisma && next build",
+    "build": "node scripts/write-ads-txt.mjs && npx prisma generate --schema=prisma/schema.prisma && next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

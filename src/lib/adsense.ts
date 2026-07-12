@@ -1,6 +1,12 @@
 /** Google AdSense publisher ID (MicStage). */
 export const ADSENSE_PUBLISHER_ID = "ca-pub-9572509189594279";
 
+/** Numeric publisher ID for ads.txt (no `ca-` prefix). */
+export const ADSENSE_PUBLISHER_NUMERIC_ID = "9572509189594279";
+
+/** IAB ads.txt authorized seller line for google.com (also written to public/ads.txt on build). */
+export const ADSENSE_ADS_TXT_LINE = `google.com, pub-${ADSENSE_PUBLISHER_NUMERIC_ID}, DIRECT, f08c47fec0942fa0`;
+
 /** True in production, or when explicitly enabled for local testing. */
 export const ADSENSE_ENABLED =
   process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === "true";

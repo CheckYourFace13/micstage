@@ -6,7 +6,6 @@ import type {
 } from "@/generated/prisma/client";
 import { slugify } from "@/lib/slug";
 import { buildListingAboutFromLead } from "@/lib/publicListings/listingAboutFromLead";
-import { sendListingClaimInviteIfNeeded } from "@/lib/publicListings/listingClaimInviteEmail";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 
 function uniqueSlug(base: string, used: Set<string>): string {
@@ -67,7 +66,7 @@ export async function publishGrowthLeadAsListing(
     source: lead.source,
   });
 
-  const listing = await prisma.publicOpenMicListing.create({
+  await prisma.publicOpenMicListing.create({
     data: {
       name: baseName,
       slug,
@@ -90,11 +89,7 @@ export async function publishGrowthLeadAsListing(
     },
   });
 
-  const invite = await sendListingClaimInviteIfNeeded(
-    prisma,
-    listing.id,
-    lead.contactEmailNormalized,
-  );
-
-  return { created: true, slug, inviteSent: invite.sent };
+  // Do not email claim invites for NEEDS_REVIEW. One-touch claim invites fire only after
+  // the listing becomes VERIFIED (Google verify / admin / promote script).
+  return { created: true, slug, inviteSent: false };
 }

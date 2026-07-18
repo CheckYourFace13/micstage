@@ -49,6 +49,7 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Pending claim invites (has email): ${inv.pendingClaimInvites}`,
     `  Venue leads waiting to publish: ${inv.leadsAwaitingPublish}`,
     `  Google Business verified: ${inv.googleVerifiedListings}`,
+    `  Hidden review queue: ${inv.needsReviewCount}`,
     `  Note: ${inv.listingsNote}`,
     "",
     data.listingsInventory.listingsCreatedCount > 0
@@ -69,6 +70,109 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
   }
   lines.push("");
   return lines;
+}
+
+function renderReviewQueueText(data: OwnerDailySummaryData): string[] {
+  const lines: string[] = [
+    `HIDDEN REVIEW QUEUE (${data.reviewQueue.length} unreviewed)`,
+    `  Admin: ${data.reviewQueueAdminUrl}`,
+    "  These listings are NOT public. Approve real venues or reject junk.",
+    "",
+  ];
+  if (data.reviewQueue.length === 0) {
+    lines.push("  (queue empty)", "");
+    return lines;
+  }
+  for (const row of data.reviewQueue) {
+    lines.push(
+      `  • [${row.verificationStatus}] ${row.name}${row.cityState ? ` — ${row.cityState}` : ""}`,
+    );
+    lines.push(
+      `      email: ${row.ownerEmail ?? "none"} (${row.emailConfidence ?? "n/a"}) · schedules: ${row.scheduleCount} · place: ${row.googlePlaceId ? "yes" : "no"}`,
+    );
+    if (row.sourceUrl) lines.push(`      source: ${row.sourceUrl}`);
+    lines.push(`      listing: ${appBaseUrl().replace(/\/$/, "")}/open-mics/${row.slug}`);
+  }
+  lines.push("");
+  return lines;
+}
+
+function renderReviewQueueHtml(data: OwnerDailySummaryData): string {
+  const base = esc(appBaseUrl().replace(/\/$/, ""));
+  const rows =
+    data.reviewQueue.length === 0
+      ? `<tr><td colspan="3" style="padding:8px;color:#666">Review queue is empty.</td></tr>`
+      : data.reviewQueue
+          .map((row) => {
+            const href = `${base}/open-mics/${encodeURIComponent(row.slug)}`;
+            const email = row.ownerEmail
+              ? `<a href="mailto:${esc(row.ownerEmail)}">${esc(row.ownerEmail)}</a> (${esc(row.emailConfidence ?? "n/a")})`
+              : "none";
+            const source = row.sourceUrl
+              ? `<br/><a href="${esc(row.sourceUrl)}" style="font-size:12px">source</a>`
+              : "";
+            return `<tr>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top">
+              <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px">${esc(row.verificationStatus)}</span><br/>
+              <strong>${esc(row.name)}</strong>${row.cityState ? `<br/><span style="color:#6b7280">${esc(row.cityState)}</span>` : ""}
+            </td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:12px">
+              ${email}<br/>schedules: ${row.scheduleCount} · Google place: ${row.googlePlaceId ? "yes" : "no"}${source}
+            </td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:12px">
+              <a href="${href}">open listing</a>
+            </td>
+          </tr>`;
+          })
+          .join("");
+
+  return `
+  <h2 style="font-size:15px;margin:20px 0 8px">Hidden review queue (${data.reviewQueue.length})</h2>
+  <p style="margin:0 0 8px;font-size:13px">All unreviewed listings (not public). <a href="${esc(data.reviewQueueAdminUrl)}">Open admin review queue</a></p>
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="text-align:left;background:#fffbeb">
+      <th style="padding:6px 8px">Listing</th><th style="padding:6px 8px">Contact / evidence</th><th style="padding:6px 8px">Link</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+export function buildReviewQueueCsv(data: OwnerDailySummaryData): string {
+  const header = [
+    "id",
+    "slug",
+    "name",
+    "cityState",
+    "verificationStatus",
+    "ownerEmail",
+    "emailConfidence",
+    "googlePlaceId",
+    "sourceUrl",
+    "scheduleCount",
+    "updatedAt",
+  ];
+  const escapeCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const lines = [header.join(",")];
+  for (const row of data.reviewQueue) {
+    lines.push(
+      [
+        row.id,
+        row.slug,
+        row.name,
+        row.cityState ?? "",
+        row.verificationStatus,
+        row.ownerEmail ?? "",
+        row.emailConfidence ?? "",
+        row.googlePlaceId ?? "",
+        row.sourceUrl ?? "",
+        String(row.scheduleCount),
+        row.updatedAt.toISOString(),
+      ]
+        .map((c) => escapeCsv(String(c)))
+        .join(","),
+    );
+  }
+  return lines.join("\n");
 }
 
 function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
@@ -109,6 +213,7 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>MicStage venues:</strong> ${inv.claimedVenues} registered · ${inv.bookableVenues} bookable with schedule</li>
     <li><strong>New listings (24h):</strong> ${inv.listingsCreatedCount} · <strong>Claim invites sent (24h):</strong> ${inv.claimInvitesSentCount}</li>
     <li><strong>Pending claim invites:</strong> ${inv.pendingClaimInvites} · <strong>Leads waiting to publish:</strong> ${inv.leadsAwaitingPublish} · <strong>Google verified:</strong> ${inv.googleVerifiedListings}</li>
+    <li><strong>Hidden review queue:</strong> ${inv.needsReviewCount}</li>
   </ul>
   <p style="margin:0 0 12px;color:#6b7280;font-size:12px">${esc(inv.listingsNote)}</p>
   <h3 style="font-size:14px;margin:16px 0 8px">${esc(heading)}</h3>
@@ -121,6 +226,8 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
 }
 
 export function ownerDailySummarySubject(data: OwnerDailySummaryData): string {
+  const n = data.reviewQueue.length;
+  if (n > 0) return `MicStage Daily Summary — ${data.reportChicagoDate} · ${n} to review`;
   return `MicStage Daily Summary — ${data.reportChicagoDate}`;
 }
 
@@ -156,6 +263,7 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
     "",
   );
   lines.push(...renderRecentListingsText(data));
+  lines.push(...renderReviewQueueText(data));
   lines.push(
     "TOP ITEMS (up to 20, prioritized)",
   );
@@ -231,6 +339,8 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
   </ul>
 
   ${renderRecentListingsHtml(data)}
+
+  ${renderReviewQueueHtml(data)}
 
   <h2 style="font-size:15px;margin:20px 0 8px">Top 20 (action list)</h2>
   <table style="width:100%;border-collapse:collapse;font-size:13px">${topRows}</table>

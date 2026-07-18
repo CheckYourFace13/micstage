@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { GrowthLeadEmailConfidence, PrismaClient } from "@/generated/prisma/client";
 import { deliverResendEmail } from "@/lib/mailer";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
@@ -7,12 +7,65 @@ import { resendDailyBudgetSnapshot } from "@/lib/resendDailyBudget";
 
 const REPLY_TO = "drummer@micstage.com";
 
+/** Shared predicate: one-touch claim invites only for public VERIFIED listings awaiting claim. */
+export const CLAIM_INVITE_LISTING_WHERE = {
+  claimInviteEmailSentAt: null,
+  claimedVenueId: null,
+  claimStatus: { not: "CLAIMED" as const },
+  verificationStatus: "VERIFIED" as const,
+  growthLead: { contactEmailNormalized: { not: null } },
+} as const;
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function hostFromUrl(url: string | null | undefined): string | null {
+  if (!url?.trim()) return null;
+  try {
+    return new URL(url.trim()).hostname.replace(/^www\./i, "").toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+function hostFromEmail(email: string): string | null {
+  const i = email.lastIndexOf("@");
+  if (i < 0) return null;
+  return email.slice(i + 1).toLowerCase().replace(/^www\./, "") || null;
+}
+
+function hostsRelated(a: string, b: string): boolean {
+  return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+}
+
+/**
+ * Claim-invite email eligibility: HIGH always; MEDIUM only when the mailbox
+ * domain matches the listing/venue website (tightened — avoids random scraped addresses).
+ */
+export function isClaimInviteEmailEligible(input: {
+  email: string;
+  confidence: GrowthLeadEmailConfidence | null | undefined;
+  websiteUrl?: string | null;
+  sourceUrl?: string | null;
+}): boolean {
+  const email = normalizeMarketingEmail(input.email);
+  if (!email) return false;
+  if (input.confidence === "LOW" || input.confidence == null) return false;
+  if (input.confidence === "HIGH") return true;
+  if (input.confidence !== "MEDIUM") return false;
+
+  const emailHost = hostFromEmail(email);
+  if (!emailHost) return false;
+  for (const url of [input.websiteUrl, input.sourceUrl]) {
+    const siteHost = hostFromUrl(url);
+    if (siteHost && hostsRelated(emailHost, siteHost)) return true;
+  }
+  return false;
 }
 
 /** Everything MicStage offers venues at no cost — used in claim invite copy. */
@@ -42,14 +95,14 @@ export function buildListingClaimInvitePayload(input: {
   const subject = `Claim ${input.listingName} on MicStage — free open mic tools`;
 
   const intro = place
-    ? `We added ${input.listingName} in ${place} to MicStage as a verified open mic listing so local performers can find it.`
-    : `We added ${input.listingName} to MicStage as a verified open mic listing so local performers can find it.`;
+    ? `We verified ${input.listingName} in ${place} as a real open mic and published a free MicStage listing so local performers can find it.`
+    : `We verified ${input.listingName} as a real open mic and published a free MicStage listing so local performers can find it.`;
 
   const policy =
-    "Right now this is a basic verified listing only. We do not run proactive marketing for your room until you claim it, set up your schedule, and start using MicStage.";
+    "This is a public verified listing only. We do not run proactive marketing for your room until you claim it, set up your schedule, and start using MicStage.";
 
   const cta =
-    "Run this open mic? Claim your page free — we will connect you to a venue account and help you take over the listing.";
+    "Run this open mic? Claim your page free in one step — we will connect you to a venue account and help you take over the listing.";
 
   const servicesText = MICSTAGE_VENUE_FREE_SERVICES.map((s) => `- ${s}`).join("\n");
   const servicesHtml = MICSTAGE_VENUE_FREE_SERVICES.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
@@ -62,8 +115,8 @@ export function buildListingClaimInvitePayload(input: {
     "",
     cta,
     "",
+    `Claim this open mic (free, one step): ${claimUrl}`,
     `View the listing: ${listingUrl}`,
-    `Claim this open mic (free): ${claimUrl}`,
     `Or register your venue directly: ${registerUrl}`,
     "",
     "Everything included free when you claim and go live:",
@@ -80,8 +133,8 @@ export function buildListingClaimInvitePayload(input: {
     "<p>Hi there,</p>",
     `<p>${escapeHtml(intro)} ${escapeHtml(policy)}</p>`,
     `<p><strong>${escapeHtml(cta)}</strong></p>`,
-    `<p><a href="${escapeHtml(listingUrl)}">View the listing</a> · <a href="${escapeHtml(claimUrl)}">Claim this open mic (free)</a></p>`,
-    `<p>New venue? <a href="${escapeHtml(registerUrl)}">Register your venue</a></p>`,
+    `<p><a href="${escapeHtml(claimUrl)}" style="display:inline-block;padding:10px 16px;background:#111827;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Claim this open mic (free)</a></p>`,
+    `<p><a href="${escapeHtml(listingUrl)}">View the listing</a> · <a href="${escapeHtml(registerUrl)}">Register your venue</a></p>`,
     "<p><strong>Everything included free when you claim and go live:</strong></p>",
     `<ul style="margin:0 0 1em 1.2em;padding:0;">${servicesHtml}</ul>`,
     "<p>Questions? Reply to this email — happy to help you get set up.</p>",
@@ -209,7 +262,8 @@ async function sendTransactional(to: string, subject: string, textBody: string, 
 }
 
 /**
- * Sends one claim invite per listing (idempotent). Uses growth lead email when not overridden.
+ * One-touch claim invite: only VERIFIED public listings, with HIGH or domain-matched MEDIUM email.
+ * Idempotent via claimInviteEmailSentAt.
  */
 export async function sendListingClaimInviteIfNeeded(
   prisma: PrismaClient,
@@ -218,17 +272,39 @@ export async function sendListingClaimInviteIfNeeded(
 ): Promise<{ sent: boolean; reason?: string }> {
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { id: listingId },
-    include: { growthLead: { select: { contactEmailNormalized: true } } },
+    include: {
+      growthLead: {
+        select: {
+          contactEmailNormalized: true,
+          contactEmailConfidence: true,
+          websiteUrl: true,
+        },
+      },
+    },
   });
   if (!listing) return { sent: false, reason: "listing_not_found" };
   if (listing.claimInviteEmailSentAt) return { sent: false, reason: "already_sent" };
   if (listing.claimedVenueId || listing.claimStatus === "CLAIMED") {
     return { sent: false, reason: "already_claimed" };
   }
+  if (listing.verificationStatus !== "VERIFIED") {
+    return { sent: false, reason: "not_verified_yet" };
+  }
 
   const rawEmail = toEmail ?? listing.growthLead?.contactEmailNormalized ?? null;
   const email = rawEmail ? normalizeMarketingEmail(rawEmail) : null;
   if (!email) return { sent: false, reason: "no_email" };
+
+  if (
+    !isClaimInviteEmailEligible({
+      email,
+      confidence: listing.growthLead?.contactEmailConfidence,
+      websiteUrl: listing.websiteUrl ?? listing.growthLead?.websiteUrl,
+      sourceUrl: listing.sourceUrl,
+    })
+  ) {
+    return { sent: false, reason: "email_not_eligible" };
+  }
 
   const payload = buildListingClaimInvitePayload({
     listingName: listing.name,
@@ -296,7 +372,10 @@ export async function refreshListingPromotionEligible(
   return true;
 }
 
-/** Growth cold outreach should not run while a public listing exists but is not yet live on MicStage. */
+/**
+ * Cold outreach is blocked only when a public VERIFIED listing is waiting to be claimed/go-live.
+ * Hidden NEEDS_REVIEW rows no longer block nationwide outreach.
+ */
 export async function leadBlocksGrowthOutreach(
   prisma: PrismaClient,
   leadId: string,
@@ -304,14 +383,14 @@ export async function leadBlocksGrowthOutreach(
   const n = await prisma.publicOpenMicListing.count({
     where: {
       growthLeadId: leadId,
-      verificationStatus: { not: "OUTDATED" },
+      verificationStatus: "VERIFIED",
       promotionEligibleAt: null,
     },
   });
   return n > 0;
 }
 
-/** True when lead has an unclaimed public listing (claim invite path instead of cold outreach). */
+/** True when lead has an unclaimed VERIFIED public listing (claim invite path instead of cold outreach). */
 export async function leadHasUnclaimedPublicListing(
   prisma: PrismaClient,
   leadId: string,
@@ -321,13 +400,13 @@ export async function leadHasUnclaimedPublicListing(
       growthLeadId: leadId,
       claimedVenueId: null,
       claimStatus: { not: "CLAIMED" },
-      verificationStatus: { not: "OUTDATED" },
+      verificationStatus: "VERIFIED",
     },
   });
   return n > 0;
 }
 
-/** Sends pending claim invites (bounded batch). Respects {@link resendDailyBudgetSnapshot}. */
+/** Sends pending claim invites for VERIFIED listings only (bounded batch). */
 export async function runPendingListingClaimInvites(
   prisma: PrismaClient,
   limit = 5,
@@ -338,32 +417,47 @@ export async function runPendingListingClaimInvites(
   }
   const effectiveLimit = Math.min(limit, remaining);
   const pending = await prisma.publicOpenMicListing.findMany({
-    where: {
-      claimInviteEmailSentAt: null,
-      claimedVenueId: null,
-      claimStatus: { not: "CLAIMED" },
-      verificationStatus: { not: "OUTDATED" },
-      growthLead: { contactEmailNormalized: { not: null } },
+    where: CLAIM_INVITE_LISTING_WHERE,
+    select: {
+      id: true,
+      growthLead: {
+        select: {
+          contactEmailNormalized: true,
+          contactEmailConfidence: true,
+          websiteUrl: true,
+        },
+      },
     },
-    select: { id: true, growthLead: { select: { contactEmailNormalized: true } } },
     orderBy: { createdAt: "asc" },
-    take: effectiveLimit,
+    take: Math.max(effectiveLimit * 3, effectiveLimit),
   });
 
   let sent = 0;
   let skipped = 0;
+  let candidates = 0;
   for (const row of pending) {
+    if (sent >= effectiveLimit) break;
     const budget = await resendDailyBudgetSnapshot(prisma);
     if (budget.remaining <= 0) break;
 
-    const result = await sendListingClaimInviteIfNeeded(
-      prisma,
-      row.id,
-      row.growthLead?.contactEmailNormalized,
-    );
+    const email = row.growthLead?.contactEmailNormalized;
+    if (
+      !email ||
+      !isClaimInviteEmailEligible({
+        email,
+        confidence: row.growthLead?.contactEmailConfidence,
+        websiteUrl: row.growthLead?.websiteUrl,
+      })
+    ) {
+      skipped += 1;
+      continue;
+    }
+    candidates += 1;
+
+    const result = await sendListingClaimInviteIfNeeded(prisma, row.id, email);
     if (result.sent) sent += 1;
     else skipped += 1;
   }
 
-  return { sent, skipped, candidates: pending.length };
+  return { sent, skipped, candidates };
 }

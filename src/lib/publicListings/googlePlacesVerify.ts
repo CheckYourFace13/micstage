@@ -6,6 +6,7 @@ import {
   OPEN_MIC_EVIDENCE_REASON,
   type OpenMicEvidenceInput,
 } from "@/lib/publicListings/openMicEvidence";
+import { sendListingClaimInviteIfNeeded } from "@/lib/publicListings/listingClaimInviteEmail";
 
 type GoogleTextSearchResult = {
   place_id?: string;
@@ -475,6 +476,13 @@ export async function verifyPublicListingsWithGoogle(
             },
           });
           verified += 1;
+          // One-touch claim invite once the listing is publicly VERIFIED.
+          await sendListingClaimInviteIfNeeded(prisma, row.id).catch((e) => {
+            console.error("[googlePlacesVerify] claim invite failed", {
+              listingId: row.id,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          });
         } else {
           const evNote = evidence.hasEvidence
             ? `${OPEN_MIC_EVIDENCE_REASON.UNTRUSTED} (${evidence.field}: "${evidence.snippet}")`

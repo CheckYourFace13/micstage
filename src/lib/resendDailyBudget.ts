@@ -40,12 +40,14 @@ export function growthOutreachPausedWhileClaimInvitesPending(): boolean {
 }
 
 export async function countPendingListingClaimInvitesWithEmail(prisma: PrismaClient): Promise<number> {
+  // Only VERIFIED public listings qualify for one-touch claim invites.
+  // Hidden NEEDS_REVIEW rows must not pause nationwide outreach.
   return prisma.publicOpenMicListing.count({
     where: {
       claimInviteEmailSentAt: null,
       claimedVenueId: null,
       claimStatus: { not: "CLAIMED" },
-      verificationStatus: { not: "OUTDATED" },
+      verificationStatus: "VERIFIED",
       growthLead: { contactEmailNormalized: { not: null } },
     },
   });

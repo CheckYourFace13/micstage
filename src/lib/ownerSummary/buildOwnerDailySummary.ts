@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { chicagoLast24hWindow } from "@/lib/ownerSummary/chicagoWindow";
+import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { loadDiscoveryInventoryStats } from "@/lib/publicListings/inventoryStats";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 import { PUBLIC_DISCOVERY_VERIFICATION } from "@/lib/publicListings/queries";
@@ -35,6 +36,22 @@ export type OwnerSummaryListingRow = {
   createdAt: Date;
 };
 
+export type OwnerSummaryReviewQueueRow = {
+  id: string;
+  name: string;
+  slug: string;
+  cityState: string | null;
+  verificationStatus: string;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  googlePlaceId: string | null;
+  ownerEmail: string | null;
+  emailConfidence: string | null;
+  scheduleCount: number;
+  updatedAt: Date;
+  adminUrl: string;
+};
+
 export type OwnerDailySummaryData = {
   windowLabel: string;
   reportChicagoDate: string;
@@ -63,8 +80,12 @@ export type OwnerDailySummaryData = {
     leadsAwaitingPublish: number;
     googleVerifiedListings: number;
     listingsNote: string;
+    needsReviewCount: number;
   };
   recentListings: OwnerSummaryListingRow[];
+  /** Full hidden review queue (NEEDS_REVIEW + UNVERIFIED, unclaimed) — all rows. */
+  reviewQueue: OwnerSummaryReviewQueueRow[];
+  reviewQueueAdminUrl: string;
 };
 
 function cityState(city: string | null | undefined, region: string | null | undefined): string | null {
@@ -297,6 +318,8 @@ export async function buildOwnerDailySummary(
     googleVerifiedListings,
     listingsCreatedInWindow,
     recentListingsFallback,
+    needsReviewCount,
+    reviewQueueRaw,
   ] = await Promise.all([
     loadDiscoveryInventoryStats(prisma),
     countPendingListingClaimInvitesWithEmail(prisma),
@@ -366,6 +389,39 @@ export async function buildOwnerDailySummary(
       orderBy: { createdAt: "desc" },
       take: 10,
     }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        claimedVenueId: null,
+        verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED"] },
+      },
+    }),
+    prisma.publicOpenMicListing.findMany({
+      where: {
+        claimedVenueId: null,
+        verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED"] },
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        city: true,
+        region: true,
+        verificationStatus: true,
+        sourceName: true,
+        sourceUrl: true,
+        googlePlaceId: true,
+        updatedAt: true,
+        claimInviteEmail: true,
+        growthLead: {
+          select: {
+            contactEmailNormalized: true,
+            contactEmailConfidence: true,
+          },
+        },
+        schedules: { where: { isActive: true }, select: { id: true } },
+      },
+    }),
   ]);
 
   const listingSource =
@@ -387,8 +443,26 @@ export async function buildOwnerDailySummary(
       createdAt: l.createdAt,
     }));
 
+  const base = appBaseUrl().replace(/\/$/, "");
+  const reviewQueueAdminUrl = `${base}/internal/admin/growth/listings`;
+  const reviewQueue: OwnerSummaryReviewQueueRow[] = reviewQueueRaw.map((l) => ({
+    id: l.id,
+    name: l.name,
+    slug: l.slug,
+    cityState: cityState(l.city, l.region),
+    verificationStatus: l.verificationStatus,
+    sourceName: l.sourceName,
+    sourceUrl: l.sourceUrl,
+    googlePlaceId: l.googlePlaceId,
+    ownerEmail: l.claimInviteEmail ?? l.growthLead?.contactEmailNormalized ?? null,
+    emailConfidence: l.growthLead?.contactEmailConfidence ?? null,
+    scheduleCount: l.schedules.length,
+    updatedAt: l.updatedAt,
+    adminUrl: reviewQueueAdminUrl,
+  }));
+
   const listingsNote =
-    "Inventory includes unclaimed public listings (not just registered venues). Discovery cron auto-publishes eligible venue leads each run; claim invites drip at LISTING_CLAIM_INVITES_PER_CRON (Resend daily cap). Run geocode-public-listings.mjs for map pins when addresses are vague.";
+    "Inventory includes unclaimed public listings (not just registered venues). Discovery holds new rows as NEEDS_REVIEW until place+evidence verification; one-touch claim invites send only after VERIFIED. Review queue below lists every hidden row awaiting your decision.";
 
   return {
     windowLabel: `${reportLabel} (America/Chicago, last 24h through end of window)`,
@@ -416,7 +490,10 @@ export async function buildOwnerDailySummary(
       leadsAwaitingPublish,
       googleVerifiedListings,
       listingsNote,
+      needsReviewCount,
     },
     recentListings,
+    reviewQueue,
+    reviewQueueAdminUrl,
   };
 }

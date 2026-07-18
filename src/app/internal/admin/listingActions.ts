@@ -7,6 +7,7 @@ import { requirePrisma } from "@/lib/prisma";
 import {
   refreshListingPromotionEligible,
   sendListingClaimApprovedEmail,
+  sendListingClaimInviteIfNeeded,
 } from "@/lib/publicListings/listingClaimInviteEmail";
 
 const LISTINGS_PATH = "/internal/admin/growth/listings";
@@ -159,8 +160,12 @@ export async function adminSetListingVerification(formData: FormData) {
       verificationStatus: status as "VERIFIED" | "NEEDS_REVIEW" | "UNVERIFIED" | "OUTDATED",
       lastVerifiedAt: status === "VERIFIED" ? new Date() : undefined,
     },
-    select: { slug: true },
+    select: { slug: true, id: true },
   });
+
+  if (status === "VERIFIED") {
+    await sendListingClaimInviteIfNeeded(prisma, listing.id).catch(() => undefined);
+  }
 
   revalidatePath(LISTINGS_PATH);
   revalidatePath(`/open-mics/${listing.slug}`);

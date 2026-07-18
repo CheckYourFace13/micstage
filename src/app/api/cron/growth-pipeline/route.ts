@@ -102,6 +102,7 @@ async function handle(request: Request) {
       if (inviteBatch > 0) {
         listingClaimInvites = await runPendingListingClaimInvites(prisma, inviteBatch);
         resendBudget = await resendDailyBudgetSnapshot(prisma);
+        pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
       } else {
         listingClaimInvites = { sent: 0, skipped: 0, candidates: 0 };
       }

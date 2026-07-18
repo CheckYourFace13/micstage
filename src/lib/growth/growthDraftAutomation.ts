@@ -33,11 +33,11 @@ const IMPORT_LIKE_DISCOVERED_SOURCE_KINDS: GrowthLeadSourceKind[] = [
   "SOCIAL_PROFILE",
 ];
 
-/** Skip cold outreach when a live public listing exists but the venue has not gone live on MicStage yet. */
+/** Skip cold outreach only when a VERIFIED public listing is awaiting claim / go-live. */
 const LISTING_BLOCKS_OUTREACH = {
   publicListings: {
     none: {
-      verificationStatus: { not: "OUTDATED" as const },
+      verificationStatus: "VERIFIED" as const,
       promotionEligibleAt: null,
     },
   },

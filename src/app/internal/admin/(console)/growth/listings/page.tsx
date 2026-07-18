@@ -21,11 +21,11 @@ export default async function AdminListingsPage(props: {
   const { ok, err } = await props.searchParams;
   const prisma = requirePrisma();
 
-  const [reviewQueue, listings, pendingClaims, pendingCorrections, venues] = await Promise.all([
+  const [reviewQueue, reviewQueueTotal, listings, pendingClaims, pendingCorrections, venues] = await Promise.all([
     prisma.publicOpenMicListing.findMany({
       where: { claimedVenueId: null, verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED"] } },
       orderBy: [{ updatedAt: "desc" }],
-      take: 100,
+      take: 200,
       select: {
         id: true,
         slug: true,
@@ -39,6 +39,9 @@ export default async function AdminListingsPage(props: {
         lastVerifiedAt: true,
         _count: { select: { schedules: true } },
       },
+    }),
+    prisma.publicOpenMicListing.count({
+      where: { claimedVenueId: null, verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED"] } },
     }),
     prisma.publicOpenMicListing.findMany({
       orderBy: [{ updatedAt: "desc" }],
@@ -97,8 +100,15 @@ export default async function AdminListingsPage(props: {
 
       <section>
         <h2 className="text-lg font-medium">
-          Review queue ({reviewQueue.length}) <span className="text-sm text-zinc-500">— hidden from public until approved</span>
+          Review queue ({reviewQueue.length}
+          {reviewQueueTotal > reviewQueue.length ? ` of ${reviewQueueTotal}` : ""}){" "}
+          <span className="text-sm text-zinc-500">— hidden from public until approved</span>
         </h2>
+        {reviewQueueTotal > reviewQueue.length ? (
+          <p className="mt-1 text-xs text-amber-300/90">
+            Showing newest {reviewQueue.length}. Full list is in the daily owner summary email (CSV attachment).
+          </p>
+        ) : null}
         {reviewQueue.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-500">Nothing waiting for review.</p>
         ) : (

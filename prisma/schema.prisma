@@ -1159,6 +1159,51 @@ model GrowthDiscoveryRun {
   @@index([createdAt])
 }
 
+/// Single-row Postgres lease for discovery single-flight + hourly completion bucket.
+/// Survives Prisma/PgBouncer pooling (unlike session advisory locks).
+model DiscoveryExecutionGuard {
+  /// Fixed singleton id: "growth-discovery"
+  id String @id
+
+  lockedAt          DateTime?
+  expiresAt         DateTime?
+  lockedByRequestId String?
+
+  lastCompletedAt         DateTime?
+  lastCompletedRunId      String?
+  /// UTC hour bucket, e.g. "2026-08-06T20"
+  lastCompletedHourBucket String?
+
+  updatedAt DateTime @updatedAt
+}
+
+/// Safe request-source log for discovery invocations (no Authorization / secrets).
+model DiscoveryInvocationLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  requestId                String
+  phase                    String
+  method                   String
+  host                     String?
+  userAgent                String?
+  sourceIpRedacted         String?
+  xffPresent               Boolean  @default(false)
+  xffHopCount              Int      @default(0)
+  authorizationPassed      Boolean
+  possibleRetryOfRequestId String?
+  /// started | already_running | already_completed | completed | failed | unauthorized
+  outcome                  String
+  growthDiscoveryRunId     String?
+  /// UTC hour bucket, e.g. "2026-08-06T20"
+  hourBucket               String
+  durationMs               Int?
+
+  @@index([createdAt])
+  @@index([hourBucket])
+  @@index([requestId])
+}
+
 model GrowthLeadOutreachDraft {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())

@@ -9,6 +9,12 @@ import {
   beginDiscoveryRequestSourceLog,
   endDiscoveryRequestSourceLog,
 } from "@/lib/growth/discoveryRequestSourceLog";
+import {
+  acquireDiscoveryExecution,
+  discoveryHourBypassRequested,
+  persistDiscoveryInvocationLog,
+  utcDiscoveryHourBucket,
+} from "@/lib/growth/discoveryExecutionGuard";
 import { autoPublishGrowthLeadsAsListings } from "@/lib/publicListings/autoPublishGrowthLeadsAsListings";
 import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
 import {
@@ -30,9 +36,6 @@ import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInv
 /** Session-scoped Postgres advisory lock (outreach only — do not hold during web discovery). */
 const GROWTH_OUTREACH_LOCK_K1 = 54_788_913;
 const GROWTH_OUTREACH_LOCK_K2 = 20_993_312;
-/** Separate lock for discovery phase so concurrent discovery crons do not overlap. */
-const GROWTH_DISCOVERY_LOCK_K1 = 54_788_914;
-const GROWTH_DISCOVERY_LOCK_K2 = 20_993_313;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -61,20 +64,6 @@ async function tryOutreachLock(prisma: PrismaClient): Promise<{ release: () => P
   return {
     release: async () => {
       await prisma.$queryRawUnsafe(`SELECT pg_advisory_unlock(${GROWTH_OUTREACH_LOCK_K1}, ${GROWTH_OUTREACH_LOCK_K2})`);
-    },
-  };
-}
-
-async function tryDiscoveryLock(prisma: PrismaClient): Promise<{ release: () => Promise<void> } | null> {
-  const rows = await prisma.$queryRawUnsafe<Array<{ locked: boolean }>>(
-    `SELECT pg_try_advisory_lock(${GROWTH_DISCOVERY_LOCK_K1}, ${GROWTH_DISCOVERY_LOCK_K2}) AS locked`,
-  );
-  if (!rows[0]?.locked) return null;
-  return {
-    release: async () => {
-      await prisma.$queryRawUnsafe(
-        `SELECT pg_advisory_unlock(${GROWTH_DISCOVERY_LOCK_K1}, ${GROWTH_DISCOVERY_LOCK_K2})`,
-      );
     },
   };
 }
@@ -193,36 +182,116 @@ async function handle(request: Request) {
     if (discoveryEnabled) {
       if (micstageDiscoveryKillSwitch()) {
         discoveryError = "MICSTAGE_KILL_DISCOVERY enabled";
-      } else {
-        const dLock = await tryDiscoveryLock(prisma);
-        if (!dLock) {
-          discoveryError = "growth-discovery already running";
-        } else {
-          try {
-            try {
-              discovery = await runGrowthLeadDiscovery(prisma);
-            } catch (e) {
-              discoveryError = e instanceof Error ? e.message : String(e);
-              console.error("[growth pipeline] discovery failed", { error: discoveryError, phase });
-            }
-            try {
-              listingAutoPublish = await autoPublishGrowthLeadsAsListings(prisma);
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : String(e);
-              console.error("[growth pipeline] listing auto-publish failed", { error: msg, phase });
-              if (!discoveryError) discoveryError = `listing auto-publish: ${msg}`;
-            }
-          } finally {
-            await dLock.release();
-          }
+        if (discoverySourceLog) {
+          await persistDiscoveryInvocationLog(prisma, {
+            snapshot: discoverySourceLog,
+            outcome: "failed",
+            hourBucket: utcDiscoveryHourBucket(),
+            durationMs: Date.now() - discoveryStartedAtMs,
+          });
+          endDiscoveryRequestSourceLog(discoverySourceLog, {
+            discoveryRunId: null,
+            discoveryError,
+            startedAtMs: discoveryStartedAtMs,
+          });
         }
-      }
-      if (discoverySourceLog) {
-        endDiscoveryRequestSourceLog(discoverySourceLog, {
-          discoveryRunId: discovery?.discoveryRunId ?? null,
-          discoveryError,
-          startedAtMs: discoveryStartedAtMs,
+      } else {
+        const bypassHourly = discoveryHourBypassRequested(request);
+        const guard = await acquireDiscoveryExecution(prisma, {
+          requestId: discoverySourceLog?.requestId ?? `ms-disc-${crypto.randomUUID()}`,
+          bypassHourlyGuard: bypassHourly,
         });
+
+        if (guard.status === "already_running") {
+          if (discoverySourceLog) {
+            await persistDiscoveryInvocationLog(prisma, {
+              snapshot: discoverySourceLog,
+              outcome: "already_running",
+              hourBucket: guard.hourBucket,
+              durationMs: Date.now() - discoveryStartedAtMs,
+            });
+            endDiscoveryRequestSourceLog(discoverySourceLog, {
+              discoveryRunId: null,
+              discoveryError: "already_running",
+              startedAtMs: discoveryStartedAtMs,
+            });
+          }
+          return NextResponse.json(
+            {
+              ok: true,
+              status: "already_running",
+              phase,
+              hourBucket: guard.hourBucket,
+              lockedByRequestId: guard.lockedByRequestId,
+              expiresAt: guard.expiresAt,
+            },
+            { status: 202, headers: { "Cache-Control": "no-store" } },
+          );
+        }
+
+        if (guard.status === "already_completed") {
+          if (discoverySourceLog) {
+            await persistDiscoveryInvocationLog(prisma, {
+              snapshot: discoverySourceLog,
+              outcome: "already_completed",
+              hourBucket: guard.hourBucket,
+              growthDiscoveryRunId: guard.existingRunId,
+              durationMs: Date.now() - discoveryStartedAtMs,
+            });
+            endDiscoveryRequestSourceLog(discoverySourceLog, {
+              discoveryRunId: guard.existingRunId,
+              discoveryError: "already_completed",
+              startedAtMs: discoveryStartedAtMs,
+            });
+          }
+          return NextResponse.json(
+            {
+              ok: true,
+              status: "already_completed",
+              phase,
+              hourBucket: guard.hourBucket,
+              discoveryRunId: guard.existingRunId,
+              completedAt: guard.completedAt,
+            },
+            { status: 202, headers: { "Cache-Control": "no-store" } },
+          );
+        }
+
+        try {
+          try {
+            discovery = await runGrowthLeadDiscovery(prisma);
+          } catch (e) {
+            discoveryError = e instanceof Error ? e.message : String(e);
+            console.error("[growth pipeline] discovery failed", { error: discoveryError, phase });
+          }
+          try {
+            listingAutoPublish = await autoPublishGrowthLeadsAsListings(prisma);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error("[growth pipeline] listing auto-publish failed", { error: msg, phase });
+            if (!discoveryError) discoveryError = `listing auto-publish: ${msg}`;
+          }
+        } finally {
+          await guard.release({
+            completedRunId: discovery?.discoveryRunId ?? null,
+            failed: Boolean(discoveryError) && !discovery?.discoveryRunId,
+          });
+        }
+
+        if (discoverySourceLog) {
+          await persistDiscoveryInvocationLog(prisma, {
+            snapshot: discoverySourceLog,
+            outcome: discoveryError && !discovery?.discoveryRunId ? "failed" : "completed",
+            hourBucket: guard.hourBucket,
+            growthDiscoveryRunId: discovery?.discoveryRunId ?? null,
+            durationMs: Date.now() - discoveryStartedAtMs,
+          });
+          endDiscoveryRequestSourceLog(discoverySourceLog, {
+            discoveryRunId: discovery?.discoveryRunId ?? null,
+            discoveryError,
+            startedAtMs: discoveryStartedAtMs,
+          });
+        }
       }
     } else if (discoverySourceLog) {
       endDiscoveryRequestSourceLog(discoverySourceLog, {

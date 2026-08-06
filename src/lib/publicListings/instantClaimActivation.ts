@@ -170,10 +170,11 @@ export async function submitInstantClaim(
   if (!eligibility.autoApprove) {
     try {
       const claimRequest = await prisma.$transaction(async (tx) => {
+        // Manual review may use a different login email than the invite; do not
+        // require recipient match on consume (auto-approve path still enforces it).
         const consumed = await consumeListingClaimInviteToken(tx as unknown as PrismaClient, {
           rawToken: input.rawToken,
           listingId: listing.id,
-          loginEmailNormalized: loginEmail,
           markUsed: true,
         });
         if (!consumed.ok) {

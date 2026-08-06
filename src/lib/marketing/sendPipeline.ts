@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
-import type { MarketingEmailCategory } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { deliverResendEmail, MailProviderError } from "@/lib/mailer";
 import { explainMarketingSendBlock } from "@/lib/marketing/blockReasons";

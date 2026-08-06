@@ -1,5 +1,3 @@
-import type { PublicOpenMicListingPayload } from "@/lib/publicListings/queries";
-
 /** How a row appears in merged public discovery. */
 export type DiscoveryListingKind = "claimed" | "verified" | "unclaimed";
 

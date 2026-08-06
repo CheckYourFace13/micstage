@@ -279,6 +279,57 @@ async function main() {
     results.freeMailManual = { decision: "MANUAL_REVIEW", noOwnerCreated: true };
   }
 
+  // --- changed login email → manual ---
+  {
+    const { listing, email } = await seedListing({ website: "https://micstage.com" });
+    const issued = await issueListingClaimInviteToken(prisma, {
+      listingId: listing.id,
+      intendedEmailNormalized: email,
+    });
+    const res = await submitInstantClaim(prisma, {
+      rawToken: issued.rawToken,
+      listingSlug: listing.slug,
+      contactName: "Changed Email",
+      role: "owner",
+      loginEmail: "other-internal@micstage.com",
+      authorityConfirmed: true,
+      termsAccepted: true,
+      privacyAccepted: true,
+    });
+    assert.equal(res.ok, true);
+    if (res.ok) {
+      assert.equal(res.decision, "MANUAL_REVIEW");
+      assert.equal(res.reason, "login_email_changed");
+    }
+    results.changedLoginEmailManual = { decision: "MANUAL_REVIEW" };
+    await prisma.venueOwner.deleteMany({ where: { email: "other-internal@micstage.com" } });
+  }
+
+  // --- revoked token ---
+  {
+    const { listing, email } = await seedListing({ website: "https://micstage.com" });
+    const issued = await issueListingClaimInviteToken(prisma, {
+      listingId: listing.id,
+      intendedEmailNormalized: email,
+    });
+    await prisma.listingClaimInviteToken.update({
+      where: { id: issued.tokenId },
+      data: { status: "REVOKED", revokedAt: new Date() },
+    });
+    const res = await submitInstantClaim(prisma, {
+      rawToken: issued.rawToken,
+      listingSlug: listing.slug,
+      contactName: "Revoked",
+      role: "owner",
+      loginEmail: email,
+      authorityConfirmed: true,
+      termsAccepted: true,
+      privacyAccepted: true,
+    });
+    assert.equal(res.ok, false);
+    results.revokedToken = { ok: false };
+  }
+
   // --- domain mismatch manual ---
   {
     const { listing, email } = await seedListing({

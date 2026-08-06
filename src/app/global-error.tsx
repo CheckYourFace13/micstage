@@ -1,33 +1,11 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
-import Link from "next/link";
-import { useCallback, useEffect } from "react";
-import { isLikelyStaleServerActionError } from "@/lib/staleActionError";
-import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
-
-function pathnamePrefix(): string {
-  if (typeof window === "undefined") return "";
-  return window.location.pathname;
-}
-
-function tryAgainHref(): string {
-  const p = pathnamePrefix();
-  if (p === ARTIST_DASHBOARD_HREF || p.startsWith(`${ARTIST_DASHBOARD_HREF}/`)) return ARTIST_DASHBOARD_HREF;
-  if (p === "/venue" || p.startsWith("/venue/")) return "/venue";
-  return "";
-}
-
-function signInAgainHref(): string {
-  const p = pathnamePrefix();
-  if (p === ARTIST_DASHBOARD_HREF || p.startsWith(`${ARTIST_DASHBOARD_HREF}/`)) return "/login/musician";
-  if (p === "/venue" || p.startsWith("/venue/")) return "/login/venue";
-  return "/login/musician";
-}
+import { useEffect } from "react";
 
 /**
- * Root-level error boundary (App Router). Renders outside the main layout.
- * Reports to Sentry when configured via env; never includes secrets in the UI.
+ * App Router global error boundary. Replaces the root layout, so it must not
+ * depend on providers, next/link, theme, auth, or analytics context.
+ * Optional Sentry reporting is lazy and must never break rendering or prerender.
  */
 export default function GlobalError({
   error,
@@ -36,77 +14,132 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const stale =
+    typeof error?.message === "string" &&
+    /Failed to find Server Action|server action.*mismatch|was not found on the server/i.test(
+      error.message,
+    );
+
   useEffect(() => {
-    Sentry.captureException(error);
+    void import("@sentry/nextjs")
+      .then((Sentry) => {
+        try {
+          Sentry.captureException(error);
+        } catch {
+          /* ignore reporting failures */
+        }
+      })
+      .catch(() => undefined);
   }, [error]);
-
-  const onTryAgain = useCallback(() => {
-    const target = tryAgainHref();
-    if (target) {
-      window.location.assign(target);
-      return;
-    }
-    reset();
-  }, [reset]);
-
-  const portalRetry = tryAgainHref();
-  const signInHref = signInAgainHref();
-  const staleAction = isLikelyStaleServerActionError(error.message);
 
   return (
     <html lang="en">
-      <body className="min-h-dvh bg-black font-sans text-white antialiased">
-        <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6 text-center">
-          <p className="text-xs font-medium uppercase tracking-widest text-white/50">MicStage</p>
-          <h1 className="mt-3 text-2xl font-semibold text-white">
-            {staleAction ? "Page out of sync after deploy" : "Something went wrong"}
-          </h1>
-          <p className="mt-2 text-sm text-white/65">
-            {staleAction ? (
-              <>
-                Your tab may be using an older MicStage build than the server.{" "}
-                <span className="text-white/80">Refresh this page</span> (or use a hard reload) so forms and server actions
-                line up again.
-              </>
-            ) : (
-              <>This error was reported automatically. Use the actions below to get back on track.</>
-            )}
+      <body
+        style={{
+          margin: 0,
+          minHeight: "100dvh",
+          background: "#000",
+          color: "#fff",
+          fontFamily:
+            'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            margin: "0 auto",
+            display: "flex",
+            minHeight: "100dvh",
+            maxWidth: 512,
+            flexDirection: "column",
+            justifyContent: "center",
+            padding: "0 24px",
+            textAlign: "center",
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              fontWeight: 500,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.5)",
+            }}
+          >
+            MicStage
           </p>
-          <div className="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+          <h1 style={{ margin: "12px 0 0", fontSize: 24, fontWeight: 600 }}>
+            {stale ? "Page out of sync after deploy" : "Something went wrong"}
+          </h1>
+          <p style={{ margin: "8px 0 0", fontSize: 14, color: "rgba(255,255,255,0.65)" }}>
+            {stale
+              ? "Your tab may be using an older MicStage build than the server. Refresh this page so forms and server actions line up again."
+              : "Use the actions below to get back on track."}
+          </p>
+          <div
+            style={{
+              marginTop: 40,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              alignItems: "stretch",
+            }}
+          >
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="h-11 rounded-md bg-pink-500 px-5 text-sm font-semibold text-black hover:brightness-110"
+              style={{
+                height: 44,
+                border: "none",
+                borderRadius: 6,
+                background: "#ec4899",
+                color: "#000",
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
             >
               Refresh page
             </button>
             <button
               type="button"
-              onClick={onTryAgain}
-              className="h-11 rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
+              onClick={() => reset()}
+              style={{
+                height: 44,
+                borderRadius: 6,
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(255,255,255,0.05)",
+                color: "#fff",
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
             >
-              {portalRetry ? "Back to dashboard" : "Try again"}
+              Try again
             </button>
-            <Link
-              href={signInHref}
-              className="inline-flex h-11 items-center justify-center rounded-md border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10"
-            >
-              Sign in again
-            </Link>
-            <Link
+            {/* Plain <a>: global-error replaces the root layout; next/link needs AppRouter context. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- intentional for /_global-error independence */}
+            <a
               href="/"
-              className="inline-flex h-11 items-center justify-center rounded-md bg-pink-500 px-5 text-sm font-semibold text-black hover:brightness-110"
+              style={{
+                display: "inline-flex",
+                height: 44,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 6,
+                background: "#ec4899",
+                color: "#000",
+                fontWeight: 600,
+                fontSize: 14,
+                textDecoration: "none",
+              }}
             >
               Home
-            </Link>
+            </a>
           </div>
-          {staleAction ? (
-            <p className="mt-4 text-xs text-white/45">
-              Hard reload: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac). Then retry your last action.
-            </p>
-          ) : !portalRetry ? (
-            <p className="mt-4 text-xs text-white/45">
-              “Try again” retries this page. If the problem continues, go home or sign in again.
+          {stale ? (
+            <p style={{ marginTop: 16, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+              Hard reload: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac).
             </p>
           ) : null}
         </div>

@@ -16,7 +16,6 @@ import {
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readSerpApiMetricsForMarket } from "@/lib/growth/discovery/webSearch";
 import {
-  growthDiscoveryMarketSlugs,
   growthDiscoveryMarketsForCronRun,
   isGrowthDiscoveryWebSearchMarket,
   nationalDiscoveryMarketSlug,

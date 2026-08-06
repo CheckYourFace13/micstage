@@ -108,7 +108,7 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
       const events = data.events ?? [];
       const pageCount = data.pagination?.page_count ?? page;
       const wrapped = page >= pageCount;
-      let nextPage = wrapped ? 1 : page + 1;
+      const nextPage = wrapped ? 1 : page + 1;
       let nextQueryIndex = queryIndex;
       let nextLocationIndex = locationIndex;
       if (wrapped) {

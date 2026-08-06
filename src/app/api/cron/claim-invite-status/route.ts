@@ -8,9 +8,9 @@ import {
   redactEmail,
 } from "@/lib/publicListings/claimInviteAutomation";
 import {
-  effectiveListingClaimInvitesPerCron,
-  micstageClaimInvitesEnabled,
-} from "@/lib/publicListings/automationKillSwitches";
+  resolveClaimInviteRuntimeSnapshot,
+  runtimeSnapshotForStatus,
+} from "@/lib/publicListings/claimInviteRuntimeSettings";
 import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 
@@ -41,6 +41,7 @@ export async function GET(request: Request) {
   const daily = await claimInviteDailyBudgetSnapshot(prisma);
   const stats = await getClaimInviteRollingStats(prisma);
   const eligibleApprox = await countEligiblePendingListingClaimInvites(prisma);
+  const snap = await resolveClaimInviteRuntimeSnapshot(prisma);
   const since = startOfUtcDay();
 
   const canaries = [];
@@ -107,9 +108,10 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    runtime: runtimeSnapshotForStatus(snap),
     gates: {
-      claimInvitesEnabled: micstageClaimInvitesEnabled(),
-      effectivePerCron: effectiveListingClaimInvitesPerCron(),
+      claimInvitesEnabled: snap.claimInvitesEnabled,
+      effectivePerCron: snap.effectivePerCron,
       dailyMax: daily.max,
       sentToday: daily.sentTodayUtc,
       remainingToday: daily.remaining,

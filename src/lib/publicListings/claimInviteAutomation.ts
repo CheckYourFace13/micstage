@@ -8,7 +8,7 @@ import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
 import { isFreeMailDomain } from "@/lib/publicListings/claimAutoApproval";
-import { micstageClaimInvitesEnabled, effectiveListingClaimInvitesPerCron } from "@/lib/publicListings/automationKillSwitches";
+import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
 
 const CONTROL_ADAPTER = "claim_invite_control";
 const CONTROL_MARKET = "global";
@@ -91,8 +91,13 @@ function emailDomain(email: string): string | null {
   return email.slice(at + 1).toLowerCase().replace(/^www\./, "") || null;
 }
 
-export function listingClaimInvitesDailyMax(): number {
+export function listingClaimInvitesDailyMaxEnvFallback(): number {
   return Math.min(50, Math.max(0, parseIntEnv("MICSTAGE_CLAIM_INVITES_DAILY_MAX", 10)));
+}
+
+/** @deprecated Prefer claimInviteDailyBudgetSnapshot which uses DB runtime settings. */
+export function listingClaimInvitesDailyMax(): number {
+  return listingClaimInvitesDailyMaxEnvFallback();
 }
 
 export function listingClaimInvitesPerDomainDailyMax(): number {
@@ -245,7 +250,8 @@ export async function claimInviteDailyBudgetSnapshot(prisma: PrismaClient): Prom
   sentTodayUtc: number;
   remaining: number;
 }> {
-  const max = listingClaimInvitesDailyMax();
+  const snap = await resolveClaimInviteRuntimeSnapshot(prisma);
+  const max = snap.dailyMax.effective;
   const sentTodayUtc = await countClaimInvitesSentTodayUtc(prisma);
   return { max, sentTodayUtc, remaining: Math.max(0, max - sentTodayUtc) };
 }
@@ -332,7 +338,8 @@ export async function claimInviteAutomationMaySend(prisma: PrismaClient): Promis
   dailyRemaining: number;
   perCron: number;
 }> {
-  if (!micstageClaimInvitesEnabled()) {
+  const snap = await resolveClaimInviteRuntimeSnapshot(prisma);
+  if (!snap.claimInvitesEnabled) {
     return { ok: false, reason: "claim_invites_disabled", dailyRemaining: 0, perCron: 0 };
   }
   const pause = await getClaimInvitePauseState(prisma);
@@ -343,7 +350,7 @@ export async function claimInviteAutomationMaySend(prisma: PrismaClient): Promis
   if (daily.remaining <= 0) {
     return { ok: false, reason: "daily_claim_invite_cap", dailyRemaining: 0, perCron: 0 };
   }
-  const perCron = effectiveListingClaimInvitesPerCron();
+  const perCron = snap.effectivePerCron;
   if (perCron <= 0) {
     return { ok: false, reason: "per_cron_zero", dailyRemaining: daily.remaining, perCron: 0 };
   }

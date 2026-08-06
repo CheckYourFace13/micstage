@@ -16,6 +16,15 @@ if (!secret) {
 } else {
   const base = (process.env.APP_URL || "https://micstage.com").replace(/\/$/, "");
 
+  function gatesMatch(runtime) {
+    return (
+      runtime?.claimInvitesEnabled === "enabled" &&
+      runtime?.LISTING_CLAIM_INVITES_PER_CRON?.effective === 2 &&
+      runtime?.MICSTAGE_CLAIM_INVITES_DAILY_MAX?.effective === 10 &&
+      runtime?.MICSTAGE_KILL_CLAIM_INVITES?.effective === "disabled"
+    );
+  }
+
   async function main() {
     const envRes = await fetch(`${base}/api/cron/claim-invite-canary`, {
       headers: { Authorization: `Bearer ${secret}` },
@@ -26,14 +35,15 @@ if (!secret) {
       process.exitCode = 1;
       return;
     }
-    if (envJson.derived?.claimInvitesEnabled !== "enabled") {
+
+    if (!gatesMatch(envJson.runtime)) {
       console.log(
         JSON.stringify(
           {
             ok: false,
-            error: "claim_invites_still_disabled_on_hostinger",
-            note: "Set MICSTAGE_CLAIM_INVITES_ENABLED=true and LISTING_CLAIM_INVITES_PER_CRON=2 in hPanel, then re-run.",
-            env: envJson.env,
+            error: "effective_gates_not_ready",
+            note: "Need ENABLED=enabled, PER_CRON=2, DAILY_MAX=10, KILL=disabled (effective).",
+            runtime: envJson.runtime,
             derived: envJson.derived,
           },
           null,
@@ -70,16 +80,19 @@ if (!secret) {
       JSON.stringify(
         {
           ok: tickRes.ok && tick?.ok !== false,
-          envApplied: envJson.env,
+          runtime: envJson.runtime,
           derived: envJson.derived,
           tickHttpStatus: tickRes.status,
           listingClaimInvites: tick?.listingClaimInvites ?? null,
           outreachSkippedReason: tick?.outreachSkippedReason ?? null,
           autoDraftsSends: tick?.autoDrafts?.outreachSendsThisRun ?? null,
-          beforeSentToday: before?.daily?.sentTodayUtc ?? before?.derived?.dailyClaimInviteSent ?? null,
-          afterSentToday: after?.daily?.sentTodayUtc ?? after?.derived?.dailyClaimInviteSent ?? null,
-          recentSendsRedacted: after?.recentSends ?? after?.todaySends ?? null,
-          pause: envJson.derived?.paused ?? after?.pause ?? null,
+          beforeSentToday: before?.gates?.sentToday ?? null,
+          afterSentToday: after?.gates?.sentToday ?? null,
+          sentDelta: (after?.gates?.sentToday ?? 0) - (before?.gates?.sentToday ?? 0),
+          recentSendsRedacted: after?.sentTodayRedacted ?? null,
+          pause: after?.gates?.paused ?? null,
+          pauseReason: after?.gates?.pauseReason ?? null,
+          bookableTemplates: after?.activity?.bookableTemplates ?? null,
         },
         null,
         2,

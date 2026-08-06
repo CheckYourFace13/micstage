@@ -10,9 +10,9 @@ import {
   getClaimInvitePauseState,
 } from "@/lib/publicListings/claimInviteAutomation";
 import {
-  effectiveListingClaimInvitesPerCron,
-  micstageClaimInvitesEnabled,
-} from "@/lib/publicListings/automationKillSwitches";
+  resolveClaimInviteRuntimeSnapshot,
+  runtimeSnapshotForStatus,
+} from "@/lib/publicListings/claimInviteRuntimeSettings";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,16 +38,8 @@ function boolGate(v: string | undefined): "enabled" | "disabled" | "missing" {
 }
 
 /**
- * GET — redacted Hostinger claim-invite env / gate status (auth required).
+ * GET — redacted claim-invite env + DB runtime + effective gates (auth required).
  * POST — send one allowlisted canary invite using production Resend.
- *
- * Body:
- * {
- *   "listingSlug": "...",
- *   "expectedDomain": "starrhill.com",
- *   "useGrowthLeadEmail": true,
- *   "confirm": "SEND_REAL_CANARY"
- * }
  */
 export async function GET(request: Request) {
   if (!authorize(request)) {
@@ -60,6 +52,7 @@ export async function GET(request: Request) {
 
   const pause = await getClaimInvitePauseState(prisma);
   const daily = await claimInviteDailyBudgetSnapshot(prisma);
+  const snap = await resolveClaimInviteRuntimeSnapshot(prisma);
 
   return NextResponse.json({
     ok: true,
@@ -80,11 +73,14 @@ export async function GET(request: Request) {
       MICSTAGE_RESEND_DAILY_MAX: process.env.MICSTAGE_RESEND_DAILY_MAX?.trim() || "missing",
       MICSTAGE_KILL_CLAIM_INVITES: boolGate(process.env.MICSTAGE_KILL_CLAIM_INVITES),
       GROWTH_AUTO_DRAFT_CRON_ENABLED: boolGate(process.env.GROWTH_AUTO_DRAFT_CRON_ENABLED),
+      GROWTH_OUTREACH_SENDS_PER_CRON_RUN:
+        process.env.GROWTH_OUTREACH_SENDS_PER_CRON_RUN?.trim() || "missing",
       NODE_ENV: process.env.NODE_ENV === "development" ? "invalid" : process.env.NODE_ENV ? "valid" : "missing",
     },
+    runtime: runtimeSnapshotForStatus(snap),
     derived: {
-      claimInvitesEnabled: micstageClaimInvitesEnabled() ? "enabled" : "disabled",
-      effectivePerCron: effectiveListingClaimInvitesPerCron(),
+      claimInvitesEnabled: snap.claimInvitesEnabled ? "enabled" : "disabled",
+      effectivePerCron: snap.effectivePerCron,
       dailyClaimInviteMax: daily.max,
       dailyClaimInviteSent: daily.sentTodayUtc,
       dailyClaimInviteRemaining: daily.remaining,
@@ -139,7 +135,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Keep automation cron disabled during explicit canary; this endpoint does not flip env.
   const result = await sendApprovedClaimCanaryInvite(prisma, {
     listingSlug,
     expectedDomain,
@@ -154,7 +149,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 422 });
   }
 
-  // Isolation checks
+  const snap = await resolveClaimInviteRuntimeSnapshot(prisma);
   const chooseTokens = await prisma.listingClaimInviteToken.count({
     where: { listing: { slug: "monday-night-poetry-open-mic-hosted-by-keeping-it-p" } },
   });
@@ -165,11 +160,10 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ...result,
     isolation: {
-      choose901Tokens:
-        listingSlug === "monday-night-poetry-open-mic-hosted-by-keeping-it-p" ? chooseTokens : chooseTokens,
+      choose901Tokens: chooseTokens,
       bookclubTokens,
-      automationStillOffUnlessHostingerEnvEnabled: !micstageClaimInvitesEnabled(),
-      effectivePerCron: effectiveListingClaimInvitesPerCron(),
+      claimInvitesEnabled: snap.claimInvitesEnabled,
+      effectivePerCron: snap.effectivePerCron,
     },
   });
 }

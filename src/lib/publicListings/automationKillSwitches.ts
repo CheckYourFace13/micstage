@@ -1,6 +1,7 @@
 /**
  * Production automation kill switches and staged claim-invite gates.
- * Stage 1 deploy: claim invites OFF unless explicitly enabled.
+ * Env-only sync helpers remain for non-claim kills and reporting.
+ * Claim-invite send gates prefer resolveClaimInviteRuntimeSnapshot (DB + env).
  */
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
 
@@ -30,15 +31,15 @@ export function micstageEmailMiningKillSwitch(): boolean {
 }
 
 /**
- * Claim invitations require an explicit enable flag for staged rollout.
- * Default OFF so deploying e73c537 cannot blast invites until Stage 3 canary.
+ * Env-only claim invite gate (no DB). Prefer resolveClaimInviteRuntimeSnapshot for sends.
+ * @deprecated for send paths — use async runtime snapshot.
  */
 export function micstageClaimInvitesEnabled(): boolean {
   if (envTruthy(process.env.MICSTAGE_KILL_CLAIM_INVITES)) return false;
   return envTruthy(process.env.MICSTAGE_CLAIM_INVITES_ENABLED);
 }
 
-/** Per-cron claim invite batch. Default 0 until canary; clamp 0–20. */
+/** Env-only per-cron (no DB). Prefer resolveClaimInviteRuntimeSnapshot for sends. */
 export function listingClaimInvitesPerCronStaged(): number {
   if (!micstageClaimInvitesEnabled()) return 0;
   const n = parseIntEnv("LISTING_CLAIM_INVITES_PER_CRON", 0);
@@ -50,10 +51,10 @@ export function listingClaimInviteCanaryMax(): number {
   return Math.min(20, Math.max(0, parseIntEnv("LISTING_CLAIM_INVITES_CANARY_MAX", 5)));
 }
 
+/** Env-only effective per-cron. Prefer resolveClaimInviteRuntimeSnapshot for sends. */
 export function effectiveListingClaimInvitesPerCron(): number {
   const n = listingClaimInvitesPerCronStaged();
   if (n <= 0) return 0;
-  // While canary mode is on (default), hard-cap at canary max.
   if (!envFalsyExplicit(process.env.MICSTAGE_CLAIM_INVITES_CANARY_MODE)) {
     return Math.min(n, listingClaimInviteCanaryMax());
   }

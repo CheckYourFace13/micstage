@@ -1115,6 +1115,30 @@ model GrowthDiscoveryCursor {
   @@index([adapterId, marketSlug])
 }
 
+/// Non-secret operational runtime settings (claim-invite gates, etc.).
+/// Secrets (CRON_SECRET, API keys, DB URLs) must never be stored here.
+model OperationalRuntimeSetting {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Stable key, e.g. MICSTAGE_CLAIM_INVITES_ENABLED
+  key String @unique
+
+  /// Typed string value: "true"/"false" or integer decimal string
+  valueType String
+  value     String
+
+  /// Who/what wrote the row: claim-invite-runtime-api, script, etc.
+  updatedBy String?
+  /// Optional human reason for the change
+  reason    String?
+  /// Redacted audit metadata (no secrets)
+  meta      Json?
+
+  @@index([updatedAt])
+}
+
 /// One persisted row per completed `runGrowthLeadDiscovery` execution (cron or script).
 model GrowthDiscoveryRun {
   id        String   @id @default(cuid())

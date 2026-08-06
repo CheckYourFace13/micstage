@@ -3,7 +3,7 @@ import { deliverResendEmail } from "@/lib/mailer";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { transactionalFromAddress } from "@/lib/marketing/emailConfig";
-import { micstageClaimInvitesEnabled } from "@/lib/publicListings/automationKillSwitches";
+import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
 import { resendDailyBudgetSnapshot } from "@/lib/resendDailyBudget";
 import { issueListingClaimInviteToken } from "@/lib/publicListings/claimInviteToken";
 import { isMarketingEmailSuppressed } from "@/lib/marketing/suppression";
@@ -236,7 +236,8 @@ export async function sendListingClaimInviteIfNeeded(
   listingId: string,
   toEmail?: string | null,
 ): Promise<{ sent: boolean; reason?: string }> {
-  if (!micstageClaimInvitesEnabled()) {
+  const runtime = await resolveClaimInviteRuntimeSnapshot(prisma);
+  if (!runtime.claimInvitesEnabled) {
     return { sent: false, reason: "claim_invites_disabled" };
   }
   const pause = await getClaimInvitePauseState(prisma);

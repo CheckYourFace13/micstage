@@ -118,7 +118,7 @@ async function handle(request: Request) {
     if (claimInvitePhase) {
       resendBudget = await resendDailyBudgetSnapshot(prisma);
       pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
-      const inviteBatch = Math.min(listingClaimInvitesPerCron(), resendBudget.remaining);
+      const inviteBatch = Math.min(await listingClaimInvitesPerCron(prisma), resendBudget.remaining);
       if (inviteBatch > 0) {
         listingClaimInvites = await runPendingListingClaimInvites(prisma, inviteBatch);
         resendBudget = await resendDailyBudgetSnapshot(prisma);

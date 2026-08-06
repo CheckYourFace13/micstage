@@ -9,6 +9,8 @@ import {
 } from "@/lib/publicListings/claimInviteEligibility";
 import { micstageClaimInvitesEnabled } from "@/lib/publicListings/automationKillSwitches";
 import { resendDailyBudgetSnapshot } from "@/lib/resendDailyBudget";
+import { issueListingClaimInviteToken } from "@/lib/publicListings/claimInviteToken";
+import { isMarketingEmailSuppressed } from "@/lib/marketing/suppression";
 
 const REPLY_TO = "drummer@micstage.com";
 
@@ -40,10 +42,13 @@ export function buildListingClaimInvitePayload(input: {
   listingSlug: string;
   city: string | null;
   region: string | null;
+  /** Prefer signed token URL when available. */
+  claimUrl?: string;
 }): { subject: string; textBody: string; htmlBody: string } {
   const base = appBaseUrl().replace(/\/$/, "");
   const listingUrl = `${base}/open-mics/${encodeURIComponent(input.listingSlug)}`;
-  const claimUrl = `${base}/claim/${encodeURIComponent(input.listingSlug)}`;
+  const claimUrl =
+    input.claimUrl?.trim() || `${base}/claim/${encodeURIComponent(input.listingSlug)}`;
   const registerUrl = `${base}/register/venue`;
   const place = [input.city, input.region].filter(Boolean).join(", ");
   const subject = `Claim ${input.listingName} on MicStage — free open mic tools`;
@@ -53,10 +58,10 @@ export function buildListingClaimInvitePayload(input: {
     : `We verified ${input.listingName} as a real open mic and published a free MicStage listing so local performers can find it.`;
 
   const policy =
-    "This is a public verified listing only. We do not run proactive marketing for your room until you claim it, set up your schedule, and start using MicStage.";
+    "This is a public verified listing only. We do not run proactive marketing for your room until you claim it, set up your schedule, and start using MicStage. No MicStage account is created until you explicitly claim and accept Terms.";
 
   const cta =
-    "Run this open mic? Claim your page free in one step — we will connect you to a venue account and help you take over the listing.";
+    "Run this open mic? Claim your page free — confirm your authority, accept Terms, and activate your venue in a few minutes.";
 
   const servicesText = MICSTAGE_VENUE_FREE_SERVICES.map((s) => `- ${s}`).join("\n");
   const servicesHtml = MICSTAGE_VENUE_FREE_SERVICES.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
@@ -69,7 +74,7 @@ export function buildListingClaimInvitePayload(input: {
     "",
     cta,
     "",
-    `Claim this open mic (free, one step): ${claimUrl}`,
+    `Secure claim link (expires): ${claimUrl}`,
     `View the listing: ${listingUrl}`,
     `Or register your venue directly: ${registerUrl}`,
     "",
@@ -193,9 +198,14 @@ export function buildListingClaimApprovedPayload(input: {
   return { subject, textBody, htmlBody };
 }
 
-async function sendTransactional(to: string, subject: string, textBody: string, htmlBody: string): Promise<boolean> {
+async function sendTransactional(
+  to: string,
+  subject: string,
+  textBody: string,
+  htmlBody: string,
+): Promise<{ ok: boolean; messageId?: string }> {
   const normalized = normalizeMarketingEmail(to);
-  if (!normalized) return false;
+  if (!normalized) return { ok: false };
 
   const out = await deliverResendEmail({
     to: normalized,
@@ -210,9 +220,9 @@ async function sendTransactional(to: string, subject: string, textBody: string, 
 
   if (out.skipped) {
     console.warn("[listingClaimEmail] skipped (no Resend key)");
-    return false;
+    return { ok: false };
   }
-  return true;
+  return { ok: true, messageId: out.messageId };
 }
 
 /**
@@ -252,6 +262,11 @@ export async function sendListingClaimInviteIfNeeded(
   const email = rawEmail ? normalizeMarketingEmail(rawEmail) : null;
   if (!email) return { sent: false, reason: "no_email" };
 
+  const suppressed = await isMarketingEmailSuppressed(prisma, email);
+  if (suppressed.suppressed) {
+    return { sent: false, reason: `suppressed:${suppressed.reason ?? "unknown"}` };
+  }
+
   if (
     !isClaimInviteEmailEligible({
       email,
@@ -263,21 +278,51 @@ export async function sendListingClaimInviteIfNeeded(
     return { sent: false, reason: "email_not_eligible" };
   }
 
+  const issued = await issueListingClaimInviteToken(prisma, {
+    listingId,
+    intendedEmailNormalized: email,
+  });
+  const base = appBaseUrl().replace(/\/$/, "");
+  // Token in path — not query string (reduces referrer leakage). Never log rawToken.
+  const claimUrl = `${base}/claim/invite/${issued.rawToken}`;
+
   const payload = buildListingClaimInvitePayload({
     listingName: listing.name,
     listingSlug: listing.slug,
     city: listing.city,
     region: listing.region,
+    claimUrl,
   });
 
-  const ok = await sendTransactional(email, payload.subject, payload.textBody, payload.htmlBody);
-  if (!ok) return { sent: false, reason: "send_skipped_or_failed" };
+  const sendResult = await sendTransactional(email, payload.subject, payload.textBody, payload.htmlBody);
+  if (!sendResult.ok) {
+    // Revoke unused token if send failed so it cannot be guessed from a partial path
+    await prisma.listingClaimInviteToken.update({
+      where: { id: issued.tokenId },
+      data: { status: "REVOKED", revokedAt: new Date() },
+    });
+    return { sent: false, reason: "send_skipped_or_failed" };
+  }
 
+  // Stamp only after provider acceptance (messageId when available).
   await prisma.publicOpenMicListing.update({
     where: { id: listingId },
     data: {
       claimInviteEmailSentAt: new Date(),
       claimInviteEmail: email,
+      claimInviteProviderMessageId: sendResult.messageId ?? null,
+    },
+  });
+
+  await prisma.listingClaimAuditEvent.create({
+    data: {
+      listingId,
+      eventType: "CLAIM_INVITE_SENT",
+      meta: {
+        tokenId: issued.tokenId,
+        hasProviderMessageId: Boolean(sendResult.messageId),
+        emailDomain: email.slice(email.indexOf("@") + 1),
+      },
     },
   });
 

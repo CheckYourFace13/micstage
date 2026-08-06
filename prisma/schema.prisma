@@ -1263,6 +1263,38 @@ enum ListingClaimRequestStatus {
   REJECTED
 }
 
+enum ListingClaimInviteTokenStatus {
+  ACTIVE
+  USED
+  REVOKED
+  EXPIRED
+}
+
+enum ListingClaimDecision {
+  AUTO_APPROVED
+  MANUAL_REVIEW
+  REJECTED
+}
+
+enum ListingEvidenceAutomationStatus {
+  PENDING
+  IN_PROGRESS
+  NEEDS_HUMAN
+  PROMOTED
+  REJECTED
+  TERMINAL
+}
+
+enum ListingOpenMicEvidenceSourceType {
+  OFFICIAL_WEBSITE
+  OFFICIAL_EVENTS_PAGE
+  OFFICIAL_SOCIAL
+  HOST_PAGE
+  STRUCTURED_EVENT_PROVIDER
+  ALTERNATE_SEARCH
+  OTHER
+}
+
 enum ListingCorrectionStatus {
   PENDING
   APPROVED
@@ -1335,16 +1367,34 @@ model PublicOpenMicListing {
   /// Idempotent owner invite to claim this listing (not growth cold outreach).
   claimInviteEmailSentAt DateTime?
   claimInviteEmail         String?
+  /// Resend message id from the most recent successful claim invite (telemetry; optional).
+  claimInviteProviderMessageId String?
   /// Set when linked venue publishes a public schedule — unlocks proactive marketing.
   promotionEligibleAt    DateTime?
 
-  schedules      PublicOpenMicSchedule[]
-  claimRequests  ListingClaimRequest[]
-  corrections    ListingCorrection[]
+  /// Evidence / place-verification automation (Priority 3).
+  placeVerifyAttemptCount   Int       @default(0)
+  placeVerifyLastAttemptAt  DateTime?
+  placeVerifyNextAttemptAt  DateTime?
+  evidenceEnrichAttemptCount  Int       @default(0)
+  evidenceEnrichLastAttemptAt DateTime?
+  evidenceEnrichNextAttemptAt DateTime?
+  evidenceTerminalReason      String?
+  evidenceAutomationStatus    ListingEvidenceAutomationStatus @default(PENDING)
+
+  schedules           PublicOpenMicSchedule[]
+  claimRequests       ListingClaimRequest[]
+  corrections         ListingCorrection[]
+  claimInviteTokens   ListingClaimInviteToken[]
+  claimAuditEvents    ListingClaimAuditEvent[]
+  openMicEvidenceRows ListingOpenMicEvidence[]
 
   @@index([city, region])
   @@index([verificationStatus, claimStatus])
   @@index([lastVerifiedAt])
+  @@index([placeVerifyNextAttemptAt, googlePlaceId])
+  @@index([evidenceEnrichNextAttemptAt, verificationStatus])
+  @@index([evidenceAutomationStatus, updatedAt])
 }
 
 model PublicOpenMicSchedule {
@@ -1388,12 +1438,92 @@ model ListingClaimRequest {
 
   status ListingClaimRequestStatus @default(PENDING)
 
+  /// Instant-claim fields (optional for legacy manual claims).
+  authorityConfirmedAt DateTime?
+  termsAcceptedAt      DateTime?
+  privacyAcceptedAt    DateTime?
+  decision             ListingClaimDecision?
+  decisionReason       String?
+  claimInviteTokenId   String?
+  claimInviteToken     ListingClaimInviteToken? @relation(fields: [claimInviteTokenId], references: [id], onDelete: SetNull)
+
   reviewedAt      DateTime?
   reviewedByEmail String?
   reviewNotes     String? @db.Text
 
   @@index([listingId, status])
   @@index([status, createdAt])
+}
+
+/// One-time signed claim invitation. Store hash only — never persist raw token.
+model ListingClaimInviteToken {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  listing   PublicOpenMicListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+
+  /// SHA-256 hex of raw token (raw appears only in email URL).
+  tokenHash String @unique
+
+  /// Invited recipient (normalized). Login email must match for auto-approval.
+  intendedEmailNormalized String
+
+  status    ListingClaimInviteTokenStatus @default(ACTIVE)
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+
+  claimRequests ListingClaimRequest[]
+
+  @@index([listingId, status])
+  @@index([intendedEmailNormalized])
+  @@index([expiresAt])
+}
+
+/// Immutable claim funnel audit events (no raw tokens, no plaintext passwords).
+model ListingClaimAuditEvent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  listing   PublicOpenMicListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+
+  eventType String
+  /// Redacted / non-secret metadata only.
+  meta      Json?
+
+  @@index([listingId, createdAt])
+  @@index([eventType, createdAt])
+}
+
+/// Stored open-mic evidence excerpts for enrichment / promotion (short excerpts only).
+model ListingOpenMicEvidence {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing   PublicOpenMicListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+
+  evidenceUrl   String
+  sourceType    ListingOpenMicEvidenceSourceType
+  evidenceTitle String?
+  /// Short necessary excerpt only — not full page copy.
+  evidenceExcerpt String? @db.Text
+  detectedPhrase  String?
+  detectedSchedule String?
+  evidenceDate    DateTime?
+  fetchedAt       DateTime  @default(now())
+  authorityScore  Float     @default(0)
+  currentnessScore Float    @default(0)
+  trusted         Boolean   @default(false)
+  reviewOnly      Boolean   @default(true)
+  reasonCode      String?
+
+  @@index([listingId, trusted])
+  @@index([listingId, fetchedAt])
+  @@unique([listingId, evidenceUrl])
 }
 
 model ListingCorrection {

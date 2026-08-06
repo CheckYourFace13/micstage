@@ -1,4 +1,5 @@
-import { isPrimaryLaunchDiscoveryMarket, primaryLaunchDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
+import { discoveryRollupSlugFromCityRegion } from "@/lib/discoveryMarket";
+import { isNationalDiscoveryMarket, nationalDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
 import {
   growthDiscoveryAutonomousEnabled,
   growthDiscoveryHttpDelayMs,
@@ -6,14 +7,17 @@ import {
   hasEventbriteToken,
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
+import { eventbriteUsLocationAddresses } from "@/lib/growth/discovery/usStateGeoScopes";
 import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
 import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
 
+/** Keep id stable for cursor / metrics continuity (behavior is US-wide state rotation). */
 const ADAPTER_ID = "autonomous_eventbrite_chicago";
 const CURSOR_KEY = "eb_page";
 const EVENTBRITE_QUERIES = ["open mic", "poetry open mic", "comedy open mic", "jam night"];
+const US_LOCATIONS = eventbriteUsLocationAddresses();
 
 type EbVenue = { name?: string; address?: { city?: string; region?: string } };
 type EbEvent = {
@@ -25,7 +29,8 @@ type EbEvent = {
   venue_id?: string;
 };
 
-const OPEN_MIC_EVENT_RE = /\bopen\s*mic\b|\bmic\s*night\b|\bjam\s*night\b|\bacoustic\s*(night|open)\b|\bcomedy\s*open\b|\bpoetry\s*open\b|\bopen\s*stage\b|\bamateur\s*night\b/i;
+const OPEN_MIC_EVENT_RE =
+  /\bopen\s*mic\b|\bmic\s*night\b|\bjam\s*night\b|\bacoustic\s*(night|open)\b|\bcomedy\s*open\b|\bpoetry\s*open\b|\bopen\s*stage\b|\bamateur\s*night\b/i;
 
 function eventText(ev: EbEvent): string {
   const name = ev.name?.text ?? "";
@@ -38,7 +43,8 @@ async function sleep(ms: number) {
 }
 
 /**
- * Paginates Eventbrite public search near Chicago, scoped to open-mic–style events.
+ * Paginates Eventbrite public search across every US state (+ DC), scoped to open-mic–style events.
+ * Runs on the nationwide discovery lane.
  */
 export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapter {
   return {
@@ -46,29 +52,35 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
     leadType: "VENUE",
     async discover(ctx: GrowthLeadDiscoveryContext) {
       if (!growthDiscoveryAutonomousEnabled()) return [];
-      if (!isPrimaryLaunchDiscoveryMarket(ctx.discoveryMarketSlug)) return [];
+      if (!isNationalDiscoveryMarket(ctx.discoveryMarketSlug)) return [];
       if (!hasEventbriteToken() || !ctx.prisma) return [];
 
       const token = growthEventbriteToken();
       const prisma = ctx.prisma;
       let page = 1;
       let queryIndex = 0;
+      let locationIndex = 0;
       try {
         const raw = await readDiscoveryCursor(prisma, ADAPTER_ID, ctx.discoveryMarketSlug, CURSOR_KEY);
-        const parsed = raw ? (JSON.parse(raw) as { page?: number; queryIndex?: number }) : null;
+        const parsed = raw
+          ? (JSON.parse(raw) as { page?: number; queryIndex?: number; locationIndex?: number })
+          : null;
         page = Math.max(1, Number(parsed?.page ?? 1) || 1);
         queryIndex = Math.max(0, Number(parsed?.queryIndex ?? 0) || 0) % EVENTBRITE_QUERIES.length;
+        locationIndex = Math.max(0, Number(parsed?.locationIndex ?? 0) || 0) % US_LOCATIONS.length;
       } catch {
         page = 1;
         queryIndex = 0;
+        locationIndex = 0;
       }
       const query = EVENTBRITE_QUERIES[queryIndex]!;
+      const locationAddress = US_LOCATIONS[locationIndex]!;
 
       await sleep(growthDiscoveryHttpDelayMs());
 
       const u = new URL("https://www.eventbriteapi.com/v3/events/search/");
-      u.searchParams.set("location.address", "Chicago, IL");
-      u.searchParams.set("location.within", process.env.GROWTH_EVENTBRITE_RADIUS_KM?.trim() || "70km");
+      u.searchParams.set("location.address", locationAddress);
+      u.searchParams.set("location.within", process.env.GROWTH_EVENTBRITE_RADIUS_KM?.trim() || "120km");
       u.searchParams.set("page", String(page));
       u.searchParams.set("expand", "venue");
       u.searchParams.set("q", query);
@@ -96,14 +108,21 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
       const events = data.events ?? [];
       const pageCount = data.pagination?.page_count ?? page;
       const wrapped = page >= pageCount;
-      const nextPage = wrapped ? 1 : page + 1;
-      const nextQueryIndex = wrapped ? (queryIndex + 1) % EVENTBRITE_QUERIES.length : queryIndex;
+      let nextPage = wrapped ? 1 : page + 1;
+      let nextQueryIndex = queryIndex;
+      let nextLocationIndex = locationIndex;
+      if (wrapped) {
+        nextQueryIndex = (queryIndex + 1) % EVENTBRITE_QUERIES.length;
+        if (nextQueryIndex === 0) {
+          nextLocationIndex = (locationIndex + 1) % US_LOCATIONS.length;
+        }
+      }
       await writeDiscoveryCursor(
         prisma,
         ADAPTER_ID,
         ctx.discoveryMarketSlug,
         CURSOR_KEY,
-        JSON.stringify({ page: nextPage, queryIndex: nextQueryIndex }),
+        JSON.stringify({ page: nextPage, queryIndex: nextQueryIndex, locationIndex: nextLocationIndex }),
       );
 
       const out: GrowthLeadCandidate[] = [];
@@ -115,15 +134,17 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
         const name =
           (v?.name && String(v.name).trim()) ||
           (ev.name?.text ? ev.name.text.trim().slice(0, 180) : null) ||
-          "Chicago area event host";
-        const city = v?.address?.city?.trim() || "Chicago";
-        const region = v?.address?.region?.trim() || "IL";
+          "Open mic event host";
+        const city = v?.address?.city?.trim() || null;
+        const region = v?.address?.region?.trim()?.toUpperCase() || null;
+        const discoveryMarketSlug =
+          city && region ? discoveryRollupSlugFromCityRegion(city, region) : nationalDiscoveryMarketSlug();
 
         const om = scoreOpenMicVenueProspect({
           snippet: ev.name?.text ?? "",
           pageTextSample: blob,
           title: ev.name?.text ?? "",
-          searchQuery: "open mic Eventbrite Chicago",
+          searchQuery: `open mic Eventbrite ${locationAddress}`,
           hasEmail: false,
           hasContactPath: Boolean(ev.url),
           hasSocial: false,
@@ -143,7 +164,7 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
           contactUrl: ev.url ?? null,
           city,
           region,
-          discoveryMarketSlug: primaryLaunchDiscoveryMarketSlug(),
+          discoveryMarketSlug,
           source: ADAPTER_ID,
           sourceKind: "EVENT_LISTING",
           fitScore: Math.max(om.fitScore, 6),
@@ -152,7 +173,7 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
           contactQuality,
           performanceTags: om.performanceTags.length ? om.performanceTags : [],
           importKey: `eb_evt:${ev.id}`,
-          internalNotes: `Eventbrite search (${query}, radius ${u.searchParams.get("location.within")}). Verify venue before outreach.`,
+          internalNotes: `Eventbrite search (${query} @ ${locationAddress}, radius ${u.searchParams.get("location.within")}). Verify venue before outreach.`,
         });
       }
       return out;

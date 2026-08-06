@@ -47,7 +47,7 @@ export function growthAutoDraftBatchLimit(): number {
  * Default 3; clamp 1–50 so frequent crons can drain a 50/day budget without huge bursts per tick.
  */
 export function growthOutreachSendsPerCronRun(): number {
-  const n = parseIntEnv("GROWTH_OUTREACH_SENDS_PER_CRON_RUN", 3);
+  const n = parseIntEnv("GROWTH_OUTREACH_SENDS_PER_CRON_RUN", 5);
   return Math.min(50, Math.max(0, n));
 }
 
@@ -64,16 +64,17 @@ export function growthOutreachDailyMax(): number {
 /**
  * How many discovery market slugs to process per cron tick (rotates through the full list).
  * Keeps Hostinger/nginx from 504-ing on combined discovery + outreach in one HTTP request.
+ * Default 1 — nationwide-only list puts full budget into US-wide adapters.
  */
 export function growthDiscoveryMarketsPerCronRun(): number {
-  const n = parseIntEnv("GROWTH_DISCOVERY_MARKETS_PER_CRON_RUN", 2);
+  const n = parseIntEnv("GROWTH_DISCOVERY_MARKETS_PER_CRON_RUN", 1);
   return Math.min(20, Math.max(1, n));
 }
 
 /** Website email-mining jobs processed per cron tick (SOCIAL_PAYLOAD_RENDER queue). */
 export function marketingSocialPayloadBatchPerCron(): number {
-  const n = parseIntEnv("MARKETING_SOCIAL_PAYLOAD_BATCH_PER_CRON", 50);
-  return Math.min(50, Math.max(1, n));
+  const n = parseIntEnv("MARKETING_SOCIAL_PAYLOAD_BATCH_PER_CRON", 80);
+  return Math.min(120, Math.max(1, n));
 }
 
 /** Max outreach sends per discovery market slug per UTC day (0 = no market cap). Spreads volume nationally. */

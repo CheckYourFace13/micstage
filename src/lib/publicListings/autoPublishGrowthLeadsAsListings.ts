@@ -5,6 +5,7 @@ import {
   listingGoogleVerifyPerDiscoveryRun,
   verifyPublicListingsWithGoogle,
 } from "@/lib/publicListings/googlePlacesVerify";
+import { promotePlaceConfirmedListings } from "@/lib/publicListings/promotePlaceConfirmedListings";
 import { publishGrowthLeadAsListing } from "@/lib/publicListings/publishGrowthLeadListing";
 
 export type AutoPublishListingsResult = {
@@ -20,6 +21,13 @@ export type AutoPublishListingsResult = {
     skipped: number;
     noApiKey: boolean;
   };
+  promotePlaceConfirmed: {
+    scanned: number;
+    promoted: number;
+    skippedNoTrustedEvidence: number;
+    skippedNonVenueName: number;
+    claimInvitesAttempted: number;
+  };
 };
 
 const LEAD_PUBLISH_WHERE = {
@@ -29,7 +37,7 @@ const LEAD_PUBLISH_WHERE = {
 };
 
 export function listingAutoPublishPerDiscoveryRun(): number {
-  return Math.min(50, Math.max(1, parseIntEnv("LISTING_AUTO_PUBLISH_PER_DISCOVERY_RUN", 15)));
+  return Math.min(50, Math.max(1, parseIntEnv("LISTING_AUTO_PUBLISH_PER_DISCOVERY_RUN", 40)));
 }
 
 export function listingEnrichFromLeadPerDiscoveryRun(): number {
@@ -155,6 +163,15 @@ export async function autoPublishGrowthLeadsAsListings(
   const googleVerify = await verifyPublicListingsWithGoogle(prisma, {
     limit: listingGoogleVerifyPerDiscoveryRun(),
   });
+  const promotePlaceConfirmed = await promotePlaceConfirmedListings(prisma);
 
-  return { published, invitesSent, enriched, skipped, backlogRemaining, googleVerify };
+  return {
+    published,
+    invitesSent,
+    enriched,
+    skipped,
+    backlogRemaining,
+    googleVerify,
+    promotePlaceConfirmed,
+  };
 }

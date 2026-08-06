@@ -16,6 +16,7 @@ import {
   pickPrimaryVenueContactUrl,
   rankVenueInternalUrls,
 } from "@/lib/growth/discovery/extractFromHtml";
+import { nationwideWebSearchGeoScopes } from "@/lib/growth/discovery/usStateGeoScopes";
 import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
 import { pickPrimaryVenueOutreachEmail } from "@/lib/growth/discovery/venueEmailExtraction";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
@@ -184,93 +185,6 @@ const OPEN_MIC_QUERY_CORES = [
   '"open mic" OR "mic night" venue OR bar',
 ];
 
-/** Rotating metro/state tails + US-wide so coverage is nationwide, not one-metro skewed. */
-const GEO_SCOPES = [
-  "",
-  "United States",
-  "Nashville TN",
-  "Austin TX",
-  "Portland OR",
-  "Los Angeles CA",
-  "Denver CO",
-  "Seattle WA",
-  "Boston MA",
-  "Atlanta GA",
-  "New Orleans LA",
-  "Phoenix AZ",
-  "Philadelphia PA",
-  "Detroit MI",
-  "Minneapolis MN",
-  "Kansas City MO",
-  "San Diego CA",
-  "Miami FL",
-  "Washington DC",
-  "Dallas TX",
-  "Houston TX",
-  "Chicago IL",
-  "St Louis MO",
-  "Charlotte NC",
-  "Columbus OH",
-  "Indianapolis IN",
-  "Las Vegas NV",
-  "San Francisco CA",
-  "San Antonio TX",
-  "Orlando FL",
-  "Tampa FL",
-  "Raleigh NC",
-  "Salt Lake City UT",
-  "Milwaukee WI",
-  "Cleveland OH",
-  "Cincinnati OH",
-  "Pittsburgh PA",
-  "Baltimore MD",
-  "Sacramento CA",
-  "Kansas City KS",
-  "Oklahoma City OK",
-  "Memphis TN",
-  "Louisville KY",
-  "Richmond VA",
-  "Buffalo NY",
-  "Albuquerque NM",
-  "Tucson AZ",
-  "Honolulu HI",
-];
-
-/** Metro tails when the cron context is `chicagoland-il` (Chicago-first web discovery). */
-const CHICAGOLAND_WEB_GEO_SCOPES = [
-  "Chicago IL",
-  "Chicagoland Illinois",
-  "Evanston IL",
-  "Oak Park IL",
-  "Naperville IL",
-  "Aurora IL",
-  "Joliet IL",
-  "Schaumburg IL",
-  "Arlington Heights IL",
-  "Skokie IL",
-  "Waukegan IL",
-];
-
-const ILLINOIS_REGIONAL_WEB_GEO_SCOPES = ["Illinois", "IL USA", "Rockford IL", "Rockford Illinois"];
-
-const CENTRAL_IL_WEB_GEO_SCOPES = [
-  "Bloomington IL",
-  "Champaign IL",
-  "Peoria IL",
-  "Decatur IL",
-  "Urbana IL",
-  "Normal IL",
-  "Springfield IL",
-];
-
-function webSearchGeoScopesForMarket(slug: string): string[] {
-  const s = slug.trim().toLowerCase();
-  if (s === "chicagoland-il") return CHICAGOLAND_WEB_GEO_SCOPES;
-  if (s === "illinois-regional") return ILLINOIS_REGIONAL_WEB_GEO_SCOPES;
-  if (s === "central-illinois-il") return CENTRAL_IL_WEB_GEO_SCOPES;
-  return GEO_SCOPES;
-}
-
 function buildSearchQuery(cursorQi: number, geoScopes: string[]): string {
   const core = OPEN_MIC_QUERY_CORES[cursorQi % OPEN_MIC_QUERY_CORES.length]!;
   const geo = geoScopes[Math.floor(cursorQi / OPEN_MIC_QUERY_CORES.length) % geoScopes.length]!;
@@ -281,13 +195,12 @@ function buildSearchQuery(cursorQi: number, geoScopes: string[]): string {
 /** Same-host deep pages per search hit (contact / events / team / booking). */
 const DEEP_PAGES_PER_HIT = 8;
 
-/** Extra throughput for the nationwide lane only (env caps still apply via allocation + parseIntEnv). */
-const NATIONWIDE_WEB_SEARCH_VOLUME_MULT = 1.22;
+/** Extra throughput for the nationwide lane (env caps still apply via allocation + parseIntEnv). */
+const NATIONWIDE_WEB_SEARCH_VOLUME_MULT = 1.35;
 
 /**
  * SerpAPI (primary) / Brave Search API (fallback) → open-mic venue queries → multi-page fetch → email extraction.
- * Runs when the cron context slug is one of `growthDiscoveryWebSearchMarketPriority()` (Illinois rollups + national);
- * geo query tails are scoped per slug (Chicago-first vs statewide vs central IL vs nationwide rotation).
+ * Runs on `national-discovery-us`; geo tails rotate through every US state (+ DC) equally.
  */
 export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter {
   return {
@@ -308,7 +221,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           });
           return [];
         }
-        const geoScopes = webSearchGeoScopesForMarket(ctx.discoveryMarketSlug);
+        const geoScopes = nationwideWebSearchGeoScopes();
         const rotationSpan = Math.max(1, OPEN_MIC_QUERY_CORES.length * geoScopes.length);
         const provider = await discoverySearchProviderForMarket(ctx.prisma, ctx.discoveryMarketSlug);
         if (!provider || !ctx.prisma) {
@@ -502,6 +415,16 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           const email = picked.primary;
           const additionalContactEmails = picked.additional;
           const totalFound = (email ? 1 : 0) + additionalContactEmails.length;
+          const sameHostEmail = Boolean(
+            email &&
+              pageHost &&
+              (() => {
+                const at = email.lastIndexOf("@");
+                if (at < 0) return false;
+                const eh = email.slice(at + 1).toLowerCase().replace(/^www\./, "");
+                return eh === pageHost || eh.endsWith(`.${pageHost}`) || pageHost.endsWith(`.${eh}`);
+              })(),
+          );
 
           const ig = ex.instagramUrls[0] ?? null;
           const fb = ex.facebookUrls[0] ?? null;
@@ -574,7 +497,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             leadType: "VENUE",
             name,
             contactEmailNormalized: email,
-            emailExtractedFromNoisyText: true,
+            emailExtractedFromNoisyText: !sameHostEmail,
             additionalContactEmails,
             websiteUrl: pageUrl,
             contactUrl: contactPick ?? ig ?? fb ?? null,

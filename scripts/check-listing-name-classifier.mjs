@@ -51,6 +51,13 @@ const MUST_REJECT = [
   "Open Mic Nights Flourish at South Evanston Venues",
   "Open Mics Showcase Local Talent",
   "Open Mics Bring Community Together",
+  // cancelled / closed / ended — never public inventory
+  "CANCELLED: Broadway Open Mic Night",
+  "Canceled Open Mic Night",
+  "Open Mic Permanently Closed",
+  "Open Mic No Longer Running",
+  "Final Night Open Mic",
+  "Postponed: Thursday Open Mic",
 ];
 
 // Real venue / event names — must pass.

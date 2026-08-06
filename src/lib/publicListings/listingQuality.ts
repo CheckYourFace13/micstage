@@ -20,7 +20,15 @@ export type ListingNameRejection =
   | "ARTICLE_OR_LISTICLE"
   | "NON_VENUE_TITLE"
   | "PATH_OR_URL_NAME"
-  | "AGGREGATOR_OR_DIRECTORY";
+  | "AGGREGATOR_OR_DIRECTORY"
+  | "CANCELLED_OR_CLOSED";
+
+/**
+ * Cancelled / closed / ended events must never become public VERIFIED inventory.
+ * Prefer explicit cancellation language over bare "closed" (preserves venue names like "The Closed Door").
+ */
+const CANCELLED_OR_CLOSED =
+  /\b(cancelled|canceled)\b|\bpermanently\s+closed\b|\bno\s+longer\s+(running|happening|active|hosting|taking\s+place)\b|\bfinal\s+night\b|\b(this\s+event\s+has\s+(been\s+)?(cancelled|canceled|ended|postponed))\b|^\s*(postponed|rescheduled)\s*:/i;
 
 /** Whole-name generic page titles (nav labels / scraped page chrome, not venues). */
 const GENERIC_PAGE_TITLE =
@@ -156,6 +164,7 @@ function looksLikeOpenMicAggregator(name: string): boolean {
 export function classifyListingName(name: string): ListingNameRejection | null {
   const n = (name ?? "").trim();
   if (!n || n.length < 4) return "TOO_SHORT";
+  if (CANCELLED_OR_CLOSED.test(n)) return "CANCELLED_OR_CLOSED";
   if (GENERIC_PAGE_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
   if (LISTICLE.test(n) || DATE_ARTICLE.test(n)) return "ARTICLE_OR_LISTICLE";
   if (PATH_OR_URL.test(n)) return "PATH_OR_URL_NAME";

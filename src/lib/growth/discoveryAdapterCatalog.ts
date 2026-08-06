@@ -58,7 +58,7 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
       id: "autonomous_web_search_venue",
       tier: "autonomous",
       description:
-        "Nationwide SerpAPI + Brave fallback (national-discovery-us cron lane) → open-mic query rotation + deep page fetch → ranked emails + state rollups",
+        "Nationwide SerpAPI + Brave fallback (national-discovery-us) → open-mic query rotation across all 50 states + DC → deep page fetch → ranked emails + state rollups",
     },
     {
       id: "autonomous_seed_url_crawl_venue",
@@ -68,7 +68,7 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
     {
       id: "autonomous_eventbrite_chicago",
       tier: "autonomous",
-      description: "Eventbrite API (Chicago radius, q=open mic) → open-mic event rows → venue leads + signal tier",
+      description: "Eventbrite API (every US state + DC rotation, q=open mic) → open-mic event rows → venue leads + signal tier",
     },
     {
       id: "chicagoland_venue_website_contact",

@@ -18,12 +18,12 @@ export function growthDiscoveryAutonomousEnabled(): boolean {
 
 /** SerpAPI or Brave search calls per adapter per cron invocation (each returns up to ~10–20 organic links). */
 export function growthDiscoveryAutonomousSearchCallsPerRun(): number {
-  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN", 20);
+  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN", 28);
 }
 
 /** HTML page fetches (for email / social extraction) per autonomous search adapter per run. */
 export function growthDiscoveryAutonomousMaxPageFetchesPerRun(): number {
-  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_PAGE_FETCHES_PER_RUN", 96);
+  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_PAGE_FETCHES_PER_RUN", 128);
 }
 
 /** Delay between outbound HTTP requests during discovery (politeness + rate limits). */
@@ -129,7 +129,7 @@ export function growthDiscoveryCrawlSeedUrls(): string[] {
 }
 
 export function growthDiscoveryCrawlMaxSeedsPerRun(): number {
-  return parseIntEnv("GROWTH_DISCOVERY_CRAWL_MAX_SEEDS_PER_RUN", 18);
+  return parseIntEnv("GROWTH_DISCOVERY_CRAWL_MAX_SEEDS_PER_RUN", 28);
 }
 
 export function hasEventbriteToken(): boolean {
@@ -145,23 +145,31 @@ export function growthEventbriteToken(): string {
 /**
  * Non-Serp direct-source listing/crawler seeds (expandable with env var).
  * These keep autonomous lead throughput alive even when SerpAPI quota is exhausted.
+ * Defaults cover US-wide directories plus a spread of large metros (not Chicago-only).
  */
 export function growthDiscoveryDirectListingSeedUrls(): string[] {
   const defaults = [
     "https://www.eventbrite.com/d/united-states/open-mic/",
-    "https://www.eventbrite.com/d/il--chicago/open-mic/",
+    "https://www.eventbrite.com/d/ny--new-york/open-mic/",
+    "https://www.eventbrite.com/d/ca--los-angeles/open-mic/",
     "https://www.eventbrite.com/d/tx--austin/open-mic/",
     "https://www.eventbrite.com/d/tn--nashville/open-mic/",
-    "https://www.eventbrite.com/d/ca--los-angeles/open-mic/",
-    "https://www.eventbrite.com/d/ny--new-york/open-mic/",
+    "https://www.eventbrite.com/d/il--chicago/open-mic/",
+    "https://www.eventbrite.com/d/ga--atlanta/open-mic/",
+    "https://www.eventbrite.com/d/co--denver/open-mic/",
+    "https://www.eventbrite.com/d/wa--seattle/open-mic/",
+    "https://www.eventbrite.com/d/fl--miami/open-mic/",
     "https://www.meetup.com/find/?keywords=open%20mic&location=us--us",
-    "https://www.meetup.com/find/?keywords=open%20mic&location=us--il--Chicago",
     "https://openmikes.org/",
-    "https://openmikes.org/open-mics-in-Chicago-IL",
+    "https://openmikes.org/open-mics-in-New-York-NY",
+    "https://openmikes.org/open-mics-in-Los-Angeles-CA",
     "https://openmikes.org/open-mics-in-Austin-TX",
     "https://openmikes.org/open-mics-in-Nashville-TN",
-    "https://openmikes.org/open-mics-in-Los-Angeles-CA",
-    "https://badslava.com/chicago-open-mics.php",
+    "https://openmikes.org/open-mics-in-Chicago-IL",
+    "https://openmikes.org/open-mics-in-Atlanta-GA",
+    "https://openmikes.org/open-mics-in-Denver-CO",
+    "https://openmikes.org/open-mics-in-Seattle-WA",
+    "https://badslava.com/",
   ];
   return defaults;
 }

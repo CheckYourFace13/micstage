@@ -195,7 +195,7 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
   }
 
   if (webSearchAdapter) {
-    // Always use the nationwide lane — geo scopes rotate through 40+ US metros via search cursor.
+    // Always use the nationwide lane — geo scopes rotate through every US state via search cursor.
     const webPriority = [nationalDiscoveryMarketSlug()];
     let pickedSlug: string | null = null;
     for (const slug of webPriority) {

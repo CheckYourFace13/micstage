@@ -7,6 +7,8 @@ import {
   type OpenMicEvidenceInput,
 } from "@/lib/publicListings/openMicEvidence";
 import { sendListingClaimInviteIfNeeded } from "@/lib/publicListings/listingClaimInviteEmail";
+import { appBaseUrl } from "@/lib/marketing/emailConfig";
+import { submitUrlsToIndexNow } from "@/lib/seo/searchEnginePing";
 
 type GoogleTextSearchResult = {
   place_id?: string;
@@ -316,7 +318,7 @@ export async function verifyListingWithGoogle(listing: {
 }
 
 export function listingGoogleVerifyPerDiscoveryRun(): number {
-  return Math.min(30, Math.max(0, parseIntEnv("LISTING_GOOGLE_VERIFY_PER_RUN", 8)));
+  return Math.min(30, Math.max(0, parseIntEnv("LISTING_GOOGLE_VERIFY_PER_RUN", 25)));
 }
 
 function appendInternalNote(existing: string | null | undefined, reason: string): string {
@@ -483,6 +485,8 @@ export async function verifyPublicListingsWithGoogle(
               error: e instanceof Error ? e.message : String(e),
             });
           });
+          const base = appBaseUrl().replace(/\/$/, "");
+          await submitUrlsToIndexNow([`${base}/open-mics/${encodeURIComponent(row.slug)}`]).catch(() => {});
         } else {
           const evNote = evidence.hasEvidence
             ? `${OPEN_MIC_EVIDENCE_REASON.UNTRUSTED} (${evidence.field}: "${evidence.snippet}")`

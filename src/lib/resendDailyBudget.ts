@@ -1,14 +1,15 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
+import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
 
 /** Resend free tier is 100/day — stay under with headroom for password resets & booking reminders. */
 export function micstageResendDailyMax(): number {
-  return parseIntEnv("MICSTAGE_RESEND_DAILY_MAX", 85);
+  return parseIntEnv("MICSTAGE_RESEND_DAILY_MAX", 95);
 }
 
 export function listingClaimInvitesPerCron(): number {
-  return Math.min(20, Math.max(1, parseIntEnv("LISTING_CLAIM_INVITES_PER_CRON", 5)));
+  return Math.min(20, Math.max(1, parseIntEnv("LISTING_CLAIM_INVITES_PER_CRON", 15)));
 }
 
 /** Counts pipeline sends + claim invites (direct Resend, not in MarketingEmailSend). */
@@ -39,16 +40,7 @@ export function growthOutreachPausedWhileClaimInvitesPending(): boolean {
   return process.env.GROWTH_OUTREACH_PAUSE_WHILE_CLAIM_INVITES_PENDING !== "false";
 }
 
+/** @deprecated Prefer countEligiblePendingListingClaimInvites — kept name for call sites. */
 export async function countPendingListingClaimInvitesWithEmail(prisma: PrismaClient): Promise<number> {
-  // Only VERIFIED public listings qualify for one-touch claim invites.
-  // Hidden NEEDS_REVIEW rows must not pause nationwide outreach.
-  return prisma.publicOpenMicListing.count({
-    where: {
-      claimInviteEmailSentAt: null,
-      claimedVenueId: null,
-      claimStatus: { not: "CLAIMED" },
-      verificationStatus: "VERIFIED",
-      growthLead: { contactEmailNormalized: { not: null } },
-    },
-  });
+  return countEligiblePendingListingClaimInvites(prisma);
 }

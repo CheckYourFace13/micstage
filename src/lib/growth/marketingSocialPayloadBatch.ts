@@ -12,6 +12,7 @@ import { pickPrimaryVenueOutreachEmail } from "@/lib/growth/discovery/venueEmail
 import { persistGrowthLeadEmailContacts } from "@/lib/growth/growthLeadContactAutomation";
 import { parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 import { marketingSocialPayloadBatchPerCron } from "@/lib/growth/expansionConfig";
+import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
 
 type JobPayload = {
   leadId?: string;
@@ -39,7 +40,7 @@ export type SocialPayloadJobRunResult =
 export function resolveMarketingSocialPayloadBatchSize(request?: Request): number {
   const raw = request ? new URL(request.url).searchParams.get("batch")?.trim() : undefined;
   const n = Number.parseInt(raw || String(marketingSocialPayloadBatchPerCron()), 10);
-  return Math.min(50, Math.max(1, Number.isFinite(n) ? n : marketingSocialPayloadBatchPerCron()));
+  return Math.min(120, Math.max(1, Number.isFinite(n) ? n : marketingSocialPayloadBatchPerCron()));
 }
 
 async function processSocialPayloadJob(prisma: PrismaClient, job: MarketingJob): Promise<SocialPayloadJobRunResult> {
@@ -66,6 +67,7 @@ async function processSocialPayloadJob(prisma: PrismaClient, job: MarketingJob):
         websiteUrl: true,
         discoveryConfidence: true,
         contactEmailNormalized: true,
+        contactEmailConfidence: true,
       },
     });
     if (!lead) {
@@ -92,8 +94,13 @@ async function processSocialPayloadJob(prisma: PrismaClient, job: MarketingJob):
       }
     })();
     const picked = pickPrimaryVenueOutreachEmail(ex.emailsTagged, pageHost);
-    const parsed = parseGrowthLeadEmailInput(picked.primary ?? "", { extractedFromNoisyText: true });
+    const sameHost = emailDomainMatchesSiteHost(picked.primary, pageHost);
+    // Same-domain official mailbox can be HIGH (unlocks claim invites without loosening MEDIUM blast).
+    const parsed = parseGrowthLeadEmailInput(picked.primary ?? "", {
+      extractedFromNoisyText: !sameHost,
+    });
     const foundPrimary = parsed.kind === "valid" ? parsed.normalized : null;
+    const foundConfidence = parsed.kind === "valid" ? parsed.confidence : null;
 
     if (foundPrimary) {
       await persistGrowthLeadEmailContacts(prisma, {
@@ -107,13 +114,21 @@ async function processSocialPayloadJob(prisma: PrismaClient, job: MarketingJob):
         additionalEmails: picked.additional,
       });
 
-      if (!lead.contactEmailNormalized?.trim()) {
+      const rank = (c: string | null | undefined) =>
+        c === "HIGH" ? 3 : c === "MEDIUM" ? 2 : c === "LOW" ? 1 : 0;
+      const existingEmail = lead.contactEmailNormalized?.trim() || null;
+      const shouldWriteEmail =
+        !existingEmail ||
+        existingEmail.toLowerCase() !== foundPrimary.toLowerCase() ||
+        rank(foundConfidence) > rank(lead.contactEmailConfidence);
+
+      if (shouldWriteEmail) {
         await prisma.growthLead.update({
           where: { id: lead.id },
           data: {
             contactEmailNormalized: foundPrimary,
             contactEmailRaw: parsed.kind === "valid" ? parsed.rawExtracted : foundPrimary,
-            contactEmailConfidence: parsed.kind === "valid" ? parsed.confidence : null,
+            contactEmailConfidence: foundConfidence,
             contactEmailRejectionReason: null,
           },
         });

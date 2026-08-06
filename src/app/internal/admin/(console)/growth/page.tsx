@@ -420,8 +420,9 @@ export default async function AdminGrowthHubPage(props: {
         <code className="text-zinc-400">GROWTH_AUTO_DRAFT_CRON_ENABLED</code>. Primary launch slug{" "}
         <code className="text-zinc-400">{primaryLaunchDiscoveryMarketSlug()}</code> from{" "}
         <code className="text-zinc-400">marketsConfig</code> (override list:{" "}
-        <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>; default includes{" "}
-        <code className="text-zinc-400">{nationalDiscoveryMarketSlug()}</code> for nationwide SerpAPI/Brave venue search). Caps:
+        <code className="text-zinc-400">GROWTH_DISCOVERY_MARKET_SLUGS</code>; default is{" "}
+        <code className="text-zinc-400">{nationalDiscoveryMarketSlug()}</code> only — SerpAPI/Brave rotates across every US
+        state). Caps:
         outreach{" "}
         {marketingDailyCap("outreach")}/day · per-domain {marketingPerDomainDailyCap("OUTREACH")}/day · contact
         cooldown{" "}

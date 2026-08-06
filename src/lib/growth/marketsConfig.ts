@@ -4,11 +4,11 @@ import { growthDiscoveryMarketsPerCronRun } from "@/lib/growth/expansionConfig";
  * Market-first growth ops — **single source of truth for launch scope** (code):
  *
  * - **`DEFAULT_GROWTH_METRO_ID`** + **`GROWTH_METROS[].discoveryMarketSlug`** define the primary launch market slug
- *   (`primaryLaunchDiscoveryMarketSlug()`). Autonomous geo discovery, curated Chicagoland seed adapters, and default
- *   admin views all use this slug unless the cron iteration context is a different market (see below).
+ *   (`primaryLaunchDiscoveryMarketSlug()`). Curated Chicagoland seed adapters and some admin defaults still use this
+ *   slug when the cron market matches; nationwide Serp/Brave/Eventbrite discovery uses `national-discovery-us`.
  * - **`GROWTH_DISCOVERY_MARKET_SLUGS`** (optional env, comma-separated): which discovery slugs the growth-pipeline cron
- *   iterates. If unset, defaults to Illinois rollup priority + national (see `growthDiscoveryMarketSlugsDefaultOrder()`).
- *   Autonomous web search runs once per cron in that priority and stops after the first slug that returns candidates.
+ *   iterates. If unset, defaults to **nationwide only** (`national-discovery-us`). Autonomous web search always runs
+ *   on the national lane and rotates queries across every US state.
  *
  * `discoveryMarketSlug` values must match `/locations/[slug]` rollups (see `discoveryMarket.ts`).
  */
@@ -60,14 +60,9 @@ export function isNationalDiscoveryMarket(slug: string | null | undefined): bool
   return slug.trim().toLowerCase() === nationalDiscoveryMarketSlug();
 }
 
-/** Nationwide + regional lanes for Serp/Brave venue web discovery (national runs first). */
+/** Lanes where Serp/Brave venue web discovery may run (nationwide state rotation). */
 export function growthDiscoveryWebSearchMarketPriority(): readonly string[] {
-  return [
-    nationalDiscoveryMarketSlug(),
-    primaryLaunchDiscoveryMarketSlug(),
-    "illinois-regional",
-    "central-illinois-il",
-  ] as const;
+  return [nationalDiscoveryMarketSlug()] as const;
 }
 
 export function isGrowthDiscoveryWebSearchMarket(slug: string | null | undefined): boolean {
@@ -75,9 +70,9 @@ export function isGrowthDiscoveryWebSearchMarket(slug: string | null | undefined
   return growthDiscoveryWebSearchMarketPriority().some((s) => s.toLowerCase() === t);
 }
 
-/** Default cron discovery iteration order (curated + per-slug adapters); web search uses `growthDiscoveryWebSearchMarketPriority` internally. */
+/** Default cron discovery iteration order — nationwide US only (override via `GROWTH_DISCOVERY_MARKET_SLUGS`). */
 export function growthDiscoveryMarketSlugsDefaultOrder(): string[] {
-  return [...growthDiscoveryWebSearchMarketPriority()];
+  return [nationalDiscoveryMarketSlug()];
 }
 
 export function isPrimaryLaunchDiscoveryMarket(slug: string | null | undefined): boolean {
@@ -128,7 +123,7 @@ function canonicalDiscoveryMarketSlug(segment: string): string {
 
 /**
  * Markets where scheduled discovery may insert DISCOVERED leads (comma-separated slugs).
- * Defaults to Chicago-first Illinois rollups + national (see `growthDiscoveryMarketSlugsDefaultOrder`).
+ * Defaults to nationwide only (see `growthDiscoveryMarketSlugsDefaultOrder`).
  * Segments are canonicalized when they match a known metro (fixes casing / minor mismatch vs `isPrimaryLaunchDiscoveryMarket`).
  */
 export function growthDiscoveryMarketSlugs(): string[] {

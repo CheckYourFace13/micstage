@@ -67,13 +67,14 @@ GROWTH_OUTREACH_DAILY_MAX=50
 GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE=true
 ```
 
-**Nationwide discovery** — put national first (update Hostinger if you still have Midwest-only list):
+**Nationwide discovery** — US-only by default (all 50 states + DC). On Hostinger, set:
 
 ```bash
-GROWTH_DISCOVERY_MARKET_SLUGS=national-discovery-us,chicagoland-il,illinois-regional,central-illinois-il
+GROWTH_DISCOVERY_MARKET_SLUGS=national-discovery-us
+GROWTH_DISCOVERY_MARKETS_PER_CRON_RUN=1
 ```
 
-National web search always runs even if omitted from that list.
+Remove any `chicagoland-il` / `illinois-regional` entries from that env if present.
 
 ## Hostinger hPanel (hands-off)
 

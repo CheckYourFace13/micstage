@@ -20,6 +20,13 @@ const EDITORIAL =
 const PATH_OR_URL =
   /(:\/\/)|(\bwww\.)|(\.(com|net|org|io|co)\b)|(\.(html?|php|aspx?)\b)|(\/)|(::)|(")|(^[a-z0-9]+(?:-[a-z0-9]+)+$)/i;
 
+/**
+ * Cancelled / closed / ended events must never become public VERIFIED inventory.
+ * Prefer explicit cancellation language over bare "closed" (preserves venue names like "The Closed Door").
+ */
+const CANCELLED_OR_CLOSED =
+  /\b(cancelled|canceled)\b|\bpermanently\s+closed\b|\bno\s+longer\s+(running|happening|active|hosting|taking\s+place)\b|\bfinal\s+night\b|\b(this\s+event\s+has\s+(been\s+)?(cancelled|canceled|ended|postponed))\b|^\s*(postponed|rescheduled)\s*:/i;
+
 const OPEN_MIC_NAME = /\bopen[\s-]?mics?\b|\bopen[\s-]?mikes?\b|\bopen\s+jams?\b|\bopen\s+stage\b|\bjam\s+night\b/i;
 
 const VENUE_IDENTITY =
@@ -93,6 +100,7 @@ function looksLikeOpenMicAggregator(name) {
 export function classifyListingName(name) {
   const n = (name ?? "").trim();
   if (!n || n.length < 4) return "TOO_SHORT";
+  if (CANCELLED_OR_CLOSED.test(n)) return "CANCELLED_OR_CLOSED";
   if (GENERIC_PAGE_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
   if (LISTICLE.test(n) || DATE_ARTICLE.test(n)) return "ARTICLE_OR_LISTICLE";
   if (PATH_OR_URL.test(n)) return "PATH_OR_URL_NAME";

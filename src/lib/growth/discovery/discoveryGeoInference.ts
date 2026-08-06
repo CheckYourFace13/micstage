@@ -7,8 +7,8 @@ const CITY_ST = /\b([A-Za-z][A-Za-z\s.'-]{1,42}),\s*([A-Z]{2})\b/g;
 
 /**
  * Map Serp title/snippet/query + URL into a discovery rollup slug for growth leads.
- * Illinois uses the same city lists as venue rollup (`discoveryRollupSlugFromCityRegion`).
- * Falls back to `national-discovery-us` when geo is unclear (expansion queue).
+ * Prefer explicit `City, ST` matches (nationwide). Chicagoland hint is a fallback only when
+ * no city/state pair is found. Falls back to `national-discovery-us` when geo is unclear.
  */
 export function inferDiscoveryGeoForNationwideSearch(input: {
   title: string;
@@ -17,10 +17,6 @@ export function inferDiscoveryGeoForNationwideSearch(input: {
   pageUrl: string;
 }): { discoveryMarketSlug: string; city: string | null; region: string | null } {
   const bundle = `${input.title}\n${input.snippet}\n${input.searchQuery}`.slice(0, 12_000);
-
-  if (CHICAGOLAND_HINT.test(bundle)) {
-    return { discoveryMarketSlug: "chicagoland-il", city: null, region: "IL" };
-  }
 
   CITY_ST.lastIndex = 0;
   let best: { city: string; st: string } | null = null;
@@ -38,6 +34,10 @@ export function inferDiscoveryGeoForNationwideSearch(input: {
       city: best.city,
       region: best.st,
     };
+  }
+
+  if (CHICAGOLAND_HINT.test(bundle)) {
+    return { discoveryMarketSlug: "chicagoland-il", city: null, region: "IL" };
   }
 
   try {

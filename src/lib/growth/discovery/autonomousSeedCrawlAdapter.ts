@@ -65,6 +65,16 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
         const picked = pickPrimaryVenueOutreachEmail(ex.emailsTagged, pageHost);
         const email = picked.primary;
         const additionalContactEmails = picked.additional;
+        const sameHostEmail = Boolean(
+          email &&
+            pageHost &&
+            (() => {
+              const at = email.lastIndexOf("@");
+              if (at < 0) return false;
+              const eh = email.slice(at + 1).toLowerCase().replace(/^www\./, "");
+              return eh === pageHost || eh.endsWith(`.${pageHost}`) || pageHost.endsWith(`.${eh}`);
+            })(),
+        );
         const ig = ex.instagramUrls[0] ?? null;
         const fb = ex.facebookUrls[0] ?? null;
         const contactPick =
@@ -108,7 +118,7 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
           leadType: "VENUE",
           name: ex.nameGuess.slice(0, 180),
           contactEmailNormalized: email,
-          emailExtractedFromNoisyText: true,
+          emailExtractedFromNoisyText: !sameHostEmail,
           additionalContactEmails,
           websiteUrl: seed.split("#")[0]!,
           contactUrl: contactPick ?? ig ?? fb ?? null,

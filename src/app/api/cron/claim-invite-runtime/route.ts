@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import {
-  CLAIM_INVITE_RUNTIME_KEYS,
-  isClaimInviteRuntimeKey,
+  OPERATIONAL_RUNTIME_KEYS,
+  isOperationalRuntimeKey,
   resolveClaimInviteRuntimeSnapshot,
   runtimeSnapshotForStatus,
   upsertClaimInviteRuntimeSetting,
-  type ClaimInviteRuntimeKey,
+  type OperationalRuntimeKey,
 } from "@/lib/publicListings/claimInviteRuntimeSettings";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,8 @@ function authorize(request: Request): boolean {
  *     "MICSTAGE_CLAIM_INVITES_ENABLED": true,
  *     "LISTING_CLAIM_INVITES_PER_CRON": 2,
  *     "MICSTAGE_CLAIM_INVITES_DAILY_MAX": 10,
- *     "MICSTAGE_KILL_CLAIM_INVITES": false
+ *     "MICSTAGE_KILL_CLAIM_INVITES": false,
+ *     "GROWTH_OUTREACH_SENDS_PER_CRON_RUN": 0
  *   },
  *   "reason": "optional"
  * }
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
   const snap = await resolveClaimInviteRuntimeSnapshot(prisma);
   return NextResponse.json({
     ok: true,
-    allowlist: [...CLAIM_INVITE_RUNTIME_KEYS],
+    allowlist: [...OPERATIONAL_RUNTIME_KEYS],
     runtime: runtimeSnapshotForStatus(snap),
   });
 }
@@ -110,12 +111,12 @@ export async function POST(request: Request) {
 
   const results: Array<{ key: string; ok: boolean; value?: string; error?: string }> = [];
   for (const key of keys) {
-    if (!isClaimInviteRuntimeKey(key)) {
+    if (!isOperationalRuntimeKey(key)) {
       results.push({ key, ok: false, error: "key_not_allowlisted" });
       continue;
     }
     const upserted = await upsertClaimInviteRuntimeSetting(prisma, {
-      key: key as ClaimInviteRuntimeKey,
+      key: key as OperationalRuntimeKey,
       value: settings[key],
       updatedBy: "claim-invite-runtime-api",
       reason: body.reason?.trim() || "runtime_settings_update",

@@ -47,6 +47,7 @@ if (!url || /127\.0\.0\.1|55432|localhost/.test(url)) {
       { key: "LISTING_CLAIM_INVITES_PER_CRON", valueType: "integer", value: "2" },
       { key: "MICSTAGE_CLAIM_INVITES_DAILY_MAX", valueType: "integer", value: "10" },
       { key: "MICSTAGE_KILL_CLAIM_INVITES", valueType: "boolean", value: "false" },
+      { key: "GROWTH_OUTREACH_SENDS_PER_CRON_RUN", valueType: "integer", value: "0" },
     ];
 
     for (const s of settings) {
@@ -78,6 +79,7 @@ if (!url || /127\.0\.0\.1|55432|localhost/.test(url)) {
             "LISTING_CLAIM_INVITES_PER_CRON",
             "MICSTAGE_CLAIM_INVITES_DAILY_MAX",
             "MICSTAGE_KILL_CLAIM_INVITES",
+            "GROWTH_OUTREACH_SENDS_PER_CRON_RUN",
           ],
         },
       },

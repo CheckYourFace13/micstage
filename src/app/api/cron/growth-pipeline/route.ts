@@ -21,6 +21,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 import { micstageDiscoveryKillSwitch } from "@/lib/publicListings/automationKillSwitches";
+import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
 
 /** Session-scoped Postgres advisory lock (outreach only — do not hold during web discovery). */
 const GROWTH_OUTREACH_LOCK_K1 = 54_788_913;
@@ -135,6 +136,7 @@ async function handle(request: Request) {
       if (pendingClaimInvites == null) {
         pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
       }
+      const outreachRuntime = await resolveClaimInviteRuntimeSnapshot(prisma);
       if (resendBudget.remaining <= 0) {
         outreachSkippedReason = "resend daily budget exhausted";
       } else if (
@@ -142,7 +144,7 @@ async function handle(request: Request) {
         growthOutreachPausedWhileClaimInvitesPending()
       ) {
         outreachSkippedReason = "outreach paused while claim invites pending";
-      } else if (process.env.GROWTH_OUTREACH_SENDS_PER_CRON_RUN?.trim() === "0") {
+      } else if (outreachRuntime.effectiveOutreachSendsPerCron <= 0) {
         outreachSkippedReason = "GROWTH_OUTREACH_SENDS_PER_CRON_RUN=0";
       } else {
         const lock = await tryOutreachLock(prisma);

@@ -9,8 +9,8 @@ import {
   growthAutoDraftBatchLimit,
   growthAutoDraftFitMin,
   growthOutreachMaxSendsPerMarketPerDay,
-  growthOutreachSendsPerCronRun,
 } from "@/lib/growth/expansionConfig";
+import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { sendApprovedGrowthLeadDraft } from "@/lib/growth/growthLeadDraftSend";
 import {
@@ -165,9 +165,10 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const fitMin = growthAutoDraftFitMin();
   const venueAutoFitMin = Math.max(6, fitMin - 1);
   const limit = growthAutoDraftBatchLimit();
-  const perCronSendCeiling = growthOutreachSendsPerCronRun();
-  const draftWorkTake = Math.min(limit, Math.max(24, perCronSendCeiling * 8));
-  const venueReviewTake = Math.min(limit, Math.max(12, perCronSendCeiling * 6));
+  const runtime = await resolveClaimInviteRuntimeSnapshot(prisma);
+  const perCronSendCeiling = runtime.effectiveOutreachSendsPerCron;
+  const draftWorkTake = Math.min(limit, Math.max(24, Math.max(1, perCronSendCeiling) * 8));
+  const venueReviewTake = Math.min(limit, Math.max(12, Math.max(1, perCronSendCeiling) * 6));
   let outreachSendsThisRun = 0;
   const allowMediumOutreach = process.env.GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE === "true";
   const emailReadyLevels: GrowthLeadEmailConfidence[] = allowMediumOutreach ? ["HIGH", "MEDIUM"] : ["HIGH"];

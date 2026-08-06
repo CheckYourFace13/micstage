@@ -1,6 +1,18 @@
 /**
- * Database-backed claim-invite operational settings with env kill-switch precedence.
+ * Database-backed operational runtime settings (claim-invite gates + outreach caps).
  * Never stores secrets — only non-secret operational gates.
+ *
+ * Precedence (claim invites):
+ * 1. Env kill true → always stop
+ * 2. DB kill true → stop
+ * 3. DB operational value when present
+ * 4. Env operational value
+ * 5. Safe defaults (enabled=false, perCron=0, dailyMax=10, kill=false)
+ *
+ * Precedence (outreach sends per cron):
+ * 1. DB value when present
+ * 2. Env value when present
+ * 3. Safe default 0 (non-sending)
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
@@ -12,7 +24,16 @@ export const CLAIM_INVITE_RUNTIME_KEYS = [
   "MICSTAGE_KILL_CLAIM_INVITES",
 ] as const;
 
+export const OUTREACH_RUNTIME_KEYS = ["GROWTH_OUTREACH_SENDS_PER_CRON_RUN"] as const;
+
+export const OPERATIONAL_RUNTIME_KEYS = [
+  ...CLAIM_INVITE_RUNTIME_KEYS,
+  ...OUTREACH_RUNTIME_KEYS,
+] as const;
+
 export type ClaimInviteRuntimeKey = (typeof CLAIM_INVITE_RUNTIME_KEYS)[number];
+export type OutreachRuntimeKey = (typeof OUTREACH_RUNTIME_KEYS)[number];
+export type OperationalRuntimeKey = (typeof OPERATIONAL_RUNTIME_KEYS)[number];
 
 export type SettingSource = "env_kill" | "db_kill" | "database" | "environment" | "default";
 
@@ -26,7 +47,7 @@ export type ResolvedBoolSetting = {
 };
 
 export type ResolvedIntSetting = {
-  key: ClaimInviteRuntimeKey;
+  key: OperationalRuntimeKey;
   envRaw: string | null;
   dbRaw: string | null;
   effective: number;
@@ -38,10 +59,13 @@ export type ClaimInviteRuntimeSnapshot = {
   enabled: ResolvedBoolSetting;
   perCron: ResolvedIntSetting;
   dailyMax: ResolvedIntSetting;
+  outreachSendsPerCron: ResolvedIntSetting;
   /** Final send gate after kill + enabled. */
   claimInvitesEnabled: boolean;
   /** Per-cron after canary cap. */
   effectivePerCron: number;
+  /** Effective general outreach sends per cron (0 = off). */
+  effectiveOutreachSendsPerCron: number;
   canaryMode: boolean;
 };
 
@@ -78,7 +102,6 @@ function listingClaimInviteCanaryMax(): number {
 }
 
 function canaryModeOn(): boolean {
-  // Default ON unless explicitly set false.
   return !envFalsyExplicit(process.env.MICSTAGE_CLAIM_INVITES_CANARY_MODE);
 }
 
@@ -86,28 +109,29 @@ export function isClaimInviteRuntimeKey(key: string): key is ClaimInviteRuntimeK
   return (CLAIM_INVITE_RUNTIME_KEYS as readonly string[]).includes(key);
 }
 
-export async function loadClaimInviteRuntimeDbMap(
+export function isOperationalRuntimeKey(key: string): key is OperationalRuntimeKey {
+  return (OPERATIONAL_RUNTIME_KEYS as readonly string[]).includes(key);
+}
+
+export async function loadOperationalRuntimeDbMap(
   prisma: PrismaClient,
 ): Promise<Map<string, string>> {
   const rows = await prisma.operationalRuntimeSetting.findMany({
-    where: { key: { in: [...CLAIM_INVITE_RUNTIME_KEYS] } },
+    where: { key: { in: [...OPERATIONAL_RUNTIME_KEYS] } },
     select: { key: true, value: true },
   });
   return new Map(rows.map((r) => [r.key, r.value]));
 }
 
-/**
- * Precedence:
- * 1. Env kill true → always stop
- * 2. DB kill true → stop
- * 3. DB operational value when present
- * 4. Env operational value
- * 5. Safe defaults (enabled=false, perCron=0, dailyMax=10, kill=false)
- */
+/** @deprecated Prefer loadOperationalRuntimeDbMap */
+export async function loadClaimInviteRuntimeDbMap(prisma: PrismaClient) {
+  return loadOperationalRuntimeDbMap(prisma);
+}
+
 export async function resolveClaimInviteRuntimeSnapshot(
   prisma: PrismaClient,
 ): Promise<ClaimInviteRuntimeSnapshot> {
-  const db = await loadClaimInviteRuntimeDbMap(prisma);
+  const db = await loadOperationalRuntimeDbMap(prisma);
 
   const envKillRaw = process.env.MICSTAGE_KILL_CLAIM_INVITES?.trim() || null;
   const dbKillRaw = db.get("MICSTAGE_KILL_CLAIM_INVITES") ?? null;
@@ -206,6 +230,29 @@ export async function resolveClaimInviteRuntimeSnapshot(
     source: dailySource,
   };
 
+  const envOutreachRaw = process.env.GROWTH_OUTREACH_SENDS_PER_CRON_RUN?.trim() || null;
+  const dbOutreachRaw = db.get("GROWTH_OUTREACH_SENDS_PER_CRON_RUN") ?? null;
+  // Safe default: 0 (non-sending) when neither DB nor env is set.
+  let outreachValue = 0;
+  let outreachSource: SettingSource = "default";
+  const dbOutreach = parseIntRaw(dbOutreachRaw);
+  const envOutreach = parseIntRaw(envOutreachRaw);
+  if (dbOutreach !== null) {
+    outreachValue = Math.min(50, Math.max(0, dbOutreach));
+    outreachSource = "database";
+  } else if (envOutreach !== null) {
+    outreachValue = Math.min(50, Math.max(0, envOutreach));
+    outreachSource = "environment";
+  }
+
+  const outreachSendsPerCron: ResolvedIntSetting = {
+    key: "GROWTH_OUTREACH_SENDS_PER_CRON_RUN",
+    envRaw: envOutreachRaw,
+    dbRaw: dbOutreachRaw,
+    effective: outreachValue,
+    source: outreachSource,
+  };
+
   const claimInvitesEnabled = !killEffective && enabledValue;
   let effectivePerCron = 0;
   if (claimInvitesEnabled) {
@@ -220,21 +267,20 @@ export async function resolveClaimInviteRuntimeSnapshot(
     enabled,
     perCron,
     dailyMax,
+    outreachSendsPerCron,
     claimInvitesEnabled,
     effectivePerCron,
+    effectiveOutreachSendsPerCron: outreachValue,
     canaryMode: canaryModeOn(),
   };
 }
 
 export function validateClaimInviteRuntimeValue(
-  key: ClaimInviteRuntimeKey,
+  key: OperationalRuntimeKey,
   value: unknown,
 ): { ok: true; valueType: "boolean" | "integer"; stored: string } | { ok: false; error: string } {
   if (typeof value === "boolean") {
-    if (
-      key === "MICSTAGE_CLAIM_INVITES_ENABLED" ||
-      key === "MICSTAGE_KILL_CLAIM_INVITES"
-    ) {
+    if (key === "MICSTAGE_CLAIM_INVITES_ENABLED" || key === "MICSTAGE_KILL_CLAIM_INVITES") {
       return { ok: true, valueType: "boolean", stored: value ? "true" : "false" };
     }
     return { ok: false, error: "boolean_not_allowed_for_key" };
@@ -246,6 +292,10 @@ export function validateClaimInviteRuntimeValue(
     }
     if (key === "MICSTAGE_CLAIM_INVITES_DAILY_MAX") {
       if (value < 0 || value > 50) return { ok: false, error: "daily_max_out_of_range" };
+      return { ok: true, valueType: "integer", stored: String(value) };
+    }
+    if (key === "GROWTH_OUTREACH_SENDS_PER_CRON_RUN") {
+      if (value < 0 || value > 50) return { ok: false, error: "outreach_per_cron_out_of_range" };
       return { ok: true, valueType: "integer", stored: String(value) };
     }
     return { ok: false, error: "integer_not_allowed_for_key" };
@@ -264,6 +314,10 @@ export function validateClaimInviteRuntimeValue(
       if (n < 0 || n > 50) return { ok: false, error: "daily_max_out_of_range" };
       return { ok: true, valueType: "integer", stored: String(n) };
     }
+    if (n !== null && key === "GROWTH_OUTREACH_SENDS_PER_CRON_RUN") {
+      if (n < 0 || n > 50) return { ok: false, error: "outreach_per_cron_out_of_range" };
+      return { ok: true, valueType: "integer", stored: String(n) };
+    }
   }
   return { ok: false, error: "invalid_value" };
 }
@@ -271,7 +325,7 @@ export function validateClaimInviteRuntimeValue(
 export async function upsertClaimInviteRuntimeSetting(
   prisma: PrismaClient,
   input: {
-    key: ClaimInviteRuntimeKey;
+    key: OperationalRuntimeKey;
     value: unknown;
     updatedBy: string;
     reason?: string | null;
@@ -344,8 +398,15 @@ export function runtimeSnapshotForStatus(snap: ClaimInviteRuntimeSnapshot) {
       effective: snap.dailyMax.effective,
       source: snap.dailyMax.source,
     },
+    GROWTH_OUTREACH_SENDS_PER_CRON_RUN: {
+      env: snap.outreachSendsPerCron.envRaw ?? "missing",
+      database: snap.outreachSendsPerCron.dbRaw,
+      effective: snap.outreachSendsPerCron.effective,
+      source: snap.outreachSendsPerCron.source,
+    },
     claimInvitesEnabled: snap.claimInvitesEnabled ? "enabled" : "disabled",
     effectivePerCron: snap.effectivePerCron,
+    effectiveOutreachSendsPerCron: snap.effectiveOutreachSendsPerCron,
     canaryMode: snap.canaryMode,
   };
 }

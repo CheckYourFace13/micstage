@@ -113,7 +113,9 @@ async function handle(request: Request) {
       emailMining = await runMarketingSocialPayloadBatch(prisma, batchSize);
     }
 
-    if (draftEnabled) {
+    // Claim invites: independent of outreach drafts (canary can run while general outreach stays off).
+    const claimInvitePhase = phase !== "discovery";
+    if (claimInvitePhase) {
       resendBudget = await resendDailyBudgetSnapshot(prisma);
       pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
       const inviteBatch = Math.min(listingClaimInvitesPerCron(), resendBudget.remaining);
@@ -127,14 +129,21 @@ async function handle(request: Request) {
     }
 
     if (draftEnabled) {
-      if (resendBudget && resendBudget.remaining <= 0) {
+      if (!resendBudget) {
+        resendBudget = await resendDailyBudgetSnapshot(prisma);
+      }
+      if (pendingClaimInvites == null) {
+        pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
+      }
+      if (resendBudget.remaining <= 0) {
         outreachSkippedReason = "resend daily budget exhausted";
       } else if (
-        pendingClaimInvites != null &&
         pendingClaimInvites > 0 &&
         growthOutreachPausedWhileClaimInvitesPending()
       ) {
         outreachSkippedReason = "outreach paused while claim invites pending";
+      } else if (process.env.GROWTH_OUTREACH_SENDS_PER_CRON_RUN?.trim() === "0") {
+        outreachSkippedReason = "GROWTH_OUTREACH_SENDS_PER_CRON_RUN=0";
       } else {
         const lock = await tryOutreachLock(prisma);
         if (!lock) {

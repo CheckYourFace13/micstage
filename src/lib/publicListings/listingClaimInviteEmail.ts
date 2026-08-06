@@ -3,14 +3,21 @@ import { deliverResendEmail } from "@/lib/mailer";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { transactionalFromAddress } from "@/lib/marketing/emailConfig";
-import {
-  CLAIM_INVITE_LISTING_WHERE,
-  isClaimInviteEmailEligible,
-} from "@/lib/publicListings/claimInviteEligibility";
 import { micstageClaimInvitesEnabled } from "@/lib/publicListings/automationKillSwitches";
 import { resendDailyBudgetSnapshot } from "@/lib/resendDailyBudget";
 import { issueListingClaimInviteToken } from "@/lib/publicListings/claimInviteToken";
 import { isMarketingEmailSuppressed } from "@/lib/marketing/suppression";
+import {
+  claimInviteAutomationMaySend,
+  claimInviteDailyBudgetSnapshot,
+  countClaimInvitesSentTodayForDomain,
+  getClaimInvitePauseState,
+  isStagedClaimInviteContactEligible,
+  listingClaimInvitesPerDomainDailyMax,
+  listingPassesStagedClaimInviteSafety,
+  recordClaimInviteSendStat,
+} from "@/lib/publicListings/claimInviteAutomation";
+import type { GrowthLeadOpenMicSignalTier } from "@/generated/prisma/client";
 
 const REPLY_TO = "drummer@micstage.com";
 
@@ -42,62 +49,57 @@ export function buildListingClaimInvitePayload(input: {
   listingSlug: string;
   city: string | null;
   region: string | null;
-  /** Prefer signed token URL when available. */
+  /** Prefer signed token URL when available. Use "[SECURE CLAIM LINK]" in previews. */
   claimUrl?: string;
+  venueName?: string | null;
 }): { subject: string; textBody: string; htmlBody: string } {
   const base = appBaseUrl().replace(/\/$/, "");
   const listingUrl = `${base}/open-mics/${encodeURIComponent(input.listingSlug)}`;
   const claimUrl =
     input.claimUrl?.trim() || `${base}/claim/${encodeURIComponent(input.listingSlug)}`;
-  const registerUrl = `${base}/register/venue`;
-  const place = [input.city, input.region].filter(Boolean).join(", ");
-  const subject = `Claim ${input.listingName} on MicStage — free open mic tools`;
+  const openMicName = (input.venueName?.trim() || input.listingName).trim();
+  const subject = "Claim your free MicStage open mic listing";
 
-  const intro = place
-    ? `We verified ${input.listingName} in ${place} as a real open mic and published a free MicStage listing so local performers can find it.`
-    : `We verified ${input.listingName} as a real open mic and published a free MicStage listing so local performers can find it.`;
-
-  const policy =
-    "This is a public verified listing only. We do not run proactive marketing for your room until you claim it, set up your schedule, and start using MicStage. No MicStage account is created until you explicitly claim and accept Terms.";
-
-  const cta =
-    "Run this open mic? Claim your page free — confirm your authority, accept Terms, and activate your venue in a few minutes.";
-
-  const servicesText = MICSTAGE_VENUE_FREE_SERVICES.map((s) => `- ${s}`).join("\n");
-  const servicesHtml = MICSTAGE_VENUE_FREE_SERVICES.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
+  // Keep the official title intact. Names that already end in sentence punctuation
+  // use "the …" so the following "and" remains grammatically clear.
+  const foundLead = /[.!?]$/.test(openMicName) ? "We found the" : "We found your";
+  const foundSentence = `${foundLead} ${openMicName} and created a free verified listing on MicStage so more performers can discover it.`;
 
   const textBody = [
-    "Hi there,",
+    "Hi,",
     "",
-    intro,
-    policy,
+    foundSentence,
     "",
-    cta,
+    "MicStage was created by an open-mic organizer who wanted an easier way to manage schedules, promote events, and organize performer signups. It is free and simple to use, and online booking remains optional.",
     "",
-    `Secure claim link (expires): ${claimUrl}`,
-    `View the listing: ${listingUrl}`,
-    `Or register your venue directly: ${registerUrl}`,
+    "No account has been created for you. If you are authorized to manage this open mic, use the secure link below to claim the listing, confirm the details, and publish your schedule.",
     "",
-    "Everything included free when you claim and go live:",
-    servicesText,
+    claimUrl,
     "",
-    "Questions? Reply to this email — happy to help you get set up.",
+    "View the current listing:",
+    "",
+    listingUrl,
+    "",
+    "The claim link is private and expires. If you are not the correct person, reply and let us know.",
     "",
     "Thanks,",
     "Chris",
     "MicStage",
   ].join("\n");
 
+  // Email-safe, short HTML — no images, tracking pixels, or heavy branding.
   const htmlBody = [
-    "<p>Hi there,</p>",
-    `<p>${escapeHtml(intro)} ${escapeHtml(policy)}</p>`,
-    `<p><strong>${escapeHtml(cta)}</strong></p>`,
-    `<p><a href="${escapeHtml(claimUrl)}" style="display:inline-block;padding:10px 16px;background:#111827;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Claim this open mic (free)</a></p>`,
-    `<p><a href="${escapeHtml(listingUrl)}">View the listing</a> · <a href="${escapeHtml(registerUrl)}">Register your venue</a></p>`,
-    "<p><strong>Everything included free when you claim and go live:</strong></p>",
-    `<ul style="margin:0 0 1em 1.2em;padding:0;">${servicesHtml}</ul>`,
-    "<p>Questions? Reply to this email — happy to help you get set up.</p>",
-    "<p>Thanks,<br />Chris<br />MicStage</p>",
+    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#111827;max-width:560px;margin:0 auto;">',
+    "<p style=\"margin:0 0 16px 0;\">Hi,</p>",
+    `<p style="margin:0 0 16px 0;">${escapeHtml(foundSentence)}</p>`,
+    '<p style="margin:0 0 16px 0;">MicStage was created by an open-mic organizer who wanted an easier way to manage schedules, promote events, and organize performer signups. It is free and simple to use, and online booking remains optional.</p>',
+    '<p style="margin:0 0 20px 0;">No account has been created for you. If you are authorized to manage this open mic, use the secure link below to claim the listing, confirm the details, and publish your schedule.</p>',
+    `<p style="margin:0 0 20px 0;"><a href="${escapeHtml(claimUrl)}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Claim Your Free Listing</a></p>`,
+    '<p style="margin:0 0 8px 0;">View the current listing:</p>',
+    `<p style="margin:0 0 20px 0;"><a href="${escapeHtml(listingUrl)}" style="color:#111827;">${escapeHtml(listingUrl)}</a></p>`,
+    '<p style="margin:0 0 16px 0;">The claim link is private and expires. If you are not the correct person, reply and let us know.</p>',
+    '<p style="margin:0;">Thanks,<br />Chris<br />MicStage</p>',
+    "</div>",
   ].join("");
 
   return { subject, textBody, htmlBody };
@@ -226,8 +228,8 @@ async function sendTransactional(
 }
 
 /**
- * One-touch claim invite: only VERIFIED public listings, with HIGH or domain-matched MEDIUM email.
- * Idempotent via claimInviteEmailSentAt.
+ * One-touch claim invite: VERIFIED public listings with HIGH official-domain contact.
+ * Idempotent via claimInviteEmailSentAt. Honors pause + claim-invite daily cap.
  */
 export async function sendListingClaimInviteIfNeeded(
   prisma: PrismaClient,
@@ -237,6 +239,15 @@ export async function sendListingClaimInviteIfNeeded(
   if (!micstageClaimInvitesEnabled()) {
     return { sent: false, reason: "claim_invites_disabled" };
   }
+  const pause = await getClaimInvitePauseState(prisma);
+  if (pause.paused) {
+    return { sent: false, reason: `paused:${pause.reason ?? "unknown"}` };
+  }
+  const claimDaily = await claimInviteDailyBudgetSnapshot(prisma);
+  if (claimDaily.remaining <= 0) {
+    return { sent: false, reason: "daily_claim_invite_cap" };
+  }
+
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { id: listingId },
     include: {
@@ -254,9 +265,9 @@ export async function sendListingClaimInviteIfNeeded(
   if (listing.claimedVenueId || listing.claimStatus === "CLAIMED") {
     return { sent: false, reason: "already_claimed" };
   }
-  if (listing.verificationStatus !== "VERIFIED") {
-    return { sent: false, reason: "not_verified_yet" };
-  }
+
+  const safety = listingPassesStagedClaimInviteSafety(listing);
+  if (!safety.ok) return { sent: false, reason: safety.reason };
 
   const rawEmail = toEmail ?? listing.growthLead?.contactEmailNormalized ?? null;
   const email = rawEmail ? normalizeMarketingEmail(rawEmail) : null;
@@ -268,7 +279,7 @@ export async function sendListingClaimInviteIfNeeded(
   }
 
   if (
-    !isClaimInviteEmailEligible({
+    !isStagedClaimInviteContactEligible({
       email,
       confidence: listing.growthLead?.contactEmailConfidence,
       websiteUrl: listing.websiteUrl ?? listing.growthLead?.websiteUrl,
@@ -277,6 +288,17 @@ export async function sendListingClaimInviteIfNeeded(
   ) {
     return { sent: false, reason: "email_not_eligible" };
   }
+
+  const domain = email.slice(email.indexOf("@") + 1).toLowerCase();
+  const domainSent = await countClaimInvitesSentTodayForDomain(prisma, domain);
+  if (domainSent >= listingClaimInvitesPerDomainDailyMax()) {
+    return { sent: false, reason: "domain_daily_cap" };
+  }
+
+  const activeTokens = await prisma.listingClaimInviteToken.count({
+    where: { listingId, status: "ACTIVE", expiresAt: { gt: new Date() } },
+  });
+  if (activeTokens > 0) return { sent: false, reason: "active_token_exists" };
 
   const issued = await issueListingClaimInviteToken(prisma, {
     listingId,
@@ -291,6 +313,7 @@ export async function sendListingClaimInviteIfNeeded(
     listingSlug: listing.slug,
     city: listing.city,
     region: listing.region,
+    venueName: listing.name,
     claimUrl,
   });
 
@@ -321,10 +344,12 @@ export async function sendListingClaimInviteIfNeeded(
       meta: {
         tokenId: issued.tokenId,
         hasProviderMessageId: Boolean(sendResult.messageId),
-        emailDomain: email.slice(email.indexOf("@") + 1),
+        emailDomain: domain,
       },
     },
   });
+
+  await recordClaimInviteSendStat(prisma);
 
   return { sent: true };
 }
@@ -408,46 +433,136 @@ export async function leadHasUnclaimedPublicListing(
   return n > 0;
 }
 
+/** Priority score for staged claim-invite selection (higher = sooner). */
+function claimInvitePriorityScore(input: {
+  openMicSignalTier: GrowthLeadOpenMicSignalTier | null | undefined;
+  region: string | null;
+  city: string | null;
+  createdAt: Date;
+}): number {
+  let score = 0;
+  const tier = input.openMicSignalTier;
+  if (tier === "EXPLICIT_OPEN_MIC") score += 100;
+  else if (tier === "STRONG_LIVE_EVENT") score += 60;
+  else if (tier === "WEAK_INFERRED") score += 20;
+  // Mild geographic diversity boost for non-IL when quality is equal-ish
+  const region = (input.region || "").toUpperCase();
+  if (region && region !== "IL") score += 5;
+  // Older listings slightly preferred
+  score += Math.min(30, Math.floor((Date.now() - input.createdAt.getTime()) / (86400000 * 7)));
+  return score;
+}
+
 /** Sends pending claim invites for VERIFIED listings only (bounded batch). */
 export async function runPendingListingClaimInvites(
   prisma: PrismaClient,
   limit = 5,
-): Promise<{ sent: number; skipped: number; candidates: number; budgetBlocked?: boolean }> {
-  const { remaining } = await resendDailyBudgetSnapshot(prisma);
-  if (remaining <= 0) {
+): Promise<{
+  sent: number;
+  skipped: number;
+  candidates: number;
+  budgetBlocked?: boolean;
+  paused?: boolean;
+  pauseReason?: string | null;
+}> {
+  const may = await claimInviteAutomationMaySend(prisma);
+  if (!may.ok) {
+    return {
+      sent: 0,
+      skipped: 0,
+      candidates: 0,
+      budgetBlocked: may.reason === "daily_claim_invite_cap" || may.reason === "claim_invites_disabled",
+      paused: may.reason?.startsWith("paused:"),
+      pauseReason: may.reason?.startsWith("paused:") ? may.reason.slice(7) : null,
+    };
+  }
+
+  const { remaining: resendRemaining } = await resendDailyBudgetSnapshot(prisma);
+  if (resendRemaining <= 0) {
     return { sent: 0, skipped: 0, candidates: 0, budgetBlocked: true };
   }
-  const effectiveLimit = Math.min(limit, remaining);
+
+  const effectiveLimit = Math.min(limit, may.perCron, may.dailyRemaining, resendRemaining);
+  if (effectiveLimit <= 0) {
+    return { sent: 0, skipped: 0, candidates: 0, budgetBlocked: true };
+  }
+
   const pending = await prisma.publicOpenMicListing.findMany({
-    where: CLAIM_INVITE_LISTING_WHERE,
+    where: {
+      claimInviteEmailSentAt: null,
+      claimedVenueId: null,
+      claimStatus: { not: "CLAIMED" },
+      verificationStatus: "VERIFIED",
+      googlePlaceId: { not: null },
+      growthLead: {
+        contactEmailNormalized: { not: null },
+        contactEmailConfidence: "HIGH",
+      },
+    },
     select: {
       id: true,
+      slug: true,
+      name: true,
       websiteUrl: true,
       sourceUrl: true,
+      city: true,
+      region: true,
+      createdAt: true,
+      verificationStatus: true,
+      claimStatus: true,
+      claimedVenueId: true,
+      googlePlaceId: true,
+      evidenceTerminalReason: true,
+      internalNotes: true,
+      about: true,
       growthLead: {
         select: {
           contactEmailNormalized: true,
           contactEmailConfidence: true,
           websiteUrl: true,
+          openMicSignalTier: true,
         },
       },
     },
     orderBy: { createdAt: "asc" },
-    take: Math.max(effectiveLimit * 8, effectiveLimit),
+    take: Math.max(effectiveLimit * 20, 40),
   });
+
+  const ranked = [...pending].sort(
+    (a, b) =>
+      claimInvitePriorityScore({
+        openMicSignalTier: b.growthLead?.openMicSignalTier,
+        region: b.region,
+        city: b.city,
+        createdAt: b.createdAt,
+      }) -
+      claimInvitePriorityScore({
+        openMicSignalTier: a.growthLead?.openMicSignalTier,
+        region: a.region,
+        city: a.city,
+        createdAt: a.createdAt,
+      }),
+  );
+
+  // Soft geographic diversity: avoid sending all to the same region in one tick when alternatives exist.
+  const regionSentThisTick = new Set<string>();
 
   let sent = 0;
   let skipped = 0;
   let candidates = 0;
-  for (const row of pending) {
+  for (const row of ranked) {
     if (sent >= effectiveLimit) break;
-    const budget = await resendDailyBudgetSnapshot(prisma);
-    if (budget.remaining <= 0) break;
+
+    const safety = listingPassesStagedClaimInviteSafety(row);
+    if (!safety.ok) {
+      skipped += 1;
+      continue;
+    }
 
     const email = row.growthLead?.contactEmailNormalized;
     if (
       !email ||
-      !isClaimInviteEmailEligible({
+      !isStagedClaimInviteContactEligible({
         email,
         confidence: row.growthLead?.contactEmailConfidence,
         websiteUrl: row.websiteUrl ?? row.growthLead?.websiteUrl,
@@ -457,11 +572,23 @@ export async function runPendingListingClaimInvites(
       skipped += 1;
       continue;
     }
-    candidates += 1;
 
+    const regionKey = (row.region || row.city || "unknown").toUpperCase();
+    if (regionSentThisTick.has(regionKey) && ranked.length > effectiveLimit) {
+      // Prefer diversity when we have surplus candidates; still allow if we are short.
+      const remainingCandidates = ranked.length - (sent + skipped);
+      if (remainingCandidates > effectiveLimit - sent) {
+        skipped += 1;
+        continue;
+      }
+    }
+
+    candidates += 1;
     const result = await sendListingClaimInviteIfNeeded(prisma, row.id, email);
-    if (result.sent) sent += 1;
-    else skipped += 1;
+    if (result.sent) {
+      sent += 1;
+      regionSentThisTick.add(regionKey);
+    } else skipped += 1;
   }
 
   return { sent, skipped, candidates };

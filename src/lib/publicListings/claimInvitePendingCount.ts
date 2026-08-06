@@ -1,16 +1,21 @@
 import type { PrismaClient } from "@/generated/prisma/client";
-import {
-  CLAIM_INVITE_LISTING_WHERE,
-  isClaimInviteEmailEligible,
-} from "@/lib/publicListings/claimInviteEligibility";
+import { CLAIM_INVITE_LISTING_WHERE } from "@/lib/publicListings/claimInviteEligibility";
+import { isStagedClaimInviteContactEligible } from "@/lib/publicListings/claimInviteAutomation";
 
 /**
- * Count VERIFIED listings that are actually claim-invite eligible (HIGH or domain-matched MEDIUM).
- * Ineligible scraped MEDIUM emails must not pause cold outreach.
+ * Count VERIFIED listings that are claim-invite eligible under staged rules
+ * (HIGH + official same-domain + not free-mail).
  */
 export async function countEligiblePendingListingClaimInvites(prisma: PrismaClient): Promise<number> {
   const rows = await prisma.publicOpenMicListing.findMany({
-    where: CLAIM_INVITE_LISTING_WHERE,
+    where: {
+      ...CLAIM_INVITE_LISTING_WHERE,
+      googlePlaceId: { not: null },
+      growthLead: {
+        contactEmailNormalized: { not: null },
+        contactEmailConfidence: "HIGH",
+      },
+    },
     select: {
       websiteUrl: true,
       sourceUrl: true,
@@ -30,7 +35,7 @@ export async function countEligiblePendingListingClaimInvites(prisma: PrismaClie
     const email = row.growthLead?.contactEmailNormalized;
     if (
       email &&
-      isClaimInviteEmailEligible({
+      isStagedClaimInviteContactEligible({
         email,
         confidence: row.growthLead?.contactEmailConfidence,
         websiteUrl: row.websiteUrl ?? row.growthLead?.websiteUrl,

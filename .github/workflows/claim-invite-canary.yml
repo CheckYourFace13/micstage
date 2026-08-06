@@ -1,0 +1,67 @@
+name: Claim invite canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      listing_slug:
+        description: "Approved canary listing slug"
+        required: true
+        type: choice
+        options:
+          - game-of-jokes-open-mic-competition-west-leigh-street-richmond
+          - monday-night-poetry-open-mic-hosted-by-keeping-it-p
+      expected_domain:
+        description: "Official domain (starrhill.com or choose901.com)"
+        required: true
+        type: string
+      confirm:
+        description: "Must be exactly SEND_REAL_CANARY"
+        required: true
+        type: string
+      mode:
+        description: "env = gate check only; send = real canary"
+        required: true
+        type: choice
+        default: env
+        options:
+          - env
+          - send
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require CRON_SECRET
+        run: |
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "::error::Add GitHub repo secret CRON_SECRET (same value as Hostinger)."
+            exit 1
+          fi
+
+      - name: Probe claim-invite env gates
+        if: ${{ inputs.mode == 'env' || inputs.mode == 'send' }}
+        run: |
+          curl -fsS -m 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://micstage.com/api/cron/claim-invite-canary"
+
+      - name: Send approved canary
+        if: ${{ inputs.mode == 'send' }}
+        run: |
+          if [ "${{ inputs.confirm }}" != "SEND_REAL_CANARY" ]; then
+            echo "::error::confirm must be SEND_REAL_CANARY"
+            exit 1
+          fi
+          curl -fsS -m 90 -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"listingSlug\":\"${{ inputs.listing_slug }}\",\"expectedDomain\":\"${{ inputs.expected_domain }}\",\"useGrowthLeadEmail\":true,\"confirm\":\"SEND_REAL_CANARY\"}" \
+            "https://micstage.com/api/cron/claim-invite-canary"
+
+      - name: Status snapshot
+        if: ${{ always() }}
+        run: |
+          curl -fsS -m 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://micstage.com/api/cron/claim-invite-status" || true

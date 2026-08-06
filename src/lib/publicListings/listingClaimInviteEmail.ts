@@ -7,6 +7,7 @@ import {
   CLAIM_INVITE_LISTING_WHERE,
   isClaimInviteEmailEligible,
 } from "@/lib/publicListings/claimInviteEligibility";
+import { micstageClaimInvitesEnabled } from "@/lib/publicListings/automationKillSwitches";
 import { resendDailyBudgetSnapshot } from "@/lib/resendDailyBudget";
 
 const REPLY_TO = "drummer@micstage.com";
@@ -223,6 +224,9 @@ export async function sendListingClaimInviteIfNeeded(
   listingId: string,
   toEmail?: string | null,
 ): Promise<{ sent: boolean; reason?: string }> {
+  if (!micstageClaimInvitesEnabled()) {
+    return { sent: false, reason: "claim_invites_disabled" };
+  }
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { id: listingId },
     include: {

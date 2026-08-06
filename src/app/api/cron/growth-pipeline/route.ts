@@ -20,10 +20,14 @@ import {
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
+import { micstageDiscoveryKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 
 /** Session-scoped Postgres advisory lock (outreach only — do not hold during web discovery). */
 const GROWTH_OUTREACH_LOCK_K1 = 54_788_913;
 const GROWTH_OUTREACH_LOCK_K2 = 20_993_312;
+/** Separate lock for discovery phase so concurrent discovery crons do not overlap. */
+const GROWTH_DISCOVERY_LOCK_K1 = 54_788_914;
+const GROWTH_DISCOVERY_LOCK_K2 = 20_993_313;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -52,6 +56,20 @@ async function tryOutreachLock(prisma: PrismaClient): Promise<{ release: () => P
   return {
     release: async () => {
       await prisma.$queryRawUnsafe(`SELECT pg_advisory_unlock(${GROWTH_OUTREACH_LOCK_K1}, ${GROWTH_OUTREACH_LOCK_K2})`);
+    },
+  };
+}
+
+async function tryDiscoveryLock(prisma: PrismaClient): Promise<{ release: () => Promise<void> } | null> {
+  const rows = await prisma.$queryRawUnsafe<Array<{ locked: boolean }>>(
+    `SELECT pg_try_advisory_lock(${GROWTH_DISCOVERY_LOCK_K1}, ${GROWTH_DISCOVERY_LOCK_K2}) AS locked`,
+  );
+  if (!rows[0]?.locked) return null;
+  return {
+    release: async () => {
+      await prisma.$queryRawUnsafe(
+        `SELECT pg_advisory_unlock(${GROWTH_DISCOVERY_LOCK_K1}, ${GROWTH_DISCOVERY_LOCK_K2})`,
+      );
     },
   };
 }
@@ -132,18 +150,31 @@ async function handle(request: Request) {
     }
 
     if (discoveryEnabled) {
-      try {
-        discovery = await runGrowthLeadDiscovery(prisma);
-      } catch (e) {
-        discoveryError = e instanceof Error ? e.message : String(e);
-        console.error("[growth pipeline] discovery failed", { error: discoveryError, phase });
-      }
-      try {
-        listingAutoPublish = await autoPublishGrowthLeadsAsListings(prisma);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error("[growth pipeline] listing auto-publish failed", { error: msg, phase });
-        if (!discoveryError) discoveryError = `listing auto-publish: ${msg}`;
+      if (micstageDiscoveryKillSwitch()) {
+        discoveryError = "MICSTAGE_KILL_DISCOVERY enabled";
+      } else {
+        const dLock = await tryDiscoveryLock(prisma);
+        if (!dLock) {
+          discoveryError = "growth-discovery already running";
+        } else {
+          try {
+            try {
+              discovery = await runGrowthLeadDiscovery(prisma);
+            } catch (e) {
+              discoveryError = e instanceof Error ? e.message : String(e);
+              console.error("[growth pipeline] discovery failed", { error: discoveryError, phase });
+            }
+            try {
+              listingAutoPublish = await autoPublishGrowthLeadsAsListings(prisma);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              console.error("[growth pipeline] listing auto-publish failed", { error: msg, phase });
+              if (!discoveryError) discoveryError = `listing auto-publish: ${msg}`;
+            }
+          } finally {
+            await dLock.release();
+          }
+        }
       }
     }
 

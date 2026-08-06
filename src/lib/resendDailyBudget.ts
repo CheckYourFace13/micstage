@@ -2,14 +2,16 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
+import { effectiveListingClaimInvitesPerCron } from "@/lib/publicListings/automationKillSwitches";
 
 /** Resend free tier is 100/day — stay under with headroom for password resets & booking reminders. */
 export function micstageResendDailyMax(): number {
   return parseIntEnv("MICSTAGE_RESEND_DAILY_MAX", 95);
 }
 
+/** Staged claim invites: 0 unless MICSTAGE_CLAIM_INVITES_ENABLED=true (canary-capped). */
 export function listingClaimInvitesPerCron(): number {
-  return Math.min(20, Math.max(1, parseIntEnv("LISTING_CLAIM_INVITES_PER_CRON", 15)));
+  return effectiveListingClaimInvitesPerCron();
 }
 
 /** Counts pipeline sends + claim invites (direct Resend, not in MarketingEmailSend). */

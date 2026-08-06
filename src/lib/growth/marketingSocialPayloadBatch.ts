@@ -13,6 +13,7 @@ import { persistGrowthLeadEmailContacts } from "@/lib/growth/growthLeadContactAu
 import { parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 import { marketingSocialPayloadBatchPerCron } from "@/lib/growth/expansionConfig";
 import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
+import { micstageEmailMiningKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 
 type JobPayload = {
   leadId?: string;
@@ -164,7 +165,15 @@ export async function runMarketingSocialPayloadBatch(
   emailsFound: number;
   pendingRemaining: number;
   results: SocialPayloadJobRunResult[];
+  killed?: boolean;
 }> {
+  if (micstageEmailMiningKillSwitch()) {
+    const pendingRemaining = await prisma.marketingJob.count({
+      where: { kind: MarketingJobKind.SOCIAL_PAYLOAD_RENDER, status: "PENDING" },
+    });
+    return { batchSize, processed: 0, emailsFound: 0, pendingRemaining, results: [], killed: true };
+  }
+
   const results: SocialPayloadJobRunResult[] = [];
   let emailsFound = 0;
 

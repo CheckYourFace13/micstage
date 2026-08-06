@@ -7,6 +7,7 @@ import {
 } from "@/lib/publicListings/googlePlacesVerify";
 import { promotePlaceConfirmedListings } from "@/lib/publicListings/promotePlaceConfirmedListings";
 import { publishGrowthLeadAsListing } from "@/lib/publicListings/publishGrowthLeadListing";
+import { micstagePromotionKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 
 export type AutoPublishListingsResult = {
   published: number;
@@ -160,6 +161,25 @@ export async function autoPublishGrowthLeadsAsListings(
 
   const enriched = await enrichListingsFromGrowthLeads(prisma, enrichLimit);
   const backlogRemaining = await prisma.growthLead.count({ where: LEAD_PUBLISH_WHERE });
+
+  if (micstagePromotionKillSwitch()) {
+    return {
+      published,
+      invitesSent,
+      enriched,
+      skipped,
+      backlogRemaining,
+      googleVerify: { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false },
+      promotePlaceConfirmed: {
+        scanned: 0,
+        promoted: 0,
+        skippedNoTrustedEvidence: 0,
+        skippedNonVenueName: 0,
+        claimInvitesAttempted: 0,
+      },
+    };
+  }
+
   const googleVerify = await verifyPublicListingsWithGoogle(prisma, {
     limit: listingGoogleVerifyPerDiscoveryRun(),
   });

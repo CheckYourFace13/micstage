@@ -168,6 +168,60 @@ export async function consumeListingClaimInviteToken(
   };
 }
 
+/**
+ * Validates a claim token by database id (session-bound). Optionally marks USED.
+ */
+export async function consumeListingClaimInviteTokenById(
+  prisma: PrismaClient,
+  input: {
+    tokenId: string;
+    listingId?: string;
+    loginEmailNormalized?: string;
+    markUsed?: boolean;
+  },
+): Promise<ConsumeClaimInviteTokenResult> {
+  const row = await prisma.listingClaimInviteToken.findUnique({
+    where: { id: input.tokenId },
+  });
+  if (!row) return { ok: false, reason: "not_found" };
+
+  if (row.status === "USED" || row.usedAt) return { ok: false, reason: "used" };
+  if (row.status === "REVOKED" || row.revokedAt) return { ok: false, reason: "revoked" };
+  if (row.status === "EXPIRED" || row.expiresAt.getTime() <= Date.now()) {
+    if (row.status === "ACTIVE") {
+      await prisma.listingClaimInviteToken.update({
+        where: { id: row.id },
+        data: { status: "EXPIRED" },
+      });
+    }
+    return { ok: false, reason: "expired" };
+  }
+  if (input.listingId && input.listingId !== row.listingId) {
+    return { ok: false, reason: "wrong_listing" };
+  }
+  if (
+    input.loginEmailNormalized &&
+    input.loginEmailNormalized.trim().toLowerCase() !== row.intendedEmailNormalized
+  ) {
+    return { ok: false, reason: "wrong_recipient" };
+  }
+
+  if (input.markUsed !== false) {
+    const updated = await prisma.listingClaimInviteToken.updateMany({
+      where: { id: row.id, status: "ACTIVE", usedAt: null },
+      data: { status: "USED", usedAt: new Date() },
+    });
+    if (updated.count === 0) return { ok: false, reason: "used" };
+  }
+
+  return {
+    ok: true,
+    tokenId: row.id,
+    listingId: row.listingId,
+    intendedEmailNormalized: row.intendedEmailNormalized,
+  };
+}
+
 /** Peek without consuming — for rendering the claim page. */
 export async function peekListingClaimInviteToken(
   prisma: PrismaClient,

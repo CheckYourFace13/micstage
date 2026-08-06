@@ -293,24 +293,57 @@ export async function sendApprovedClaimCanaryInvite(
   let claimPageVerification: Record<string, unknown> = { skipped: true };
   if (input.verifyClaimPage !== false) {
     try {
-      const res = await fetch(claimUrl, {
+      // Manual redirect so we can forward the HttpOnly session cookie to the clean URL.
+      const first = await fetch(claimUrl, {
         headers: { "User-Agent": "MicStageCanaryVerify/1.0" },
         redirect: "manual",
       });
-      const body = await res.text();
+      const setCookie = first.headers.getSetCookie?.() ?? [];
+      const cookieHeader = setCookie
+        .map((c) => c.split(";")[0])
+        .filter(Boolean)
+        .join("; ");
+      const location = first.headers.get("location");
+      let finalStatus = first.status;
+      let body = await first.text();
+      let finalUrl = claimUrl;
+      if (first.status >= 300 && first.status < 400 && location) {
+        finalUrl = new URL(location, claimUrl).toString();
+        const second = await fetch(finalUrl, {
+          headers: {
+            "User-Agent": "MicStageCanaryVerify/1.0",
+            ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          },
+          redirect: "follow",
+        });
+        finalStatus = second.status;
+        body = await second.text();
+        finalUrl = second.url || finalUrl;
+      }
       const ownersAfter = await prisma.venueOwner.count();
+      const fullEmailExposed = body.includes(email);
+      const path = (() => {
+        try {
+          return new URL(finalUrl).pathname;
+        } catch {
+          return "";
+        }
+      })();
       claimPageVerification = {
-        httpStatus: res.status,
-        loadsOk: res.status === 200,
+        httpStatus: finalStatus,
+        loadsOk: finalStatus === 200,
+        exchangedToCleanUrl: path === "/claim/invite" || path === "/claim/invite/",
         showsListingName: body.includes(listing.name),
-        requiresAuthority: /authority/i.test(body),
-        requiresTerms: /terms/i.test(body),
-        requiresPrivacy: /privacy/i.test(body),
-        recipientEmailNotInHtml: !body.includes(email),
+        requiresAuthority:
+          /data-claim-authority="required"/i.test(body) ||
+          /I confirm that I am the owner, manager, authorized employee/i.test(body),
+        requiresTerms: /terms of service/i.test(body),
+        requiresPrivacy: /privacy policy/i.test(body),
+        recipientEmailNotInHtml: !fullEmailExposed,
         rawTokenNotInHtml: !body.includes(issued.rawToken),
         invitationUnavailable: /invitation unavailable/i.test(body),
         venueOwnersUnchanged: ownersAfter === ownersBefore,
-        note: "Fetched once; form not submitted; raw token discarded.",
+        note: "Token exchanged for session cookie; form not submitted; raw token discarded.",
       };
     } catch (e) {
       claimPageVerification = {

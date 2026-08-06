@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { CLAIM_AUTHORITY_ROLES, type ClaimAuthorityRole } from "@/lib/publicListings/claimAutoApproval";
 import { submitInstantClaim } from "@/lib/publicListings/instantClaimActivation";
+import {
+  clearClaimInviteSession,
+  getClaimInviteSession,
+} from "@/lib/publicListings/claimInviteSession";
 import { siteOrigin } from "@/lib/publicSeo";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { setSession } from "@/lib/session";
@@ -12,7 +16,6 @@ export const dynamic = "force-dynamic";
 function originAllowed(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) {
-    // Same-site navigations / some clients omit Origin; require Sec-Fetch-Site when present.
     const site = request.headers.get("sec-fetch-site");
     if (!site || site === "same-origin" || site === "same-site" || site === "none") return true;
     return false;
@@ -42,7 +45,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  const rawToken = typeof body.rawToken === "string" ? body.rawToken : "";
+  const claimSession = await getClaimInviteSession();
+  const legacyRawToken = typeof body.rawToken === "string" ? body.rawToken : "";
   const listingSlug = typeof body.listingSlug === "string" ? body.listingSlug : "";
   const contactName = typeof body.contactName === "string" ? body.contactName : "";
   const role = typeof body.role === "string" ? body.role : "";
@@ -51,11 +55,17 @@ export async function POST(request: Request) {
   const termsAccepted = body.termsAccepted === true;
   const privacyAccepted = body.privacyAccepted === true;
 
-  if (!rawToken || !listingSlug) {
-    return NextResponse.json({ ok: false, error: "Missing invitation or listing" }, { status: 400 });
+  if (!listingSlug) {
+    return NextResponse.json({ ok: false, error: "Missing listing" }, { status: 400 });
+  }
+  if (!claimSession && !legacyRawToken) {
+    return NextResponse.json({ ok: false, error: "Invitation session expired" }, { status: 400 });
   }
   if (!CLAIM_AUTHORITY_ROLES.includes(role as ClaimAuthorityRole)) {
     return NextResponse.json({ ok: false, error: "Invalid role" }, { status: 400 });
+  }
+  if (!authorityConfirmed || !termsAccepted || !privacyAccepted) {
+    return NextResponse.json({ ok: false, error: "Consent required" }, { status: 400 });
   }
 
   const emailKey = loginEmail.trim().toLowerCase() || "unknown";
@@ -81,7 +91,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await submitInstantClaim(prisma, {
-      rawToken,
+      tokenId: claimSession?.tokenId,
+      rawToken: claimSession ? undefined : legacyRawToken || undefined,
       listingSlug,
       contactName,
       role: role as ClaimAuthorityRole,
@@ -89,12 +100,14 @@ export async function POST(request: Request) {
       authorityConfirmed,
       termsAccepted,
       privacyAccepted,
+      sessionIntendedEmailNormalized: claimSession?.intendedEmailNormalized,
     });
 
     if (!result.ok) {
-      // Never echo token material or token reason codes that include raw secrets.
       return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
     }
+
+    await clearClaimInviteSession();
 
     if (result.decision === "AUTO_APPROVED") {
       await setSession({

@@ -15,15 +15,16 @@ const ROLES: { value: ClaimAuthorityRole; label: string }[] = [
 export function InstantClaimForm(props: {
   listingSlug: string;
   listingName: string;
-  rawToken: string;
-  invitedEmail: string;
+  /** Masked only — never pass the full invited address to the client. */
+  invitedEmailMasked: string;
   address: string;
   evidenceSummary?: string | null;
+  authorityAffirmation: string;
 }) {
   const router = useRouter();
   const [contactName, setContactName] = useState("");
   const [role, setRole] = useState<ClaimAuthorityRole>("owner");
-  const [loginEmail, setLoginEmail] = useState(props.invitedEmail);
+  const [loginEmail, setLoginEmail] = useState("");
   const [authority, setAuthority] = useState(false);
   const [terms, setTerms] = useState(false);
   const [privacy, setPrivacy] = useState(false);
@@ -37,6 +38,10 @@ export function InstantClaimForm(props: {
       setError("Name is required.");
       return;
     }
+    if (!loginEmail.trim()) {
+      setError("Enter the invited login email to continue.");
+      return;
+    }
     if (!authority || !terms || !privacy) {
       setError("Confirm authority and accept Terms and Privacy to continue.");
       return;
@@ -48,7 +53,6 @@ export function InstantClaimForm(props: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          rawToken: props.rawToken,
           listingSlug: props.listingSlug,
           contactName: contactName.trim(),
           role,
@@ -88,8 +92,8 @@ export function InstantClaimForm(props: {
         <h2 className="text-lg font-semibold text-white">Claim received — manual review</h2>
         <p className="mt-2 text-sm text-white/80">
           Thanks. Your claim for {props.listingName} needs a short human review
-          {manualReason ? ` (${manualReason.replace(/_/g, " ")})` : ""}. We&apos;ll email {loginEmail} with next steps.
-          No account was created without this confirmation.
+          {manualReason ? ` (${manualReason.replace(/_/g, " ")})` : ""}. We&apos;ll email you at the address you
+          entered with next steps. No account was created without this confirmation.
         </p>
         <Link href={`/open-mics/${props.listingSlug}`} className="mt-4 inline-block text-sm text-[rgb(var(--om-neon))] underline">
           Back to listing
@@ -107,8 +111,8 @@ export function InstantClaimForm(props: {
         <p className="mt-1">{props.address}</p>
         {props.evidenceSummary ? <p className="mt-2 text-white/60">{props.evidenceSummary}</p> : null}
         <p className="mt-3 text-white/55">
-          You received this invitation because we verified this open mic and found a strong contact match for your venue.
-          Claiming is free. No MicStage account exists until you submit this form.
+          Invitation for <span className="text-white/80">{props.invitedEmailMasked}</span>. Claiming is free. No
+          MicStage account exists until you submit this form. Online booking remains optional and off by default.
         </p>
       </div>
 
@@ -119,6 +123,7 @@ export function InstantClaimForm(props: {
           value={contactName}
           onChange={(e) => setContactName(e.target.value)}
           className="h-10 rounded-md border border-white/15 bg-black/40 px-3 text-white"
+          autoComplete="name"
         />
       </label>
 
@@ -138,25 +143,34 @@ export function InstantClaimForm(props: {
       </label>
 
       <label className="grid gap-1 text-sm">
-        <span className="text-white/80">Login email</span>
+        <span className="text-white/80">Invited login email</span>
         <input
           required
           type="email"
           value={loginEmail}
           onChange={(e) => setLoginEmail(e.target.value)}
+          placeholder={props.invitedEmailMasked}
           className="h-10 rounded-md border border-white/15 bg-black/40 px-3 text-white"
+          autoComplete="email"
         />
         <span className="text-xs text-white/45">
-          Must match the invited address for automatic approval. Changing it sends the claim to manual review.
+          Type the full invited address (shown masked above). Automatic approval requires an exact match; a different
+          address goes to manual review.
         </span>
       </label>
 
       <label className="flex items-start gap-2 text-sm text-white/80">
-        <input type="checkbox" checked={authority} onChange={(e) => setAuthority(e.target.checked)} className="mt-1" />
-        <span>I confirm I am authorized to manage this open mic listing for the venue.</span>
+        <input
+          type="checkbox"
+          checked={authority}
+          onChange={(e) => setAuthority(e.target.checked)}
+          className="mt-1"
+          required
+        />
+        <span data-claim-authority="required">{props.authorityAffirmation}</span>
       </label>
       <label className="flex items-start gap-2 text-sm text-white/80">
-        <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-1" />
+        <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-1" required />
         <span>
           I accept the{" "}
           <Link href="/terms" className="underline text-[rgb(var(--om-neon))]" target="_blank">
@@ -166,7 +180,13 @@ export function InstantClaimForm(props: {
         </span>
       </label>
       <label className="flex items-start gap-2 text-sm text-white/80">
-        <input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-1" />
+        <input
+          type="checkbox"
+          checked={privacy}
+          onChange={(e) => setPrivacy(e.target.checked)}
+          className="mt-1"
+          required
+        />
         <span>
           I accept the{" "}
           <Link href="/privacy" className="underline text-[rgb(var(--om-neon))]" target="_blank">

@@ -14,14 +14,41 @@ import {
 } from "@/lib/publicListings/claimAutoApproval";
 import {
   consumeListingClaimInviteToken,
+  consumeListingClaimInviteTokenById,
   peekListingClaimInviteToken,
 } from "@/lib/publicListings/claimInviteToken";
 import { createPasswordReset } from "@/lib/passwordReset";
 import { REGISTRATION_CONTENT_CONSENT_VERSION } from "@/lib/registrationConsent";
 import { isMarketingEmailSuppressed } from "@/lib/marketing/suppression";
 import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
+import { CLAIM_AUTHORITY_CONSENT_VERSION } from "@/lib/publicListings/claimInviteSession";
 
 const UNUSABLE_PASSWORD_PREFIX = "claim-pending-setup:";
+
+async function consumeInviteForSubmit(
+  prisma: PrismaClient,
+  input: SubmitInstantClaimInput,
+  listingId: string,
+  opts: { requireRecipientMatch: boolean; loginEmail: string },
+) {
+  if (input.tokenId) {
+    return consumeListingClaimInviteTokenById(prisma, {
+      tokenId: input.tokenId,
+      listingId,
+      loginEmailNormalized: opts.requireRecipientMatch ? opts.loginEmail : undefined,
+      markUsed: true,
+    });
+  }
+  if (input.rawToken) {
+    return consumeListingClaimInviteToken(prisma, {
+      rawToken: input.rawToken,
+      listingId,
+      loginEmailNormalized: opts.requireRecipientMatch ? opts.loginEmail : undefined,
+      markUsed: true,
+    });
+  }
+  return { ok: false as const, reason: "not_found" as const };
+}
 
 async function uniqueVenueSlug(prisma: PrismaClient, base: string): Promise<string> {
   const slug = slugify(base) || `venue-${Date.now().toString(36)}`;
@@ -34,7 +61,9 @@ async function uniqueVenueSlug(prisma: PrismaClient, base: string): Promise<stri
 }
 
 export type SubmitInstantClaimInput = {
-  rawToken: string;
+  /** Prefer session-bound tokenId; rawToken kept for legacy callers. */
+  tokenId?: string;
+  rawToken?: string;
   listingSlug: string;
   contactName: string;
   role: ClaimAuthorityRole;
@@ -42,6 +71,8 @@ export type SubmitInstantClaimInput = {
   authorityConfirmed: boolean;
   termsAccepted: boolean;
   privacyAccepted: boolean;
+  /** Bound recipient from HttpOnly session — compared server-side. */
+  sessionIntendedEmailNormalized?: string;
 };
 
 export type SubmitInstantClaimResult =
@@ -77,9 +108,26 @@ export async function submitInstantClaim(
     return { ok: false, error: "Consent required", status: 400 };
   }
 
-  const peeked = await peekListingClaimInviteToken(prisma, input.rawToken);
+  let peeked: Awaited<ReturnType<typeof peekListingClaimInviteToken>>;
+  if (input.tokenId) {
+    peeked = await consumeListingClaimInviteTokenById(prisma, {
+      tokenId: input.tokenId,
+      markUsed: false,
+    });
+  } else if (input.rawToken) {
+    peeked = await peekListingClaimInviteToken(prisma, input.rawToken);
+  } else {
+    return { ok: false, error: "Invitation unavailable", status: 400 };
+  }
   if (!peeked.ok) {
     return { ok: false, error: "Invitation unavailable", status: 400 };
+  }
+
+  if (
+    input.sessionIntendedEmailNormalized &&
+    input.sessionIntendedEmailNormalized !== peeked.intendedEmailNormalized
+  ) {
+    return { ok: false, error: "Invitation session mismatch", status: 400 };
   }
 
   const listing = await prisma.publicOpenMicListing.findUnique({
@@ -172,11 +220,12 @@ export async function submitInstantClaim(
       const claimRequest = await prisma.$transaction(async (tx) => {
         // Manual review may use a different login email than the invite; do not
         // require recipient match on consume (auto-approve path still enforces it).
-        const consumed = await consumeListingClaimInviteToken(tx as unknown as PrismaClient, {
-          rawToken: input.rawToken,
-          listingId: listing.id,
-          markUsed: true,
-        });
+        const consumed = await consumeInviteForSubmit(
+          tx as unknown as PrismaClient,
+          input,
+          listing.id,
+          { requireRecipientMatch: false, loginEmail },
+        );
         if (!consumed.ok) {
           throw new Error("invitation_unavailable");
         }
@@ -195,6 +244,7 @@ export async function submitInstantClaim(
             decisionReason: eligibility.reason,
             claimInviteTokenId: consumed.tokenId,
             status: "PENDING",
+            notes: `authorityConsentVersion=${CLAIM_AUTHORITY_CONSENT_VERSION}`,
           },
         });
         await tx.publicOpenMicListing.update({
@@ -206,7 +256,12 @@ export async function submitInstantClaim(
           data: {
             listingId: listing.id,
             eventType: "CLAIM_SUBMITTED_MANUAL_REVIEW",
-            meta: { reason: eligibility.reason, claimRequestId: cr.id },
+            meta: {
+              reason: eligibility.reason,
+              claimRequestId: cr.id,
+              authorityConsentVersion: CLAIM_AUTHORITY_CONSENT_VERSION,
+              authorityAffirmed: true,
+            },
           },
         });
         return cr;
@@ -253,12 +308,12 @@ export async function submitInstantClaim(
       throw new Error("listing_not_verified");
     }
 
-    const consumed = await consumeListingClaimInviteToken(tx as unknown as PrismaClient, {
-      rawToken: input.rawToken,
-      listingId: locked.id,
-      loginEmailNormalized: loginEmail,
-      markUsed: true,
-    });
+    const consumed = await consumeInviteForSubmit(
+      tx as unknown as PrismaClient,
+      input,
+      locked.id,
+      { requireRecipientMatch: true, loginEmail },
+    );
     if (!consumed.ok) {
       throw new Error("invitation_unavailable");
     }
@@ -366,6 +421,7 @@ export async function submitInstantClaim(
         reviewedAt: new Date(),
         reviewedByEmail: "system:instant-claim",
         reviewNotes: "Auto-approved official-domain claim",
+        notes: `authorityConsentVersion=${CLAIM_AUTHORITY_CONSENT_VERSION}`,
       },
     });
 
@@ -389,6 +445,8 @@ export async function submitInstantClaim(
           claimRequestId: claimRequest.id,
           schedulesImported: locked.schedules.length,
           bookingEnabled: false,
+          authorityConsentVersion: CLAIM_AUTHORITY_CONSENT_VERSION,
+          authorityAffirmed: true,
         },
       },
     });

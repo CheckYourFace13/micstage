@@ -109,7 +109,8 @@ for (const slug of SLUGS) {
   }
 
   const latestToken = tokens[0] ?? null;
-  const sentAudit = audits.find((a) => a.eventType === "CLAIM_INVITE_SENT");
+    const sentAudit = audits.find((a) => a.eventType === "CLAIM_INVITE_SENT");
+  const opened = audits.some((a) => a.eventType === "CLAIM_INVITE_OPENED");
   const submitted = audits.some((a) => String(a.eventType).includes("CLAIM_SUBMITTED"));
   const autoApproved = audits.some((a) => a.eventType === "CLAIM_AUTO_APPROVED");
   const activationReached = audits.some((a) =>
@@ -161,8 +162,8 @@ for (const slug of SLUGS) {
       revoked: tokens.filter((t) => t.status === "REVOKED").length,
       expired: tokens.filter((t) => t.status === "EXPIRED").length,
     },
-    claimPageOpened: "not_tracked",
-    claimStarted: submitted || claims.length > 0,
+      claimPageOpened: opened,
+      claimStarted: submitted || claims.length > 0,
     claimSubmitted: submitted || claims.some((c) => c.status !== "REJECTED"),
     autoApproved,
     manualReview: claims.some((c) => c.status === "PENDING"),

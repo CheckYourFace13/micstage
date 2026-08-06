@@ -1,0 +1,135 @@
+import Link from "next/link";
+import type { Metadata } from "next";
+import { InstantClaimForm } from "@/components/publicListings/InstantClaimForm";
+import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
+import { getPrismaOrNull } from "@/lib/prisma";
+import {
+  CLAIM_AUTHORITY_AFFIRMATION,
+  clearClaimInviteSession,
+  getClaimInviteSession,
+  maskClaimInviteEmail,
+} from "@/lib/publicListings/claimInviteSession";
+import { consumeListingClaimInviteTokenById } from "@/lib/publicListings/claimInviteToken";
+import { buildPublicMetadata } from "@/lib/publicSeo";
+
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  return buildPublicMetadata({
+    title: "Claim your open mic",
+    description: "Complete your MicStage open mic claim invitation.",
+    path: "/claim/invite",
+    index: false,
+  });
+}
+
+/**
+ * Clean claim form URL — session from prior token exchange. No raw token in HTML.
+ */
+export default async function ClaimInviteSessionPage() {
+  const prisma = getPrismaOrNull();
+  if (!prisma) return <PublicDataUnavailable title="Claim form unavailable" />;
+
+  const session = await getClaimInviteSession();
+  if (!session) {
+    return (
+      <div className="min-h-dvh bg-black text-white">
+        <main className="mx-auto max-w-xl px-4 py-16">
+          <h1 className="om-heading text-3xl">Invitation session expired</h1>
+          <p className="mt-3 text-sm text-white/70">
+            Open the secure link from your email again to continue. Claiming is free.
+          </p>
+          <Link href="/" className="mt-6 inline-block text-[rgb(var(--om-neon))] underline">
+            Back home
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  const peeked = await consumeListingClaimInviteTokenById(prisma, {
+    tokenId: session.tokenId,
+    listingId: session.listingId,
+    markUsed: false,
+  });
+  if (!peeked.ok) {
+    await clearClaimInviteSession();
+    return (
+      <div className="min-h-dvh bg-black text-white">
+        <main className="mx-auto max-w-xl px-4 py-16">
+          <h1 className="om-heading text-3xl">Invitation unavailable</h1>
+          <p className="mt-3 text-sm text-white/70">
+            This claim link is no longer valid. Request a new invitation or contact MicStage support.
+          </p>
+          <Link href="/" className="mt-6 inline-block text-[rgb(var(--om-neon))] underline">
+            Back home
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  const listing = await prisma.publicOpenMicListing.findUnique({
+    where: { id: session.listingId },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      formattedAddress: true,
+      claimedVenueId: true,
+      about: true,
+      schedules: {
+        where: { isActive: true },
+        select: { weekday: true, startTimeMin: true, endTimeMin: true, title: true },
+        take: 5,
+      },
+    },
+  });
+  if (!listing) {
+    await clearClaimInviteSession();
+    return (
+      <div className="min-h-dvh bg-black text-white">
+        <main className="mx-auto max-w-xl px-4 py-16">
+          <h1 className="om-heading text-3xl">Listing unavailable</h1>
+        </main>
+      </div>
+    );
+  }
+
+  const scheduleBits = listing.schedules.map((s) => {
+    const sh = Math.floor(s.startTimeMin / 60);
+    const sm = String(s.startTimeMin % 60).padStart(2, "0");
+    return `${s.weekday} ${sh}:${sm}${s.title ? ` (${s.title})` : ""}`;
+  });
+  const evidenceSummary =
+    scheduleBits.length > 0
+      ? `Recurring schedule on file: ${scheduleBits.join("; ")}.`
+      : listing.about?.slice(0, 180) || null;
+
+  const invitedEmailMasked = maskClaimInviteEmail(session.intendedEmailNormalized);
+
+  return (
+    <div className="min-h-dvh bg-black text-white">
+      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
+        <Link href={`/open-mics/${listing.slug}`} className="text-sm text-[rgb(var(--om-neon))] underline">
+          ← View public listing
+        </Link>
+        <h1 className="om-heading mt-4 text-3xl">Claim your open mic</h1>
+        <p className="mt-2 text-sm text-white/70">
+          Secure invitation for <span className="font-semibold text-white">{listing.name}</span>. Claiming is
+          free. Online booking stays off until you enable it.
+        </p>
+        <div className="mt-8">
+          <InstantClaimForm
+            listingSlug={listing.slug}
+            listingName={listing.name}
+            invitedEmailMasked={invitedEmailMasked}
+            address={listing.formattedAddress}
+            evidenceSummary={evidenceSummary}
+            authorityAffirmation={CLAIM_AUTHORITY_AFFIRMATION}
+          />
+        </div>
+      </main>
+    </div>
+  );
+}

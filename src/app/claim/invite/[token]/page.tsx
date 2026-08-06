@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { InstantClaimForm } from "@/components/publicListings/InstantClaimForm";
 import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { peekListingClaimInviteToken } from "@/lib/publicListings/claimInviteToken";
+import { setClaimInviteSession } from "@/lib/publicListings/claimInviteSession";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { consumeRateLimit } from "@/lib/rateLimit";
 
@@ -19,7 +19,13 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default async function ClaimInviteTokenPage(props: { params: Promise<{ token: string }> }) {
+/**
+ * Exchange raw URL token for an HttpOnly claim session, then redirect to a clean URL.
+ * Does not consume the one-time invite token (submission does).
+ */
+export default async function ClaimInviteTokenExchangePage(props: {
+  params: Promise<{ token: string }>;
+}) {
   const { token } = await props.params;
   if (!token || token.length < 32 || !/^[a-f0-9]{32,128}$/i.test(token)) notFound();
 
@@ -27,7 +33,7 @@ export default async function ClaimInviteTokenPage(props: { params: Promise<{ to
   if (!prisma) return <PublicDataUnavailable title="Claim form unavailable" />;
 
   const rl = await consumeRateLimit({
-    scope: "claim:invite:peek",
+    scope: "claim:invite:exchange",
     identifier: token.slice(0, 16),
     limit: 40,
     windowSec: 60 * 15,
@@ -62,23 +68,7 @@ export default async function ClaimInviteTokenPage(props: { params: Promise<{ to
 
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { id: peeked.listingId },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      formattedAddress: true,
-      city: true,
-      region: true,
-      claimedVenueId: true,
-      claimStatus: true,
-      verificationStatus: true,
-      about: true,
-      schedules: {
-        where: { isActive: true },
-        select: { weekday: true, startTimeMin: true, endTimeMin: true, title: true },
-        take: 5,
-      },
-    },
+    select: { id: true, slug: true, claimedVenueId: true },
   });
   if (!listing) notFound();
 
@@ -90,40 +80,37 @@ export default async function ClaimInviteTokenPage(props: { params: Promise<{ to
     if (venue) redirect(`/venues/${venue.slug}`);
   }
 
-  const scheduleBits = listing.schedules.map((s) => {
-    const sh = Math.floor(s.startTimeMin / 60);
-    const sm = String(s.startTimeMin % 60).padStart(2, "0");
-    return `${s.weekday} ${sh}:${sm}${s.title ? ` (${s.title})` : ""}`;
+  const tokenRow = await prisma.listingClaimInviteToken.findUnique({
+    where: { id: peeked.tokenId },
+    select: { expiresAt: true },
   });
-  const evidenceSummary =
-    scheduleBits.length > 0
-      ? `Recurring schedule on file: ${scheduleBits.join("; ")}.`
-      : listing.about?.slice(0, 180) || null;
+  const remainingSec = tokenRow
+    ? Math.max(60, Math.floor((tokenRow.expiresAt.getTime() - Date.now()) / 1000))
+    : 60 * 60 * 2;
+  const sessionTtl = Math.min(60 * 60 * 2, remainingSec);
 
-  // Prefill shows domain-safe hint only — full invited email is required for confirmation.
-  const invitedEmail = peeked.intendedEmailNormalized;
-
-  return (
-    <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
-        <Link href={`/open-mics/${listing.slug}`} className="text-sm text-[rgb(var(--om-neon))] underline">
-          ← View public listing
-        </Link>
-        <h1 className="om-heading mt-4 text-3xl">Claim your open mic</h1>
-        <p className="mt-2 text-sm text-white/70">
-          Secure invitation for <span className="font-semibold text-white">{listing.name}</span>. Claiming is free.
-        </p>
-        <div className="mt-8">
-          <InstantClaimForm
-            listingSlug={listing.slug}
-            listingName={listing.name}
-            rawToken={token}
-            invitedEmail={invitedEmail}
-            address={listing.formattedAddress}
-            evidenceSummary={evidenceSummary}
-          />
-        </div>
-      </main>
-    </div>
+  await setClaimInviteSession(
+    {
+      tokenId: peeked.tokenId,
+      listingId: peeked.listingId,
+      intendedEmailNormalized: peeked.intendedEmailNormalized,
+    },
+    sessionTtl,
   );
+
+  // Privacy-safe open tracking — no IP, no full email.
+  await prisma.listingClaimAuditEvent.create({
+    data: {
+      listingId: peeked.listingId,
+      eventType: "CLAIM_INVITE_OPENED",
+      meta: {
+        tokenId: peeked.tokenId,
+        emailDomain: peeked.intendedEmailNormalized.includes("@")
+          ? peeked.intendedEmailNormalized.slice(peeked.intendedEmailNormalized.indexOf("@") + 1)
+          : null,
+      },
+    },
+  });
+
+  redirect("/claim/invite");
 }

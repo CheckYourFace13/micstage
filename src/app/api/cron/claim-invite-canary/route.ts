@@ -122,6 +122,7 @@ export async function POST(request: Request) {
     useGrowthLeadEmail?: boolean;
     confirm?: string;
     verifyClaimPage?: boolean;
+    allowCorrectedResend?: boolean;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
     useGrowthLeadEmail: body.useGrowthLeadEmail !== false,
     confirm: body.confirm,
     verifyClaimPage: body.verifyClaimPage !== false,
+    allowCorrectedResend: body.allowCorrectedResend === true,
   });
 
   if (!result.ok) {

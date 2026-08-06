@@ -76,6 +76,7 @@ if (!secret) {
         expectedDomain,
         useGrowthLeadEmail: true,
         confirm: "SEND_REAL_CANARY",
+        allowCorrectedResend: process.argv.includes("--allow-corrected-resend"),
       }),
     });
     const text = await res.text();

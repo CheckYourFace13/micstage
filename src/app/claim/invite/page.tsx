@@ -5,7 +5,6 @@ import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { getPrismaOrNull } from "@/lib/prisma";
 import {
   CLAIM_AUTHORITY_AFFIRMATION,
-  clearClaimInviteSession,
   getClaimInviteSession,
   maskClaimInviteEmail,
 } from "@/lib/publicListings/claimInviteSession";
@@ -25,17 +24,40 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Clean claim form URL — session from prior token exchange. No raw token in HTML.
+ * Do not call cookies().set here (RSC) — exchange/clear happen in Route Handlers.
  */
-export default async function ClaimInviteSessionPage() {
+export default async function ClaimInviteSessionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ err?: string }>;
+}) {
   const prisma = getPrismaOrNull();
   if (!prisma) return <PublicDataUnavailable title="Claim form unavailable" />;
 
-  const session = await getClaimInviteSession();
-  if (!session) {
+  const sp = await searchParams;
+  if (sp.err === "rate") {
     return (
       <div className="min-h-dvh bg-black text-white">
         <main className="mx-auto max-w-xl px-4 py-16">
-          <h1 className="om-heading text-3xl">Invitation session expired</h1>
+          <h1 className="om-heading text-3xl">Too many attempts</h1>
+          <p className="mt-3 text-sm text-white/70">Please wait and try again later.</p>
+        </main>
+      </div>
+    );
+  }
+
+  const session = await getClaimInviteSession();
+  if (!session) {
+    const title =
+      sp.err === "invalid"
+        ? "Invitation unavailable"
+        : sp.err === "session"
+          ? "Secure session unavailable"
+          : "Invitation session expired";
+    return (
+      <div className="min-h-dvh bg-black text-white">
+        <main className="mx-auto max-w-xl px-4 py-16">
+          <h1 className="om-heading text-3xl">{title}</h1>
           <p className="mt-3 text-sm text-white/70">
             Open the secure link from your email again to continue. Claiming is free.
           </p>
@@ -53,7 +75,6 @@ export default async function ClaimInviteSessionPage() {
     markUsed: false,
   });
   if (!peeked.ok) {
-    await clearClaimInviteSession();
     return (
       <div className="min-h-dvh bg-black text-white">
         <main className="mx-auto max-w-xl px-4 py-16">
@@ -86,7 +107,6 @@ export default async function ClaimInviteSessionPage() {
     },
   });
   if (!listing) {
-    await clearClaimInviteSession();
     return (
       <div className="min-h-dvh bg-black text-white">
         <main className="mx-auto max-w-xl px-4 py-16">

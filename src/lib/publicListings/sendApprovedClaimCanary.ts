@@ -16,6 +16,7 @@ import {
   listingPassesStagedClaimInviteSafety,
   redactEmail,
   recordClaimInviteSendStat,
+  recordClaimInviteSafetyEvent,
 } from "@/lib/publicListings/claimInviteAutomation";
 import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
 
@@ -86,6 +87,8 @@ export async function sendApprovedClaimCanaryInvite(
     expectedRecipient?: string | null;
     useGrowthLeadEmail?: boolean;
     confirm: string;
+    /** When true, allow a new invite after all prior tokens are revoked (security re-send). */
+    allowCorrectedResend?: boolean;
     /** When true, fetch claim page with live token in-memory (never returned). */
     verifyClaimPage?: boolean;
   },
@@ -184,7 +187,16 @@ export async function sendApprovedClaimCanaryInvite(
     return { ok: false, error: `suppressed:${suppressed.reason ?? "unknown"}` };
   }
 
-  if (listing.claimInviteEmailSentAt) return { ok: false, error: "already_sent" };
+  if (listing.claimInviteEmailSentAt) {
+    if (!input.allowCorrectedResend) {
+      return { ok: false, error: "already_sent" };
+    }
+    // Corrected resend only when no usable active token remains.
+    const active = await prisma.listingClaimInviteToken.count({
+      where: { listingId: listing.id, status: "ACTIVE", expiresAt: { gt: new Date() } },
+    });
+    if (active > 0) return { ok: false, error: "active_token_exists" };
+  }
 
   const activeTokens = await prisma.listingClaimInviteToken.count({
     where: { listingId: listing.id, status: "ACTIVE", expiresAt: { gt: new Date() } },
@@ -206,6 +218,8 @@ export async function sendApprovedClaimCanaryInvite(
   }
 
   const ownersBefore = await prisma.venueOwner.count();
+  const priorProviderMessageId = listing.claimInviteProviderMessageId;
+  const priorClaimInviteEmailSentAt = listing.claimInviteEmailSentAt;
 
   const issued = await issueListingClaimInviteToken(prisma, {
     listingId: listing.id,
@@ -282,6 +296,9 @@ export async function sendApprovedClaimCanaryInvite(
         hasProviderMessageId: true,
         emailDomain: recipDomain,
         canary: true,
+        correctedResend: Boolean(input.allowCorrectedResend && priorClaimInviteEmailSentAt),
+        priorProviderMessageIdPreserved: priorProviderMessageId,
+        priorClaimInviteEmailSentAt: priorClaimInviteEmailSentAt?.toISOString() ?? null,
         source: "claim-invite-canary-api",
         providerMessageIdPrefix: String(sendResult.messageId).slice(0, 8),
       },
@@ -333,7 +350,9 @@ export async function sendApprovedClaimCanaryInvite(
         httpStatus: finalStatus,
         loadsOk: finalStatus === 200,
         exchangedToCleanUrl: path === "/claim/invite" || path === "/claim/invite/",
+        rawTokenAbsentFromFinalUrl: !finalUrl.includes(issued.rawToken),
         showsListingName: body.includes(listing.name),
+        showsMaskedEmail: /[a-z0-9]\*\*\*@/i.test(body),
         requiresAuthority:
           /data-claim-authority="required"/i.test(body) ||
           /I confirm that I am the owner, manager, authorized employee/i.test(body),
@@ -345,6 +364,17 @@ export async function sendApprovedClaimCanaryInvite(
         venueOwnersUnchanged: ownersAfter === ownersBefore,
         note: "Token exchanged for session cookie; form not submitted; raw token discarded.",
       };
+      const verifyFailed =
+        !claimPageVerification.loadsOk ||
+        !claimPageVerification.exchangedToCleanUrl ||
+        !claimPageVerification.rawTokenAbsentFromFinalUrl ||
+        !claimPageVerification.recipientEmailNotInHtml ||
+        !claimPageVerification.rawTokenNotInHtml ||
+        !claimPageVerification.requiresAuthority;
+      if (verifyFailed) {
+        await recordClaimInviteSafetyEvent(prisma, "claim_page_failure");
+        await recordClaimInviteSafetyEvent(prisma, "security_failure");
+      }
     } catch (e) {
       claimPageVerification = {
         ok: false,

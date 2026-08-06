@@ -57,7 +57,19 @@ export type ClaimInviteRollingStats = {
   complaints: number;
   unauthorizedAttempts: number;
   duplicatesBlocked: number;
+  securityFailures: number;
+  suppressionBypasses: number;
+  claimPageFailures: number;
 };
+
+export type ClaimInviteSafetyKind =
+  | "hard_bounce"
+  | "complaint"
+  | "unauthorized"
+  | "duplicate"
+  | "security_failure"
+  | "suppression_bypass"
+  | "claim_page_failure";
 
 function envTruthy(v: string | undefined): boolean {
   const s = v?.trim().toLowerCase();
@@ -158,19 +170,25 @@ export async function setClaimInvitePaused(
 }
 
 export async function getClaimInviteRollingStats(prisma: PrismaClient): Promise<ClaimInviteRollingStats> {
+  const empty: ClaimInviteRollingStats = {
+    sends: 0,
+    hardBounces: 0,
+    complaints: 0,
+    unauthorizedAttempts: 0,
+    duplicatesBlocked: 0,
+    securityFailures: 0,
+    suppressionBypasses: 0,
+    claimPageFailures: 0,
+  };
   const raw = await readControlValue(prisma, STATS_KEY);
-  if (!raw) return { sends: 0, hardBounces: 0, complaints: 0, unauthorizedAttempts: 0, duplicatesBlocked: 0 };
+  if (!raw) return empty;
   try {
     return {
-      sends: 0,
-      hardBounces: 0,
-      complaints: 0,
-      unauthorizedAttempts: 0,
-      duplicatesBlocked: 0,
+      ...empty,
       ...(JSON.parse(raw) as Partial<ClaimInviteRollingStats>),
     };
   } catch {
-    return { sends: 0, hardBounces: 0, complaints: 0, unauthorizedAttempts: 0, duplicatesBlocked: 0 };
+    return empty;
   }
 }
 
@@ -182,19 +200,27 @@ export async function recordClaimInviteSendStat(prisma: PrismaClient): Promise<v
 
 export async function recordClaimInviteSafetyEvent(
   prisma: PrismaClient,
-  kind: "hard_bounce" | "complaint" | "unauthorized" | "duplicate",
+  kind: ClaimInviteSafetyKind,
 ): Promise<ClaimInvitePauseState> {
   const stats = await getClaimInviteRollingStats(prisma);
   if (kind === "hard_bounce") stats.hardBounces += 1;
   if (kind === "complaint") stats.complaints += 1;
   if (kind === "unauthorized") stats.unauthorizedAttempts += 1;
   if (kind === "duplicate") stats.duplicatesBlocked += 1;
+  if (kind === "security_failure") stats.securityFailures += 1;
+  if (kind === "suppression_bypass") stats.suppressionBypasses += 1;
+  if (kind === "claim_page_failure") stats.claimPageFailures += 1;
   await upsertControlValue(prisma, STATS_KEY, JSON.stringify(stats));
 
+  // Immediate pause for any complaint / unauthorized / duplicate / security / suppression / claim-page failure.
+  // Bounce thresholds: 2 hard bounces in first 10 sends, or >5% after ≥20 sends.
   let pauseReason: string | null = null;
-  if (stats.complaints >= 1) pauseReason = "complaint_received";
+  if (stats.complaints >= 1 || kind === "complaint") pauseReason = "complaint_received";
   else if (kind === "unauthorized") pauseReason = "unauthorized_recipient";
   else if (kind === "duplicate") pauseReason = "duplicate_invitation";
+  else if (kind === "security_failure") pauseReason = "token_or_session_security_failure";
+  else if (kind === "suppression_bypass") pauseReason = "suppression_bypass";
+  else if (kind === "claim_page_failure") pauseReason = "claim_page_failure";
   else if (stats.sends <= 10 && stats.hardBounces >= 2) pauseReason = "hard_bounce_early_threshold";
   else if (stats.sends >= 20 && stats.hardBounces / stats.sends > 0.05) {
     pauseReason = "hard_bounce_rate_above_5pct";

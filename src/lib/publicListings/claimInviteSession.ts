@@ -1,9 +1,12 @@
 /**
  * Short-lived claim-invite session after exchanging a raw URL token.
  * Raw token never enters React props / RSC payloads.
+ *
+ * Cookie writes must happen in Route Handlers (or Server Actions), not RSC pages.
  */
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { OM_CLAIM_INVITE_SESSION_COOKIE_NAME } from "@/lib/authCookieNames";
 
 export const CLAIM_AUTHORITY_CONSENT_VERSION = "2026-08-06-v1";
@@ -32,6 +35,16 @@ function secretKey() {
   return new TextEncoder().encode(getAuthSecret());
 }
 
+function cookieBase(maxAgeSec: number) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: maxAgeSec,
+  };
+}
+
 /** Mask for public UI — never show the full address. */
 export function maskClaimInviteEmail(email: string): string {
   const n = email.toLowerCase().trim();
@@ -44,35 +57,47 @@ export function maskClaimInviteEmail(email: string): string {
   return `${local.slice(0, 1)}***@${domainBit}`;
 }
 
-export async function setClaimInviteSession(
+export async function signClaimInviteSessionJwt(
   session: Omit<ClaimInviteSession, "kind">,
   maxAgeSec = 60 * 60 * 2,
-): Promise<void> {
-  const token = await new SignJWT({ ...session, kind: "claim_invite" })
+): Promise<string> {
+  return new SignJWT({ ...session, kind: "claim_invite" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${maxAgeSec}s`)
     .sign(secretKey());
+}
 
+/** Attach HttpOnly session cookie on a Route Handler redirect response. */
+export async function attachClaimInviteSessionCookie(
+  res: NextResponse,
+  session: Omit<ClaimInviteSession, "kind">,
+  maxAgeSec = 60 * 60 * 2,
+): Promise<void> {
+  const token = await signClaimInviteSessionJwt(session, maxAgeSec);
+  res.cookies.set(OM_CLAIM_INVITE_SESSION_COOKIE_NAME, token, cookieBase(maxAgeSec));
+}
+
+export function attachClearClaimInviteSessionCookie(res: NextResponse): void {
+  res.cookies.set(OM_CLAIM_INVITE_SESSION_COOKIE_NAME, "", cookieBase(0));
+}
+
+/**
+ * @deprecated Prefer attachClaimInviteSessionCookie on a Route Handler response.
+ * Kept for Server Actions / API routes that already use cookies() from next/headers.
+ */
+export async function setClaimInviteSession(
+  session: Omit<ClaimInviteSession, "kind">,
+  maxAgeSec = 60 * 60 * 2,
+): Promise<void> {
+  const token = await signClaimInviteSessionJwt(session, maxAgeSec);
   const jar = await cookies();
-  jar.set(OM_CLAIM_INVITE_SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: maxAgeSec,
-  });
+  jar.set(OM_CLAIM_INVITE_SESSION_COOKIE_NAME, token, cookieBase(maxAgeSec));
 }
 
 export async function clearClaimInviteSession(): Promise<void> {
   const jar = await cookies();
-  jar.set(OM_CLAIM_INVITE_SESSION_COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
-  });
+  jar.set(OM_CLAIM_INVITE_SESSION_COOKIE_NAME, "", cookieBase(0));
 }
 
 export async function getClaimInviteSession(): Promise<ClaimInviteSession | null> {

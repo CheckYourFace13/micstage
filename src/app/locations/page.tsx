@@ -8,8 +8,6 @@ import { loadPublicDiscoveryLocationRows, type PublicDiscoveryLocationRow } from
 import { MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY } from "@/lib/discoveryMarket";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { LocationsDirectory } from "./LocationsDirectory";
-import { DiscoveryInventorySummary } from "@/components/discovery/DiscoveryInventorySummary";
-
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -77,7 +75,6 @@ export default async function LocationsPage() {
               broader market (for example Chicagoland or Central Illinois) so discovery is easier. Addresses on each venue page
               stay exact.
             </p>
-            <DiscoveryInventorySummary className="mb-3" />
             <p className="text-xs leading-snug text-white/50 md:text-sm md:leading-normal md:text-white/65">
               Looking for venues near you? Start with{" "}
               <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/find-open-mics">

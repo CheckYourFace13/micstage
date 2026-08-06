@@ -368,28 +368,50 @@ export async function verifyPublicListingsWithGoogle(
     return { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false };
   }
 
+  const now = new Date();
   const rows = await prisma.publicOpenMicListing.findMany({
     where: {
       claimedVenueId: null,
       verificationStatus: { not: "OUTDATED" },
       OR: [{ googlePlaceId: null }, { googlePlaceVerifiedAt: null }],
+      AND: [
+        {
+          OR: [{ placeVerifyNextAttemptAt: null }, { placeVerifyNextAttemptAt: { lte: now } }],
+        },
+      ],
     },
     select: {
       id: true,
       slug: true,
       name: true,
+      formattedAddress: true,
       city: true,
       region: true,
-      formattedAddress: true,
-      googlePlaceId: true,
+      country: true,
+      lat: true,
+      lng: true,
       websiteUrl: true,
+      sourceUrl: true,
+      sourceName: true,
+      googlePlaceId: true,
+      googlePlaceVerifiedAt: true,
       verificationStatus: true,
       internalNotes: true,
-      sourceUrl: true,
+      about: true,
+      placeVerifyAttemptCount: true,
+      createdAt: true,
       schedules: { select: { title: true, description: true } },
-      growthLead: { select: { sourceKind: true, internalNotes: true, discoveryHints: true } },
+      growthLead: {
+        select: {
+          sourceKind: true,
+          discoveryHints: true,
+          websiteUrl: true,
+          internalNotes: true,
+        },
+      },
     },
-    orderBy: [{ googlePlaceVerifiedAt: "asc" }, { updatedAt: "desc" }],
+    // Age-aware: oldest eligible first so new discoveries cannot starve the backlog.
+    orderBy: [{ createdAt: "asc" }, { placeVerifyAttemptCount: "asc" }, { updatedAt: "asc" }],
     take: limit,
   });
 
@@ -399,6 +421,18 @@ export async function verifyPublicListingsWithGoogle(
   let skipped = 0;
 
   for (const row of rows) {
+    // Track attempt timing for age-aware retries (do not erase historical stamps).
+    const attemptCount = (row.placeVerifyAttemptCount ?? 0) + 1;
+    const backoffHours = Math.min(48, Math.max(1, attemptCount));
+    await prisma.publicOpenMicListing.update({
+      where: { id: row.id },
+      data: {
+        placeVerifyAttemptCount: attemptCount,
+        placeVerifyLastAttemptAt: new Date(),
+        placeVerifyNextAttemptAt: new Date(Date.now() + backoffHours * 3600 * 1000),
+      },
+    });
+
     const result = await verifyListingWithGoogle(row);
 
     if (result.outcome === "skipped") {

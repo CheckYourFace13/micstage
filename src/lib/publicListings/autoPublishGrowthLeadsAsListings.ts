@@ -29,6 +29,13 @@ export type AutoPublishListingsResult = {
     skippedNonVenueName: number;
     claimInvitesAttempted: number;
   };
+  evidenceEnrich: {
+    processed: number;
+    evidenceStored: number;
+    promoted: number;
+    rejected: number;
+    skipped: number;
+  };
 };
 
 const LEAD_PUBLISH_WHERE = {
@@ -177,6 +184,13 @@ export async function autoPublishGrowthLeadsAsListings(
         skippedNonVenueName: 0,
         claimInvitesAttempted: 0,
       },
+      evidenceEnrich: {
+        processed: 0,
+        evidenceStored: 0,
+        promoted: 0,
+        rejected: 0,
+        skipped: 0,
+      },
     };
   }
 
@@ -184,6 +198,10 @@ export async function autoPublishGrowthLeadsAsListings(
     limit: listingGoogleVerifyPerDiscoveryRun(),
   });
   const promotePlaceConfirmed = await promotePlaceConfirmedListings(prisma);
+  const { enrichListingsMissingTrustedEvidence } = await import(
+    "@/lib/publicListings/evidenceEnrichment"
+  );
+  const evidenceEnrich = await enrichListingsMissingTrustedEvidence(prisma);
 
   return {
     published,
@@ -193,5 +211,6 @@ export async function autoPublishGrowthLeadsAsListings(
     backlogRemaining,
     googleVerify,
     promotePlaceConfirmed,
+    evidenceEnrich,
   };
 }

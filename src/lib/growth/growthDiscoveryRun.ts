@@ -64,13 +64,17 @@ export type GrowthDiscoveryRunResult = {
     fallback_ready: boolean;
     warning: string | null;
   };
+  /** Persisted `GrowthDiscoveryRun.id` when write succeeds. */
+  discoveryRunId: string | null;
 };
 
 const MAX_ADAPTER_ERROR_LINES = 80;
 const MAX_ADAPTER_ERROR_CHARS = 480;
 const AUTONOMOUS_WEB_SEARCH_ADAPTER_ID = "autonomous_web_search_venue";
 
-function discoveryRunSummaryForDb(r: GrowthDiscoveryRunResult): Prisma.InputJsonValue {
+function discoveryRunSummaryForDb(
+  r: Omit<GrowthDiscoveryRunResult, "discoveryRunId">,
+): Prisma.InputJsonValue {
   const adapterErrors: Record<string, string[]> = {};
   for (const [id, errs] of Object.entries(r.adapterErrors)) {
     adapterErrors[id] = errs.slice(0, MAX_ADAPTER_ERROR_LINES).map((e) => e.slice(0, MAX_ADAPTER_ERROR_CHARS));
@@ -95,10 +99,13 @@ function discoveryRunSummaryForDb(r: GrowthDiscoveryRunResult): Prisma.InputJson
   } as Prisma.InputJsonValue;
 }
 
-async function persistGrowthDiscoveryRun(prisma: PrismaClient, r: GrowthDiscoveryRunResult): Promise<void> {
+async function persistGrowthDiscoveryRun(
+  prisma: PrismaClient,
+  r: Omit<GrowthDiscoveryRunResult, "discoveryRunId">,
+): Promise<string | null> {
   const candidatesTotal = Object.values(r.candidatesEmittedByAdapter).reduce((a, b) => a + b, 0);
   try {
-    await prisma.growthDiscoveryRun.create({
+    const row = await prisma.growthDiscoveryRun.create({
       data: {
         markets: r.markets,
         createdLeads: r.created,
@@ -107,9 +114,12 @@ async function persistGrowthDiscoveryRun(prisma: PrismaClient, r: GrowthDiscover
         candidatesTotal,
         summary: discoveryRunSummaryForDb(r),
       },
+      select: { id: true },
     });
+    return row.id;
   } catch (e) {
     console.error("[growth discovery] GrowthDiscoveryRun persist failed", e);
+    return null;
   }
 }
 
@@ -322,7 +332,7 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
     }
   }
 
-  const result: GrowthDiscoveryRunResult = {
+  const resultBase: Omit<GrowthDiscoveryRunResult, "discoveryRunId"> = {
     markets,
     allMarkets,
     rotationOffset,
@@ -356,6 +366,6 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
     },
   };
 
-  await persistGrowthDiscoveryRun(prisma, result);
-  return result;
+  const discoveryRunId = await persistGrowthDiscoveryRun(prisma, resultBase);
+  return { ...resultBase, discoveryRunId };
 }

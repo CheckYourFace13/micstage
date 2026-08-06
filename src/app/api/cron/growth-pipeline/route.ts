@@ -5,6 +5,10 @@ import {
 } from "@/lib/growth/expansionConfig";
 import { runAutoGrowthOutreachDrafts } from "@/lib/growth/growthDraftAutomation";
 import { runGrowthLeadDiscovery } from "@/lib/growth/growthDiscoveryRun";
+import {
+  beginDiscoveryRequestSourceLog,
+  endDiscoveryRequestSourceLog,
+} from "@/lib/growth/discoveryRequestSourceLog";
 import { autoPublishGrowthLeadsAsListings } from "@/lib/publicListings/autoPublishGrowthLeadsAsListings";
 import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
 import {
@@ -84,17 +88,43 @@ export async function GET(request: Request) {
 }
 
 async function handle(request: Request) {
-  if (!authorize(request)) {
+  const authOk = authorize(request);
+  const phaseEarly = parsePhase(request);
+  /** Log any request that would run discovery if authorized (not tick/outreach). */
+  const isDiscoveryPhaseRequest = phaseEarly !== "outreach" && phaseEarly !== "tick";
+  const discoverySourceLog = isDiscoveryPhaseRequest
+    ? beginDiscoveryRequestSourceLog(request, {
+        phase: phaseEarly,
+        authorizationPassed: authOk,
+      })
+    : null;
+  const discoveryStartedAtMs = discoverySourceLog ? Date.now() : 0;
+
+  if (!authOk) {
+    if (discoverySourceLog) {
+      endDiscoveryRequestSourceLog(discoverySourceLog, {
+        discoveryRunId: null,
+        discoveryError: "Unauthorized",
+        startedAtMs: discoveryStartedAtMs,
+      });
+    }
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
+    if (discoverySourceLog) {
+      endDiscoveryRequestSourceLog(discoverySourceLog, {
+        discoveryRunId: null,
+        discoveryError: "DATABASE_URL not configured",
+        startedAtMs: discoveryStartedAtMs,
+      });
+    }
     return NextResponse.json({ ok: false, error: "DATABASE_URL not configured" }, { status: 503 });
   }
 
-  const phase = parsePhase(request);
-  const discoveryEnabled = growthLeadDiscoveryCronEnabled() && phase !== "outreach" && phase !== "tick";
+  const phase = phaseEarly;
+  const discoveryEnabled = growthLeadDiscoveryCronEnabled() && isDiscoveryPhaseRequest;
   const draftEnabled = growthAutoDraftCronEnabled() && phase !== "discovery";
   const emailMiningEnabled = phase === "tick";
 
@@ -187,6 +217,19 @@ async function handle(request: Request) {
           }
         }
       }
+      if (discoverySourceLog) {
+        endDiscoveryRequestSourceLog(discoverySourceLog, {
+          discoveryRunId: discovery?.discoveryRunId ?? null,
+          discoveryError,
+          startedAtMs: discoveryStartedAtMs,
+        });
+      }
+    } else if (discoverySourceLog) {
+      endDiscoveryRequestSourceLog(discoverySourceLog, {
+        discoveryRunId: null,
+        discoveryError: "discovery not enabled for this request",
+        startedAtMs: discoveryStartedAtMs,
+      });
     }
 
     const sinceUtcDay = startOfUtcDay();
@@ -240,6 +283,13 @@ async function handle(request: Request) {
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
+    if (discoverySourceLog) {
+      endDiscoveryRequestSourceLog(discoverySourceLog, {
+        discoveryRunId: null,
+        discoveryError: message,
+        startedAtMs: discoveryStartedAtMs,
+      });
+    }
     return NextResponse.json({ ok: false, error: message, phase }, { status: 500 });
   }
 }

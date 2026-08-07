@@ -15,9 +15,9 @@ import { parseGrowthLeadEmailInput } from "../src/lib/growth/leadEmailValidation
 import { persistGrowthLeadEmailContacts } from "../src/lib/growth/growthLeadContactAutomation.ts";
 import { isMarketingEmailSuppressed } from "../src/lib/marketing/suppression.ts";
 import { countEligiblePendingListingClaimInvites } from "../src/lib/publicListings/claimInvitePendingCount.ts";
-import {
-  isStagedClaimInviteContactEligible,
-} from "../src/lib/publicListings/claimInviteAutomation.ts";
+import { isStagedClaimInviteContactEligible } from "../src/lib/publicListings/claimInviteAutomation.ts";
+import { emailDomainMatchesSiteHost } from "../src/lib/publicListings/claimInviteEligibility.ts";
+import { isFreeMailDomain } from "../src/lib/publicListings/claimAutoApproval.ts";
 
 function loadEnvFile(name) {
   if (!fs.existsSync(name)) return;

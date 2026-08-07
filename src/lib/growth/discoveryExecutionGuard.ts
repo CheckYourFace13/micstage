@@ -6,25 +6,51 @@ export const DISCOVERY_GUARD_ID = "growth-discovery";
 /** Lease TTL — longer than Hostinger curl --max-time 300 plus auto-publish headroom. */
 export const DISCOVERY_LOCK_TTL_MS = 15 * 60_000;
 
-export type DiscoveryHourBucket = string; // "YYYY-MM-DDTHH" UTC
+/**
+ * UTC half-hour bucket for discovery idempotency.
+ * Examples: `2026-08-07T15:00` (minutes 0–29) or `2026-08-07T15:30` (minutes 30–59).
+ */
+export type DiscoveryScheduleBucket = string;
 
-export function utcDiscoveryHourBucket(at: Date = new Date()): DiscoveryHourBucket {
+export function utcDiscoveryScheduleBucket(at: Date = new Date()): DiscoveryScheduleBucket {
   const y = at.getUTCFullYear();
   const m = String(at.getUTCMonth() + 1).padStart(2, "0");
   const d = String(at.getUTCDate()).padStart(2, "0");
   const h = String(at.getUTCHours()).padStart(2, "0");
-  return `${y}-${m}-${d}T${h}`;
+  const half = at.getUTCMinutes() < 30 ? "00" : "30";
+  return `${y}-${m}-${d}T${h}:${half}`;
+}
+
+/** @deprecated Use utcDiscoveryScheduleBucket — kept as alias for call sites. */
+export function utcDiscoveryHourBucket(at: Date = new Date()): DiscoveryScheduleBucket {
+  return utcDiscoveryScheduleBucket(at);
+}
+
+export function discoveryScheduleBucketWindow(at: Date = new Date()): { start: Date; end: Date } {
+  const start = new Date(
+    Date.UTC(
+      at.getUTCFullYear(),
+      at.getUTCMonth(),
+      at.getUTCDate(),
+      at.getUTCHours(),
+      at.getUTCMinutes() < 30 ? 0 : 30,
+      0,
+      0,
+    ),
+  );
+  return { start, end: new Date(start.getTime() + 30 * 60 * 1000) };
 }
 
 export function discoveryHourBypassRequested(request: Request): boolean {
   const url = new URL(request.url);
-  return url.searchParams.get("confirm") === "FORCE_DISCOVERY_HOUR_BYPASS";
+  const confirm = url.searchParams.get("confirm")?.trim();
+  return confirm === "FORCE_DISCOVERY_HOUR_BYPASS" || confirm === "FORCE_DISCOVERY_BUCKET_BYPASS";
 }
 
 export type DiscoveryGuardAcquireResult =
   | {
       status: "acquired";
-      hourBucket: DiscoveryHourBucket;
+      hourBucket: DiscoveryScheduleBucket;
       release: (opts: {
         completedRunId: string | null;
         failed: boolean;
@@ -32,19 +58,19 @@ export type DiscoveryGuardAcquireResult =
     }
   | {
       status: "already_running";
-      hourBucket: DiscoveryHourBucket;
+      hourBucket: DiscoveryScheduleBucket;
       lockedByRequestId: string | null;
       expiresAt: string | null;
     }
   | {
       status: "already_completed";
-      hourBucket: DiscoveryHourBucket;
+      hourBucket: DiscoveryScheduleBucket;
       existingRunId: string | null;
       completedAt: string | null;
     };
 
 /**
- * Postgres row-lease single-flight + hourly completion idempotency.
+ * Postgres row-lease single-flight + half-hour completion idempotency.
  * Uses SELECT … FOR UPDATE so it works across Node processes and pooled connections
  * (session `pg_try_advisory_lock` does not, under Prisma/PgBouncer).
  */
@@ -55,9 +81,10 @@ export async function acquireDiscoveryExecution(
     bypassHourlyGuard: boolean;
   },
 ): Promise<DiscoveryGuardAcquireResult> {
-  const hourBucket = utcDiscoveryHourBucket();
+  const hourBucket = utcDiscoveryScheduleBucket();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + DISCOVERY_LOCK_TTL_MS);
+  const window = discoveryScheduleBucketWindow(now);
 
   return prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
@@ -114,14 +141,10 @@ export async function acquireDiscoveryExecution(
       };
     }
 
-    // Also treat a GrowthDiscoveryRun created in this UTC hour as completed (belt-and-suspenders).
+    // Belt-and-suspenders: any GrowthDiscoveryRun already in this half-hour window.
     if (!opts.bypassHourlyGuard) {
-      const hourStart = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), 0, 0, 0),
-      );
-      const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000);
       const existing = await tx.growthDiscoveryRun.findFirst({
-        where: { createdAt: { gte: hourStart, lt: hourEnd } },
+        where: { createdAt: { gte: window.start, lt: window.end } },
         orderBy: { createdAt: "asc" },
         select: { id: true, createdAt: true },
       });

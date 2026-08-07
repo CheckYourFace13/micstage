@@ -1171,7 +1171,7 @@ model DiscoveryExecutionGuard {
 
   lastCompletedAt         DateTime?
   lastCompletedRunId      String?
-  /// UTC hour bucket, e.g. "2026-08-06T20"
+  /// UTC schedule bucket of last successful run (half-hour: `YYYY-MM-DDTHH:00` or `:30`)
   lastCompletedHourBucket String?
 
   updatedAt DateTime @updatedAt

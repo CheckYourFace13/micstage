@@ -81,7 +81,7 @@ Remove any `chicagoland-il` / `illinois-regional` entries from that env if prese
 1. **Advanced → Cron Jobs → Add**
 2. Schedule: `*/15 * * * *`
 3. Command: paste from `scripts/hostinger-growth-cron.sh` with your secret
-4. Second job: `5 * * * *` with the discovery `curl` line
+4. Second job: `0,30 * * * *` with the discovery `curl` line (half-hour idempotency guard allows one completed run per `:00` and `:30` UTC bucket)
 
 If the panel cannot send `Authorization` headers, use **Windows Task Scheduler** with `scripts/run-production-crons.ps1` every 15 minutes instead.
 

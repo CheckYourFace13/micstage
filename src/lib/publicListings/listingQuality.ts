@@ -54,7 +54,11 @@ const DATE_ARTICLE =
 
 /** Non-venue editorial phrasing anywhere in the title. */
 const EDITORIAL =
-  /(\bthings\s+to\s+do\b)|(\bnight\s+of\s+laughs\b)|(\btour\s+of\s+comedy\b)|(\bbest\s+(live\s+music|bars|comedy|places|things)\b)|(\b(nightlife|city|bar|drink|dining|music|comedy|visitors?|travel|ultimate|summer|winter|spring|fall|autumn|holiday|weekend|seasonal|annual)\s+guide\b)|(\bguide\s*[:|-])|(\bguide\s+to\b)|(\bguide$)|(\bcalendar\b)|(\blive\s+music\s+calendar\b)|(\bconcerts?\s+(19|20)\d{2}\b)|(\b(19|20)\d{2}\s+schedule\b)|(\btop\s+ten\b)|(\btop\s+10\b)|(\blist\s+of\b)|(\bround-?up\b)|(\bthis\s+weekend\b)|(\bthis\s+week\b)|(\bnear\s+you\b)|(\bmust[-\s](see|visit|try)\b)|(\bmust-chicago\b)|(\bhow\s+to\b)|(\breview:)|(\brecap\b)|(\b(ways|reasons)\s+to\b)|(\bsoloing\s+wings\b)|(\bstretch\s+my\b)|(\bkaraoke\b)|(\btrivia\b)|(\bpub\s+trivia\b)|(\bbandmix\b)|(\bprivate\s+events\b)|(\blive\s+music\s+trail\b)/i;
+  /(\bthings\s+to\s+do\b)|(\bnight\s+of\s+laughs\b)|(\btour\s+of\s+comedy\b)|(\bbest\s+(live\s+music|bars|comedy|places|things)\b)|(\b(nightlife|city|bar|drink|dining|music|comedy|visitors?|travel|ultimate|summer|winter|spring|fall|autumn|holiday|weekend|seasonal|annual)\s+guide\b)|(\bguide\s*[:|-])|(\bguide\s+to\b)|(\bguide$)|(\bcalendar\b)|(\blive\s+music\s+calendar\b)|(\bconcerts?\s+(19|20)\d{2}\b)|(\b(19|20)\d{2}\s+schedule\b)|(\btop\s+ten\b)|(\btop\s+10\b)|(\blist\s+of\b)|(\bround-?up\b)|(\bthis\s+weekend\b)|(\bthis\s+week\b)|(\bnear\s+you\b)|(\bmust[-\s](see|visit|try)\b)|(\bmust-chicago\b)|(\bhow\s+to\b)|(\breview:)|(\brecap\b)|(\b(ways|reasons)\s+to\b)|(\bsoloing\s+wings\b)|(\bstretch\s+my\b)|(\bkaraoke\b)|(\btrivia\b)|(\bpub\s+trivia\b)|(\bbandmix\b)|(\bprivate\s+events\b)|(\blive\s+music\s+trail\b)|(\byou\s+have\s+to\s+(experience|see|visit|try)\b)|(\bmusic\s+venues?\s+you\b)|(\btop\s+singers?\b)|(\bartist\s+booking\b)|(\bbooking\s+information\b)|(\bvenue\s+rental\b)|(\brent\s+(this\s+)?venue\b)|(\bentertainment\s+directory\b)|(\btourism\b)|(\bvisitors?\s+guide\b)/i;
+
+/** Exact generic page titles that are not venues even when they mention live music. */
+const GENERIC_LIVE_MUSIC_TITLE =
+  /^\s*(live\s+music\s+events?|live\s+music|music\s+venues?|artist\s+booking(?:\s+information)?)\s*$/i;
 
 /** Scraped URL / path-fragment / artifact names ("a/stir", "open-mic-night-3", "www.foo.com", "X :: Y", stray quotes). */
 const PATH_OR_URL =
@@ -166,6 +170,7 @@ export function classifyListingName(name: string): ListingNameRejection | null {
   if (!n || n.length < 4) return "TOO_SHORT";
   if (CANCELLED_OR_CLOSED.test(n)) return "CANCELLED_OR_CLOSED";
   if (GENERIC_PAGE_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
+  if (GENERIC_LIVE_MUSIC_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
   if (LISTICLE.test(n) || DATE_ARTICLE.test(n)) return "ARTICLE_OR_LISTICLE";
   if (PATH_OR_URL.test(n)) return "PATH_OR_URL_NAME";
   if (EDITORIAL.test(n)) return "NON_VENUE_TITLE";

@@ -18,7 +18,7 @@ import {
 } from "@/lib/publicListings/evidenceTrust";
 
 export function listingEvidenceEnrichPerRun(): number {
-  return Math.min(40, Math.max(0, parseIntEnv("LISTING_EVIDENCE_ENRICH_PER_RUN", 20)));
+  return Math.min(50, Math.max(0, parseIntEnv("LISTING_EVIDENCE_ENRICH_PER_RUN", 30)));
 }
 
 function hostFromUrl(u: string | null | undefined): string | null {

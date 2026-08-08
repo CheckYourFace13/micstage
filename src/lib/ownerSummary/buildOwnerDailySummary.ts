@@ -2,9 +2,10 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { chicagoLast24hWindow } from "@/lib/ownerSummary/chicagoWindow";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { loadDiscoveryInventoryStats } from "@/lib/publicListings/inventoryStats";
-import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { classifyListingName, isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 import { PUBLIC_DISCOVERY_VERIFICATION } from "@/lib/publicListings/queries";
 import { countPendingListingClaimInvitesWithEmail } from "@/lib/resendDailyBudget";
+import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
 
 export type OwnerSummarySignupRow = {
   kind: "venue" | "artist";
@@ -82,9 +83,23 @@ export type OwnerDailySummaryData = {
     listingsNote: string;
     needsReviewCount: number;
   };
+  /** Compact funnel + automation counters for ops email (not the full review dump). */
+  growthFunnel: {
+    waitingEnrichment: number;
+    waitingVerification: number;
+    waitingEmail: number;
+    inviteReady: number;
+    needsReviewTotal: number;
+    backlogProcessedApprox: number;
+    autoVerifiedToday: number;
+    autoRejectedToday: number;
+    highContactsRecoveredToday: number;
+    reviewReasonBuckets: Array<{ reason: string; count: number }>;
+  };
   recentListings: OwnerSummaryListingRow[];
-  /** Full hidden review queue (NEEDS_REVIEW + UNVERIFIED, unclaimed) — all rows. */
+  /** Top human-review items only (full queue lives in admin). */
   reviewQueue: OwnerSummaryReviewQueueRow[];
+  reviewQueueTotal: number;
   reviewQueueAdminUrl: string;
 };
 
@@ -320,6 +335,14 @@ export async function buildOwnerDailySummary(
     recentListingsFallback,
     needsReviewCount,
     reviewQueueRaw,
+    waitingVerification,
+    waitingEnrichment,
+    waitingEmail,
+    inviteReady,
+    autoVerifiedToday,
+    autoRejectedToday,
+    highContactsRecoveredToday,
+    reviewReasonSample,
   ] = await Promise.all([
     loadDiscoveryInventoryStats(prisma),
     countPendingListingClaimInvitesWithEmail(prisma),
@@ -401,6 +424,7 @@ export async function buildOwnerDailySummary(
         verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED"] },
       },
       orderBy: [{ updatedAt: "desc" }],
+      take: 20,
       select: {
         id: true,
         name: true,
@@ -421,6 +445,67 @@ export async function buildOwnerDailySummary(
         },
         schedules: { where: { isActive: true }, select: { id: true } },
       },
+    }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        claimedVenueId: null,
+        verificationStatus: "NEEDS_REVIEW",
+        OR: [{ googlePlaceId: null }, { googlePlaceVerifiedAt: null }],
+      },
+    }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        claimedVenueId: null,
+        verificationStatus: "NEEDS_REVIEW",
+        googlePlaceId: { not: null },
+        googlePlaceVerifiedAt: { not: null },
+      },
+    }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        verificationStatus: "VERIFIED",
+        claimStatus: "UNCLAIMED",
+        claimedVenueId: null,
+        claimInviteEmailSentAt: null,
+        OR: [
+          { growthLead: { is: { contactEmailNormalized: null } } },
+          { growthLead: { is: { contactEmailConfidence: { not: "HIGH" } } } },
+        ],
+      },
+    }),
+    countEligiblePendingListingClaimInvites(prisma),
+    prisma.publicOpenMicListing.count({
+      where: {
+        verificationStatus: "VERIFIED",
+        lastVerifiedAt: { gte: startUtc, lt: endUtc },
+        internalNotes: { contains: "auto-promote" },
+      },
+    }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        verificationStatus: "OUTDATED",
+        updatedAt: { gte: startUtc, lt: endUtc },
+        internalNotes: { contains: "auto-reject" },
+      },
+    }),
+    prisma.growthLead.count({
+      where: {
+        updatedAt: { gte: startUtc, lt: endUtc },
+        contactEmailConfidence: "HIGH",
+        contactEmailNormalized: { not: null },
+      },
+    }),
+    prisma.publicOpenMicListing.findMany({
+      where: {
+        claimedVenueId: null,
+        verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED"] },
+      },
+      select: {
+        name: true,
+        googlePlaceId: true,
+        evidenceTerminalReason: true,
+      },
+      take: 500,
     }),
   ]);
 
@@ -461,8 +546,23 @@ export async function buildOwnerDailySummary(
     adminUrl: reviewQueueAdminUrl,
   }));
 
+  const reasonCounts = new Map<string, number>();
+  for (const row of reviewReasonSample) {
+    const nameReject = classifyListingName(row.name);
+    let reason = "ambiguous_human_review";
+    if (nameReject) reason = `junk_name_${nameReject}`;
+    else if (row.evidenceTerminalReason) reason = row.evidenceTerminalReason;
+    else if (!row.googlePlaceId) reason = "missing_google_place";
+    else reason = "needs_trusted_open_mic_evidence";
+    reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+  }
+  const reviewReasonBuckets = [...reasonCounts.entries()]
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12);
+
   const listingsNote =
-    "Inventory includes unclaimed public listings (not just registered venues). Discovery holds new rows as NEEDS_REVIEW until place+evidence verification; one-touch claim invites send only after VERIFIED. Review queue below lists every hidden row awaiting your decision.";
+    "Inventory includes unclaimed public listings. Strong place+evidence rows auto-promote to VERIFIED; junk names auto-reject to OUTDATED. Email shows top 20 review items only — full queue is in admin.";
 
   return {
     windowLabel: `${reportLabel} (America/Chicago, last 24h through end of window)`,
@@ -492,8 +592,21 @@ export async function buildOwnerDailySummary(
       listingsNote,
       needsReviewCount,
     },
+    growthFunnel: {
+      waitingEnrichment,
+      waitingVerification,
+      waitingEmail,
+      inviteReady,
+      needsReviewTotal: needsReviewCount,
+      backlogProcessedApprox: autoVerifiedToday + autoRejectedToday + listingsCreatedCount,
+      autoVerifiedToday,
+      autoRejectedToday,
+      highContactsRecoveredToday,
+      reviewReasonBuckets,
+    },
     recentListings,
     reviewQueue,
+    reviewQueueTotal: needsReviewCount,
     reviewQueueAdminUrl,
   };
 }

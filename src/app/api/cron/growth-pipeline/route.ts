@@ -16,6 +16,7 @@ import {
   utcDiscoveryHourBucket,
 } from "@/lib/growth/discoveryExecutionGuard";
 import { autoPublishGrowthLeadsAsListings } from "@/lib/publicListings/autoPublishGrowthLeadsAsListings";
+import { runListingBacklogProcessor } from "@/lib/publicListings/listingBacklogProcessor";
 import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
 import {
   countPendingListingClaimInvitesWithEmail,
@@ -121,6 +122,7 @@ async function handle(request: Request) {
     let discovery: Awaited<ReturnType<typeof runGrowthLeadDiscovery>> | null = null;
     let discoveryError: string | null = null;
     let listingAutoPublish: Awaited<ReturnType<typeof autoPublishGrowthLeadsAsListings>> | null = null;
+    let listingBacklog: Awaited<ReturnType<typeof runListingBacklogProcessor>> | null = null;
     let drafts: Awaited<ReturnType<typeof runAutoGrowthOutreachDrafts>> | null = null;
     let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
     let listingClaimInvites: Awaited<ReturnType<typeof runPendingListingClaimInvites>> | null = null;
@@ -131,6 +133,12 @@ async function handle(request: Request) {
     if (emailMiningEnabled) {
       const batchSize = resolveMarketingSocialPayloadBatchSize(request);
       emailMining = await runMarketingSocialPayloadBatch(prisma, batchSize);
+      try {
+        listingBacklog = await runListingBacklogProcessor(prisma);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[growth pipeline] listing backlog processor failed", { error: msg, phase });
+      }
     }
 
     // Claim invites: independent of outreach drafts (canary can run while general outreach stays off).
@@ -335,6 +343,7 @@ async function handle(request: Request) {
         discovery,
         discoveryError,
         listingAutoPublish,
+        listingBacklog,
         emailMining,
         resendBudget,
         pendingClaimInvites,

@@ -9,6 +9,7 @@ import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
 import { isFreeMailDomain } from "@/lib/publicListings/claimAutoApproval";
 import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
+import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 
 const CONTROL_ADAPTER = "claim_invite_control";
 const CONTROL_MARKET = "global";
@@ -291,6 +292,18 @@ export function isBlockedClaimInviteDomain(domainOrEmail: string): boolean {
  * Staged automation eligibility: HIGH + official same-domain + not free-mail + not blocked domain.
  * MEDIUM contacts are excluded during this phase.
  */
+const BLOCKED_CLAIM_LOCAL_PARTS = new Set([
+  "visitors",
+  "tourism",
+  "chamber",
+  "cvb",
+  "editor",
+  "newsroom",
+  "webmaster",
+  "noreply",
+  "no-reply",
+]);
+
 export function isStagedClaimInviteContactEligible(input: {
   email: string;
   confidence: string | null | undefined;
@@ -302,6 +315,8 @@ export function isStagedClaimInviteContactEligible(input: {
   if (input.confidence !== "HIGH") return false;
   if (isFreeMailDomain(email)) return false;
   if (isBlockedClaimInviteDomain(email)) return false;
+  const local = email.split("@")[0]?.toLowerCase() ?? "";
+  if (BLOCKED_CLAIM_LOCAL_PARTS.has(local)) return false;
   const siteHost = hostFromUrl(input.websiteUrl) || hostFromUrl(input.sourceUrl);
   if (!siteHost || !emailDomainMatchesSiteHost(email, siteHost)) return false;
   return true;
@@ -316,6 +331,10 @@ export function listingPassesStagedClaimInviteSafety(listing: {
   internalNotes: string | null;
   name: string;
   about: string | null;
+  region?: string | null;
+  city?: string | null;
+  formattedAddress?: string | null;
+  discoveryMarketSlug?: string | null;
 }): { ok: true } | { ok: false; reason: string } {
   if (listing.verificationStatus !== "VERIFIED") return { ok: false, reason: "not_verified" };
   if (listing.claimStatus !== "UNCLAIMED") return { ok: false, reason: "not_unclaimed" };
@@ -327,6 +346,18 @@ export function listingPassesStagedClaimInviteSafety(listing: {
   }
   if (/cancel+ed|permanently closed/i.test(`${listing.name} ${listing.about ?? ""}`)) {
     return { ok: false, reason: "cancellation_signal" };
+  }
+  // Area 51 / Roswell GA vs IL and similar geo mismatches must never enter invite pool.
+  if (
+    listingHasGeoConflict({
+      region: listing.region,
+      city: listing.city,
+      formattedAddress: listing.formattedAddress,
+      name: listing.name,
+      discoveryMarketSlug: listing.discoveryMarketSlug,
+    })
+  ) {
+    return { ok: false, reason: "geo_conflict" };
   }
   return { ok: true };
 }

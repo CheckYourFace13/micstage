@@ -18,7 +18,8 @@ export function growthDiscoveryAutonomousEnabled(): boolean {
 
 /** SerpAPI or Brave search calls per adapter per cron invocation (each returns up to ~10–20 organic links). */
 export function growthDiscoveryAutonomousSearchCallsPerRun(): number {
-  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN", 28);
+  // Keep per-run modest so GROWTH_SERPAPI_DAILY_MAX can cover many half-hour slots + pagination.
+  return parseIntEnv("GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN", 8);
 }
 
 /** HTML page fetches (for email / social extraction) per autonomous search adapter per run. */
@@ -83,14 +84,14 @@ export function growthSerpApiEnabled(): boolean {
   return envTruthy(raw);
 }
 
-/** Hard runtime cap regardless of provider limit (e.g. 8/day). */
+/** Hard runtime cap regardless of provider limit. Raised for national inventory throughput. */
 export function growthSerpApiDailyMax(): number {
-  return parseIntEnv("GROWTH_SERPAPI_DAILY_MAX", 24);
+  return parseIntEnv("GROWTH_SERPAPI_DAILY_MAX", 120);
 }
 
 /** Soft monthly budget to avoid exhausting paid quota before month end. */
 export function growthSerpApiMonthlySoftMax(): number {
-  return parseIntEnv("GROWTH_SERPAPI_MONTHLY_SOFT_MAX", 240);
+  return parseIntEnv("GROWTH_SERPAPI_MONTHLY_SOFT_MAX", 2800);
 }
 
 /** Cooldown after provider 429 quota exhaustion. */
@@ -98,9 +99,9 @@ export function growthSerpApiCooldownHoursOn429(): number {
   return parseIntEnv("GROWTH_SERPAPI_COOLDOWN_HOURS_ON_429", 24);
 }
 
-/** Keep SerpAPI as premium source: max run starts per UTC day. */
+/** Max SerpAPI-backed discovery run starts per UTC day (half-hour cadence ≈ 48 slots). */
 export function growthSerpApiRunsPerDay(): number {
-  return parseIntEnv("GROWTH_SERPAPI_RUNS_PER_DAY", 6);
+  return parseIntEnv("GROWTH_SERPAPI_RUNS_PER_DAY", 36);
 }
 
 /** Optional cost modeling for ops dashboards. */

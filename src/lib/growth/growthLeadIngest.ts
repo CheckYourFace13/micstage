@@ -188,8 +188,16 @@ export async function ingestGrowthLeadCandidate(
   const primaryParsed = parsePrimaryEmailForIngest(raw);
   const primary = resolveStoredPrimaryEmail(raw, primaryParsed);
   const email = primary.normalized;
-  /** Main growth-lead table is email-only: never insert new rows without at least one parsed-valid mailbox. */
-  if (!hasAnyValidParsedEmail(primaryParsed, raw.additionalContactEmails)) {
+  const hasValidEmail = hasAnyValidParsedEmail(primaryParsed, raw.additionalContactEmails);
+  /**
+   * Inventory path: venue discoveries with a website + open-mic signal may enter without email
+   * so publish/verify can build public listings. Outreach/claim still require a mined mailbox.
+   */
+  const allowInventoryWithoutEmail =
+    raw.leadType === "VENUE" &&
+    Boolean(normalizeWebsiteHost(raw.websiteUrl ?? null)) &&
+    (raw.openMicSignalTier === "EXPLICIT_OPEN_MIC" || raw.openMicSignalTier === "STRONG_LIVE_EVENT");
+  if (!hasValidEmail && !allowInventoryWithoutEmail) {
     return { status: "skipped", reason: "no_valid_email_for_main_pipeline" };
   }
   const websiteHostNormalized = normalizeWebsiteHost(raw.websiteUrl ?? null);

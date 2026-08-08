@@ -72,11 +72,39 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
   return lines;
 }
 
-function renderReviewQueueText(data: OwnerDailySummaryData): string[] {
+function renderFunnelText(data: OwnerDailySummaryData): string[] {
+  const f = data.growthFunnel;
   const lines: string[] = [
-    `HIDDEN REVIEW QUEUE (${data.reviewQueue.length} unreviewed)`,
-    `  Admin: ${data.reviewQueueAdminUrl}`,
-    "  These listings are NOT public. Approve real venues or reject junk.",
+    "GROWTH FUNNEL",
+    `  Waiting verification (no place yet): ${f.waitingVerification}`,
+    `  Waiting evidence (place ok): ${f.waitingEnrichment}`,
+    `  Waiting HIGH official email: ${f.waitingEmail}`,
+    `  Invite-ready: ${f.inviteReady}`,
+    `  NEEDS_REVIEW total: ${f.needsReviewTotal}`,
+    `  Backlog processed (approx 24h): ${f.backlogProcessedApprox}`,
+    `  Auto-verified (24h): ${f.autoVerifiedToday}`,
+    `  Auto-rejected (24h): ${f.autoRejectedToday}`,
+    `  HIGH contacts touched (24h): ${f.highContactsRecoveredToday}`,
+    "",
+    "REVIEW REASON BUCKETS",
+  ];
+  if (f.reviewReasonBuckets.length === 0) {
+    lines.push("  (none)", "");
+  } else {
+    for (const b of f.reviewReasonBuckets) {
+      lines.push(`  • ${b.reason}: ${b.count}`);
+    }
+    lines.push("");
+  }
+  return lines;
+}
+
+function renderReviewQueueText(data: OwnerDailySummaryData): string[] {
+  const total = data.reviewQueueTotal ?? data.reviewQueue.length;
+  const lines: string[] = [
+    `TOP HUMAN-REVIEW ITEMS (${data.reviewQueue.length} of ${total})`,
+    `  Full queue: ${data.reviewQueueAdminUrl}`,
+    "  Not public. Auto-rules handle junk + strong evidence; these need judgment.",
     "",
   ];
   if (data.reviewQueue.length === 0) {
@@ -97,8 +125,30 @@ function renderReviewQueueText(data: OwnerDailySummaryData): string[] {
   return lines;
 }
 
+function renderFunnelHtml(data: OwnerDailySummaryData): string {
+  const f = data.growthFunnel;
+  const buckets =
+    f.reviewReasonBuckets.length === 0
+      ? "<li>(none)</li>"
+      : f.reviewReasonBuckets.map((b) => `<li>${esc(b.reason)}: <strong>${b.count}</strong></li>`).join("");
+  return `
+  <h2 style="font-size:15px;margin:20px 0 8px">Growth funnel</h2>
+  <ul style="margin:0 0 12px;padding-left:18px;font-size:13px;line-height:1.5">
+    <li>Waiting verification: <strong>${f.waitingVerification}</strong></li>
+    <li>Waiting evidence: <strong>${f.waitingEnrichment}</strong></li>
+    <li>Waiting HIGH official email: <strong>${f.waitingEmail}</strong></li>
+    <li>Invite-ready: <strong>${f.inviteReady}</strong></li>
+    <li>NEEDS_REVIEW total: <strong>${f.needsReviewTotal}</strong></li>
+    <li>Auto-verified (24h): <strong>${f.autoVerifiedToday}</strong> · Auto-rejected: <strong>${f.autoRejectedToday}</strong></li>
+    <li>HIGH contacts touched (24h): <strong>${f.highContactsRecoveredToday}</strong></li>
+  </ul>
+  <h3 style="font-size:14px;margin:12px 0 6px">Review reason buckets</h3>
+  <ul style="margin:0 0 12px;padding-left:18px;font-size:13px">${buckets}</ul>`;
+}
+
 function renderReviewQueueHtml(data: OwnerDailySummaryData): string {
   const base = esc(appBaseUrl().replace(/\/$/, ""));
+  const total = data.reviewQueueTotal ?? data.reviewQueue.length;
   const rows =
     data.reviewQueue.length === 0
       ? `<tr><td colspan="3" style="padding:8px;color:#666">Review queue is empty.</td></tr>`
@@ -127,8 +177,8 @@ function renderReviewQueueHtml(data: OwnerDailySummaryData): string {
           .join("");
 
   return `
-  <h2 style="font-size:15px;margin:20px 0 8px">Hidden review queue (${data.reviewQueue.length})</h2>
-  <p style="margin:0 0 8px;font-size:13px">All unreviewed listings (not public). <a href="${esc(data.reviewQueueAdminUrl)}">Open admin review queue</a></p>
+  <h2 style="font-size:15px;margin:20px 0 8px">Top human-review items (${data.reviewQueue.length} of ${total})</h2>
+  <p style="margin:0 0 8px;font-size:13px">Not public. Full queue in admin (not emailed). <a href="${esc(data.reviewQueueAdminUrl)}">Open admin review queue</a></p>
   <table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="text-align:left;background:#fffbeb">
       <th style="padding:6px 8px">Listing</th><th style="padding:6px 8px">Contact / evidence</th><th style="padding:6px 8px">Link</th>
@@ -226,9 +276,12 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
 }
 
 export function ownerDailySummarySubject(data: OwnerDailySummaryData): string {
-  const n = data.reviewQueue.length;
-  if (n > 0) return `MicStage Daily Summary — ${data.reportChicagoDate} · ${n} to review`;
-  return `MicStage Daily Summary — ${data.reportChicagoDate}`;
+  const n = data.reviewQueueTotal ?? data.reviewQueue.length;
+  const verified = data.listingsInventory.verifiedListings;
+  if (n > 0) {
+    return `MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified · ${n} review`;
+  }
+  return `MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified`;
 }
 
 export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string {
@@ -263,6 +316,7 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
     "",
   );
   lines.push(...renderRecentListingsText(data));
+  lines.push(...renderFunnelText(data));
   lines.push(...renderReviewQueueText(data));
   lines.push(
     "TOP ITEMS (up to 20, prioritized)",
@@ -339,6 +393,8 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
   </ul>
 
   ${renderRecentListingsHtml(data)}
+
+  ${renderFunnelHtml(data)}
 
   ${renderReviewQueueHtml(data)}
 

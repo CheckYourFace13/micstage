@@ -7,7 +7,7 @@ import {
   OPEN_MIC_EVIDENCE_REASON,
   type OpenMicEvidenceInput,
 } from "@/lib/publicListings/openMicEvidence";
-import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { classifyListingName, isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 import { sendListingClaimInviteIfNeeded } from "@/lib/publicListings/listingClaimInviteEmail";
 import { submitUrlsToIndexNow } from "@/lib/seo/searchEnginePing";
 
@@ -16,6 +16,7 @@ export type PromotePlaceConfirmedResult = {
   promoted: number;
   skippedNoTrustedEvidence: number;
   skippedNonVenueName: number;
+  junkOutdated: number;
   claimInvitesAttempted: number;
 };
 
@@ -62,6 +63,7 @@ export async function promotePlaceConfirmedListings(
       promoted: 0,
       skippedNoTrustedEvidence: 0,
       skippedNonVenueName: 0,
+      junkOutdated: 0,
       claimInvitesAttempted: 0,
     };
   }
@@ -90,11 +92,27 @@ export async function promotePlaceConfirmedListings(
   let promoted = 0;
   let skippedNoTrustedEvidence = 0;
   let skippedNonVenueName = 0;
+  let junkOutdated = 0;
   let claimInvitesAttempted = 0;
   const indexUrls: string[] = [];
   const base = appBaseUrl().replace(/\/$/, "");
 
   for (const row of rows) {
+    const nameReject = classifyListingName(row.name);
+    if (nameReject) {
+      skippedNonVenueName += 1;
+      junkOutdated += 1;
+      await prisma.publicOpenMicListing.update({
+        where: { id: row.id },
+        data: {
+          verificationStatus: "OUTDATED",
+          evidenceTerminalReason: `JUNK_NAME_${nameReject}`.slice(0, 80),
+          internalNotes: appendNote(row.internalNotes, `auto-reject JUNK_NAME_${nameReject}`),
+        },
+      });
+      continue;
+    }
+
     const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
     if (!evidence.trusted) {
       skippedNoTrustedEvidence += 1;
@@ -112,7 +130,7 @@ export async function promotePlaceConfirmedListings(
         lastVerifiedAt: new Date(),
         internalNotes: appendNote(
           row.internalNotes,
-          `${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (${evidence.field}: "${evidence.snippet}"); place identity confirmed`,
+          `auto-promote ${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (${evidence.field}: "${evidence.snippet}"); place identity confirmed`,
         ),
       },
     });
@@ -139,6 +157,7 @@ export async function promotePlaceConfirmedListings(
     promoted,
     skippedNoTrustedEvidence,
     skippedNonVenueName,
+    junkOutdated,
     claimInvitesAttempted,
   };
 }

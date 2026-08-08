@@ -2,7 +2,6 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import type { Prisma } from "@/generated/prisma/client";
 import { buildOwnerDailySummary } from "@/lib/ownerSummary/buildOwnerDailySummary";
 import {
-  buildReviewQueueCsv,
   ownerDailySummarySubject,
   renderOwnerDailySummaryHtml,
   renderOwnerDailySummaryText,
@@ -57,17 +56,6 @@ export async function sendOwnerDailySummary(
   const subject = ownerDailySummarySubject(data);
   const html = renderOwnerDailySummaryHtml(data);
   const text = renderOwnerDailySummaryText(data);
-  const csv = buildReviewQueueCsv(data);
-  const attachments =
-    data.reviewQueue.length > 0
-      ? [
-          {
-            filename: `micstage-review-queue-${chicagoDate}.csv`,
-            content: Buffer.from(csv, "utf8"),
-            contentType: "text/csv",
-          },
-        ]
-      : undefined;
 
   try {
     const out = await deliverResendEmail({
@@ -77,7 +65,6 @@ export async function sendOwnerDailySummary(
       text,
       category: "transactional",
       allowDevSkipWhenNoApiKey: true,
-      attachments,
     });
 
     if (out.skipped) {

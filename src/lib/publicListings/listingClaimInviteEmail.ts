@@ -257,6 +257,7 @@ export async function sendListingClaimInviteIfNeeded(
           contactEmailNormalized: true,
           contactEmailConfidence: true,
           websiteUrl: true,
+          discoveryMarketSlug: true,
         },
       },
     },
@@ -267,7 +268,10 @@ export async function sendListingClaimInviteIfNeeded(
     return { sent: false, reason: "already_claimed" };
   }
 
-  const safety = listingPassesStagedClaimInviteSafety(listing);
+  const safety = listingPassesStagedClaimInviteSafety({
+    ...listing,
+    discoveryMarketSlug: listing.growthLead?.discoveryMarketSlug,
+  });
   if (!safety.ok) return { sent: false, reason: safety.reason };
 
   const rawEmail = toEmail ?? listing.growthLead?.contactEmailNormalized ?? null;
@@ -508,6 +512,7 @@ export async function runPendingListingClaimInvites(
       sourceUrl: true,
       city: true,
       region: true,
+      formattedAddress: true,
       createdAt: true,
       verificationStatus: true,
       claimStatus: true,
@@ -522,6 +527,7 @@ export async function runPendingListingClaimInvites(
           contactEmailConfidence: true,
           websiteUrl: true,
           openMicSignalTier: true,
+          discoveryMarketSlug: true,
         },
       },
     },
@@ -554,7 +560,10 @@ export async function runPendingListingClaimInvites(
   for (const row of ranked) {
     if (sent >= effectiveLimit) break;
 
-    const safety = listingPassesStagedClaimInviteSafety(row);
+    const safety = listingPassesStagedClaimInviteSafety({
+      ...row,
+      discoveryMarketSlug: row.growthLead?.discoveryMarketSlug,
+    });
     if (!safety.ok) {
       skipped += 1;
       continue;

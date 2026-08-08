@@ -27,6 +27,7 @@ export type AutoPublishListingsResult = {
     promoted: number;
     skippedNoTrustedEvidence: number;
     skippedNonVenueName: number;
+    junkOutdated?: number;
     claimInvitesAttempted: number;
   };
   evidenceEnrich: {
@@ -45,7 +46,7 @@ const LEAD_PUBLISH_WHERE = {
 };
 
 export function listingAutoPublishPerDiscoveryRun(): number {
-  return Math.min(50, Math.max(1, parseIntEnv("LISTING_AUTO_PUBLISH_PER_DISCOVERY_RUN", 40)));
+  return Math.min(80, Math.max(1, parseIntEnv("LISTING_AUTO_PUBLISH_PER_DISCOVERY_RUN", 50)));
 }
 
 export function listingEnrichFromLeadPerDiscoveryRun(): number {
@@ -118,18 +119,36 @@ async function enrichListingsFromGrowthLeads(
  */
 export async function autoPublishGrowthLeadsAsListings(
   prisma: PrismaClient,
-  opts?: { publishLimit?: number; enrichLimit?: number },
+  opts?: { publishLimit?: number; enrichLimit?: number; skipDownstream?: boolean },
 ): Promise<AutoPublishListingsResult> {
   const publishLimit = opts?.publishLimit ?? listingAutoPublishPerDiscoveryRun();
   const enrichLimit = opts?.enrichLimit ?? listingEnrichFromLeadPerDiscoveryRun();
+  const emptyDownstream = {
+    googleVerify: { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false },
+    promotePlaceConfirmed: {
+      scanned: 0,
+      promoted: 0,
+      skippedNoTrustedEvidence: 0,
+      skippedNonVenueName: 0,
+      claimInvitesAttempted: 0,
+    },
+    evidenceEnrich: {
+      processed: 0,
+      evidenceStored: 0,
+      promoted: 0,
+      rejected: 0,
+      skipped: 0,
+    },
+  } as const;
 
   const existingSlugs = new Set(
     (await prisma.publicOpenMicListing.findMany({ select: { slug: true } })).map((r) => r.slug),
   );
 
+  // Prefer oldest untouched backlog rows so the same high-fit failures cannot starve the queue.
   const leads = await prisma.growthLead.findMany({
     where: LEAD_PUBLISH_WHERE,
-    orderBy: [{ fitScore: "desc" }, { updatedAt: "desc" }],
+    orderBy: [{ updatedAt: "asc" }, { fitScore: "desc" }],
     take: publishLimit,
     select: {
       id: true,
@@ -169,28 +188,14 @@ export async function autoPublishGrowthLeadsAsListings(
   const enriched = await enrichListingsFromGrowthLeads(prisma, enrichLimit);
   const backlogRemaining = await prisma.growthLead.count({ where: LEAD_PUBLISH_WHERE });
 
-  if (micstagePromotionKillSwitch()) {
+  if (opts?.skipDownstream || micstagePromotionKillSwitch()) {
     return {
       published,
       invitesSent,
       enriched,
       skipped,
       backlogRemaining,
-      googleVerify: { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false },
-      promotePlaceConfirmed: {
-        scanned: 0,
-        promoted: 0,
-        skippedNoTrustedEvidence: 0,
-        skippedNonVenueName: 0,
-        claimInvitesAttempted: 0,
-      },
-      evidenceEnrich: {
-        processed: 0,
-        evidenceStored: 0,
-        promoted: 0,
-        rejected: 0,
-        skipped: 0,
-      },
+      ...emptyDownstream,
     };
   }
 

@@ -318,7 +318,7 @@ export async function verifyListingWithGoogle(listing: {
 }
 
 export function listingGoogleVerifyPerDiscoveryRun(): number {
-  return Math.min(30, Math.max(0, parseIntEnv("LISTING_GOOGLE_VERIFY_PER_RUN", 25)));
+  return Math.min(50, Math.max(0, parseIntEnv("LISTING_GOOGLE_VERIFY_PER_RUN", 30)));
 }
 
 function appendInternalNote(existing: string | null | undefined, reason: string): string {

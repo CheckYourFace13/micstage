@@ -14,6 +14,9 @@ export type AutoPublishListingsResult = {
   invitesSent: number;
   enriched: number;
   skipped: number;
+  /** Deterministic rejects removed from active backlog (status=REJECTED). */
+  rejectedFromBacklog: number;
+  rejectReasons: Record<string, number>;
   backlogRemaining: number;
   googleVerify: {
     verified: number;
@@ -39,8 +42,9 @@ export type AutoPublishListingsResult = {
   };
 };
 
-const LEAD_PUBLISH_WHERE = {
+export const LEAD_PUBLISH_WHERE = {
   leadType: "VENUE" as const,
+  status: { notIn: ["REJECTED", "UNSUBSCRIBED", "BOUNCED"] as ("REJECTED" | "UNSUBSCRIBED" | "BOUNCED")[] },
   openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] as ("EXPLICIT_OPEN_MIC" | "STRONG_LIVE_EVENT")[] },
   NOT: { publicListings: { some: {} } },
 };
@@ -174,14 +178,34 @@ export async function autoPublishGrowthLeadsAsListings(
   let published = 0;
   let invitesSent = 0;
   let skipped = 0;
+  let rejectedFromBacklog = 0;
+  const rejectReasons: Record<string, number> = {};
 
   for (const lead of leads) {
     const result = await publishGrowthLeadAsListing(prisma, lead, existingSlugs);
     if (result.created) {
       published += 1;
       if (result.inviteSent) invitesSent += 1;
-    } else {
-      skipped += 1;
+      continue;
+    }
+    skipped += 1;
+    const reason = result.skipReason ?? "unknown";
+    // Deterministic failures leave the active backlog so ticks stop re-scanning them forever.
+    if (reason.startsWith("failed_classifier") || reason === "missing_name") {
+      rejectReasons[reason] = (rejectReasons[reason] ?? 0) + 1;
+      await prisma.growthLead.update({
+        where: { id: lead.id },
+        data: {
+          status: "REJECTED",
+          internalNotes: [
+            lead.internalNotes?.trim(),
+            `[${new Date().toISOString().slice(0, 10)}] publish-reject: ${reason}`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        },
+      });
+      rejectedFromBacklog += 1;
     }
   }
 
@@ -194,6 +218,8 @@ export async function autoPublishGrowthLeadsAsListings(
       invitesSent,
       enriched,
       skipped,
+      rejectedFromBacklog,
+      rejectReasons,
       backlogRemaining,
       ...emptyDownstream,
     };
@@ -213,6 +239,8 @@ export async function autoPublishGrowthLeadsAsListings(
     invitesSent,
     enriched,
     skipped,
+    rejectedFromBacklog,
+    rejectReasons,
     backlogRemaining,
     googleVerify,
     promotePlaceConfirmed,

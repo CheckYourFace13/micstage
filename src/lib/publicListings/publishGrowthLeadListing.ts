@@ -6,7 +6,7 @@ import type {
 } from "@/generated/prisma/client";
 import { slugify } from "@/lib/slug";
 import { buildListingAboutFromLead } from "@/lib/publicListings/listingAboutFromLead";
-import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { classifyListingName } from "@/lib/publicListings/listingQuality";
 
 function uniqueSlug(base: string, used: Set<string>): string {
   let slug = base;
@@ -18,6 +18,14 @@ function uniqueSlug(base: string, used: Set<string>): string {
   used.add(slug);
   return slug;
 }
+
+export type PublishGrowthLeadResult = {
+  created: boolean;
+  slug?: string;
+  inviteSent?: boolean;
+  /** Machine reason when created=false — caller should remove lead from active publish backlog. */
+  skipReason?: string;
+};
 
 export async function publishGrowthLeadAsListing(
   prisma: PrismaClient,
@@ -41,10 +49,16 @@ export async function publishGrowthLeadAsListing(
     discoveryHints?: unknown;
   },
   existingSlugs: Set<string>,
-): Promise<{ created: boolean; slug?: string; inviteSent?: boolean }> {
+): Promise<PublishGrowthLeadResult> {
   const city = (lead.city ?? lead.suburb ?? "").trim();
   const baseName = lead.name.trim();
-  if (!baseName || !isPublicListingNameOk(baseName)) return { created: false };
+  if (!baseName) {
+    return { created: false, skipReason: "missing_name" };
+  }
+  const nameReject = classifyListingName(baseName);
+  if (nameReject) {
+    return { created: false, skipReason: `failed_classifier_${nameReject}` };
+  }
 
   const slugBase =
     slugify(city ? `${baseName}-${city}` : baseName) || slugify(baseName) || `listing-${lead.id.slice(0, 8)}`;

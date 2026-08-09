@@ -29,9 +29,15 @@ import {
   type SearchHit,
 } from "@/lib/growth/discovery/webSearch";
 import { markSerpApiRunStarted, readSerpApiProviderState, serpApiAvailabilityNow } from "@/lib/growth/discovery/providerState";
+import { normalizeWebsiteHost } from "@/lib/growth/leadFieldNormalization";
 
 const ADAPTER_ID = "autonomous_web_search_venue";
 const CURSOR_KEY = "search_rotation";
+
+/** Cap Serp pagination depth per query/geo combo before forcing vocabulary rotation. */
+const MAX_START_PER_QUERY = 40;
+/** If fewer than this fraction of hit hosts are new to GrowthLead inventory, rotate qi. */
+const MIN_UNIQUE_HOST_RATIO = 0.25;
 
 type SearchCursor = {
   qi: number;
@@ -297,6 +303,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             bravePaginationExhausted: res.meta.bravePaginationExhausted ?? false,
           });
           rawSearchItemsThisRun += res.items.length;
+          const hostsThisCall: string[] = [];
           for (const it of res.items) {
             const resolved = resolveOutboundUrlFromSearchHit(it.link);
             if (!resolved) {
@@ -307,11 +314,44 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
               droppedAllowHitUrl++;
               continue;
             }
+            const host = normalizeWebsiteHost(resolved);
+            if (host) hostsThisCall.push(host);
             hits.push({ hit: { ...it, link: resolved }, searchQuery: q });
           }
           cur.prov = res.nextCursor.provider;
           cur.start = res.nextCursor.start;
-          if (res.items.length < 8 || res.meta.bravePaginationExhausted) {
+
+          const uniqueHosts = [...new Set(hostsThisCall)];
+          let knownHostCount = 0;
+          if (uniqueHosts.length > 0) {
+            knownHostCount = await prisma.growthLead.count({
+              where: {
+                leadType: "VENUE",
+                websiteHostNormalized: { in: uniqueHosts },
+              },
+            });
+          }
+          const newHostCount = Math.max(0, uniqueHosts.length - knownHostCount);
+          const uniqueRatio = uniqueHosts.length > 0 ? newHostCount / uniqueHosts.length : 0;
+          const paginationDeep = cur.start >= MAX_START_PER_QUERY;
+          const thinPage = res.items.length < 8;
+          const saturated = uniqueHosts.length >= 3 && uniqueRatio < MIN_UNIQUE_HOST_RATIO;
+          if (thinPage || res.meta.bravePaginationExhausted || paginationDeep || saturated) {
+            console.info("[growth discovery] autonomous_web_search_venue rotate query", {
+              iteration: i,
+              query: q.slice(0, 100),
+              uniqueHosts: uniqueHosts.length,
+              knownHosts: knownHostCount,
+              uniqueRatio: Number(uniqueRatio.toFixed(2)),
+              reason: thinPage
+                ? "thin_page"
+                : res.meta.bravePaginationExhausted
+                  ? "brave_exhausted"
+                  : paginationDeep
+                    ? "pagination_depth"
+                    : "duplicate_saturation",
+              nextQi: (cur.qi + 1) % rotationSpan,
+            });
             cur.qi = (cur.qi + 1) % rotationSpan;
             cur.start = 0;
           }

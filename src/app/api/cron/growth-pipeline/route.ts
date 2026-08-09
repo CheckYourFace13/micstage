@@ -33,6 +33,10 @@ import { getPrismaOrNull } from "@/lib/prisma";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 import { micstageDiscoveryKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
+import {
+  growthRuntimeSnapshotForStatus,
+  resolveGrowthPipelineRuntimeSnapshot,
+} from "@/lib/growth/growthRuntimeSettings";
 
 /** Session-scoped Postgres advisory lock (outreach only — do not hold during web discovery). */
 const GROWTH_OUTREACH_LOCK_K1 = 54_788_913;
@@ -117,6 +121,9 @@ async function handle(request: Request) {
   const discoveryEnabled = growthLeadDiscoveryCronEnabled() && isDiscoveryPhaseRequest;
   const draftEnabled = growthAutoDraftCronEnabled() && phase !== "discovery";
   const emailMiningEnabled = phase === "tick";
+
+  // Warm DB-backed growth knobs for Serp/backlog readers in this request.
+  const growthRuntime = await resolveGrowthPipelineRuntimeSnapshot(prisma);
 
   try {
     let discovery: Awaited<ReturnType<typeof runGrowthLeadDiscovery>> | null = null;
@@ -344,6 +351,7 @@ async function handle(request: Request) {
         discoveryError,
         listingAutoPublish,
         listingBacklog,
+        growthRuntime: growthRuntimeSnapshotForStatus(growthRuntime),
         emailMining,
         resendBudget,
         pendingClaimInvites,

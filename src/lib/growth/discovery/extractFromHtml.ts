@@ -157,6 +157,46 @@ export function extractFromHtml(pageUrl: string, html: string, opts?: { maxSameH
     .trim();
   if (chromeText) pushEmailMatches(chromeText, "header_footer", emailsTagged);
 
+  // JSON-LD Organization / LocalBusiness / Event organizer contact emails.
+  $('script[type="application/ld+json"]').each((_, el) => {
+    const raw = $(el).contents().text();
+    if (!raw?.trim()) return;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      const stack: unknown[] = Array.isArray(parsed) ? [...parsed] : [parsed];
+      while (stack.length) {
+        const node = stack.pop();
+        if (!node || typeof node !== "object") continue;
+        const obj = node as Record<string, unknown>;
+        if (Array.isArray(obj["@graph"])) stack.push(...obj["@graph"]);
+        for (const v of Object.values(obj)) {
+          if (v && typeof v === "object") stack.push(v);
+        }
+        const emailField = obj.email;
+        if (typeof emailField === "string") {
+          pushEmailMatches(emailField, "mailto", emailsTagged);
+        } else if (Array.isArray(emailField)) {
+          for (const e of emailField) {
+            if (typeof e === "string") pushEmailMatches(e, "mailto", emailsTagged);
+          }
+        }
+        const contactPoint = obj.contactPoint;
+        const points = Array.isArray(contactPoint) ? contactPoint : contactPoint ? [contactPoint] : [];
+        for (const p of points) {
+          if (p && typeof p === "object" && typeof (p as { email?: unknown }).email === "string") {
+            pushEmailMatches((p as { email: string }).email, "mailto", emailsTagged);
+          }
+        }
+        const organizer = obj.organizer;
+        if (organizer && typeof organizer === "object" && typeof (organizer as { email?: unknown }).email === "string") {
+          pushEmailMatches((organizer as { email: string }).email, "mailto", emailsTagged);
+        }
+      }
+    } catch {
+      /* ignore malformed JSON-LD */
+    }
+  });
+
   const bodyText = $("body").text();
   const bodyTextSample = bodyText.replace(/\s+/g, " ").trim().slice(0, 18_000);
   pushEmailMatches(bodyTextSample, "body", emailsTagged);

@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@/generated/prisma/client";
-import { parseIntEnv } from "@/lib/marketing/emailConfig";
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { autoPublishGrowthLeadsAsListings } from "@/lib/publicListings/autoPublishGrowthLeadsAsListings";
 import { autoRejectJunkListings } from "@/lib/publicListings/autoRejectJunkListings";
@@ -8,14 +7,23 @@ import { verifyPublicListingsWithGoogle } from "@/lib/publicListings/googlePlace
 import { promotePlaceConfirmedListings } from "@/lib/publicListings/promotePlaceConfirmedListings";
 import { mineVerifiedListingOfficialEmails } from "@/lib/publicListings/mineVerifiedListingContacts";
 import { micstagePromotionKillSwitch } from "@/lib/publicListings/automationKillSwitches";
+import {
+  resolveGrowthPipelineRuntimeSnapshot,
+  type GrowthPipelineRuntimeSnapshot,
+} from "@/lib/growth/growthRuntimeSettings";
 
 const BACKLOG_ADAPTER = "listing_backlog_processor";
 const BACKLOG_MARKET = "_global";
 const REPROCESS_CURSOR_KEY = "lead_reprocess_updated_at";
 
+/** Soft wall-clock budget so Hostinger nginx does not 504 mid-pipeline. */
+const TICK_BUDGET_MS = 55_000;
+
 export type ListingBacklogProcessorResult = {
   published: number;
   publishSkipped: number;
+  rejectedFromBacklog: number;
+  rejectReasons: Record<string, number>;
   publishBacklogRemaining: number;
   googleVerify: Awaited<ReturnType<typeof verifyPublicListingsWithGoogle>>;
   promoted: number;
@@ -24,90 +32,146 @@ export type ListingBacklogProcessorResult = {
   evidenceEnrich: Awaited<ReturnType<typeof enrichListingsMissingTrustedEvidence>>;
   contactMine: Awaited<ReturnType<typeof mineVerifiedListingOfficialEmails>>;
   leadsReprocessed: number;
+  stagesRun: string[];
+  stagesSkippedForBudget: string[];
+  runtime?: GrowthPipelineRuntimeSnapshot;
   killed?: boolean;
 };
 
-function backlogPublishLimit(): number {
-  return Math.min(80, Math.max(0, parseIntEnv("LISTING_BACKLOG_PUBLISH_PER_TICK", 50)));
-}
-
-function backlogVerifyLimit(): number {
-  return Math.min(50, Math.max(0, parseIntEnv("LISTING_BACKLOG_GOOGLE_VERIFY_PER_TICK", 30)));
-}
-
-function backlogPromoteLimit(): number {
-  return Math.min(100, Math.max(0, parseIntEnv("LISTING_BACKLOG_PROMOTE_PER_TICK", 60)));
-}
-
-function backlogEnrichLimit(): number {
-  return Math.min(50, Math.max(0, parseIntEnv("LISTING_BACKLOG_EVIDENCE_ENRICH_PER_TICK", 30)));
-}
-
-function backlogJunkLimit(): number {
-  return Math.min(200, Math.max(0, parseIntEnv("LISTING_AUTO_REJECT_JUNK_PER_RUN", 80)));
-}
-
-function backlogContactMineLimit(): number {
-  return Math.min(40, Math.max(0, parseIntEnv("LISTING_VERIFIED_CONTACT_MINE_PER_TICK", 20)));
-}
-
-function backlogLeadReprocessLimit(): number {
-  return Math.min(100, Math.max(0, parseIntEnv("LISTING_LEAD_REPROCESS_PER_TICK", 40)));
-}
-
 /**
  * High-throughput backlog processor independent of discovery.
- * Runs on tick so publish/verify/promote continue even when the discovery
- * half-hour guard returns already_completed / already_running.
+ * Stages run in priority order with a shared time budget to avoid gateway timeouts.
  */
 export async function runListingBacklogProcessor(
   prisma: PrismaClient,
 ): Promise<ListingBacklogProcessorResult> {
+  const started = Date.now();
+  const runtime = await resolveGrowthPipelineRuntimeSnapshot(prisma);
+  const stagesRun: string[] = [];
+  const stagesSkippedForBudget: string[] = [];
+
+  const emptyVerify = { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false };
+  const emptyEnrich = { processed: 0, evidenceStored: 0, promoted: 0, rejected: 0, skipped: 0 };
+  const emptyMine = {
+    scanned: 0,
+    mined: 0,
+    highOfficial: 0,
+    failed: 0,
+    byFailureReason: {} as Record<string, number>,
+  };
+
   if (micstagePromotionKillSwitch()) {
     return {
       published: 0,
       publishSkipped: 0,
+      rejectedFromBacklog: 0,
+      rejectReasons: {},
       publishBacklogRemaining: 0,
-      googleVerify: { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false },
+      googleVerify: emptyVerify,
       promoted: 0,
       junkRejected: 0,
       junkByReason: {},
-      evidenceEnrich: { processed: 0, evidenceStored: 0, promoted: 0, rejected: 0, skipped: 0 },
-      contactMine: { scanned: 0, mined: 0, highOfficial: 0, failed: 0 },
+      evidenceEnrich: emptyEnrich,
+      contactMine: emptyMine,
       leadsReprocessed: 0,
+      stagesRun,
+      stagesSkippedForBudget: ["all"],
+      runtime,
       killed: true,
     };
   }
 
-  // A: reject obvious garbage first so later promote/enrich skip them.
-  const junk = await autoRejectJunkListings(prisma, { limit: backlogJunkLimit() });
+  const remaining = () => TICK_BUDGET_MS - (Date.now() - started);
+  const canRun = (needMs: number) => remaining() > needMs;
 
-  // B: publish waiting leads only (verify/promote run below with tick budgets).
-  const publish = await autoPublishGrowthLeadsAsListings(prisma, {
-    publishLimit: backlogPublishLimit(),
-    enrichLimit: Math.min(25, Math.floor(backlogPublishLimit() / 4)),
-    skipDownstream: true,
-  });
+  let junk = { scanned: 0, rejected: 0, byReason: {} as Record<string, number> };
+  if (canRun(3_000)) {
+    junk = await autoRejectJunkListings(prisma, {
+      limit: runtime.autoRejectJunkPerRun.effective,
+    });
+    stagesRun.push("auto_reject_junk");
+  } else {
+    stagesSkippedForBudget.push("auto_reject_junk");
+  }
 
-  const googleVerify = await verifyPublicListingsWithGoogle(prisma, {
-    limit: backlogVerifyLimit(),
-  });
-  const promote = await promotePlaceConfirmedListings(prisma, {
-    limit: backlogPromoteLimit(),
-  });
-  const evidenceEnrich = await enrichListingsMissingTrustedEvidence(prisma, {
-    limit: backlogEnrichLimit(),
-  });
+  let publish = {
+    published: 0,
+    skipped: 0,
+    rejectedFromBacklog: 0,
+    rejectReasons: {} as Record<string, number>,
+    backlogRemaining: 0,
+  };
+  if (canRun(8_000)) {
+    const pub = await autoPublishGrowthLeadsAsListings(prisma, {
+      publishLimit: runtime.backlogPublishPerTick.effective,
+      enrichLimit: Math.min(15, Math.floor(runtime.backlogPublishPerTick.effective / 4)),
+      skipDownstream: true,
+    });
+    publish = {
+      published: pub.published,
+      skipped: pub.skipped,
+      rejectedFromBacklog: pub.rejectedFromBacklog,
+      rejectReasons: pub.rejectReasons,
+      backlogRemaining: pub.backlogRemaining,
+    };
+    stagesRun.push("publish");
+  } else {
+    stagesSkippedForBudget.push("publish");
+  }
 
-  const contactMine = await mineVerifiedListingOfficialEmails(prisma, {
-    limit: backlogContactMineLimit(),
-  });
+  let googleVerify = emptyVerify;
+  if (canRun(10_000)) {
+    googleVerify = await verifyPublicListingsWithGoogle(prisma, {
+      limit: runtime.backlogGoogleVerifyPerTick.effective,
+    });
+    stagesRun.push("google_verify");
+  } else {
+    stagesSkippedForBudget.push("google_verify");
+  }
 
-  const leadsReprocessed = await reprocessOldLeadsCursor(prisma, backlogLeadReprocessLimit());
+  let promote = { promoted: 0 };
+  if (canRun(5_000)) {
+    promote = await promotePlaceConfirmedListings(prisma, {
+      limit: runtime.backlogPromotePerTick.effective,
+    });
+    stagesRun.push("promote");
+  } else {
+    stagesSkippedForBudget.push("promote");
+  }
+
+  let evidenceEnrich = emptyEnrich;
+  if (canRun(12_000)) {
+    evidenceEnrich = await enrichListingsMissingTrustedEvidence(prisma, {
+      limit: runtime.backlogEvidenceEnrichPerTick.effective,
+    });
+    stagesRun.push("evidence_enrich");
+  } else {
+    stagesSkippedForBudget.push("evidence_enrich");
+  }
+
+  let contactMine = emptyMine;
+  if (canRun(12_000)) {
+    contactMine = await mineVerifiedListingOfficialEmails(prisma, {
+      limit: runtime.verifiedContactMinePerTick.effective,
+    });
+    stagesRun.push("contact_mine");
+  } else {
+    stagesSkippedForBudget.push("contact_mine");
+  }
+
+  let leadsReprocessed = 0;
+  if (canRun(2_000)) {
+    leadsReprocessed = await reprocessOldLeadsCursor(prisma, 40);
+    stagesRun.push("lead_reprocess");
+  } else {
+    stagesSkippedForBudget.push("lead_reprocess");
+  }
 
   return {
     published: publish.published,
     publishSkipped: publish.skipped,
+    rejectedFromBacklog: publish.rejectedFromBacklog,
+    rejectReasons: publish.rejectReasons,
     publishBacklogRemaining: publish.backlogRemaining,
     googleVerify,
     promoted: promote.promoted + evidenceEnrich.promoted,
@@ -116,40 +180,35 @@ export async function runListingBacklogProcessor(
     evidenceEnrich,
     contactMine,
     leadsReprocessed,
+    stagesRun,
+    stagesSkippedForBudget,
+    runtime,
   };
 }
 
-/**
- * Incrementally touch old unpublished venue leads so updatedAt rotation
- * keeps them flowing through publish selection and contact automation.
- */
 async function reprocessOldLeadsCursor(prisma: PrismaClient, limit: number): Promise<number> {
   if (limit <= 0) return 0;
   const cursorRaw = await readDiscoveryCursor(prisma, BACKLOG_ADAPTER, BACKLOG_MARKET, REPROCESS_CURSOR_KEY);
   const after = cursorRaw ? new Date(cursorRaw) : new Date(0);
-  if (Number.isNaN(after.getTime())) {
-    // fall through with epoch
-  }
 
   const leads = await prisma.growthLead.findMany({
     where: {
       leadType: "VENUE",
+      status: { notIn: ["REJECTED", "UNSUBSCRIBED", "BOUNCED"] },
       openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] },
       NOT: { publicListings: { some: {} } },
       updatedAt: { gt: after },
     },
     orderBy: { updatedAt: "asc" },
     take: limit,
-    select: { id: true, updatedAt: true, websiteUrl: true, contactUrl: true },
+    select: { id: true, updatedAt: true },
   });
 
   if (leads.length === 0) {
-    // Wrap cursor so we keep sweeping the backlog.
     await writeDiscoveryCursor(prisma, BACKLOG_ADAPTER, BACKLOG_MARKET, REPROCESS_CURSOR_KEY, new Date(0).toISOString());
     return 0;
   }
 
-  // Touch via a no-op status write so @updatedAt advances and oldest-first publish rotates.
   for (const lead of leads) {
     await prisma.growthLead.update({
       where: { id: lead.id },

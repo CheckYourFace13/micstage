@@ -11,6 +11,10 @@ import {
   resolveClaimInviteRuntimeSnapshot,
   runtimeSnapshotForStatus,
 } from "@/lib/publicListings/claimInviteRuntimeSettings";
+import {
+  growthRuntimeSnapshotForStatus,
+  resolveGrowthPipelineRuntimeSnapshot,
+} from "@/lib/growth/growthRuntimeSettings";
 import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 
@@ -42,6 +46,7 @@ export async function GET(request: Request) {
   const stats = await getClaimInviteRollingStats(prisma);
   const eligibleApprox = await countEligiblePendingListingClaimInvites(prisma);
   const snap = await resolveClaimInviteRuntimeSnapshot(prisma);
+  const growthRuntime = await resolveGrowthPipelineRuntimeSnapshot(prisma);
   const since = startOfUtcDay();
 
   const canaries = [];
@@ -109,6 +114,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     runtime: runtimeSnapshotForStatus(snap),
+    growthRuntime: growthRuntimeSnapshotForStatus(growthRuntime),
     gates: {
       claimInvitesEnabled: snap.claimInvitesEnabled,
       effectivePerCron: snap.effectivePerCron,

@@ -355,6 +355,7 @@ export async function buildOwnerDailySummary(
     prisma.growthLead.count({
       where: {
         leadType: "VENUE",
+        status: { notIn: ["REJECTED", "UNSUBSCRIBED", "BOUNCED"] },
         openMicSignalTier: { in: ["EXPLICIT_OPEN_MIC", "STRONG_LIVE_EVENT"] },
         NOT: { publicListings: { some: {} } },
       },

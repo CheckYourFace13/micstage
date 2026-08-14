@@ -164,9 +164,10 @@ async function loadArtistPortalData(musicianId: string): Promise<ArtistPortalLoa
 export default async function ArtistPortalPage({
   searchParams,
 }: {
-  searchParams: Promise<{ profile?: string; profileError?: string }>;
+  searchParams: Promise<{ profile?: string; profileError?: string; joined?: string }>;
 }) {
   const q = await searchParams;
+  const isFirstSession = q.joined === "musician";
   const session = await getMusicianSessionOrNull();
   if (!session) {
     throw new Error("Expected musician auth guard middleware for /artist.");
@@ -263,37 +264,53 @@ export default async function ArtistPortalPage({
                 <span className="text-white/50"> · {displayName}</span>
               ) : null}
             </div>
-            <p className="mt-3 max-w-2xl text-sm text-white/55">
-              You log in with <span className="text-white/75">email</span> (private). Fans and venues find you by{" "}
-              <span className="text-white/75">stage name</span> only.
-            </p>
-            <div className="mt-4 max-w-2xl rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/70">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Suggested next steps</div>
-              <ol className="mt-2 list-decimal space-y-1.5 pl-5 marker:text-white/40">
-                <li>
-                  Finish your profile below, especially <span className="text-white/85">stage name</span> and where you play.
-                </li>
-                <li>Track venues you like, or browse upcoming performers by discovery market.</li>
-                <li>
-                  Book a slot from any venue&apos;s public page while signed in. Your upcoming gigs show up in{" "}
-                  <span className="text-white/85">Your upcoming bookings</span> below.
-                </li>
-              </ol>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2 text-sm">
-              <Link
-                className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
-                href="/performers"
-              >
-                Search artists
-              </Link>
-              <Link
-                className="rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-white/90 hover:border-[rgb(var(--om-neon))]/50 hover:bg-white/10"
-                href="/locations"
-              >
-                Browse by area
-              </Link>
-            </div>
+
+            {isFirstSession ? (
+              <div className="mt-6 max-w-xl rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-4 sm:p-5">
+                <h2 className="text-lg font-semibold text-white">Your account is ready.</h2>
+                <p className="mt-1 text-sm text-white/70">
+                  Find open mics now — building your profile is optional and can wait.
+                </p>
+                <div className="mt-5 grid gap-3">
+                  <Link
+                    href="/find-open-mics"
+                    className="inline-flex h-12 items-center justify-center rounded-md border border-violet-400/40 bg-violet-500/20 px-5 text-base font-semibold text-violet-50 hover:bg-violet-500/30"
+                  >
+                    Find open mics near me
+                  </Link>
+                  <Link
+                    href="/artist#profile"
+                    className="inline-flex h-12 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10"
+                  >
+                    Build my profile
+                  </Link>
+                  <Link
+                    href="/artist"
+                    className="inline-flex h-11 items-center justify-center px-5 text-sm font-medium text-white/60 underline hover:text-white"
+                  >
+                    Do this later
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 max-w-xl">
+                <p className="text-sm text-white/65">Find a night to play, or tidy your profile when you have a minute.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Link
+                    href="/find-open-mics"
+                    className="inline-flex h-11 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold text-violet-50 hover:bg-violet-500/25"
+                  >
+                    Find open mics near me
+                  </Link>
+                  <Link
+                    href="/artist#profile"
+                    className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
+                  >
+                    Build my profile
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <Link className="text-white/70 hover:text-white" href="/">
@@ -407,14 +424,16 @@ export default async function ArtistPortalPage({
             if (bookingRows.length === 0) {
               return (
                 <div className="mt-4 rounded-lg border border-dashed border-white/15 bg-black/20 px-4 py-5 text-sm text-white/65">
-                  <p className="font-medium text-white/80">No upcoming gigs yet</p>
+                  <p className="font-medium text-white/80">You haven&apos;t signed up for a night yet.</p>
                   <p className="mt-2">
-                    Open a venue&apos;s public page, pick an open time, and reserve while signed in. Start from{" "}
-                    <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/locations">
-                      discovery markets
-                    </Link>{" "}
-                    or venues you&apos;re tracking above.
+                    Browse open mics, open a venue page, and reserve a spot while signed in.
                   </p>
+                  <Link
+                    href="/find-open-mics"
+                    className="mt-4 inline-flex h-11 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold text-violet-50 hover:bg-violet-500/25"
+                  >
+                    Find open mics near me
+                  </Link>
                 </div>
               );
             }

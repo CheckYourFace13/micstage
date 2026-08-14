@@ -1,6 +1,11 @@
 /**
  * Friendly setup nudges for registered venue owners / promoters who skipped optional steps.
  * Idempotent via MarketingEmailSend.purposeKey. Does not send during unit testing.
+ *
+ * Rollout guard for existing accounts:
+ * - Age is measured from max(accountCreatedAt, FEATURE_START) so old accounts do not
+ *   suddenly match day-1, day-3, and day-7 windows at once.
+ * - At most one setup nudge per email address in any 24-hour window.
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { deliverResendEmail } from "@/lib/mailer";
@@ -8,6 +13,15 @@ import { absoluteUrl } from "@/lib/publicSeo";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 
 type NudgeKind = "venue_schedule" | "venue_listing" | "venue_signups" | "promoter_connect";
+
+/** Accounts created before this use FEATURE_START as their nudge clock. Override via env if needed. */
+export const SETUP_NUDGE_FEATURE_START = new Date(
+  process.env.SETUP_NUDGE_FEATURE_START_ISO?.trim() || "2026-08-14T00:00:00.000Z",
+);
+
+export function effectiveNudgeCreatedAt(createdAt: Date, featureStart: Date = SETUP_NUDGE_FEATURE_START): Date {
+  return createdAt.getTime() > featureStart.getTime() ? createdAt : featureStart;
+}
 
 function subjectFor(kind: NudgeKind): string {
   switch (kind) {
@@ -108,6 +122,24 @@ async function alreadySent(prisma: PrismaClient, purposeKey: string): Promise<bo
   return Boolean(row);
 }
 
+/** Never send more than one setup nudge to the same inbox in 24 hours. */
+async function sentAnySetupNudgeInLast24h(
+  prisma: PrismaClient,
+  toEmail: string,
+  now: Date,
+): Promise<boolean> {
+  const email = normalizeMarketingEmail(toEmail) || toEmail.toLowerCase();
+  const row = await prisma.marketingEmailSend.findFirst({
+    where: {
+      toEmailNormalized: email,
+      templateKind: { startsWith: "onboarding_nudge_" },
+      sentAt: { gte: new Date(now.getTime() - 24 * 3600 * 1000) },
+    },
+    select: { id: true },
+  });
+  return Boolean(row);
+}
+
 async function recordSend(
   prisma: PrismaClient,
   input: {
@@ -136,17 +168,35 @@ async function recordSend(
   });
 }
 
+function pickVenueNudgeKind(input: {
+  ageDays: number;
+  hasSchedule: boolean;
+  hasPhoto: boolean;
+  hasAbout: boolean;
+  hasSocial: boolean;
+  bookingOn: boolean;
+}): NudgeKind | null {
+  const { ageDays, hasSchedule, hasPhoto, hasAbout, hasSocial, bookingOn } = input;
+  // One action per email — earliest incomplete step that matches the age window.
+  if (ageDays >= 1 && ageDays < 3 && !hasSchedule) return "venue_schedule";
+  if (ageDays >= 3 && ageDays < 7 && (!hasPhoto || !hasAbout || !hasSocial)) return "venue_listing";
+  if (ageDays >= 7 && ageDays < 14 && !bookingOn) return "venue_signups";
+  return null;
+}
+
 export async function runOnboardingSetupNudges(
   prisma: PrismaClient,
-  opts?: { limit?: number; now?: Date },
+  opts?: { limit?: number; now?: Date; featureStart?: Date },
 ): Promise<{ scanned: number; sent: number; skipped: number }> {
   const now = opts?.now ?? new Date();
+  const featureStart = opts?.featureStart ?? SETUP_NUDGE_FEATURE_START;
   const limit = opts?.limit ?? 20;
   let scanned = 0;
   let sent = 0;
   let skipped = 0;
 
   const dayMs = 24 * 3600 * 1000;
+  // Only consider accounts that are at least 1 real day old (avoid same-day spam).
   const venues = await prisma.venue.findMany({
     where: { createdAt: { lte: new Date(now.getTime() - dayMs) } },
     orderBy: { createdAt: "asc" },
@@ -168,17 +218,22 @@ export async function runOnboardingSetupNudges(
 
   for (const venue of venues) {
     scanned += 1;
-    const ageDays = (now.getTime() - venue.createdAt.getTime()) / dayMs;
+    const effectiveCreated = effectiveNudgeCreatedAt(venue.createdAt, featureStart);
+    const ageDays = (now.getTime() - effectiveCreated.getTime()) / dayMs;
     const hasSchedule = venue.eventTemplates.length > 0;
     const hasPhoto = Boolean(venue.imagePrimaryUrl);
     const hasAbout = Boolean(venue.about?.trim());
     const hasSocial = Boolean(venue.websiteUrl || venue.facebookUrl || venue.instagramUrl);
     const bookingOn = (venue.bookingOpensDaysAhead ?? 0) > 0;
 
-    let kind: NudgeKind | null = null;
-    if (ageDays >= 1 && ageDays < 3 && !hasSchedule) kind = "venue_schedule";
-    else if (ageDays >= 3 && ageDays < 7 && (!hasPhoto || !hasAbout || !hasSocial)) kind = "venue_listing";
-    else if (ageDays >= 7 && ageDays < 14 && !bookingOn) kind = "venue_signups";
+    const kind = pickVenueNudgeKind({
+      ageDays,
+      hasSchedule,
+      hasPhoto,
+      hasAbout,
+      hasSocial,
+      bookingOn,
+    });
     if (!kind) {
       skipped += 1;
       continue;
@@ -186,6 +241,10 @@ export async function runOnboardingSetupNudges(
 
     const purposeKey = `onboarding-nudge:${kind}:venue:${venue.id}`;
     if (await alreadySent(prisma, purposeKey)) {
+      skipped += 1;
+      continue;
+    }
+    if (await sentAnySetupNudgeInLast24h(prisma, venue.owner.email, now)) {
       skipped += 1;
       continue;
     }
@@ -233,7 +292,8 @@ export async function runOnboardingSetupNudges(
 
   for (const p of promoters) {
     scanned += 1;
-    const ageDays = (now.getTime() - p.createdAt.getTime()) / dayMs;
+    const effectiveCreated = effectiveNudgeCreatedAt(p.createdAt, featureStart);
+    const ageDays = (now.getTime() - effectiveCreated.getTime()) / dayMs;
     if (ageDays < 1 || ageDays > 10) {
       skipped += 1;
       continue;
@@ -241,6 +301,10 @@ export async function runOnboardingSetupNudges(
     const kind: NudgeKind = "promoter_connect";
     const purposeKey = `onboarding-nudge:${kind}:promoter:${p.id}`;
     if (await alreadySent(prisma, purposeKey)) {
+      skipped += 1;
+      continue;
+    }
+    if (await sentAnySetupNudgeInLast24h(prisma, p.email, now)) {
       skipped += 1;
       continue;
     }

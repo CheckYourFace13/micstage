@@ -9,9 +9,11 @@ import { publicLineupHrefForVenueDate } from "@/lib/promoterLineup";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
+import { absoluteUrl } from "@/lib/publicSeo";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { FindOpenMicPanel } from "@/components/promoter/FindOpenMicPanel";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
+import { SharePageButtons } from "@/components/onboarding/SharePageButtons";
 import {
   promoterSetupChecklist,
   suggestOpenMicsForPromoterApplication,
@@ -113,85 +115,174 @@ export default async function PromoterDashboardPage(props: {
   const promoterNotice = (() => {
     switch (promoter) {
       case "series_ok":
-        return "Series saved.";
+        return "Open mic name saved. Next: connect the venue.";
       case "series_taken":
       case "series_slug":
       case "series_invalid":
-        return "Check the series name and try again.";
+        return "Check the open mic name and try again.";
       case "series_error":
-        return "Could not save the series. Try again.";
+        return "Could not save. Try again.";
+      case "connected":
       case "venue_request":
-        return "Request sent. We'll notify the venue if approval is needed.";
+        return "Your open mic is connected. We'll notify the venue if they still need to approve.";
       case "venue_missing":
         return "We couldn't find that open mic yet. Try another name search.";
       case "venue_already":
-        return "You're already connected to that venue.";
+        return "Your open mic is already connected.";
       case "venue_pending":
-        return "A request is already waiting for that venue.";
+        return "Waiting on the venue — they still need to approve.";
       case "venue_invalid":
       case "venue_error":
         return "Could not send that request. Try again.";
       case "night_ok":
-        return "Night added.";
+        return "Schedule confirmed.";
       case "night_duplicate":
-        return "That venue and date are already on this series.";
+        return "That venue and date are already on your list.";
       case "night_bad_date":
         return "Pick a valid date.";
       case "night_no_access":
-        return "Connect with the venue first, then add nights.";
+        return "Connect your open mic first, then add nights.";
       case "night_invalid":
       case "night_error":
         return "Could not add that night. Try again.";
       case "forbidden":
-        return "That series is not on your account.";
+        return "That open mic is not on your account.";
       default:
         return null;
     }
   })();
 
   const approvedVenues = accessList.filter((a) => a.status === PromoterVenueAccessStatus.APPROVED);
+  const primaryVenue = approvedVenues[0]?.venue ?? accessList[0]?.venue ?? null;
+  const upcomingNight = seriesList
+    .flatMap((s) => s.nights.map((n) => ({ ...n, seriesName: s.name })))
+    .filter((n) => n.date.getTime() >= Date.now() - 12 * 3600 * 1000)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+
+  const primaryPublicUrl = primaryVenue ? absoluteUrl(`/venues/${primaryVenue.slug}`) : null;
+  const isLinked = approvedVenues.length > 0;
+  const justConnected =
+    promoter === "connected" || promoter === "venue_already" || promoter === "venue_request";
+  const isUnlinkedEmpty = accessList.length === 0;
 
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="text-xs font-medium uppercase tracking-widest text-white/55">Promoter</div>
         <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">Hi, {firstName}</h1>
-        <p className="mt-2 max-w-2xl text-sm text-white/70">
-          Here&apos;s what you run, what&apos;s next, and who&apos;s connected — in plain language.
-        </p>
 
         {notice === "messages" ? (
           <div className="mt-6 rounded-xl border border-violet-400/35 bg-violet-500/10 px-4 py-3 text-sm text-white">
-            Messaging is for artists and venues. Use this home page to manage your open mic nights.
+            Messaging is for artists and venues. Use this home page to manage your open mic.
           </div>
         ) : null}
         {promoterNotice ? (
-          <div className="mt-6 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/90">
+          <div className="mt-6 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-white/90">
             {promoterNotice}
           </div>
         ) : null}
 
-        <div className="mt-8">
-          <SetupChecklist
-            heading="Make your open mic easier to run"
-            subheading="Optional — skip anything and come back later. Your account already works."
-            items={checklist}
-            laterHref="/promoter/welcome/skip"
-          />
-        </div>
+        {(isLinked || justConnected) && primaryVenue ? (
+          <section className="mt-8 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-4 sm:p-6">
+            <p className="text-xs font-medium uppercase tracking-widest text-emerald-100/70">Your open mic</p>
+            <h2 className="mt-1 text-2xl font-semibold text-white">{primaryVenue.name}</h2>
+            {justConnected ? (
+              <p className="mt-2 text-base font-medium text-emerald-50">Your open mic is connected.</p>
+            ) : null}
+            <p className="mt-2 text-sm text-white/75">
+              {upcomingNight
+                ? `Next night: ${lineupNavLabelFromYmd(storageYmdUtc(upcomingNight.date))}`
+                : "No upcoming night scheduled yet."}
+            </p>
+            <p className="mt-1 text-sm text-white/60">
+              {isLinked
+                ? "Performer signups: managed on your open mic page (optional)."
+                : "Waiting on the venue to approve — you can still prep schedule and sharing."}
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link
+                href={`/venues/${primaryVenue.slug}`}
+                className="inline-flex h-12 items-center justify-center rounded-md border border-violet-400/40 bg-violet-500/20 px-5 text-base font-semibold text-violet-50 hover:bg-violet-500/30"
+              >
+                Manage my open mic
+              </Link>
+            </div>
+            {justConnected ? (
+              <div className="mt-6 grid gap-2 sm:grid-cols-3">
+                <Link
+                  href="/promoter#night"
+                  className="rounded-xl border border-white/15 bg-black/25 px-3 py-3 text-center text-sm font-semibold hover:bg-white/10"
+                >
+                  Confirm schedule
+                </Link>
+                <Link
+                  href={`/venues/${primaryVenue.slug}`}
+                  className="rounded-xl border border-white/15 bg-black/25 px-3 py-3 text-center text-sm font-semibold hover:bg-white/10"
+                >
+                  Turn on performer signups
+                </Link>
+                <Link
+                  href={`#share`}
+                  className="rounded-xl border border-white/15 bg-black/25 px-3 py-3 text-center text-sm font-semibold hover:bg-white/10"
+                >
+                  Share my page
+                </Link>
+              </div>
+            ) : null}
+            {primaryPublicUrl ? (
+              <div id="share" className="mt-6">
+                <p className="mb-2 text-sm font-medium text-white/85">Share your page</p>
+                <SharePageButtons url={primaryPublicUrl} label="Public page" />
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
+        {isUnlinkedEmpty ? (
+          <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-white">You haven&apos;t connected an open mic yet.</h2>
+            <p className="mt-2 text-sm text-white/65">Pick one path — it only takes a minute.</p>
+            <div className="mt-5 grid gap-3">
+              <Link
+                href="/promoter/welcome?step=find"
+                className="inline-flex h-12 items-center justify-center rounded-md border border-violet-400/40 bg-violet-500/20 px-5 text-base font-semibold text-violet-50 hover:bg-violet-500/30"
+              >
+                Find my open mic
+              </Link>
+              <Link
+                href="/promoter/welcome?step=create"
+                className="inline-flex h-12 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10"
+              >
+                Create a new open mic
+              </Link>
+              <p className="text-center text-sm text-white/50">You can explore the rest of MicStage anytime.</p>
+            </div>
+            <div className="mt-6">
+              <FindOpenMicPanel suggested={suggested} />
+            </div>
+          </section>
+        ) : null}
+
+        {!isUnlinkedEmpty ? (
+          <div className="mt-8">
+            <SetupChecklist
+              heading="Make your open mic easier to run"
+              subheading="Optional — skip anything and come back later."
+              items={checklist}
+              laterHref="/promoter/welcome/skip"
+            />
+          </div>
+        ) : null}
+
+        {!isUnlinkedEmpty ? (
         <section
           id="find"
           className={`mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6 ${
             focus === "find" ? "ring-2 ring-violet-400/40" : ""
           }`}
         >
-          <h2 className="text-lg font-semibold text-white">Your open mic</h2>
-          <p className="mt-1 text-sm text-white/60">
-            {accessList.length === 0
-              ? "Connect the place you host. We'll ask the venue to approve if needed."
-              : "Venues you're connected with (or waiting on)."}
-          </p>
+          <h2 className="text-lg font-semibold text-white">Connected places</h2>
+          <p className="mt-1 text-sm text-white/60">Venues you host with (or are waiting on).</p>
 
           {accessList.length > 0 ? (
             <ul className="mt-4 grid gap-2">
@@ -218,14 +309,17 @@ export default async function PromoterDashboardPage(props: {
             <FindOpenMicPanel suggested={suggested} />
           </div>
         </section>
+        ) : null}
 
+        {!isUnlinkedEmpty ? (
+          <>
         <section
           id="series"
           className={`mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6 ${
             focus === "series" ? "ring-2 ring-violet-400/40" : ""
           }`}
         >
-          <h2 className="text-lg font-semibold text-white">Name your series</h2>
+          <h2 className="text-lg font-semibold text-white">Name your open mic</h2>
           <p className="mt-1 text-xs text-white/55">Optional. Example: “Friday Night Open Mic.”</p>
           <form action={createPromoterSeriesAction} className="mt-4 grid gap-3">
             <label className="grid gap-1 text-sm">
@@ -247,7 +341,7 @@ export default async function PromoterDashboardPage(props: {
               />
             </label>
             <FormSubmitButton
-              label="Save series"
+              label="Save name"
               pendingLabel="Saving…"
               className="inline-flex h-11 min-w-[140px] items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-5 text-sm font-semibold text-violet-50 hover:bg-violet-500/25 disabled:opacity-60"
             />
@@ -255,7 +349,10 @@ export default async function PromoterDashboardPage(props: {
         </section>
 
         {seriesList.length === 0 ? (
-          <p className="mt-8 text-sm text-white/55">When you&apos;re ready, add a series name above, then schedule a night.</p>
+          <div className="mt-8 rounded-xl border border-dashed border-white/15 bg-black/20 px-4 py-5 text-sm text-white/65">
+            <p className="font-medium text-white/85">You haven&apos;t named your open mic series yet.</p>
+            <p className="mt-1">Optional — add a simple name above when you&apos;re ready.</p>
+          </div>
         ) : (
           <div className="mt-10 grid gap-8">
             {seriesList.map((series) => (
@@ -311,15 +408,18 @@ export default async function PromoterDashboardPage(props: {
                   </label>
                   <div className="sm:col-span-2">
                     <FormSubmitButton
-                      label="Add night"
-                      pendingLabel="Adding…"
+                      label="Confirm schedule"
+                      pendingLabel="Saving…"
                       className="inline-flex h-11 min-w-[120px] items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-5 text-sm font-semibold text-violet-50 hover:bg-violet-500/25 disabled:opacity-60"
                     />
                   </div>
                 </form>
 
                 {series.nights.length === 0 ? (
-                  <p className="mt-4 text-sm text-white/55">No nights yet.</p>
+                  <div className="mt-4 rounded-lg border border-dashed border-white/15 bg-black/20 px-3 py-4 text-sm text-white/65">
+                    <p className="font-medium text-white/85">No upcoming nights yet.</p>
+                    <p className="mt-1">Confirm a date above so performers know when to come.</p>
+                  </div>
                 ) : (
                   <ul className="mt-4 grid gap-2 text-sm">
                     {series.nights.map((n) => {
@@ -344,7 +444,9 @@ export default async function PromoterDashboardPage(props: {
                               Open night page
                             </Link>
                           ) : (
-                            <span className="shrink-0 text-xs text-white/45">Night page appears when the venue opens that date</span>
+                            <span className="shrink-0 text-xs text-white/45">
+                              Night page appears when the venue opens that date
+                            </span>
                           )}
                         </li>
                       );
@@ -355,6 +457,8 @@ export default async function PromoterDashboardPage(props: {
             ))}
           </div>
         )}
+          </>
+        ) : null}
       </main>
     </div>
   );

@@ -4,12 +4,14 @@ import { setupCompletionPct } from "@/lib/onboarding/setupProgress";
 
 export function SetupChecklist(props: {
   heading: string;
+  /** Lead with benefit — e.g. "3 quick things can help more performers find you." */
   subheading: string;
   items: SetupChecklistItem[];
   laterHref?: string;
 }) {
   const pct = setupCompletionPct(props.items);
   const remaining = props.items.filter((i) => !i.done);
+  const remainingCount = remaining.length;
 
   if (remaining.length === 0) {
     return (
@@ -20,18 +22,17 @@ export function SetupChecklist(props: {
     );
   }
 
+  const benefitLead =
+    remainingCount === 1
+      ? "1 quick thing can help more performers find you."
+      : `${remainingCount} quick things can help more performers find you.`;
+
   return (
     <section className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold text-white">{props.heading}</h2>
-          <p className="mt-1 text-sm text-white/65">{props.subheading}</p>
-        </div>
-        <div className="text-sm font-semibold text-white/80">{pct}% complete</div>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full bg-[rgb(var(--om-neon))]" style={{ width: `${pct}%` }} />
-      </div>
+      <h2 className="text-lg font-semibold text-white">{props.heading}</h2>
+      <p className="mt-1 text-sm text-white/80">{benefitLead}</p>
+      <p className="mt-1 text-xs text-white/55">{props.subheading}</p>
+      <p className="mt-2 text-xs text-white/40">{pct}% done · optional</p>
       <ul className="mt-4 grid gap-3">
         {props.items.map((item) => (
           <li
@@ -51,7 +52,7 @@ export function SetupChecklist(props: {
               {!item.done ? (
                 <Link
                   href={item.href}
-                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/5 px-3 text-sm font-semibold text-white hover:bg-white/10"
+                  className="inline-flex h-11 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/5 px-3 text-sm font-semibold text-white hover:bg-white/10"
                 >
                   Do this
                 </Link>

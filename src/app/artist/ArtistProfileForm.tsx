@@ -51,7 +51,7 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
     [musician.firstName, musician.lastName].filter(Boolean).join(" ").trim() || musician.stageName;
 
   return (
-    <div className="mt-10 rounded-2xl border border-white/10 bg-black/30 p-6">
+    <div id="profile" className="mt-10 scroll-mt-24 rounded-2xl border border-white/10 bg-black/30 p-6">
       <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
         Your artist profile
       </div>

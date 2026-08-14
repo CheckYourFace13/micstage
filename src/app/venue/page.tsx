@@ -226,9 +226,11 @@ export default async function VenuePortalPage({
     sent?: string;
     failed?: string;
     promoterAccess?: string;
+    joined?: string;
   }>;
 }) {
   const q = await searchParams;
+  const isFirstSession = q.joined === "venue";
   const preservedQuery: Record<string, string | undefined> = Object.fromEntries(
     Object.entries(q).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
   );
@@ -300,31 +302,52 @@ export default async function VenuePortalPage({
           <p className="mt-2 text-sm text-white/70">
             {anyVenueOperational ? (
               <>
-                <span className="text-white/85">Control center:</span> share your lineup, watch tonight&apos;s board, and
-                manage slots below. Signed in as <span className="font-mono">{session.email}</span>
+                Share your lineup, watch tonight&apos;s board, and manage slots below. Signed in as{" "}
+                <span className="font-mono">{session.email}</span>
               </>
             ) : (
               <>
-                <span className="text-white/85">Finish setup:</span> save your venue profile and weekly schedule — your public
-                page updates as you go. Signed in as <span className="font-mono">{session.email}</span>
+                Confirm your schedule and listing when you&apos;re ready — booking/signups stay optional. Signed in as{" "}
+                <span className="font-mono">{session.email}</span>
               </>
             )}
           </p>
         </div>
 
+        {isFirstSession && venues[0] ? (
+          <section className="mt-8 max-w-xl rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-4 sm:p-5">
+            <h2 className="text-lg font-semibold text-white">Your open mic is claimed.</h2>
+            <p className="mt-1 text-sm text-white/70">
+              <span className="text-white">{venues[0].name}</span> is ready. Pick one useful next step:
+            </p>
+            <div className="mt-5 grid gap-3">
+              <Link
+                href="/venue#schedule"
+                className="inline-flex h-12 items-center justify-center rounded-md border border-violet-400/40 bg-violet-500/20 px-5 text-base font-semibold text-violet-50 hover:bg-violet-500/30"
+              >
+                Confirm schedule
+              </Link>
+              <Link
+                href="/venue#profile"
+                className="inline-flex h-12 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10"
+              >
+                Improve listing
+              </Link>
+              <Link
+                href="/venue#booking"
+                className="inline-flex h-12 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10"
+              >
+                Turn on performer signups
+              </Link>
+            </div>
+          </section>
+        ) : null}
+
         {q.profile === "saved" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            <span className="font-semibold text-emerald-100/95">Profile saved.</span>{" "}
-            {anyVenueOperational ? (
-              <>
-                Your public venue and lineup pages pick this up — refresh if you don&apos;t see changes yet.
-              </>
-            ) : (
-              <>
-                Your public venue page shows this info—refresh if needed. Next: set or update your weekly schedule so artists can
-                book.
-              </>
-            )}
+            <span className="font-semibold text-emerald-100/95">Profile saved.</span> Your listing is now easier for
+            performers to find
+            {anyVenueOperational ? " — refresh if you don't see changes yet." : ". Next: confirm your schedule when ready."}
           </div>
         ) : null}
         {q.profile === "imageUploaded" ? (
@@ -639,16 +662,16 @@ export default async function VenuePortalPage({
         {venues.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-8">
             <div className="text-sm text-white/70">
-              <p>
-                No venues are linked to this login yet. If you haven&apos;t created a room on MicStage, start at{" "}
+              <p className="font-medium text-white/90">You haven&apos;t connected an open mic yet.</p>
+              <p className="mt-2">
+                Claim a listing from its public page, or{" "}
                 <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
-                  venue registration
+                  register a new venue
                 </Link>
                 .
               </p>
               <p className="mt-3 text-white/60">
-                If you already completed registration but still see this, your session may be out of sync or data may
-                need a fix —{" "}
+                If you already finished signup but still see this,{" "}
                 <Link className="underline hover:text-white" href="/contact">
                   contact support
                 </Link>
@@ -658,7 +681,8 @@ export default async function VenuePortalPage({
           </div>
         ) : (
           <div className="mt-10 grid gap-8">
-            {venues.map((v) => {
+            {venues.map((v, venueIndex) => {
+              const isPrimaryVenue = venueIndex === 0;
               const operational = venueIsOperational(v);
               const lineupTemplates = lineupByVenueId[v.id] ?? [];
               const nowDash = new Date();
@@ -720,7 +744,7 @@ export default async function VenuePortalPage({
                     </div>
                     {operational ? (
                       <a
-                        href={`#venue-profile-${v.id}`}
+                        href={isPrimaryVenue ? "#profile" : `#venue-profile-${v.id}`}
                         className="mt-3 inline-flex text-sm font-medium text-[rgb(var(--om-neon))] underline hover:brightness-110"
                       >
                         Edit venue info
@@ -892,11 +916,10 @@ export default async function VenuePortalPage({
                           ))}
                         </div>
                       ) : (
-                        <p className="mt-4 text-sm text-white/55">
-                          No slots for{" "}
-                          <span className="text-white/80">{lineupNavLabelFromYmd(selectedYmd)}</span> yet — use{" "}
-                          <span className="text-white/75">Each schedule block</span> below, pick this date, and{" "}
-                          <span className="text-white/75">Schedule setup</span>.
+                        <p className="mt-4 text-sm text-white/65">
+                          No performers have signed up yet for{" "}
+                          <span className="text-white/85">{lineupNavLabelFromYmd(selectedYmd)}</span>. Share your open
+                          mic page, or confirm schedule setup below if slots aren&apos;t open.
                         </p>
                       )}
                     </div>
@@ -916,13 +939,18 @@ export default async function VenuePortalPage({
                   </div>
                 ) : null}
 
-                {!operational ? <VenueProfileForm venue={v} /> : null}
+                {!operational ? (
+                  <div id={isPrimaryVenue ? "profile" : undefined} className="scroll-mt-24">
+                    <VenueProfileForm venue={v} />
+                  </div>
+                ) : null}
 
                 <div
+                  id={isPrimaryVenue ? "schedule" : undefined}
                   className={
                     operational
-                      ? "mt-8 rounded-xl border border-white/10 bg-black/30 p-5 sm:p-6"
-                      : "mt-6 rounded-2xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.06)] p-6 shadow-[0_0_0_1px_rgba(255,45,149,0.12)]"
+                      ? "mt-8 scroll-mt-24 rounded-xl border border-white/10 bg-black/30 p-5 sm:p-6"
+                      : "mt-6 scroll-mt-24 rounded-2xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.06)] p-6 shadow-[0_0_0_1px_rgba(255,45,149,0.12)]"
                   }
                 >
                   <div className="inline-flex items-center rounded-full border border-white/15 bg-black/30 px-2.5 py-0.5 text-xs font-medium text-white/80">
@@ -946,11 +974,13 @@ export default async function VenuePortalPage({
                     )}
                   </p>
 
-                  <div className="mt-6 border-t border-white/10 pt-6">
+                  <div
+                    id={isPrimaryVenue ? "booking" : undefined}
+                    className="mt-6 scroll-mt-24 border-t border-white/10 pt-6"
+                  >
                     <h4 className="text-base font-semibold text-white">Schedule setup</h4>
                     <p className="mt-1 max-w-2xl text-sm text-white/55">
-                      One-off or recurring: MicStage saves one template per weekday you use and fills slots in your booking
-                      window.
+                      Confirm nights and signup rules here. Performer signups stay optional until you turn them on.
                     </p>
                     <WeeklyScheduleForm
                       venueId={v.id}
@@ -1017,8 +1047,8 @@ export default async function VenuePortalPage({
 
                 {operational ? (
                   <details
-                    id={`venue-profile-${v.id}`}
-                    className="group mt-8 scroll-mt-28 rounded-2xl border border-white/10 bg-black/25 p-5 open:border-white/15 open:bg-black/35"
+                    id={isPrimaryVenue ? "profile" : `venue-profile-${v.id}`}
+                    className="group mt-8 scroll-mt-24 rounded-2xl border border-white/10 bg-black/25 p-5 open:border-white/15 open:bg-black/35"
                   >
                     <summary className="cursor-pointer list-none marker:content-none [&::-webkit-details-marker]:hidden">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">

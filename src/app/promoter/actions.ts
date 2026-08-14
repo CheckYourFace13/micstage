@@ -56,7 +56,7 @@ export async function createPromoterSeriesAction(formData: FormData) {
       });
       revalidatePath("/promoter");
       revalidatePath("/promoter/welcome");
-      redirect("/promoter?promoter=series_ok");
+      redirect("/promoter?promoter=series_ok&focus=find");
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         continue;
@@ -112,7 +112,7 @@ async function requestAccessToVenueId(promoterId: string, venueId: string) {
   revalidatePath("/promoter");
   revalidatePath("/promoter/welcome");
   revalidatePath("/venue");
-  redirect("/promoter?promoter=venue_request");
+  redirect("/promoter?promoter=connected");
 }
 
 /** Preferred: connect by venue id from name search (never ask users for slugs). */

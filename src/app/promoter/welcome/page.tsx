@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { getPromoterSessionOrNull } from "@/lib/authz";
 import { requirePrisma } from "@/lib/prisma";
 import { buildPublicMetadata } from "@/lib/publicSeo";
@@ -17,8 +15,6 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export const dynamic = "force-dynamic";
-
-const WELCOME_COOKIE = "om_promoter_welcome_seen";
 
 export default async function PromoterWelcomePage(props: {
   searchParams: Promise<{ step?: string }>;
@@ -37,8 +33,6 @@ export default async function PromoterWelcomePage(props: {
       application: {
         select: { contactName: true, brandName: true, notes: true, cityRegion: true },
       },
-      series: { select: { id: true }, take: 1 },
-      venueAccess: { select: { id: true }, take: 1 },
     },
   });
 
@@ -50,19 +44,6 @@ export default async function PromoterWelcomePage(props: {
   const suggested = user?.application
     ? await suggestOpenMicsForPromoterApplication(prisma, user.application)
     : [];
-
-  const cookieStore = await cookies();
-  if (step === "later") {
-    // Mark welcome seen via redirect query handled client-side isn't available on server set easily
-    // without Route Handler — use redirect to dashboard with cookie set in response via separate path.
-  }
-
-  if (cookieStore.get(WELCOME_COOKIE)?.value === "1" && !step) {
-    // Allow revisiting welcome intentionally via ?step=
-  }
-
-  const showFind = !step || step === "find" || step === "setup";
-  const showSeries = step === "setup" || step === "series";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -79,7 +60,6 @@ export default async function PromoterWelcomePage(props: {
           ) : null}
           .
         </p>
-        <p className="mt-2 text-sm text-white/55">Signed in as {session.email}</p>
 
         {!step ? (
           <div className="mt-8 grid gap-3">
@@ -88,56 +68,50 @@ export default async function PromoterWelcomePage(props: {
               href="/promoter/welcome?step=find"
               className="inline-flex h-12 items-center justify-center rounded-md border border-violet-400/40 bg-violet-500/20 px-5 text-base font-semibold text-violet-50 hover:bg-violet-500/30"
             >
-              Set up my open mic
+              Find my open mic
             </Link>
             <Link
-              href="/promoter/welcome?step=find"
+              href="/promoter/welcome?step=create"
               className="inline-flex h-12 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10"
             >
-              Find my existing open mic
+              Create a new open mic
             </Link>
             <Link
               href="/promoter/welcome/skip"
               className="inline-flex h-12 items-center justify-center rounded-md px-5 text-base font-medium text-white/60 underline hover:text-white"
             >
-              I&apos;ll do this later
+              Do this later
             </Link>
           </div>
         ) : null}
 
-        {showFind && step ? (
+        {step === "find" ? (
           <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
-            <h2 className="text-lg font-semibold text-white">Connect your open mic</h2>
-            <p className="mt-1 text-sm text-white/60">
-              Pick the place you host — we&apos;ll handle the rest. No technical codes required.
-            </p>
+            <h2 className="text-lg font-semibold text-white">Find my open mic</h2>
+            <p className="mt-1 text-sm text-white/60">Search by name. We&apos;ll handle the rest.</p>
             <div className="mt-4">
               <FindOpenMicPanel suggested={suggested} />
             </div>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <Link
-                href="/promoter/welcome?step=series"
-                className="inline-flex h-11 flex-1 items-center justify-center rounded-md border border-white/15 bg-white/5 text-sm font-semibold hover:bg-white/10"
-              >
-                Next
-              </Link>
-              <Link
                 href="/promoter/welcome/skip"
                 className="inline-flex h-11 flex-1 items-center justify-center text-sm text-white/55 underline hover:text-white"
               >
-                Skip for now
+                Do this later
               </Link>
             </div>
           </section>
         ) : null}
 
-        {showSeries && step === "series" ? (
+        {step === "create" ? (
           <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
-            <h2 className="text-lg font-semibold text-white">Name your open mic series</h2>
-            <p className="mt-1 text-sm text-white/60">Optional — helps you organize nights. You can change this later.</p>
+            <h2 className="text-lg font-semibold text-white">Name your open mic</h2>
+            <p className="mt-1 text-sm text-white/60">
+              Give it a simple name performers will recognize. You can connect the venue next.
+            </p>
             <form action={createPromoterSeriesAction} className="mt-4 grid gap-3">
               <label className="grid gap-1 text-sm">
-                <span className="text-white/75">Series name</span>
+                <span className="text-white/75">Open mic name</span>
                 <input
                   name="name"
                   required
@@ -147,14 +121,21 @@ export default async function PromoterWelcomePage(props: {
                 />
               </label>
               <FormSubmitButton
-                label="Save and continue"
+                label="Save and find venue"
                 pendingLabel="Saving…"
                 className="inline-flex h-12 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-5 text-sm font-semibold text-violet-50 hover:bg-violet-500/25 disabled:opacity-60"
               />
             </form>
-            <Link href="/promoter/welcome/skip" className="mt-4 inline-block text-sm text-white/55 underline">
-              Skip for now
-            </Link>
+            <p className="mt-4 text-sm text-white/55">
+              Or{" "}
+              <Link href="/promoter/welcome?step=find" className="underline hover:text-white">
+                find an existing open mic
+              </Link>
+              {" · "}
+              <Link href="/promoter/welcome/skip" className="underline hover:text-white">
+                do this later
+              </Link>
+            </p>
           </section>
         ) : null}
       </main>

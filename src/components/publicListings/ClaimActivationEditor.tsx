@@ -180,7 +180,10 @@ export function ClaimActivationEditor(props: {
 
       <section className="grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4">
         <h2 className="font-semibold">Performer signup method</h2>
-        <p className="text-sm text-white/60">Choose how performers interact after activation. Only MicStage booking creates reservable slots.</p>
+        <p className="text-sm text-white/60">
+          Choose how performers interact with your page. Online signups are optional — you can keep the page
+          informational only.
+        </p>
         <fieldset className="grid gap-3">
           <label className="flex items-start gap-2 text-sm">
             <input
@@ -261,7 +264,7 @@ export function ClaimActivationEditor(props: {
           disabled={status === "saving"}
           className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 font-semibold text-black disabled:opacity-60"
         >
-          {status === "saving" ? "Saving…" : "Save activation"}
+          {status === "saving" ? "Saving…" : "Save and continue"}
         </button>
         <button
           type="button"

@@ -45,10 +45,30 @@ export function MarketingTrackingClient() {
         trackMarketingEvent("performer_signup_started", { page_path: pathname });
       });
     }
+    if (pathname === "/register/promoter" || pathname === "/promoter/apply") {
+      oncePerSession("trk:promoter_signup_started", () => {
+        trackMarketingEvent("promoter_signup_started", { page_path: pathname });
+      });
+    }
+    if (pathname === "/promoter/welcome") {
+      oncePerSession("trk:promoter_welcome_viewed", () => {
+        trackMarketingEvent("promoter_welcome_viewed", { page_path: pathname });
+      });
+    }
+    if (pathname === "/promoter" && searchParams.get("promoter") === "connected") {
+      oncePerSession("trk:promoter_mic_connected", () => {
+        trackMarketingEvent("promoter_mic_connected", { page_path: pathname });
+      });
+    }
+    if (pathname === "/claim/invite" || pathname.startsWith("/claim/")) {
+      oncePerSession(`trk:claim_started:${pathname}`, () => {
+        trackMarketingEvent("claim_started", { page_path: pathname });
+      });
+    }
     if (pathname === "/map") {
       trackMarketingEvent("map_page_viewed", { page_path: pathname });
     }
-    if (pathname.startsWith("/venues/")) {
+    if (pathname.startsWith("/venues/") || pathname.startsWith("/open-mics/")) {
       trackMarketingEvent("open_mic_page_viewed", { page_path: pathname });
     }
   }, [pathname, searchParams]);

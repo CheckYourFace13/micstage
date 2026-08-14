@@ -102,7 +102,7 @@ export function InstantClaimForm(props: {
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="grid max-w-xl gap-4">
+    <form onSubmit={(e) => void onSubmit(e)} className="grid max-w-xl gap-4" data-track-event="claim_submitted">
       <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/75">
         <p>
           <span className="font-semibold text-white">{props.listingName}</span>

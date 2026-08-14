@@ -396,7 +396,7 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
           </div>
           <p className="text-xs text-white/50">
             Search with Google the same way venues register. We only link venues that already exist on MicStage (matched
-            by Google Place ID).
+            by Google Maps place).
           </p>
           <PastVenuesGoogleField initial={pastVenueChips} />
         </div>

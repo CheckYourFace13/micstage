@@ -41,8 +41,13 @@ export function EmptyDiscoveryActions(props: { context?: string }) {
           </Link>
         </li>
         <li>
-          <Link href="/find-open-mics" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">
-            Browse closest verified listings
+          <Link href="/map" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">
+            Browse the open mic map
+          </Link>
+        </li>
+        <li>
+          <Link href="/locations" className="text-[rgb(var(--om-neon))] underline hover:brightness-110">
+            Browse by city
           </Link>
         </li>
         <li>

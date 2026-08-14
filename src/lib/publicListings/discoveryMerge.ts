@@ -33,6 +33,26 @@ function listingKind(verificationStatus: string): DiscoveryListingKind {
   return "unclaimed";
 }
 
+/** Avoid showing "Name, City, ST" under an H1 that already shows Name. */
+export function displayListingAddress(
+  name: string,
+  formattedAddress: string | null | undefined,
+  city: string | null | undefined,
+  region: string | null | undefined,
+): string {
+  const place = [city, region].filter(Boolean).join(", ").trim();
+  const addr = (formattedAddress ?? "").trim();
+  if (!addr) return place;
+  const nameNorm = name.trim().toLowerCase();
+  if (nameNorm && addr.toLowerCase().startsWith(nameNorm)) {
+    const rest = addr.slice(name.length).replace(/^[\s,]+/, "").trim();
+    if (rest) return rest;
+    return place;
+  }
+  if (place && addr.toLowerCase() === `${nameNorm}, ${place.toLowerCase()}`) return place;
+  return addr;
+}
+
 function toFinderRow(
   base: {
     slug: string;
@@ -118,15 +138,37 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
   const [venues, listings, counts] = await Promise.all([
     prisma.venue.findMany({
       orderBy: [{ name: "asc" }],
-      select: { slug: true, name: true, city: true, region: true, lat: true, lng: true },
+      select: {
+        slug: true,
+        name: true,
+        city: true,
+        region: true,
+        lat: true,
+        lng: true,
+        bookingOpensDaysAhead: true,
+        eventTemplates: {
+          where: { isPublic: true },
+          select: { id: true, bookingRestrictionMode: true },
+          take: 3,
+        },
+      },
     }),
     loadDiscoverablePublicListings(prisma),
     getDiscoveryLocationCounts(prisma),
   ]);
 
-  const claimed = venues.map((v) =>
-    toFinderRow(v, { href: venuePublicHref(v.slug), kind: "claimed", bookable: true }, counts),
-  );
+  const claimed = venues.map((v) => {
+    const hasSchedule = v.eventTemplates.length > 0;
+    const bookable =
+      hasSchedule &&
+      (v.bookingOpensDaysAhead ?? 0) > 0 &&
+      v.eventTemplates.some((t) => t.bookingRestrictionMode !== "HOUSE_ONLY");
+    return toFinderRow(
+      v,
+      { href: venuePublicHref(v.slug), kind: "claimed", bookable, hasSchedule },
+      counts,
+    );
+  });
 
   const unclaimed = listings.map((l) => {
     const kind = listingKind(l.verificationStatus);
@@ -157,6 +199,12 @@ export async function loadNearbyDiscoveryRows(
         formattedAddress: true,
         lat: true,
         lng: true,
+        bookingOpensDaysAhead: true,
+        eventTemplates: {
+          where: { isPublic: true },
+          select: { id: true, bookingRestrictionMode: true },
+          take: 3,
+        },
       },
     }),
     loadDiscoverablePublicListings(prisma),
@@ -180,18 +228,32 @@ export async function loadNearbyDiscoveryRows(
   };
 
   const rows: Raw[] = [
-    ...venues.map((v) => ({
-      ...v,
-      href: venuePublicHref(v.slug),
-      kind: "claimed" as const,
-      bookable: true,
-    })),
+    ...venues.map((v) => {
+      const hasSchedule = v.eventTemplates.length > 0;
+      const bookable =
+        hasSchedule &&
+        (v.bookingOpensDaysAhead ?? 0) > 0 &&
+        v.eventTemplates.some((t) => t.bookingRestrictionMode !== "HOUSE_ONLY");
+      return {
+        slug: v.slug,
+        name: v.name,
+        city: v.city,
+        region: v.region,
+        formattedAddress: v.formattedAddress,
+        lat: v.lat,
+        lng: v.lng,
+        href: venuePublicHref(v.slug),
+        kind: "claimed" as const,
+        bookable,
+        hasSchedule,
+      };
+    }),
     ...listings.map((l) => ({
       slug: l.slug,
       name: l.name,
       city: l.city,
       region: l.region,
-      formattedAddress: l.formattedAddress,
+      formattedAddress: displayListingAddress(l.name, l.formattedAddress, l.city, l.region),
       lat: l.lat,
       lng: l.lng,
       href: listingPublicHref(l.slug),

@@ -9,10 +9,18 @@ export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim() ?? ""
 type VercelProp = string | number | boolean | null | undefined;
 
 export type MarketingEventName =
+  | "homepage_cta_find"
+  | "homepage_cta_host"
   | "venue_signup_started"
   | "venue_signup_completed"
   | "performer_signup_started"
   | "performer_signup_completed"
+  | "promoter_signup_started"
+  | "promoter_signup_completed"
+  | "promoter_welcome_viewed"
+  | "promoter_mic_connected"
+  | "claim_started"
+  | "claim_submitted"
   | "open_mic_page_viewed"
   | "map_page_viewed"
   | "search_performed"

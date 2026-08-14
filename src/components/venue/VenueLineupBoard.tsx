@@ -171,7 +171,7 @@ export function VenueLineupBoard({
                         middleCell = "Open";
                       }
 
-                      const performLabel = isReservedCandidate ? "Confirm" : "Perform";
+                      const performLabel = isReservedCandidate ? "Confirm signup" : "Sign up";
                       const loginNext = encodeURIComponent(reserveReturnPath(returnPath, s.id));
 
                       const rightCell =
@@ -228,16 +228,16 @@ export function VenueLineupBoard({
                             <div className="flex justify-end">
                               <Link
                                 href={`/login/musician?next=${loginNext}`}
-                                title="Sign in with your artist account to book this slot"
+                                title="Sign in with your artist account to reserve this spot"
                                 className={lineupPrimaryActionClass}
                                 data-track-event="booking_started"
                               >
-                                Perform
+                                Sign up
                               </Link>
                             </div>
                           )
                         ) : activeBooking ? (
-                          <p className="text-right text-sm text-white/45">Booked</p>
+                          <p className="text-right text-sm text-white/45">Signed up</p>
                         ) : (
                           <p className="text-right text-sm leading-snug text-white/60">
                             {instanceCancelled
@@ -281,10 +281,13 @@ export function VenueLineupBoard({
       {!embed && !isMusician && !isVenueStaffHere && lineups.length > 0 ? (
         <p className="text-center text-xs leading-relaxed text-white/50">
           New artist?{" "}
-          <Link href="/register/musician" className="text-white/75 underline hover:text-white">
-            Create a free profile
+          <Link
+            href={`/register/musician?next=${encodeURIComponent(canonicalPath)}`}
+            className="text-white/75 underline hover:text-white"
+          >
+            Create a free account
           </Link>
-          , then tap <span className="text-white/70">Perform</span> on an open slot.
+          , then tap <span className="text-white/70">Sign up</span> on an open spot.
         </p>
       ) : null}
 

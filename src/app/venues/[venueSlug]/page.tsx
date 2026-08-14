@@ -100,7 +100,7 @@ export default async function VenuePublicPage(props: {
     return (
       <PublicDataUnavailable
         title="This venue page could not load"
-        description="The live schedule query failed. If you just deployed, apply pending Prisma migrations (slot override columns) and run prisma generate, then redeploy."
+        description="We couldn’t load this open mic’s schedule right now. Please try again in a moment."
       />
     );
   }
@@ -303,7 +303,7 @@ export default async function VenuePublicPage(props: {
         ) : null}
         {isMusician && reserve ? (
           <div className="mt-4 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            Finish booking: tap <span className="font-semibold">Confirm</span> on the slot you chose.
+            Finish signup: tap <span className="font-semibold">Confirm signup</span> on the spot you chose.
           </div>
         ) : null}
 

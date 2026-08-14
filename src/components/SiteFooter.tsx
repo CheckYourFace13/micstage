@@ -29,11 +29,7 @@ export async function SiteFooter() {
               <Link className="hover:text-white" href="/internal/admin">
                 Admin
               </Link>
-            ) : (
-              <Link className="text-white/35 hover:text-white/55" href="/internal/admin/login">
-                Admin
-              </Link>
-            )}
+            ) : null}
           </nav>
           <div className="text-xs text-white/45">
             <span>

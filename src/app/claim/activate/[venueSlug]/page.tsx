@@ -17,7 +17,7 @@ export default async function ClaimActivatePage(props: {
 
   const session = await getSession();
   if (!session || session.kind !== "venue" || !session.venueOwnerId) {
-    redirect(`/login?next=${encodeURIComponent(`/claim/activate/${venueSlug}`)}`);
+    redirect(`/login/venue?next=${encodeURIComponent(`/claim/activate/${venueSlug}`)}`);
   }
 
   const venue = await prisma.venue.findUnique({

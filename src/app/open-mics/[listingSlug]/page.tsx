@@ -11,6 +11,7 @@ import { getPrismaOrNull } from "@/lib/prisma";
 import { loadPublicOpenMicListingBySlug } from "@/lib/publicListings/queries";
 import { isPublicListingRenderable, listingIsPubliclyIndexable } from "@/lib/publicListings/listingQuality";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
+import { displayListingAddress } from "@/lib/publicListings/discoveryMerge";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 
@@ -138,8 +139,21 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
             ) : null}
           </div>
           <h1 className="om-heading mt-3 text-3xl sm:text-4xl">{listing.name}</h1>
-          <p className="mt-2 text-sm text-white/70">{listing.formattedAddress}</p>
-          {place ? <p className="text-sm text-white/55">{place}</p> : null}
+          {(() => {
+            const addr = displayListingAddress(listing.name, listing.formattedAddress, listing.city, listing.region);
+            if (!addr && !place) return null;
+            if (addr && place && addr.toLowerCase() === place.toLowerCase()) {
+              return <p className="mt-2 text-sm text-white/70">{place}</p>;
+            }
+            return (
+              <>
+                {addr ? <p className="mt-2 text-sm text-white/70">{addr}</p> : null}
+                {place && addr?.toLowerCase() !== place.toLowerCase() ? (
+                  <p className="text-sm text-white/55">{place}</p>
+                ) : null}
+              </>
+            );
+          })()}
         </header>
 
         <div className="mt-4 rounded-lg border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-50/95">

@@ -6,7 +6,7 @@ import { getPrismaOrNull } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { JOINED_MUSICIAN, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
-import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
+import { safeAfterMusicianLoginPath } from "@/lib/safeRedirect";
 import {
   REGISTRATION_CONTENT_CONSENT_VERSION,
   registrationContentConsentChecked,
@@ -31,6 +31,17 @@ function optString(formData: FormData, key: string): string | null {
   return v.trim();
 }
 
+function registerErrorPath(code: string, next: string | null) {
+  const base = `/register/musician?error=${code}`;
+  if (!next) return base;
+  return `${base}&next=${encodeURIComponent(next)}`;
+}
+
+function withJoinedAnalytics(dest: string): string {
+  const sep = dest.includes("?") ? "&" : "?";
+  return `${dest}${sep}${PRODUCT_ANALYTICS_QS.joined}=${JOINED_MUSICIAN}`;
+}
+
 export async function POST(request: Request) {
   let formData: FormData;
   try {
@@ -38,6 +49,8 @@ export async function POST(request: Request) {
   } catch {
     return redirectTo("/register/musician?error=unavailable");
   }
+
+  const nextRaw = optString(formData, "next");
 
   let email: string;
   let password: string;
@@ -47,11 +60,11 @@ export async function POST(request: Request) {
     password = reqString(formData, "password");
     stageName = reqString(formData, "stageName");
   } catch {
-    return redirectTo("/register/musician?error=unavailable");
+    return redirectTo(registerErrorPath("unavailable", nextRaw));
   }
 
   if (!registrationContentConsentChecked(formData)) {
-    return redirectTo("/register/musician?error=consent");
+    return redirectTo(registerErrorPath("consent", nextRaw));
   }
 
   const rl = await consumeRateLimit({
@@ -60,7 +73,7 @@ export async function POST(request: Request) {
     limit: 6,
     windowSec: 60 * 60,
   });
-  if (!rl.allowed) return redirectTo("/register/musician?error=rate");
+  if (!rl.allowed) return redirectTo(registerErrorPath("rate", nextRaw));
 
   const passwordHash = await bcrypt.hash(password, 12);
   const growthTraceLeadId = optString(formData, "growthTraceLeadId");
@@ -68,12 +81,15 @@ export async function POST(request: Request) {
   const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[registerMusician] database not configured");
-    return redirectTo("/register/musician?error=unavailable");
+    return redirectTo(registerErrorPath("unavailable", nextRaw));
   }
 
   try {
     const existing = await prisma.musicianUser.findUnique({ where: { email } });
-    if (existing) return redirectTo("/login/musician");
+    if (existing) {
+      const loginNext = nextRaw ? `?next=${encodeURIComponent(nextRaw)}` : "";
+      return redirectTo(`/login/musician${loginNext}`);
+    }
 
     const now = new Date();
     const musician = await prisma.musicianUser.create({
@@ -106,10 +122,10 @@ export async function POST(request: Request) {
       }
     }
 
-    return redirectTo(`${ARTIST_DASHBOARD_HREF}?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_MUSICIAN}`);
+    const dest = safeAfterMusicianLoginPath(nextRaw);
+    return redirectTo(withJoinedAnalytics(dest));
   } catch (e) {
     console.error("[registerMusician]", e);
-    return redirectTo("/register/musician?error=unavailable");
+    return redirectTo(registerErrorPath("unavailable", nextRaw));
   }
 }
-

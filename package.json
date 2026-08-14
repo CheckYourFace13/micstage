@@ -17,6 +17,7 @@
     "test:listing-names": "node scripts/check-listing-name-classifier.mjs",
     "test:instant-claim": "node scripts/check-instant-claim.mjs",
     "test:onboarding": "node scripts/check-onboarding-simplification.mjs",
+    "test:product-audit": "node scripts/check-product-audit-p0.mjs",
     "audit:claim-invites": "node scripts/audit-historical-claim-invitations.mjs",
     "audit:duplicate-places": "node scripts/analyze-duplicate-google-places.mjs"
   },

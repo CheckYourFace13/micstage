@@ -36,8 +36,10 @@ export function discoveryBadgeLabel(
   bookable: boolean,
   opts?: { hasSchedule?: boolean },
 ): string {
-  if (bookable) return "Bookable on MicStage";
-  if (kind === "claimed") return "MicStage venue";
+  if (bookable) return "Signups open on MicStage";
+  if (kind === "claimed") {
+    return opts?.hasSchedule === false ? "Listed on MicStage" : "Schedule on MicStage";
+  }
   if (kind === "verified") {
     return opts?.hasSchedule === false ? "Schedule details needed" : "Verified listing";
   }

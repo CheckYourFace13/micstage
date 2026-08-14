@@ -35,9 +35,7 @@ export function VenuePlaceFields() {
         <div className="rounded-xl border border-white/10 bg-black/30 p-4 text-sm">
           <div className="font-semibold text-white">{place.venueName ?? "Selected venue"}</div>
           <div className="mt-1 text-white/70">{place.formattedAddress}</div>
-          <div className="mt-2 text-xs text-white/50">
-            Place ID saved: <span className="font-mono">{place.placeId}</span>
-          </div>
+          <div className="mt-2 text-xs text-white/50">Address confirmed from Google Maps</div>
         </div>
       ) : (
         <div className="text-xs text-white/50">You must select a suggestion before submitting.</div>

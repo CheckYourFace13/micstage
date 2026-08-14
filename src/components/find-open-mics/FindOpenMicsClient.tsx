@@ -279,7 +279,11 @@ export function FindOpenMicsClient(props: {
                       </div>
                       <p className="mt-2 text-xs text-white/55">{v.formattedAddress}</p>
                       <p className="mt-2 text-xs text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2">
-                        {v.bookable ? "View schedule and book →" : "View verified listing →"}
+                        {v.bookable
+                          ? "View schedule and sign up →"
+                          : v.kind === "claimed"
+                            ? "View open mic →"
+                            : "View listing →"}
                       </p>
                     </Link>
                   </li>

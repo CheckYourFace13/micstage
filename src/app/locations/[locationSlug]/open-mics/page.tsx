@@ -92,7 +92,7 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
           </span>
           {bookable.length > 0 ? (
             <span className="rounded-md border border-[rgb(var(--om-neon))]/30 bg-[rgba(var(--om-neon),0.08)] px-2 py-1">
-              {bookable.length} bookable on MicStage
+              {bookable.length} with online signups open
             </span>
           ) : null}
           <Link

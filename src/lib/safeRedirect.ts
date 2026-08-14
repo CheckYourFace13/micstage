@@ -35,13 +35,22 @@ export function safeAfterAuthPath(next: string | null | undefined, fallback: str
 }
 
 /**
- * After musician login (or “already signed in” on the login page): always land on the artist dashboard
- * unless `next` is a safe deep link back to a venue (e.g. finish booking after sign-in).
+ * After musician login (or “already signed in” on the login page): land on the artist dashboard
+ * unless `next` is a safe deep link back to discovery or a venue (e.g. finish booking after sign-in).
  */
 export function safeAfterMusicianLoginPath(next: string | null | undefined): string {
   const resolved = safeAfterAuthPath(next, ARTIST_DASHBOARD_HREF);
   const pathOnly = (resolved.split("?")[0] || "").trim();
-  if (pathOnly.startsWith("/venues/")) return resolved;
+  if (
+    pathOnly.startsWith("/venues/") ||
+    pathOnly.startsWith("/open-mics/") ||
+    pathOnly === "/find-open-mics" ||
+    pathOnly.startsWith("/find-open-mics?") ||
+    pathOnly === "/map" ||
+    pathOnly.startsWith("/locations/")
+  ) {
+    return resolved;
+  }
   return ARTIST_DASHBOARD_HREF;
 }
 

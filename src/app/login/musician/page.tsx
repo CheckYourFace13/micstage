@@ -104,7 +104,10 @@ export default async function MusicianLoginPage(props: {
             </Link>
             .<br />
             New artist?{" "}
-            <Link className="underline hover:text-white" href="/register/musician">
+            <Link
+              className="underline hover:text-white"
+              href={next ? `/register/musician?next=${encodeURIComponent(next)}` : "/register/musician"}
+            >
               Create an account
             </Link>
             .

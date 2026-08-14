@@ -19,7 +19,7 @@ export function VenueBookingFlash({
   if (booked) {
     return (
       <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-        Reservation confirmed. You can manage it from your artist portal if you booked while signed in.
+        Signup confirmed. You can manage it from your artist account.
       </div>
     );
   }

@@ -20,11 +20,14 @@ export const metadata: Metadata = buildPublicMetadata({
 const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
 
 export default async function MusicianRegisterPage(props: {
-  searchParams: Promise<{ error?: string; growthLead?: string }>;
+  searchParams: Promise<{ error?: string; growthLead?: string; next?: string }>;
 }) {
-  const { error, growthLead } = await props.searchParams;
+  const { error, growthLead, next: nextRaw } = await props.searchParams;
   const session = await getSession();
   if (session?.kind === "musician") redirect(ARTIST_DASHBOARD_HREF);
+
+  const returnNext =
+    typeof nextRaw === "string" && nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw.trim() : "";
 
   const traceId = typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim()) ? growthLead.trim() : "";
   if (traceId) {
@@ -42,7 +45,7 @@ export default async function MusicianRegisterPage(props: {
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-6 py-16">
-        <Link className="text-sm text-white/70 hover:text-white" href="/">
+        <Link className="text-sm text-white/70 hover:text-white" href={returnNext || "/"}>
           &lt;- Back
         </Link>
 
@@ -50,6 +53,9 @@ export default async function MusicianRegisterPage(props: {
         <p className="mt-2 text-sm text-white/70">
           Just a display name, email, and password. Find open mics and build your profile after you&apos;re in.
         </p>
+        {returnNext ? (
+          <p className="mt-2 text-sm text-emerald-100/90">After you create your account, we&apos;ll bring you right back.</p>
+        ) : null}
 
         <form
           method="post"
@@ -57,6 +63,7 @@ export default async function MusicianRegisterPage(props: {
           className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6"
         >
           {traceId ? <input type="hidden" name="growthTraceLeadId" value={traceId} /> : null}
+          {returnNext ? <input type="hidden" name="next" value={returnNext} /> : null}
           {showRate ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Too many signup attempts. Please try again later.

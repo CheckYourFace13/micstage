@@ -43,11 +43,22 @@ export default async function ClaimActivatePage(props: { params: Promise<{ venue
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-        <p className="text-xs uppercase tracking-wide text-white/45">Post-claim activation</p>
-        <h1 className="om-heading mt-2 text-3xl">Confirm and publish</h1>
+        <p className="text-xs uppercase tracking-wide text-white/45">Your open mic</p>
+        <h1 className="om-heading mt-2 text-3xl">Your open mic is claimed</h1>
         <p className="mt-2 text-sm text-white/70">
-          We prefilled {venue.name} from the verified listing. Confirm details, publish your schedule, and optionally enable booking.
+          {venue.name} is on your MicStage account. Everything below is optional — skip and finish later anytime.
         </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href="/venue"
+            className="inline-flex h-11 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold text-violet-50 hover:bg-violet-500/25"
+          >
+            Go to my dashboard
+          </Link>
+          <Link href="/venue" className="inline-flex h-11 items-center justify-center px-4 text-sm text-white/60 underline">
+            I&apos;ll do this later
+          </Link>
+        </div>
         <div className="mt-8">
           <ClaimActivationEditor
             venue={{

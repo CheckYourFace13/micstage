@@ -3,7 +3,6 @@ import bcrypt from "bcryptjs";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
-import { PROMOTER_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import {
   REGISTRATION_CONTENT_CONSENT_VERSION,
   registrationContentConsentChecked,
@@ -90,7 +89,7 @@ export async function POST(request: Request) {
     });
 
     await setSession({ kind: "promoter", promoterId: promoter.id, email: promoter.email });
-    return redirectTo(PROMOTER_DASHBOARD_HREF);
+    return redirectTo("/promoter/welcome");
   } catch (e) {
     console.error("[registerPromoter]", e);
     return redirectTo("/register/promoter?error=unavailable");

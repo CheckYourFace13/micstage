@@ -137,20 +137,22 @@ async function sendApplicantDecisionEmail(input: {
   const subject = approved
     ? "MicStage promoter application approved"
     : "MicStage promoter application update";
-  const registerUrl = absoluteUrl("/register/promoter");
+  const registerUrl = absoluteUrl(`/register/promoter?email=${encodeURIComponent(input.to)}`);
   const text = approved
     ? [
-        "Thanks for applying to run promoter-led nights through MicStage.",
+        "Thanks for applying to run open mics through MicStage.",
         "",
         "Your promoter application is approved.",
         "",
-        "Next step: create your promoter account with the same email you applied with:",
+        "Next step (about one minute): create your account with the same email:",
         registerUrl,
         "",
-        `If you need help launching your first nights, contact us: ${absoluteUrl("/contact")}`,
+        "You'll only need that email and a password. We'll use what you already told us about your open mic — no technical codes required.",
+        "",
+        `If you need help, contact us: ${absoluteUrl("/contact")}`,
       ].join("\n")
     : [
-        "Thanks for applying to run promoter-led nights through MicStage.",
+        "Thanks for applying to run open mics through MicStage.",
         "",
         "Your promoter application is not approved at this time.",
         "",
@@ -159,13 +161,13 @@ async function sendApplicantDecisionEmail(input: {
   const html = approved
     ? `<p>${escapeHtml(
         [
-          "Thanks for applying to run promoter-led nights through MicStage.",
+          "Thanks for applying to run open mics through MicStage.",
           "",
           "Your promoter application is approved.",
           "",
-          "Next: create your promoter account with the same email you applied with.",
+          "Next (about one minute): create your account with the same email. You'll only need a password — no technical codes.",
         ].join("\n"),
-      ).replace(/\n/g, "<br/>")}</p><p><a href="${escapeHtml(registerUrl)}">${escapeHtml(registerUrl)}</a></p><p>${escapeHtml(
+      ).replace(/\n/g, "<br/>")}</p><p><a href="${escapeHtml(registerUrl)}">Create my account</a></p><p>${escapeHtml(
         `Questions? ${absoluteUrl("/contact")}`,
       )}</p>`
     : `<p>${escapeHtml(text).replace(/\n/g, "<br/>")}</p>`;

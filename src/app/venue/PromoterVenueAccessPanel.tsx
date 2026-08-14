@@ -17,10 +17,10 @@ export function PromoterVenueAccessPanel({ rows }: { rows: PromoterVenueAccessPa
   return (
     <section className="mt-10 rounded-2xl border border-violet-400/25 bg-violet-500/[0.07] p-4 sm:p-6">
       <div className="text-xs font-medium uppercase tracking-widest text-violet-200/80">Promoters</div>
-      <h2 className="om-heading mt-2 text-xl tracking-wide text-white">Pending promoter access</h2>
+      <h2 className="om-heading mt-2 text-xl tracking-wide text-white">Someone wants to host here</h2>
       <p className="mt-2 text-sm text-white/70">
-        Promoters organize nights across venues. Approve only people you trust to represent your room. Public lineup links stay
-        on your schedule — approving access lets them plan nights in their dashboard.
+        A promoter says they host an open mic at your venue. Approve only people you trust. Approving lets them plan nights
+        with you on MicStage.
       </p>
       <ul className="mt-5 grid gap-4">
         {rows.map((row) => (

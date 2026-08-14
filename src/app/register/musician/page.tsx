@@ -7,7 +7,6 @@ import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { MUSICIAN_REGISTER_SUBMIT_PATH } from "./actions";
-import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
 import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
@@ -47,10 +46,9 @@ export default async function MusicianRegisterPage(props: {
           &lt;- Back
         </Link>
 
-        <h1 className="om-heading mt-6 text-4xl tracking-wide">Artist registration</h1>
+        <h1 className="om-heading mt-6 text-3xl tracking-wide sm:text-4xl">Create your artist account</h1>
         <p className="mt-2 text-sm text-white/70">
-          Book open mic slots, save and follow venues, get nearby alerts, and appear publicly by stage name. Your legal
-          name and login email stay private — only your stage name shows in search.
+          Just a display name, email, and password. Find open mics and build your profile after you&apos;re in.
         </p>
 
         <form
@@ -75,13 +73,15 @@ export default async function MusicianRegisterPage(props: {
             </div>
           ) : null}
           <label className="grid gap-1 text-sm">
-            <span className="text-white/80">Stage name</span>
+            <span className="text-white/80">Display name</span>
             <input
               name="stageName"
-              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
-              placeholder="Neon Wolves"
+              className="h-12 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white placeholder:text-white/40"
+              placeholder="How you want to appear"
               required
+              autoComplete="nickname"
             />
+            <span className="text-xs text-white/50">You can change this anytime. Bio, photo, and genres come later.</span>
           </label>
           <label className="grid gap-1 text-sm">
             <span className="text-white/80">Email</span>
@@ -109,12 +109,10 @@ export default async function MusicianRegisterPage(props: {
           <RegistrationContentConsent />
 
           <FormSubmitButton
-            label="Create artist account"
-            pendingLabel="Creating account..."
-            className="mt-2 inline-flex h-11 min-w-[200px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+            label="Create account"
+            pendingLabel="Creating…"
+            className="mt-2 inline-flex h-12 min-w-[200px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10 disabled:opacity-60"
           />
-          <p className="text-xs text-white/50">After signup, you will be able to book slots and track your upcoming sets.</p>
-          <LineupSlotTypesHelp className="mt-4" />
         </form>
       </main>
     </div>

@@ -18,6 +18,7 @@ import {
 import { autoPublishGrowthLeadsAsListings } from "@/lib/publicListings/autoPublishGrowthLeadsAsListings";
 import { runListingBacklogProcessor } from "@/lib/publicListings/listingBacklogProcessor";
 import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
+import { runOnboardingSetupNudges } from "@/lib/onboarding/setupNudges";
 import {
   countPendingListingClaimInvitesWithEmail,
   growthOutreachPausedWhileClaimInvitesPending,
@@ -133,6 +134,7 @@ async function handle(request: Request) {
     let drafts: Awaited<ReturnType<typeof runAutoGrowthOutreachDrafts>> | null = null;
     let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
     let listingClaimInvites: Awaited<ReturnType<typeof runPendingListingClaimInvites>> | null = null;
+    let onboardingNudges: Awaited<ReturnType<typeof runOnboardingSetupNudges>> | null = null;
     let resendBudget: Awaited<ReturnType<typeof resendDailyBudgetSnapshot>> | null = null;
     let pendingClaimInvites: number | null = null;
     let outreachSkippedReason: string | null = null;
@@ -160,6 +162,15 @@ async function handle(request: Request) {
         pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
       } else {
         listingClaimInvites = { sent: 0, skipped: 0, candidates: 0 };
+      }
+    }
+
+    if (emailMiningEnabled) {
+      try {
+        onboardingNudges = await runOnboardingSetupNudges(prisma, { limit: 8 });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[growth pipeline] onboarding nudges failed", { error: msg, phase });
       }
     }
 
@@ -356,6 +367,7 @@ async function handle(request: Request) {
         resendBudget,
         pendingClaimInvites,
         listingClaimInvites,
+        onboardingNudges,
         autoDrafts: drafts,
         growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,
         hint:

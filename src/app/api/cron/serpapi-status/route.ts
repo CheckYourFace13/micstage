@@ -13,6 +13,10 @@ import {
   readSerpApiProviderState,
   serpApiAvailabilityNow,
 } from "@/lib/growth/discovery/providerState";
+import {
+  growthRuntimeSnapshotForStatus,
+  resolveGrowthPipelineRuntimeSnapshot,
+} from "@/lib/growth/growthRuntimeSettings";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -82,6 +86,7 @@ async function buildStatus(forceProbe: boolean) {
     const account = await probeSerpApiAccount();
     return { ok: false, error: "database_unavailable", account };
   }
+  const growthRuntime = await resolveGrowthPipelineRuntimeSnapshot(prisma);
   const avail = await serpApiAvailabilityNow(prisma, market, new Date(), {
     forceAccountProbe: forceProbe,
   });
@@ -109,7 +114,12 @@ async function buildStatus(forceProbe: boolean) {
       daysRemaining: alloc.daysRemaining,
       remainingBudget: alloc.remainingBudget,
       micstageCallsMonth: state.callsMonth,
+      source: {
+        daily: growthRuntime.serpDailyMax.source,
+        monthly: growthRuntime.serpMonthlySoftMax.source,
+      },
     },
+    growthRuntime: growthRuntimeSnapshotForStatus(growthRuntime),
     circuit: {
       disabledUntilIso: state.disabledUntilIso,
       reason: state.reason,

@@ -33,3 +33,13 @@ openmic/
 
 # Local cron script contains CRON_SECRET
 run-micstage-discovery.cmd
+
+# Database dumps / logical backups — never commit
+*.dump
+micstage-prod-*.sql
+micstage-prod-*.manifest.json
+OpenMic-private-backups/
+backups/
+**/micstage-production-*.dump
+**/micstage-production-*.dump.manifest.json
+

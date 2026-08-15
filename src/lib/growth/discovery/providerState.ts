@@ -112,20 +112,49 @@ export async function markSerpApiCall(
   return s;
 }
 
+/**
+ * Circuit-breaker after SerpAPI HTTP 429.
+ *
+ * - `monthly_exhausted`: provider body says plan searches are gone → disable until UTC month rollover
+ *   (or cooldown if longer — e.g. late-month exhaustion near rollover).
+ * - `rate_limited` / other: cooldown only (`GROWTH_SERPAPI_COOLDOWN_HOURS_ON_429`, default 24h).
+ *
+ * Previous bug always took the *later* of cooldown vs 1st-of-next-month, so a mid-month quota 429
+ * locked SerpAPI until month end even after the account regained searches / after a misclassified 429.
+ */
 export async function disableSerpApiOnQuota429(
   prisma: PrismaClient,
   marketSlug: string,
   reason: string,
   now: Date = new Date(),
+  opts?: { kind?: "monthly_exhausted" | "rate_limited" },
 ): Promise<SerpApiProviderState> {
   const s = await readSerpApiProviderState(prisma, marketSlug, now);
   const cooldownMs = Math.max(1, growthSerpApiCooldownHoursOn429()) * 60 * 60 * 1000;
-  const firstOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const byCooldown = new Date(now.getTime() + cooldownMs);
-  const disabledUntil = byCooldown > firstOfNextMonth ? byCooldown : firstOfNextMonth;
+  const kind = opts?.kind ?? "monthly_exhausted";
+  let disabledUntil = byCooldown;
+  if (kind === "monthly_exhausted") {
+    const firstOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    disabledUntil = byCooldown > firstOfNextMonth ? byCooldown : firstOfNextMonth;
+  }
   s.disabledUntilIso = disabledUntil.toISOString();
   s.last429AtIso = now.toISOString();
   s.reason = reason.slice(0, 300);
+  await writeSerpApiProviderState(prisma, marketSlug, s);
+  return s;
+}
+
+/** Clear circuit-breaker so the next discovery run may call SerpAPI again (caps still apply). */
+export async function clearSerpApiCircuitBreaker(
+  prisma: PrismaClient,
+  marketSlug: string,
+  now: Date = new Date(),
+  note = "manual_clear",
+): Promise<SerpApiProviderState> {
+  const s = await readSerpApiProviderState(prisma, marketSlug, now);
+  s.disabledUntilIso = null;
+  s.reason = note.slice(0, 300);
   await writeSerpApiProviderState(prisma, marketSlug, s);
   return s;
 }

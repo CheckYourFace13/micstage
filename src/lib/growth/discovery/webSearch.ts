@@ -129,18 +129,21 @@ export async function runSerpApiSearch(
     const text = await res.text();
     if (!res.ok) {
       const tLower = text.toLowerCase();
-      const quotaExhausted =
-        res.status === 429 &&
-        (tLower.includes("run out of searches") ||
-          tLower.includes("out of searches") ||
-          tLower.includes("quota"));
-      if (quotaExhausted && opts?.prisma && opts.marketSlug) {
-        const state = await disableSerpApiOnQuota429(opts.prisma, opts.marketSlug, "serpapi_429_quota");
+      if (res.status === 429 && opts?.prisma && opts.marketSlug) {
+        const monthlyExhausted =
+          tLower.includes("run out of searches") || tLower.includes("out of searches");
+        const kind = monthlyExhausted ? "monthly_exhausted" : "rate_limited";
+        const reason = monthlyExhausted ? "serpapi_429_quota" : "serpapi_429_rate";
+        const state = await disableSerpApiOnQuota429(opts.prisma, opts.marketSlug, reason, new Date(), {
+          kind,
+        });
         console.error("[growth discovery] SerpAPI circuit breaker engaged", {
           market: opts.marketSlug,
+          kind,
           disabledUntil: state.disabledUntilIso,
           last429At: state.last429AtIso,
           reason: state.reason,
+          bodyPreview: text.slice(0, 200),
         });
       }
       console.warn("[growth discovery] SerpAPI HTTP", res.status, text.slice(0, 400));

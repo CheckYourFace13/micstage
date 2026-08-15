@@ -315,6 +315,20 @@ export async function serpApiAvailabilityNow(
         }
         s.runsToday = 0;
         s.callsToday = 0;
+      } else if (
+        typeof account.planSearchesLeft === "number" &&
+        account.planSearchesLeft <= 0 &&
+        account.planRenewalDate
+      ) {
+        // Keep circuit aligned to provider renewal (Account API; no search cost).
+        const renewal = parseRenewalDate(account.planRenewalDate, now);
+        if (renewal) {
+          const until = s.disabledUntilIso ? new Date(s.disabledUntilIso) : null;
+          if (!until || Number.isNaN(until.getTime()) || until.getTime() < renewal.getTime()) {
+            s.disabledUntilIso = renewal.toISOString();
+            s.reason = "provider_quota_exhausted";
+          }
+        }
       }
     }
   }

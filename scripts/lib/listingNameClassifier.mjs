@@ -12,7 +12,7 @@ const CANCELLED_OR_CLOSED =
 
 /** Whole-name generic page titles (nav labels / scraped page chrome, not venues). */
 export const GENERIC_PAGE_TITLE =
-  /^(write|events?|event\s+venue|event\s+spaces?(?:\s*(?:&|and)\s*places?)?|stand|home(?:\s*page)?|homepage|home-\d+|local\s+events|all\s+events|upcoming(?:\s+events)?|calendar|schedule|contact(?:\s+us)?|about(?:\s+us)?|menus?|hours|our\s+hours|directions|locations?|venues?|gallery|photos?|blog|news|faqs?|log\s?in|sign\s?in|sign\s?up|signup|register|search|tickets|buy\s+tickets|shop|store|privacy(?:\s+policy)?|terms(?:\s+of\s+service)?|page\s+not\s+found|not\s+found|404|error|coming\s+soon|under\s+construction|what'?s\s+on|book\s+now|reservations?|reserve|more\s+info|learn\s+more|read\s+more|click\s+here|untitled|default|sample\s+page|test|welcome|account\s+suspended|open\s?mic|open\s?mic\s+night|instagram|facebook|twitter|tiktok|youtube|linkedin|music|live|tonight|ticket|must|open|entertainment|bookings?|groups?|meetup|directory|category|private\s+events?|discovered\s+lead)$/i;
+  /^(write|events?|event\s+venue|event\s+spaces?(?:\s*(?:&|and)\s*places?)?|events?\s+list|all\s+venues?|stand|home(?:\s*page)?|homepage|home-\d+|local\s+events|all\s+events|upcoming(?:\s+events)?|calendar|schedule|contact(?:\s+us)?|about(?:\s+us)?|about\s+\w+|menus?|hours|our\s+hours|directions|locations?|venues?|gallery|photos?|blog|news|faqs?|log\s?in|sign\s?in|sign\s?up|signup|register|search|tickets|buy\s+tickets|shop|store|privacy(?:\s+policy)?|terms(?:\s+of\s+service)?|page\s+not\s+found|not\s+found|404|error|coming\s+soon|under\s+construction|what'?s\s+on|book\s+now|reservations?|reserve|more\s+info|learn\s+more|read\s+more|click\s+here|untitled|default|sample\s+page|test|welcome|account\s+suspended|open\s?mic|open\s?mic\s+night|instagram|facebook|twitter|tiktok|youtube|linkedin|music|live|tonight|ticket|must|open|entertainment|bookings?|groups?|meetup|directory|category|private\s+events?|discovered\s+lead|singer|nightlife|the\s+nightlife)$/i;
 
 /**
  * Exact junk tokens that are never a public open-mic identity (any casing).
@@ -62,7 +62,7 @@ const DATE_ARTICLE =
 
 /** Non-venue editorial phrasing anywhere in the title. */
 export const EDITORIAL =
-  /(\bthings\s+to\s+do\b)|(\bnight\s+of\s+laughs\b)|(\btour\s+of\s+comedy\b)|(\bbest\s+(live\s+music|bars|comedy|places|things|private\s+event)\b)|(\bfind\s+the\s+best\b)|(\btop\s+(conference|summit|venues?|clubs?|bars?|spots?)\b)|(\blive\s+music\s*(?:&|and)\s*concerts?\b)|(\btickets?\s*(?:&|and)\s*schedule\b)|(\bevent\s+spaces?(?:\s*(?:&|and)\s*places?)?\b)|(\b(nightlife|city|bar|drink|dining|music|comedy|visitors?|travel|ultimate|summer|winter|spring|fall|autumn|holiday|weekend|seasonal|annual)\s+guide\b)|(\bguide\s*[:|-])|(\bguide\s+to\b)|(\bguide$)|(\bcalendar\b)|(\blive\s+music\s+calendar\b)|(\bconcerts?\s+(19|20)\d{2}\b)|(\b(19|20)\d{2}\s+schedule\b)|(\btop\s+ten\b)|(\btop\s+10\b)|(\blist\s+of\b)|(\bround-?up\b)|(\bthis\s+weekend\b)|(\bthis\s+week\b)|(\bnear\s+you\b)|(\bmust[-\s](see|visit|try)\b)|(\bmust-chicago\b)|(\bhow\s+to\b)|(\bhow\s+many\b)|(\bhow\s+\w[\w\s']{2,40}\s+still\b)|(\breview:)|(\brecap\b)|(\b(ways|reasons)\s+to\b)|(\bsoloing\s+wings\b)|(\bstretch\s+my\b)|(\bkaraoke\b)|(\btrivia\b)|(\bpub\s+trivia\b)|(\bbandmix\b)|(\bprivate\s+events?\b)|(\blive\s+music\s+trail\b)|(\byou\s+have\s+to\s+(experience|see|visit|try)\b)|(\bmusic\s+venues?\s+you\b)|(\btop\s+singers?\b)|(\bartist\s+booking\b)|(\bbooking\s+information\b)|(\bvenue\s+rental\b)|(\brent\s+(this\s+)?venue\b)|(\bentertainment\s+directory\b)|(\btourism\b)|(\bvisitors?\s+guide\b)|(\bwhere\s+to\b)|(\bour\s+picks\b)|(\bstep\s+on\s+the\s+stage\b)|(\blooking\s+for\s+live\s+music\b)|(\bcelebrate\s+poetry\b)|(\bnational\s+poetry\s+month\b)|(\bmeet\s+our\s+(song\s+)?creators?\b)|(\bfolk\s+and\s+acoustic\s+music\s*home\b)|(\bhosts?\s+open\s+mic\b[\s\S]*\braising\s+money\b)|(\bculture\s+is\s+prevention\b)|(\bsix\s+of\s+the\s+city'?s\s+best\b)|(\bmusic\s+festivals?\s*(?:&|and)\s*concerts?\b)|(\bshowcase\s+your\s+talent\b)|(\bi\s+wanna\b)|(\bi\s+want\s+to\b)|(\ball\s+posts?\b)|(\barchives?\b)|(\busing\s+\w+\s+at\s+an?\s+open\s+mic\b)|(\bmusic\s+venue\s+series\b)|(\bupcoming\s+events?\b)|(\bfilled\s+a\s+void\b)|(\bcolumnist\s+writes\b)|(\bnext\s+voices\b)|(\btap\s+comedians\b)|(\bpull\s+thirsty\b)|(\bwe\s+love\b)|(\ba\s+place\s+to\s+share\b)|(\bcatalog\s+of\b)|(\blocal\s+open\s+mic\b)|(\bcharms?\b)|(\bstill\s+shapes?\b)|(\bstill\s+have\s+reservations?\b)|(\brestaurants?\s+that\b)|(\bcomedy\s+tour\b)|(\b(how|what|where|why|when|who)\b[\s\S]{0,80}\?\s*$)/i;
+  /(\bthings\s+to\s+do\b)|(\bnight\s+of\s+laughs\b)|(\btour\s+of\s+comedy\b)|(\bbest\s+(live\s+music|bars|comedy|places|things|private\s+event)\b)|(\bfind\s+the\s+best\b)|(\btop\s+(conference|summit|venues?|clubs?|bars?|spots?)\b)|(\blive\s+music\s*(?:&|and)\s*concerts?\b)|(\btickets?\s*(?:&|and)\s*schedule\b)|(\bevent\s+spaces?(?:\s*(?:&|and)\s*places?)?\b)|(\b(nightlife|city|bar|drink|dining|music|comedy|visitors?|travel|ultimate|summer|winter|spring|fall|autumn|holiday|weekend|seasonal|annual)\s+guide\b)|(\bguide\s*[:|-])|(\bguide\s+to\b)|(\bguide$)|(\bcalendar\b)|(\blive\s+music\s+calendar\b)|(\bconcerts?\s+(19|20)\d{2}\b)|(\b(19|20)\d{2}\s+schedule\b)|(\btop\s+ten\b)|(\btop\s+10\b)|(\blist\s+of\b)|(\bround-?up\b)|(\bthis\s+weekend\b)|(\bthis\s+week\b)|(\bnear\s+you\b)|(\bmust[-\s](see|visit|try)\b)|(\bmust-chicago\b)|(\bhow\s+to\b)|(\bhow\s+many\b)|(\bhow\s+\w[\w\s']{2,40}\s+still\b)|(\breview:)|(\brecap\b)|(\b(ways|reasons)\s+to\b)|(\bsoloing\s+wings\b)|(\bstretch\s+my\b)|(\bkaraoke\b)|(\btrivia\b)|(\bpub\s+trivia\b)|(\bbandmix\b)|(\bprivate\s+events?\b)|(\blive\s+music\s+trail\b)|(\byou\s+have\s+to\s+(experience|see|visit|try)\b)|(\bmusic\s+venues?\s+you\b)|(\btop\s+singers?\b)|(\bartist\s+booking\b)|(\bbooking\s+information\b)|(\bvenue\s+rental\b)|(\brent\s+(this\s+)?venue\b)|(\bentertainment\s+directory\b)|(\btourism\b)|(\bvisitors?\s+guide\b)|(\bwhere\s+to\b)|(\bour\s+picks\b)|(\bstep\s+on\s+the\s+stage\b)|(\blooking\s+for\s+live\s+music\b)|(\bcelebrate\s+poetry\b)|(\bnational\s+poetry\s+month\b)|(\bmeet\s+our\s+(song\s+)?creators?\b)|(\bfolk\s+and\s+acoustic\s+music\s*home\b)|(\bhosts?\s+open\s+mic\b[\s\S]*\braising\s+money\b)|(\bculture\s+is\s+prevention\b)|(\bsix\s+of\s+the\s+city'?s\s+best\b)|(\bmusic\s+festivals?\s*(?:&|and)\s*concerts?\b)|(\bshowcase\s+your\s+talent\b)|(\bi\s+wanna\b)|(\bi\s+want\s+to\b)|(\ball\s+posts?\b)|(\barchives?\b)|(\busing\s+\w+\s+at\s+an?\s+open\s+mic\b)|(\bmusic\s+venue\s+series\b)|(\bupcoming\s+events?\b)|(\bfilled\s+a\s+void\b)|(\bcolumnist\s+writes\b)|(\bnext\s+voices\b)|(\btap\s+comedians\b)|(\bpull\s+thirsty\b)|(\bwe\s+love\b)|(\ba\s+place\s+to\s+share\b)|(\bcatalog\s+of\b)|(\blocal\s+open\s+mic\b)|(\bcharms?\b)|(\bstill\s+shapes?\b)|(\bstill\s+have\s+reservations?\b)|(\brestaurants?\s+that\b)|(\bcomedy\s+tour\b)|(\ba\s+stage\s+for\s+all\b)|(\ba\s+community\s+for\s+everyone\b)|(\bexplore\s+\w[\w\s']{0,40}\s+open\b)|(\btake\s+a\s+crack\b)|(\bsome\s+of\s+these\b)|(\bchicago\s+all\b)|(\b(how|what|where|why|when|who)\b[\s\S]{0,80}\?\s*$)/i;
 
 /** Exact generic page titles that are not venues even when they mention live music. */
 export const GENERIC_LIVE_MUSIC_TITLE =
@@ -145,6 +145,19 @@ function looksLikeOpenMicAggregator(name) {
   return true;
 }
 
+function looksLikeGenreCityShell(name) {
+  const toks = tokenizeName(name);
+  if (toks.length < 2 || toks.length > 4) return false;
+  const genre = toks[0];
+  if (!["comedy", "poetry", "music", "standup", "stand", "up"].includes(genre)) return false;
+  for (const tok of toks.slice(1)) {
+    if (AGG_GENERIC_TOKENS.has(tok)) continue;
+    if (AGG_GEO_TOKENS.has(tok)) continue;
+    return false;
+  }
+  return true;
+}
+
 /** Returns a rejection reason string, or null when the name is public-quality. */
 export function classifyListingName(name) {
   const n = (name ?? "").trim();
@@ -152,6 +165,22 @@ export function classifyListingName(name) {
   if (EXACT_JUNK_NAME.has(n.toLowerCase())) return "GENERIC_PAGE_TITLE";
   if (/^(poetry|comedy|jazz|blues|karaoke|trivia|music|live|events?|tickets?)$/i.test(n)) {
     return "GENERIC_PAGE_TITLE";
+  }
+  if (
+    /^(comedy|poetry|music|standup|stand[\s-]?up)\s+(shows?|venues?|readings?|nights?|clubs?|events?|list|guide|calendar|scene)\b/i.test(
+      n,
+    )
+  ) {
+    return "AGGREGATOR_OR_DIRECTORY";
+  }
+  if (/^(comedy|poetry|music)\s+[a-z][a-z\s']+$/i.test(n) && looksLikeGenreCityShell(n)) {
+    return "AGGREGATOR_OR_DIRECTORY";
+  }
+  if (/^[a-z][a-z\s']+\s+standup$/i.test(n) && !VENUE_IDENTITY.test(n)) {
+    return "AGGREGATOR_OR_DIRECTORY";
+  }
+  if (/\bis\s+held\b/i.test(n) || /\btake\s+a\s+crack\b/i.test(n)) {
+    return "NON_VENUE_TITLE";
   }
   if (CANCELLED_OR_CLOSED.test(n)) return "CANCELLED_OR_CLOSED";
   if (GENERIC_PAGE_TITLE.test(n)) return "GENERIC_PAGE_TITLE";

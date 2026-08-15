@@ -306,6 +306,15 @@ export async function serpApiAvailabilityNow(
       if (shouldAutoRecoverFromAccount(s, account, now)) {
         s.disabledUntilIso = null;
         s.reason = "auto_recovered_provider_quota_available";
+        // Provider billing cycle may not match UTC monthKey. Align MicStage
+        // monthly usage to the Account API so soft-cap does not block a fresh allowance.
+        if (typeof account.thisMonthUsage === "number" && account.thisMonthUsage >= 0) {
+          s.callsMonth = account.thisMonthUsage;
+        } else {
+          s.callsMonth = 0;
+        }
+        s.runsToday = 0;
+        s.callsToday = 0;
       }
     }
   }

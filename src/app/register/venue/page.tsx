@@ -15,7 +15,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Venue registration",
   description:
-    "Create a free MicStage venue account, publish your open mic schedule, and share bookable slots with artists. List your room and grow attendance.",
+    "Create a free MicStage venue account, publish your open mic schedule, and optionally enable online performer signups. List your room and grow attendance.",
   path: "/register/venue",
 });
 

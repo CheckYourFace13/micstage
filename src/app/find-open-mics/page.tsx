@@ -45,13 +45,13 @@ export default async function FindOpenMicsPage() {
             </p>
             <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide sm:text-4xl">Find local open mics</h1>
             <p className="text-xs leading-snug text-white/55 md:hidden">
-              Search by location, ZIP, city, or metro, then open a venue for schedule and booking.
+              Search by location, ZIP, city, or metro, then open a venue for schedule and signup.
             </p>
           </div>
 
           <p className="order-4 max-w-2xl text-xs leading-snug text-white/55 md:order-2 md:mt-3 md:text-sm md:leading-normal md:text-white/70">
             Start from where you are, a ZIP code, a city, or a metro. Open any venue to see its public open mic page,
-            schedule, and booking board.
+            schedule, and signup board.
           </p>
           <div className="order-3 flex flex-wrap gap-x-3 gap-y-2 text-xs text-white/60 md:order-3 md:gap-3 md:gap-y-2 md:text-sm md:text-white/70">
             <Link href="/performers" className="text-inherit underline hover:text-white">

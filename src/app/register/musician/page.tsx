@@ -13,7 +13,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Artist registration",
   description:
-    "Create your MicStage artist account with email and password. Set a public stage name, find open mics, and book slots.",
+    "Create your free MicStage artist account with email and password. Set a public stage name, find open mics, and sign up when available.",
   path: "/register/musician",
 });
 

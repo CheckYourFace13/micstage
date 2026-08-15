@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic map: find venues by night on MicStage",
   description:
-    "Map-first discovery for MicStage open mics: filter by weekday and format, see which venues take online bookings soon, then open any profile to reserve a slot. Complements city or ZIP search; it is not a duplicate directory.",
+    "Map-first discovery for MicStage open mics: filter by weekday and format, see which venues offer online signups, then open any profile to sign up when available. Complements city or ZIP search; it is not a duplicate directory.",
   path: "/map",
 });
 

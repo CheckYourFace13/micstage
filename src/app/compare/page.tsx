@@ -24,9 +24,9 @@ function markLabel(m: CompareMark): string {
     case "PARTIAL":
       return "Partial";
     case "COMING_LATER":
-      return "Later";
+      return "Coming later";
     default:
-      return "—";
+      return "No";
   }
 }
 
@@ -55,13 +55,15 @@ export default function ComparePage() {
         </h1>
         <p className="mt-4 max-w-2xl text-sm text-white/70 md:text-base">
           There are several good tools depending on what you need. Some focus on the night itself (timers, TV displays).
-          Others are directories or full production platforms. MicStage is built to help you{" "}
-          <span className="text-white">find open mics, run the night, and organize performer signups — free</span>.
+          Others are directories or full production platforms. MicStage is{" "}
+          <span className="text-white">free, open-mic-specific, and built for the full workflow</span> — find open mics,
+          run the night, and organize performer signups without a subscription.
         </p>
         <p className="mt-3 text-xs text-white/45">
           Pricing and feature claims last verified from official public pages on{" "}
-          <time dateTime={COMPETITOR_COMPARE_VERIFIED_AT}>{COMPETITOR_COMPARE_VERIFIED_AT}</time>. Competitor products
-          change — check their sites before deciding.
+          <time dateTime={COMPETITOR_COMPARE_VERIFIED_AT}>{COMPETITOR_COMPARE_VERIFIED_AT}</time> (same date on every
+          row below). Competitor products change — check their sites before deciding. Marks use Yes / No / Partial /
+          Coming later only.
         </p>
 
         <section className="mt-10 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03]">
@@ -99,7 +101,7 @@ export default function ComparePage() {
                 <tr key={f.key} className="border-b border-white/10">
                   <td className="px-3 py-3 text-white/60 sm:px-4">{f.label}</td>
                   {COMPETITORS.map((c) => {
-                    const m = c.features[f.key] ?? "UNKNOWN";
+                    const m = c.features[f.key] ?? "NO";
                     return (
                       <td key={c.id} className={`px-3 py-3 font-medium sm:px-4 ${markClass(m)}`}>
                         {markLabel(m)}
@@ -116,6 +118,9 @@ export default function ComparePage() {
           {COMPETITORS.map((c) => (
             <article key={c.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
               <h2 className="text-lg font-semibold text-white">{c.name}</h2>
+              <p className="mt-1 text-xs text-white/40">
+                Verified <time dateTime={c.verifiedAt}>{c.verifiedAt}</time>
+              </p>
               <p className="mt-2 text-sm text-white/70">{c.notes}</p>
               <ul className="mt-3 list-inside list-disc text-xs text-white/45">
                 {c.sources.map((s) => (
@@ -133,9 +138,9 @@ export default function ComparePage() {
         <section className="mt-12 max-w-2xl">
           <h2 className="text-xl font-semibold text-white">Where MicStage fits</h2>
           <p className="mt-3 text-sm text-white/70">
-            MicStage is free for performers, promoters, and venues on the current product. It is strongest when you want
-            discovery, a public listing, recurring schedule, optional online signups, and a shareable lineup in one place —
-            without a subscription.
+            MicStage is free for performers, promoters, and venues on the current product. Forms stay short (no credit
+            card). It is strongest when you want an open-mic-specific full workflow: discovery, a public listing,
+            recurring schedule, optional online signups, and a shareable lineup in one place — without a subscription.
           </p>
           <p className="mt-3 text-sm text-white/70">
             If you need a venue TV display, set timer, or bucket draw tonight, tools like Ajar Mic or Open Mic Search may

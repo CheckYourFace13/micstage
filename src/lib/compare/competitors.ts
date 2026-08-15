@@ -4,7 +4,7 @@
  */
 export const COMPETITOR_COMPARE_VERIFIED_AT = "2026-08-15";
 
-export type CompareMark = "YES" | "NO" | "PARTIAL" | "COMING_LATER" | "UNKNOWN";
+export type CompareMark = "YES" | "NO" | "PARTIAL" | "COMING_LATER";
 
 export type CompetitorId = "micstage" | "ajar_mic" | "open_mic_search" | "cocoscout" | "openmic_us";
 
@@ -12,6 +12,8 @@ export type CompetitorRow = {
   id: CompetitorId;
   name: string;
   url: string;
+  /** ISO date this row’s prices/features were last checked from sources. */
+  verifiedAt: string;
   sources: Array<{ label: string; url: string }>;
   performerCost: string;
   hostCost: string;
@@ -48,11 +50,16 @@ export const COMPETITORS: CompetitorRow[] = [
     id: "micstage",
     name: "MicStage",
     url: "https://micstage.com",
-    sources: [{ label: "MicStage production audit", url: "https://micstage.com" }],
+    verifiedAt: COMPETITOR_COMPARE_VERIFIED_AT,
+    sources: [
+      { label: "MicStage home", url: "https://micstage.com" },
+      { label: "Find open mics", url: "https://micstage.com/find-open-mics" },
+      { label: "Venue register", url: "https://micstage.com/register/venue" },
+    ],
     performerCost: "$0",
     hostCost: "$0 for venues & promoters (current product)",
     notes:
-      "Open-mic discovery + schedule + optional online signups + public lineup + share. No credit card. No Stripe billing in production.",
+      "Open-mic-specific full workflow: discovery + schedule + optional online signups + public lineup + share. Free. No credit card. No Stripe billing in production.",
     features: {
       discovery: "YES",
       venueListing: "YES",
@@ -76,6 +83,7 @@ export const COMPETITORS: CompetitorRow[] = [
     id: "ajar_mic",
     name: "Ajar Mic",
     url: "https://ajarmic.com/",
+    verifiedAt: COMPETITOR_COMPARE_VERIFIED_AT,
     sources: [
       { label: "ajarmic.com (plans)", url: "https://ajarmic.com/" },
       { label: "App Store listing", url: "https://apps.apple.com/us/app/ajar-mic/id6762021039" },
@@ -95,11 +103,11 @@ export const COMPETITORS: CompetitorRow[] = [
       sharing: "YES",
       venueControl: "YES",
       checkIn: "YES",
-      timer: "UNKNOWN",
+      timer: "NO",
       broadcast: "YES",
       tvDisplay: "YES",
-      calendar: "UNKNOWN",
-      history: "UNKNOWN",
+      calendar: "NO",
+      history: "NO",
       ratings: "NO",
     },
   },
@@ -107,26 +115,27 @@ export const COMPETITORS: CompetitorRow[] = [
     id: "open_mic_search",
     name: "Open Mic Search",
     url: "https://www.openmicsearch.com/",
+    verifiedAt: COMPETITOR_COMPARE_VERIFIED_AT,
     sources: [{ label: "openmicsearch.com", url: "https://www.openmicsearch.com/" }],
     performerCost: "Free account; Performer Pro mentioned (price not clearly listed on homepage)",
     hostCost: "Host tools advertised as free to list / free forever",
     notes:
-      "Directory + free host tools (sign-up list, timer, bucket draw, applause meter) per homepage (2026-08-15). Comedy-forward positioning; features marked from their marketing claims.",
+      "Directory + free host tools (sign-up list, timer, bucket draw, applause meter) per homepage (2026-08-15). Comedy-forward positioning; unsupported claims marked No.",
     features: {
       discovery: "YES",
       venueListing: "YES",
       promoterTools: "YES",
       onlineSignup: "PARTIAL",
-      advanceSlots: "UNKNOWN",
+      advanceSlots: "NO",
       publicLineup: "PARTIAL",
-      recurring: "UNKNOWN",
-      sharing: "UNKNOWN",
+      recurring: "NO",
+      sharing: "NO",
       venueControl: "PARTIAL",
       checkIn: "YES",
       timer: "YES",
-      broadcast: "UNKNOWN",
+      broadcast: "NO",
       tvDisplay: "NO",
-      calendar: "UNKNOWN",
+      calendar: "NO",
       history: "YES",
       ratings: "PARTIAL",
     },
@@ -135,6 +144,7 @@ export const COMPETITORS: CompetitorRow[] = [
     id: "cocoscout",
     name: "CocoScout",
     url: "https://cocoscout.com/",
+    verifiedAt: COMPETITOR_COMPARE_VERIFIED_AT,
     sources: [
       { label: "cocoscout.com", url: "https://cocoscout.com/" },
       { label: "For producers", url: "https://www.cocoscout.com/for-producers" },
@@ -149,7 +159,7 @@ export const COMPETITORS: CompetitorRow[] = [
       promoterTools: "YES",
       onlineSignup: "YES",
       advanceSlots: "PARTIAL",
-      publicLineup: "UNKNOWN",
+      publicLineup: "NO",
       recurring: "YES",
       sharing: "PARTIAL",
       venueControl: "PARTIAL",
@@ -166,6 +176,7 @@ export const COMPETITORS: CompetitorRow[] = [
     id: "openmic_us",
     name: "OpenMic.US",
     url: "https://www.openmic.us/",
+    verifiedAt: COMPETITOR_COMPARE_VERIFIED_AT,
     sources: [
       { label: "Host register", url: "https://www.openmic.us/HostRegister/" },
       { label: "Venue sales", url: "https://www.openmic.us/p/venue-sales-page.html" },

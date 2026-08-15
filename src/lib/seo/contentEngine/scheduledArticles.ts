@@ -48,11 +48,11 @@ export const SCHEDULED_RESOURCE_ARTICLES: ResourceArticle[] = [
     faq: [
       {
         q: "Is MicStage the same as advice about micing a stage for theater?",
-        a: "No. MicStage helps people find open mic nights and book performance slots at venues. It is not a guide for sound engineers placing microphones on a theater stage.",
+        a: "No. MicStage helps people find open mic nights and sign up for performance spots at venues when online signups are enabled. It is not a guide for sound engineers placing microphones on a theater stage.",
       },
       {
-        q: "Can I book an open mic slot for tonight on MicStage?",
-        a: "When a venue enables booking on MicStage, you can reserve from their public page. Otherwise, show up during the venue’s posted sign-up window.",
+        q: "Can I sign up for an open mic spot tonight on MicStage?",
+        a: "When a venue enables online signups on MicStage, you can sign up from their public page. Otherwise, show up during the venue’s posted sign-up window.",
       },
     ],
     relatedGuides: [
@@ -133,7 +133,7 @@ export const SCHEDULED_RESOURCE_ARTICLES: ResourceArticle[] = [
     slug: "list-your-open-mic-venue-on-micstage",
     title: "List your open mic venue on MicStage (free venue guide)",
     description:
-      "How bar, café, and club owners list an open mic night on MicStage so local performers can find your room, see your schedule, and book slots when enabled.",
+      "How bar, café, and club owners list an open mic night on MicStage so local performers can find your room, see your schedule, and sign up for spots when the venue enables online signups.",
     category: "venue-ops",
     readingMinutes: 8,
     publishedAt: "2026-06-19",

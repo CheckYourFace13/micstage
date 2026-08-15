@@ -142,8 +142,8 @@ export default async function VenuesDirectoryPage() {
               for artists and hosts. New rooms join MicStage every week as venues publish schedules.
             </p>
             <p className="mt-4 rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-white/80">
-              <span className="font-medium text-white">Run an open mic?</span> List your venue free: get bookable slots and a
-              public page artists can find.{" "}
+              <span className="font-medium text-white">Run an open mic?</span> List your venue free: get a public page and
+              optional online signups artists can find.{" "}
               <Link className="font-semibold text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
                 Register your venue
               </Link>
@@ -158,7 +158,7 @@ export default async function VenuesDirectoryPage() {
             {listings.length > 0 ? (
               <section className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4 md:p-5">
                 <h2 className="text-lg font-semibold md:text-xl">Verified open mic listings</h2>
-                <p className="mt-1 text-xs text-white/55 md:text-sm">Not yet managed on MicStage — claim to enable booking.</p>
+                <p className="mt-1 text-xs text-white/55 md:text-sm">Not yet managed on MicStage — claim to manage schedule and signups.</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {listings.slice(0, 24).map((l) => (
                     <Link

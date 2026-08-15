@@ -49,7 +49,7 @@ export default async function MusicianRegisterPage(props: {
           &lt;- Back
         </Link>
 
-        <h1 className="om-heading mt-6 text-3xl tracking-wide sm:text-4xl">Create your artist account</h1>
+        <h1 className="om-heading mt-6 text-3xl tracking-wide sm:text-4xl">Create your free performer account</h1>
         <p className="mt-2 text-sm text-white/70">
           Just a display name, email, and password. Find open mics and build your profile after you&apos;re in.
         </p>

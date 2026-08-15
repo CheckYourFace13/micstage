@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
-      "Find open mics near you. Free for performers. Venues and hosts can claim their listing and optionally turn on online signups.",
+      "Find open mics near you and run your night free. Free for performers, promoters, and venues — discover, schedule, signup, lineup, and share.",
     path: "/",
   }),
   title: { absolute: homeTitle },
@@ -19,8 +19,8 @@ export default function Home() {
   return (
     <div className="relative min-h-dvh overflow-hidden bg-black text-white">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(255,45,149,0.35),rgba(0,0,0,0)_60%)] blur-2xl" />
-        <div className="absolute -bottom-56 -left-40 h-[680px] w-[680px] rounded-full bg-[radial-gradient(circle_at_center,rgba(123,97,255,0.28),rgba(0,0,0,0)_60%)] blur-2xl" />
+        <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(255,45,149,0.32),rgba(0,0,0,0)_60%)] blur-2xl" />
+        <div className="absolute -bottom-56 -left-40 h-[680px] w-[680px] rounded-full bg-[radial-gradient(circle_at_center,rgba(255,45,149,0.12),rgba(0,0,0,0)_60%)] blur-2xl" />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35),rgba(0,0,0,1))]" />
       </div>
 
@@ -29,16 +29,16 @@ export default function Home() {
           <div className="lg:col-span-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80">
               <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--om-neon))]" />
-              Free open mic discovery
+              Free for performers, promoters &amp; venues
             </div>
             <h1 className="om-heading mt-4 text-4xl leading-[0.95] tracking-wide sm:text-5xl md:text-6xl">
-              Find open mics
+              Find it. Run it.
               <br />
-              near you
+              Perform. Free.
             </h1>
             <p className="mt-4 max-w-xl text-sm text-white/70 md:text-base">
-              Search local open mics by ZIP or city. Free for performers. If you run a night, claim your listing in
-              minutes.
+              Discover real open mics, manage the schedule, organize performer signups, share your lineup, and keep the
+              night moving — in one place. No credit card required.
             </p>
 
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
@@ -54,7 +54,7 @@ export default function Home() {
                 data-track-event="homepage_cta_host"
                 className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/25 bg-white/8 px-6 text-base font-semibold text-white hover:bg-white/15"
               >
-                I run an open mic
+                Run your open mic free
               </Link>
             </div>
 
@@ -63,15 +63,30 @@ export default function Home() {
 
           <div className="lg:col-span-5">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
-              <div className="text-xs font-medium uppercase tracking-widest text-white/50">More ways to browse</div>
+              <div className="text-xs font-medium uppercase tracking-widest text-white/50">Who it&apos;s for</div>
+              <ul className="mt-3 grid gap-3 text-sm">
+                <li className="rounded-xl border border-white/10 bg-black/30 p-4">
+                  <p className="font-semibold text-white">Performers</p>
+                  <p className="mt-1 text-xs text-white/55">Find real open mics and sign up when available.</p>
+                </li>
+                <li className="rounded-xl border border-white/10 bg-black/30 p-4">
+                  <p className="font-semibold text-white">Hosts &amp; promoters</p>
+                  <p className="mt-1 text-xs text-white/55">Manage your night without spreadsheets.</p>
+                </li>
+                <li className="rounded-xl border border-white/10 bg-black/30 p-4">
+                  <p className="font-semibold text-white">Venues</p>
+                  <p className="mt-1 text-xs text-white/55">Get discovered and make performer signup easier.</p>
+                </li>
+              </ul>
               <div className="mt-3 grid gap-2.5">
-                <Link href="/map" className="rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40">
-                  <div className="font-semibold">Open mic map</div>
-                  <div className="mt-1 text-xs text-white/55">See nights on a map near you</div>
+                <Link href="/map" className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm hover:bg-black/40">
+                  <span className="font-semibold">Open mic map</span>
                 </Link>
-                <Link href="/locations" className="rounded-xl border border-white/10 bg-black/30 p-4 hover:bg-black/40">
-                  <div className="font-semibold">Browse by city</div>
-                  <div className="mt-1 text-xs text-white/55">Jump to your metro area</div>
+                <Link
+                  href="/compare"
+                  className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm hover:bg-black/40"
+                >
+                  <span className="font-semibold">Compare open mic apps</span>
                 </Link>
               </div>
             </div>

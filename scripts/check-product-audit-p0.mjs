@@ -53,8 +53,31 @@ function read(rel) {
 
 {
   const home = read("src/app/page.tsx");
-  assert.ok(/Free for performers/i.test(home) || /Free open mic discovery/i.test(home));
+  assert.ok(/Free for performers, promoters/i.test(home), "homepage free for all roles");
+  assert.ok(/No credit card required/i.test(home));
+  assert.ok(/Find open mics/i.test(home));
+  assert.ok(/Run your open mic free/i.test(home));
   assert.ok(home.includes("data-track-event"));
+}
+
+{
+  const compare = read("src/app/compare/page.tsx");
+  assert.ok(/COMPETITOR_COMPARE_VERIFIED_AT|verified/i.test(compare) || compare.includes("verified"));
+  assert.ok(compare.includes("ajarmic.com") || compare.includes("Ajar Mic"));
+  const data = read("src/lib/compare/competitors.ts");
+  assert.ok(data.includes("COMPETITOR_COMPARE_VERIFIED_AT"));
+  assert.ok(data.includes("COMING_LATER"));
+}
+
+{
+  const venueForm = read("src/app/venue/VenueProfileForm.tsx");
+  assert.ok(/NODE_ENV !== "production"/.test(venueForm), "PRO upgrade hidden in production");
+}
+
+{
+  const safe = read("src/lib/safeRedirect.ts");
+  assert.ok(safe.includes('raw.startsWith("//")'), "blocks protocol-relative open redirects");
+  assert.ok(safe.includes("://"), "blocks absolute URLs in next=");
 }
 
 {

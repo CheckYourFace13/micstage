@@ -47,10 +47,10 @@ export default async function VenueRegisterPage(props: { searchParams: Promise<{
           &lt;- Back
         </Link>
 
-        <h1 className="om-heading mt-6 text-4xl tracking-wide">Venue registration</h1>
+        <h1 className="om-heading mt-6 text-4xl tracking-wide">Run your open mic free</h1>
         <p className="mt-2 text-sm text-white/70">
-          Create your venue account, set your open mic schedule, optionally require on-premises signups, then share your
-          signup link on social media so performers can discover your venue.
+          Create your free venue account, set your open mic schedule when you&apos;re ready, optionally turn on online
+          signups, then share your page. No credit card required.
         </p>
         {traceId ? (
           <div className="mt-4 rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">

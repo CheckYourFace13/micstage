@@ -310,7 +310,8 @@ export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
         />
       </form>
 
-      {venue.subscriptionTier === "FREE" ? (
+      {/* Paid PRO is not offered in production yet — hide upgrade CTA to avoid a dead “buy” path. */}
+      {venue.subscriptionTier === "FREE" && process.env.NODE_ENV !== "production" ? (
         <form action={async (fd) => go(await upgradeVenuePlan(fd))} className="mt-4 flex flex-wrap items-center gap-3">
           <input type="hidden" name="venueId" value={venue.id} />
           <FormSubmitButton
@@ -318,11 +319,12 @@ export function VenueProfileForm({ venue, emphasis = "primary" }: Props) {
             pendingLabel="Upgrading…"
             className="h-10 rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-70"
           />
-          <span className="text-xs text-white/50">Payments integration is TODO; this is dev-safe.</span>
+          <span className="text-xs text-white/50">Dev only — payments are not enabled in production.</span>
         </form>
-      ) : (
+      ) : null}
+      {venue.subscriptionTier === "PRO" ? (
         <div className="mt-4 text-xs text-white/60">PRO enabled: your booking horizon can extend beyond 60 days.</div>
-      )}
+      ) : null}
     </div>
   );
 }

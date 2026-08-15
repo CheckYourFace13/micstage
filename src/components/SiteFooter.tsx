@@ -13,6 +13,9 @@ export async function SiteFooter() {
             <Link className="hover:text-white" href="/contact">
               Contact
             </Link>
+            <Link className="hover:text-white" href="/compare">
+              Compare apps
+            </Link>
             <Link className="hover:text-white" href="/resources">
               Resources and guides
             </Link>

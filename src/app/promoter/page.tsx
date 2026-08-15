@@ -115,7 +115,9 @@ export default async function PromoterDashboardPage(props: {
   const promoterNotice = (() => {
     switch (promoter) {
       case "series_ok":
-        return "Open mic name saved. Next: connect the venue.";
+        return focus === "schedule"
+          ? "Your open mic is saved. Add the schedule when you're ready so performers can find the next one."
+          : "Open mic saved. Next: connect the venue when you're ready.";
       case "series_taken":
       case "series_slug":
       case "series_invalid":

@@ -169,11 +169,9 @@ export default async function PromoterWelcomePage(props: {
 
         {step === "create" ? (
           <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
-            <h2 className="text-lg font-semibold text-white">Name your open mic</h2>
+            <h2 className="text-lg font-semibold text-white">Create your open mic</h2>
             <p className="mt-1 text-sm text-white/60">
-              Required now: open mic name
-              {primaryVenueHint ? ` (venue: ${primaryVenueHint} can connect later)` : ""}. Everything else is
-              optional afterward.
+              Just a name to start. Venue and schedule can wait until you&apos;re ready.
             </p>
             <form action={createPromoterSeriesAction} className="mt-4 grid gap-3">
               <label className="grid gap-1 text-sm">
@@ -186,19 +184,28 @@ export default async function PromoterWelcomePage(props: {
                   placeholder="Friday night open mic"
                 />
               </label>
-              {primaryVenueHint ? (
-                <p className="text-xs text-white/50">
-                  Venue hint from your application: {primaryVenueHint}
-                  {cityRegion ? ` · ${cityRegion}` : ""}. You&apos;ll connect it after save — no slug or IDs needed.
-                </p>
-              ) : null}
+              <label className="grid gap-1 text-sm">
+                <span className="text-white/75">
+                  Venue name <span className="text-white/45">(optional)</span>
+                </span>
+                <input
+                  name="venueName"
+                  defaultValue={primaryVenueHint || ""}
+                  className="h-12 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white"
+                  placeholder="Bar or cafe name"
+                />
+              </label>
               <FormSubmitButton
-                label="Save and continue"
+                label="Save open mic"
                 pendingLabel="Saving…"
                 className="inline-flex h-12 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-5 text-sm font-semibold text-violet-50 hover:bg-violet-500/25 disabled:opacity-60"
               />
             </form>
             <p className="mt-4 text-sm text-white/55">
+              Your open mic is saved after this step. Add the schedule when you&apos;re ready so performers can find the
+              next one.
+            </p>
+            <p className="mt-3 text-sm text-white/55">
               Or{" "}
               <Link href="/promoter/welcome?step=find" className="underline hover:text-white">
                 find an existing open mic

@@ -63,7 +63,7 @@ const PLACE_ONLY_REASON = "GOOGLE_PLACE_CONFIRMED_OPEN_MIC_EVIDENCE_MISSING";
 const UNTRUSTED_REASON = "OPEN_MIC_EVIDENCE_UNTRUSTED_SOURCE";
 
 const EXPLICIT_OPEN_MIC_PATTERN =
-  /(\bopen[\s-]?mic(?:s|e|rophone)?\b)|(\bopen[\s-]?mike\b)|(\bopen[\s-]?mic\s*(?:night|signup|sign[\s-]?up)\b)|(\bopen\s+jam\b)|(\bopen\s+blues\s+jam\b)|(\bopen\s+stage\b)|(\bjam\s+night\b)|(\bsongwriter\s+(?:open\s*mic|night)\b)|(\bspoken\s+word\s+open\s*mic\b)/i;
+  /(\bopen[\s-]?mic(?:s|e|rophone)?\b)|(\bopen[\s-]?mike\b)|(\bopen[\s-]?mic\s*(?:night|signup|sign[\s-]?up)\b)|(\bopen\s+jam\b)|(\bopen\s+blues\s+jam\b)|(\bopen\s+stage\b)|(\bjam\s+night\b)|(\bsongwriter\s+(?:open\s*mic|night)\b)|(\bopen\s+singer[\s-]?songwriter\b)|(\bsinger[\s-]?songwriter\s+(?:open\s*mic|night)\b)|(\bspoken\s+word\s+open\s*mic\b)/i;
 
 const NON_EVIDENCE_NOISE = [
   /open[\s-]?mic venue identified from public listings and web search\.?/gi,
@@ -229,6 +229,9 @@ try {
       where: { id: row.id },
       data: {
         verificationStatus: "NEEDS_REVIEW",
+        evidenceTerminalReason: reason.slice(0, 80),
+        evidenceAutomationStatus: "PENDING",
+        evidenceEnrichNextAttemptAt: new Date(),
         internalNotes: appendNote(row.internalNotes, reason),
       },
     });

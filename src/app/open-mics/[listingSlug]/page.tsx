@@ -134,7 +134,8 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
             <DiscoveryListingBadge kind={kind} bookable={false} hasSchedule={listing.schedules.length > 0} />
             {listing.lastVerifiedAt ? (
               <span className="text-xs text-white/50">
-                Verified {listing.lastVerifiedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                Schedule last confirmed{" "}
+                {listing.lastVerifiedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
               </span>
             ) : null}
           </div>
@@ -170,21 +171,26 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Schedule</h2>
           {listing.schedules.length === 0 ? (
-            <p className="mt-2 text-sm text-white/60">Schedule details are still being verified.</p>
+            <p className="mt-2 text-sm text-white/60">Schedule not published yet — check with the venue before going.</p>
           ) : (
-            <ul className="mt-3 grid gap-3">
-              {listing.schedules.map((s) => (
-                <li key={s.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <div className="font-semibold">{weekdayToLabel(s.weekday)}</div>
-                  <div className="mt-1 text-sm text-white/75">
-                    {minutesToTimeLabel(s.startTimeMin)} – {minutesToTimeLabel(s.endTimeMin)}
-                    {s.title ? ` · ${s.title}` : ""}
-                  </div>
-                  <div className="mt-1 text-xs text-white/55">{performanceFormatLabel(s.performanceFormat)}</div>
-                  {s.signupMethod ? <div className="mt-2 text-xs text-white/60">Signup: {s.signupMethod}</div> : null}
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="mt-3 grid gap-3">
+                {listing.schedules.map((s) => (
+                  <li key={s.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="font-semibold">Weekly on {weekdayToLabel(s.weekday)}</div>
+                    <div className="mt-1 text-sm text-white/75">
+                      {minutesToTimeLabel(s.startTimeMin)} – {minutesToTimeLabel(s.endTimeMin)}
+                      {s.title ? ` · ${s.title}` : ""}
+                    </div>
+                    <div className="mt-1 text-xs text-white/55">{performanceFormatLabel(s.performanceFormat)}</div>
+                    {s.signupMethod ? <div className="mt-2 text-xs text-white/60">Signup: {s.signupMethod}</div> : null}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-white/50">
+                Schedule may have changed — check with the venue before going.
+              </p>
+            </>
           )}
         </section>
 

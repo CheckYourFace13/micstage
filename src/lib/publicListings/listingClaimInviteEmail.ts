@@ -252,6 +252,7 @@ export async function sendListingClaimInviteIfNeeded(
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { id: listingId },
     include: {
+      schedules: { select: { title: true, description: true } },
       growthLead: {
         select: {
           contactEmailNormalized: true,
@@ -271,6 +272,7 @@ export async function sendListingClaimInviteIfNeeded(
   const safety = listingPassesStagedClaimInviteSafety({
     ...listing,
     discoveryMarketSlug: listing.growthLead?.discoveryMarketSlug,
+    schedules: listing.schedules,
   });
   if (!safety.ok) return { sent: false, reason: safety.reason };
 
@@ -521,6 +523,7 @@ export async function runPendingListingClaimInvites(
       evidenceTerminalReason: true,
       internalNotes: true,
       about: true,
+      schedules: { select: { title: true, description: true } },
       growthLead: {
         select: {
           contactEmailNormalized: true,
@@ -563,6 +566,7 @@ export async function runPendingListingClaimInvites(
     const safety = listingPassesStagedClaimInviteSafety({
       ...row,
       discoveryMarketSlug: row.growthLead?.discoveryMarketSlug,
+      schedules: row.schedules,
     });
     if (!safety.ok) {
       skipped += 1;

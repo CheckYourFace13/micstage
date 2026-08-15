@@ -11,6 +11,7 @@ import { isFreeMailDomain } from "@/lib/publicListings/claimAutoApproval";
 import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
 import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { evaluateOpenMicEvidence } from "@/lib/publicListings/openMicEvidence";
 
 const CONTROL_ADAPTER = "claim_invite_control";
 const CONTROL_MARKET = "global";
@@ -336,19 +337,21 @@ export function listingPassesStagedClaimInviteSafety(listing: {
   city?: string | null;
   formattedAddress?: string | null;
   discoveryMarketSlug?: string | null;
+  websiteUrl?: string | null;
+  sourceUrl?: string | null;
+  schedules?: Array<{ title: string | null; description: string | null }> | null;
 }): { ok: true } | { ok: false; reason: string } {
   if (listing.verificationStatus !== "VERIFIED") return { ok: false, reason: "not_verified" };
   if (listing.claimStatus !== "UNCLAIMED") return { ok: false, reason: "not_unclaimed" };
   if (listing.claimedVenueId) return { ok: false, reason: "already_has_venue" };
   if (!listing.googlePlaceId) return { ok: false, reason: "missing_google_place" };
   const terminal = `${listing.evidenceTerminalReason ?? ""} ${listing.internalNotes ?? ""}`;
-  if (/PLACE_OR_REGION_CONFLICT|CANCELLED|CLOSED|NO_TRUSTED_EVIDENCE/i.test(terminal)) {
+  if (/PLACE_OR_REGION_CONFLICT|CANCELLED|CLOSED|NO_TRUSTED_EVIDENCE|PLACE_ONLY|NEEDS_EVIDENCE/i.test(terminal)) {
     return { ok: false, reason: "evidence_terminal_block" };
   }
   if (/cancel+ed|permanently closed/i.test(`${listing.name} ${listing.about ?? ""}`)) {
     return { ok: false, reason: "cancellation_signal" };
   }
-  // Area 51 / Roswell GA vs IL and similar geo mismatches must never enter invite pool.
   if (
     listingHasGeoConflict({
       region: listing.region,
@@ -360,9 +363,18 @@ export function listingPassesStagedClaimInviteSafety(listing: {
   ) {
     return { ok: false, reason: "geo_conflict" };
   }
-  // Public display quality — never invite owners to claim scrapy/article titles.
   if (!isPublicListingNameOk(listing.name)) {
     return { ok: false, reason: "public_display_quality" };
+  }
+  // Explicit open-mic evidence required — place identity alone is not enough.
+  const evidence = evaluateOpenMicEvidence({
+    listingName: listing.name,
+    schedules: listing.schedules,
+    sourceUrl: listing.sourceUrl,
+    websiteUrl: listing.websiteUrl,
+  });
+  if (!evidence.trusted) {
+    return { ok: false, reason: "open_mic_evidence_required" };
   }
   return { ok: true };
 }

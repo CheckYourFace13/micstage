@@ -32,6 +32,7 @@ export async function createPromoterSeriesAction(formData: FormData) {
   const session = await requirePromoterSession();
   const nameRaw = formData.get("name");
   const descriptionRaw = formData.get("description");
+  const venueNameRaw = formData.get("venueName");
   if (typeof nameRaw !== "string" || !nameRaw.trim()) redirect("/promoter?promoter=series_invalid");
 
   const name = nameRaw.trim();
@@ -39,8 +40,12 @@ export async function createPromoterSeriesAction(formData: FormData) {
   let slugInput = slugifyName(name);
   if (!SLUG_RE.test(slugInput) || slugInput.length > 64) redirect("/promoter?promoter=series_slug");
 
-  const description =
-    typeof descriptionRaw === "string" && descriptionRaw.trim() ? descriptionRaw.trim() : undefined;
+  const venueName =
+    typeof venueNameRaw === "string" && venueNameRaw.trim() ? venueNameRaw.trim().slice(0, 120) : "";
+  const descriptionParts: string[] = [];
+  if (typeof descriptionRaw === "string" && descriptionRaw.trim()) descriptionParts.push(descriptionRaw.trim());
+  if (venueName) descriptionParts.push(`Venue: ${venueName}`);
+  const description = descriptionParts.length ? descriptionParts.join("\n") : undefined;
 
   const prisma = requirePrisma();
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -56,7 +61,11 @@ export async function createPromoterSeriesAction(formData: FormData) {
       });
       revalidatePath("/promoter");
       revalidatePath("/promoter/welcome");
-      redirect("/promoter?promoter=series_ok&focus=find");
+      // Prefer find-venue next when a venue name was given; otherwise soft success.
+      if (venueName) {
+        redirect(`/promoter?promoter=series_ok&focus=find&q=${encodeURIComponent(venueName)}`);
+      }
+      redirect("/promoter?promoter=series_ok&focus=schedule");
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         continue;

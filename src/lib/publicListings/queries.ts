@@ -1,10 +1,11 @@
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { evaluateOpenMicEvidence } from "@/lib/publicListings/openMicEvidence";
 
 /**
  * Listings shown in public discovery. Only fully VERIFIED, unclaimed listings
- * are public. NEEDS_REVIEW (held for admin review), UNVERIFIED (discovered),
- * and OUTDATED (rejected/stale) rows are hidden from every browse surface.
+ * with explicit open-mic evidence (name/schedule/trusted source) are public.
+ * Place identity alone is not enough.
  */
 export const PUBLIC_DISCOVERY_VERIFICATION = ["VERIFIED"] as const;
 
@@ -64,6 +65,16 @@ const listingSelect = {
 
 export type PublicOpenMicListingPayload = Prisma.PublicOpenMicListingGetPayload<{ select: typeof listingSelect }>;
 
+function listingPassesPublicOpenMicGate(l: PublicOpenMicListingPayload): boolean {
+  if (!isPublicListingNameOk(l.name)) return false;
+  return evaluateOpenMicEvidence({
+    listingName: l.name,
+    schedules: l.schedules,
+    sourceUrl: l.sourceUrl,
+    websiteUrl: l.websiteUrl,
+  }).trusted;
+}
+
 export async function loadDiscoverablePublicListings(
   prisma: PrismaClient,
 ): Promise<PublicOpenMicListingPayload[]> {
@@ -72,7 +83,7 @@ export async function loadDiscoverablePublicListings(
     orderBy: [{ name: "asc" }],
     select: listingSelect,
   });
-  return rows.filter((l) => isPublicListingNameOk(l.name));
+  return rows.filter((l) => listingPassesPublicOpenMicGate(l));
 }
 
 export async function loadPublicOpenMicListingBySlug(
@@ -144,5 +155,5 @@ export async function loadFeaturedPublicListings(
     take: limit * 3,
     select: listingSelect,
   });
-  return rows.filter((l) => isPublicListingNameOk(l.name)).slice(0, limit);
+  return rows.filter((l) => listingPassesPublicOpenMicGate(l)).slice(0, limit);
 }

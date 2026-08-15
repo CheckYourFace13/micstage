@@ -19,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: "Complete your MicStage open mic claim invitation.",
     path: "/claim/invite",
     index: false,
+    follow: false,
   });
 }
 

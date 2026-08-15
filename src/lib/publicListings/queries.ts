@@ -39,6 +39,7 @@ const listingSelect = {
   verificationStatus: true,
   claimStatus: true,
   claimedVenueId: true,
+  removedAt: true,
   about: true,
   hostName: true,
   signupMethod: true,

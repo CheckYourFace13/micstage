@@ -6,6 +6,7 @@ import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { isValidPublicSlug } from "@/lib/locationSlugValidation";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { loadPublicOpenMicListingBySlug } from "@/lib/publicListings/queries";
+import { isPublicListingRenderable } from "@/lib/publicListings/listingQuality";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ export async function generateMetadata(props: { params: Promise<{ listingSlug: s
     title: "Claim this open mic",
     description: "Venue hosts and managers can claim a verified MicStage listing.",
     path: `/claim/${listingSlug}`,
+    index: false,
+    follow: false,
   });
 }
 
@@ -27,7 +30,7 @@ export default async function ClaimListingPage(props: { params: Promise<{ listin
   if (!prisma) return <PublicDataUnavailable title="Claim form unavailable" />;
 
   const listing = await loadPublicOpenMicListingBySlug(prisma, listingSlug);
-  if (!listing) notFound();
+  if (!listing || !isPublicListingRenderable(listing)) notFound();
 
   if (listing.claimedVenueId) {
     const venue = await prisma.venue.findUnique({

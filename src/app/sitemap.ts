@@ -6,15 +6,19 @@ import { siteOrigin } from "@/lib/publicSeo";
 import { getAllResourceArticles } from "@/lib/resourcesContent";
 import { marketingSitemapSupplements } from "@/lib/marketing/indexability";
 import { publicListingWhereDiscoverable } from "@/lib/publicListings/queries";
-import { listingIsPubliclyIndexable } from "@/lib/publicListings/listingQuality";
+import { listingMeetsPublicSeoIndexGate, venueIsSitemapEligible } from "@/lib/publicListings/listingSeo";
+import { loadOpenMicFinderVenues } from "@/lib/publicListings/discoveryMerge";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteOrigin();
+  // Prefer a deploy-stable stamp; do not invent a fresh timestamp on every request.
   const staticLastModified = process.env.VERCEL_GIT_COMMIT_DATE
     ? new Date(process.env.VERCEL_GIT_COMMIT_DATE)
-    : new Date();
+    : process.env.MICSTAGE_SITEMAP_STATIC_LASTMOD
+      ? new Date(process.env.MICSTAGE_SITEMAP_STATIC_LASTMOD)
+      : undefined;
 
   const staticPaths = [
     "",
@@ -45,8 +49,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticEntries: MetadataRoute.Sitemap = staticPaths.map((path) => ({
     url: `${base}${path || "/"}`,
-    lastModified: staticLastModified,
-    changeFrequency: "weekly",
+    ...(staticLastModified && !Number.isNaN(staticLastModified.getTime())
+      ? { lastModified: staticLastModified }
+      : {}),
+    changeFrequency: "weekly" as const,
     priority:
       path === ""
         ? 1
@@ -69,9 +75,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    const [venues, listings] = await Promise.all([
+    const [venues, listings, finderRows] = await Promise.all([
       prisma.venue.findMany({
-        select: { slug: true, updatedAt: true, city: true, region: true },
+        select: {
+          slug: true,
+          updatedAt: true,
+          city: true,
+          region: true,
+          name: true,
+          googlePlaceId: true,
+          formattedAddress: true,
+        },
       }),
       prisma.publicOpenMicListing.findMany({
         where: publicListingWhereDiscoverable(),
@@ -84,19 +98,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           verificationStatus: true,
           formattedAddress: true,
           lastVerifiedAt: true,
-          schedules: { where: { isActive: true }, select: { id: true } },
+          removedAt: true,
+          sourceUrl: true,
+          websiteUrl: true,
+          schedules: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              performanceFormat: true,
+            },
+          },
         },
       }),
+      loadOpenMicFinderVenues(prisma),
     ]);
 
-    const venueEntries: MetadataRoute.Sitemap = venues.map((v) => ({
-      url: `${base}/venues/${v.slug}`,
-      lastModified: v.updatedAt,
-      changeFrequency: "weekly",
-      priority: 0.75,
-    }));
+    const venueEntries: MetadataRoute.Sitemap = venues
+      .filter((v) => venueIsSitemapEligible(v))
+      .map((v) => ({
+        url: `${base}/venues/${v.slug}`,
+        lastModified: v.updatedAt,
+        changeFrequency: "weekly" as const,
+        priority: 0.75,
+      }));
 
-    const indexableListings = listings.filter((l) => listingIsPubliclyIndexable(l));
+    const indexableListings = listings.filter((l) => listingMeetsPublicSeoIndexGate(l));
 
     const listingEntries: MetadataRoute.Sitemap = indexableListings.map((l) => ({
       url: `${base}/open-mics/${l.slug}`,
@@ -122,14 +150,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
 
-    const locationOpenMicEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()].map(
-      ([slug, updatedAt]) => ({
+    const listingCountBySlug = new Map<string, { count: number; hasSchedule: boolean }>();
+    for (const row of finderRows) {
+      const slug = row.discoverySlug;
+      if (!slug) continue;
+      const cur = listingCountBySlug.get(slug) ?? { count: 0, hasSchedule: false };
+      cur.count += 1;
+      if (row.hasSchedule) cur.hasSchedule = true;
+      listingCountBySlug.set(slug, cur);
+    }
+
+    const locationOpenMicEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()]
+      .filter(([slug]) => {
+        const inv = listingCountBySlug.get(slug);
+        if (!inv) return false;
+        return shouldIndexDiscoveryPage({
+          venueCount: inv.count,
+          listingCount: inv.count,
+          hasPublicSchedule: inv.hasSchedule,
+          requireMeaningfulInventory: true,
+        });
+      })
+      .map(([slug, updatedAt]) => ({
         url: `${base}/locations/${slug}/open-mics`,
         lastModified: updatedAt,
         changeFrequency: "weekly" as const,
-        priority: 0.68,
-      }),
-    );
+        priority: 0.8,
+      }));
 
     const indexBySlug = await mapDiscoverySlugIndexSignals(prisma);
     const locationPerformerEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()]

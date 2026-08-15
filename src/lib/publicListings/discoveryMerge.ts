@@ -62,7 +62,15 @@ function toFinderRow(
     lat: number | null;
     lng: number | null;
   },
-  opts: { href: string; kind: DiscoveryListingKind; bookable: boolean; hasSchedule?: boolean },
+  opts: {
+    href: string;
+    kind: DiscoveryListingKind;
+    bookable: boolean;
+    hasSchedule?: boolean;
+    scheduleWeekdays?: string[];
+    performanceFormats?: string[];
+    signupMethod?: string | null;
+  },
   counts: ReadonlyMap<string, number>,
 ): OpenMicFinderVenue {
   const city = (base.city ?? "").trim();
@@ -80,6 +88,9 @@ function toFinderRow(
     lat: base.lat,
     lng: base.lng,
     discoverySlug,
+    scheduleWeekdays: opts.scheduleWeekdays,
+    performanceFormats: opts.performanceFormats,
+    signupMethod: opts.signupMethod ?? null,
   };
 }
 
@@ -148,8 +159,8 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
         bookingOpensDaysAhead: true,
         eventTemplates: {
           where: { isPublic: true },
-          select: { id: true, bookingRestrictionMode: true },
-          take: 3,
+          select: { id: true, bookingRestrictionMode: true, weekday: true, performanceFormat: true },
+          take: 8,
         },
       },
     }),
@@ -163,9 +174,18 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
       hasSchedule &&
       (v.bookingOpensDaysAhead ?? 0) > 0 &&
       v.eventTemplates.some((t) => t.bookingRestrictionMode !== "HOUSE_ONLY");
+    const scheduleWeekdays = [...new Set(v.eventTemplates.map((t) => t.weekday))];
+    const performanceFormats = [...new Set(v.eventTemplates.map((t) => t.performanceFormat).filter(Boolean))];
     return toFinderRow(
       v,
-      { href: venuePublicHref(v.slug), kind: "claimed", bookable, hasSchedule },
+      {
+        href: venuePublicHref(v.slug),
+        kind: "claimed",
+        bookable,
+        hasSchedule,
+        scheduleWeekdays,
+        performanceFormats,
+      },
       counts,
     );
   });
@@ -173,9 +193,21 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
   const unclaimed = listings.map((l) => {
     const kind = listingKind(l.verificationStatus);
     const hasSchedule = l.schedules.length > 0;
+    const scheduleWeekdays = [...new Set(l.schedules.map((s) => s.weekday))];
+    const performanceFormats = [
+      ...new Set(l.schedules.map((s) => s.performanceFormat).filter(Boolean) as string[]),
+    ];
     return toFinderRow(
       l,
-      { href: listingPublicHref(l.slug), kind, bookable: false, hasSchedule },
+      {
+        href: listingPublicHref(l.slug),
+        kind,
+        bookable: false,
+        hasSchedule,
+        scheduleWeekdays,
+        performanceFormats,
+        signupMethod: l.signupMethod,
+      },
       counts,
     );
   });

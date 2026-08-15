@@ -15,6 +15,7 @@
     "audit:verified-open-mic-evidence": "node scripts/audit-verified-open-mic-evidence.mjs",
     "promote:reviewed-open-mic-listings": "node scripts/promote-reviewed-open-mic-listings.mjs",
     "test:listing-names": "node scripts/check-listing-name-classifier.mjs",
+    "test:seo-indexability": "npx tsx scripts/check-seo-indexability.mjs",
     "test:open-mic-evidence": "node scripts/check-public-open-mic-evidence.mjs",
     "test:instant-claim": "node scripts/check-instant-claim.mjs",
     "test:onboarding": "node scripts/check-onboarding-simplification.mjs",

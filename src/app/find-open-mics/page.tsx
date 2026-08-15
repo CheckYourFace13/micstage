@@ -8,12 +8,17 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = buildPublicMetadata({
-  title: "Find local open mics near you",
-  description:
-    "Search MicStage open mic venues by your location, ZIP, city, or metro area. See distance-sorted results and open each venue's public schedule and lineup.",
-  path: "/find-open-mics",
-});
+const findTitle = "Find Open Mics Near You | Music, Comedy & Poetry";
+
+export const metadata: Metadata = {
+  ...buildPublicMetadata({
+    title: findTitle,
+    description:
+      "Find open mic nights near you for music, comedy, poetry and more. Search by city or ZIP, see schedules, and check signup details before you go.",
+    path: "/find-open-mics",
+  }),
+  title: { absolute: `${findTitle} | MicStage` },
+};
 
 export default async function FindOpenMicsPage() {
   const prisma = getPrismaOrNull();
@@ -43,28 +48,30 @@ export default async function FindOpenMicsPage() {
             <p className="text-[10px] font-medium uppercase tracking-widest text-white/45 md:text-xs md:text-white/55">
               Discovery
             </p>
-            <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide sm:text-4xl">Find local open mics</h1>
+            <h1 className="om-heading text-[1.65rem] leading-tight tracking-wide sm:text-4xl">
+              Find Open Mics Near You
+            </h1>
             <p className="text-xs leading-snug text-white/55 md:hidden">
-              Search by location, ZIP, city, or metro, then open a venue for schedule and signup.
+              Search by city or ZIP. See nearby open mics, schedules, type, and signup details when available.
             </p>
           </div>
 
           <p className="order-4 max-w-2xl text-xs leading-snug text-white/55 md:order-2 md:mt-3 md:text-sm md:leading-normal md:text-white/70">
-            Start from where you are, a ZIP code, a city, or a metro. Open any venue to see its public open mic page,
-            schedule, and signup board.
+            Find open mic nights near you for music, comedy, poetry and more. Search by city or ZIP, see schedules, and
+            check signup details before you go.
           </p>
           <div className="order-3 flex flex-wrap gap-x-3 gap-y-2 text-xs text-white/60 md:order-3 md:gap-3 md:gap-y-2 md:text-sm md:text-white/70">
-            <Link href="/performers" className="text-inherit underline hover:text-white">
-              Find artists (stage names)
-            </Link>
             <Link href="/locations" className="text-inherit underline hover:text-white">
-              All markets directory
-            </Link>
-            <Link href="/venues" className="text-inherit underline hover:text-white">
-              Full venue list
+              Browse by city
             </Link>
             <Link href="/map" className="text-inherit underline hover:text-white">
               Open mic map
+            </Link>
+            <Link href="/performers" className="text-inherit underline hover:text-white">
+              Find artists
+            </Link>
+            <Link href="/venues" className="text-inherit underline hover:text-white">
+              Full venue list
             </Link>
             <Link href="/resources" className="text-inherit underline hover:text-white">
               Resources and guides

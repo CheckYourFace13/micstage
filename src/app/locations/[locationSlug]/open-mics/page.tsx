@@ -10,20 +10,71 @@ import {
 } from "@/lib/locationSlugValidation";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { loadDiscoveryMarketOpenMics } from "@/lib/publicListings/discoveryMerge";
+import type { OpenMicFinderVenue } from "@/lib/publicListings/types";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { relatedLocationsForLocationSlug } from "@/lib/relatedLocations";
+import { shouldIndexDiscoveryPage } from "@/lib/seo/discoveryIndex";
+import { jsDayToWeekday } from "@/lib/publicListings/listingSeo";
+import { weekdayToLabel } from "@/lib/time";
+import type { Weekday } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
+
+function listingCard(v: OpenMicFinderVenue) {
+  return (
+    <li key={`${v.href}-${v.slug}`}>
+      <Link
+        href={v.href}
+        className="block rounded-xl border border-white/10 bg-black/30 p-4 hover:border-[rgb(var(--om-neon))]/40 hover:bg-black/45"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">{v.name}</span>
+          <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} hasSchedule={v.hasSchedule} />
+        </div>
+        <p className="mt-1 text-xs text-white/55">{[v.city, v.region].filter(Boolean).join(", ")}</p>
+        {v.scheduleWeekdays && v.scheduleWeekdays.length > 0 ? (
+          <p className="mt-1 text-xs text-white/50">
+            {v.scheduleWeekdays.map((d) => weekdayToLabel(d as Weekday)).join(" · ")}
+          </p>
+        ) : null}
+        {v.signupMethod ? <p className="mt-1 text-xs text-white/45">Signup: {v.signupMethod}</p> : null}
+        <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">
+          {v.bookable ? "View schedule and book →" : "View listing →"}
+        </span>
+      </Link>
+    </li>
+  );
+}
 
 export async function generateMetadata(props: { params: Promise<{ locationSlug: string }> }): Promise<Metadata> {
   const { locationSlug } = await props.params;
   const canonical = await canonicalLocationSlugOrNull(locationSlug);
   const slug = canonical ?? locationSlug;
   const place = await resolveLocationPlaceTitle(slug);
+  const prisma = getPrismaOrNull();
+  let index = false;
+  let listingCount = 0;
+  let hasSchedule = false;
+  if (prisma) {
+    try {
+      const listings = await loadDiscoveryMarketOpenMics(prisma, slug);
+      listingCount = listings.length;
+      hasSchedule = listings.some((l) => l.hasSchedule);
+      index = shouldIndexDiscoveryPage({
+        venueCount: listingCount,
+        listingCount,
+        hasPublicSchedule: hasSchedule,
+        requireMeaningfulInventory: true,
+      });
+    } catch {
+      index = false;
+    }
+  }
   return buildPublicMetadata({
-    title: `${place} open mics`,
-    description: `Browse open mic venues and verified listings in ${place}. Book on MicStage where available, or view schedules and claim pages for unclaimed rooms.`,
+    title: `Open Mics in ${place} | Schedules & Upcoming`,
+    description: `Trusted open mic nights in ${place} for music, comedy, poetry and more. See schedules and signup details on MicStage.`,
     path: `/locations/${slug}/open-mics`,
+    index,
   });
 }
 
@@ -50,18 +101,32 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
   }
 
   const bookable = listings.filter((l) => l.bookable);
-  const verified = listings.filter((l) => !l.bookable);
   const nearbyLocations = await relatedLocationsForLocationSlug(locationSlug, 6);
+
+  const todayWeekday = jsDayToWeekday(new Date().getDay());
+  const tonight = listings.filter((l) => (l.scheduleWeekdays ?? []).includes(todayWeekday));
+  const tonightLabel = weekdayToLabel(todayWeekday);
+
+  const comedy = listings.filter((l) =>
+    (l.performanceFormats ?? []).some((f) => f === "COMEDY" || f === "COMEDY_SPOKEN_WORD"),
+  );
+  const spoken = listings.filter((l) => (l.performanceFormats ?? []).includes("SPOKEN_WORD"));
+  const music = listings.filter((l) =>
+    (l.performanceFormats ?? []).some((f) =>
+      ["ACOUSTIC_ONLY", "GUITAR_VOCAL_ONLY", "FULL_BANDS_ALLOWED", "OPEN_VARIETY"].includes(f),
+    ),
+  );
 
   const breadcrumbs = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Markets", item: absoluteUrl("/locations") },
+      { "@type": "ListItem", position: 1, name: "Find open mics", item: absoluteUrl("/find-open-mics") },
+      { "@type": "ListItem", position: 2, name: "Markets", item: absoluteUrl("/locations") },
       {
         "@type": "ListItem",
-        position: 2,
-        name: `${placeTitle} open mics`,
+        position: 3,
+        name: `Open mics in ${placeTitle}`,
         item: absoluteUrl(`/locations/${locationSlug}/open-mics`),
       },
     ],
@@ -75,15 +140,20 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Open mics</div>
-            <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">{placeTitle} open mics</h1>
+            <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">Open Mics in {placeTitle}</h1>
             <p className="mt-2 max-w-2xl text-sm text-white/70">
-              Verified listings and bookable MicStage venues in this market. Each card opens a public page with schedule
-              info, signup details, and booking when available.
+              Trusted open-mic listings in {placeTitle}. Browse venues and rooms with schedules and signup details when
+              available — music, comedy, poetry, and more.
             </p>
           </div>
-          <Link className="text-sm text-white/70 hover:text-white" href="/locations">
-            All markets
-          </Link>
+          <div className="flex flex-col items-end gap-2 text-sm">
+            <Link className="text-white/70 hover:text-white" href="/find-open-mics">
+              Search near you
+            </Link>
+            <Link className="text-white/70 hover:text-white" href="/locations">
+              All markets
+            </Link>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/60">
@@ -113,58 +183,56 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
           </div>
         ) : (
           <div className="mt-8 grid gap-8">
+            {tonight.length > 0 ? (
+              <section>
+                <h2 className="text-lg font-semibold">Open mics scheduled for {tonightLabel}</h2>
+                <p className="mt-1 text-xs text-white/55">
+                  Based on recurring {tonightLabel} schedules on file — not a live confirmation that tonight&apos;s night
+                  is running. Confirm with the venue before you go.
+                </p>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{tonight.map(listingCard)}</ul>
+              </section>
+            ) : (
+              <p className="text-sm text-white/50">
+                No recurring {tonightLabel} schedules are on file for {placeTitle} right now. Browse the full list
+                below, or{" "}
+                <Link href="/find-open-mics" className="underline hover:text-white">
+                  search near you
+                </Link>
+                .
+              </p>
+            )}
+
+            <section>
+              <h2 className="text-lg font-semibold">Open mics in {placeTitle}</h2>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">{listings.map(listingCard)}</ul>
+            </section>
+
             {bookable.length > 0 ? (
               <section>
-                <h2 className="text-lg font-semibold">Bookable on MicStage</h2>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {bookable.map((v) => (
-                    <li key={`${v.href}-${v.slug}`}>
-                      <Link
-                        href={v.href}
-                        className="block rounded-xl border border-white/10 bg-black/30 p-4 hover:border-[rgb(var(--om-neon))]/40 hover:bg-black/45"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{v.name}</span>
-                          <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} />
-                        </div>
-                        <p className="mt-1 text-xs text-white/55">
-                          {[v.city, v.region].filter(Boolean).join(", ")}
-                        </p>
-                        <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">
-                          View schedule and book →
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <h2 className="text-lg font-semibold">Signups open on MicStage</h2>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{bookable.map(listingCard)}</ul>
               </section>
             ) : null}
 
-            {verified.length > 0 ? (
+            {comedy.length > 0 ? (
               <section>
-                <h2 className="text-lg font-semibold">Verified listings</h2>
-                <p className="mt-1 text-xs text-white/55">Not yet managed on MicStage — hosts can claim these pages.</p>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {verified.map((v) => (
-                    <li key={`${v.href}-${v.slug}`}>
-                      <Link
-                        href={v.href}
-                        className="block rounded-xl border border-white/10 bg-black/30 p-4 hover:border-white/20 hover:bg-black/45"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{v.name}</span>
-                          <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} />
-                        </div>
-                        <p className="mt-1 text-xs text-white/55">
-                          {[v.city, v.region].filter(Boolean).join(", ")}
-                        </p>
-                        <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">
-                          View listing →
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <h2 className="text-lg font-semibold">Comedy open mics</h2>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{comedy.map(listingCard)}</ul>
+              </section>
+            ) : null}
+
+            {music.length > 0 ? (
+              <section>
+                <h2 className="text-lg font-semibold">Music open mics</h2>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{music.map(listingCard)}</ul>
+              </section>
+            ) : null}
+
+            {spoken.length > 0 ? (
+              <section>
+                <h2 className="text-lg font-semibold">Poetry &amp; spoken word open mics</h2>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{spoken.map(listingCard)}</ul>
               </section>
             ) : null}
           </div>
@@ -189,7 +257,7 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
 
         <p className="mt-10 text-center text-sm text-white/50">
           <Link href="/find-open-mics" className="text-[rgb(var(--om-neon))] underline">
-            Search by ZIP or city
+            Find open mics near you
           </Link>
           {" · "}
           <Link href="/map" className="underline hover:text-white">

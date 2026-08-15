@@ -14,6 +14,11 @@ export type OpenMicFinderVenue = {
   lat: number | null;
   lng: number | null;
   discoverySlug: string | null;
+  /** Recurring weekdays when known (Prisma Weekday). */
+  scheduleWeekdays?: string[];
+  /** Performance formats when known. */
+  performanceFormats?: string[];
+  signupMethod?: string | null;
 };
 
 export type NearbyDiscoveryRow = {

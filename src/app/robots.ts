@@ -17,6 +17,7 @@ export default function robots(): MetadataRoute.Robots {
         "/api",
         "/login",
         "/reset",
+        // /claim stays crawlable so Google can see page-level noindex metadata
         ...marketingRobotsDisallowExtra(),
       ],
     },

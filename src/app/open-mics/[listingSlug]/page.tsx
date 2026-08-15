@@ -9,11 +9,19 @@ import { safeExternalHref } from "@/lib/externalUrl";
 import { isValidPublicSlug } from "@/lib/locationSlugValidation";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { loadPublicOpenMicListingBySlug } from "@/lib/publicListings/queries";
-import { isPublicListingRenderable, listingIsPubliclyIndexable } from "@/lib/publicListings/listingQuality";
+import { isPublicListingRenderable } from "@/lib/publicListings/listingQuality";
+import {
+  listingMeetsPublicSeoIndexGate,
+  listingPlaceLabel,
+  publicListingSeoDescription,
+  publicListingSeoTitle,
+  buildListingEventJsonLd,
+} from "@/lib/publicListings/listingSeo";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { displayListingAddress } from "@/lib/publicListings/discoveryMerge";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
+import { primaryDiscoverySlugForVenue, getVenueCityDiscoveryCounts } from "@/lib/discoveryMarket";
 
 export const dynamic = "force-dynamic";
 
@@ -27,20 +35,24 @@ export async function generateMetadata(props: { params: Promise<{ listingSlug: s
       title: "Open mic listing",
       description: "Verified open mic listings on MicStage.",
       path,
+      index: false,
     });
   }
   const listing = await loadPublicOpenMicListingBySlug(prisma, listingSlug);
-  if (!listing) {
-    return buildPublicMetadata({ title: "Listing not found", description: "This open mic listing could not be found.", path });
+  if (!listing || !isPublicListingRenderable(listing)) {
+    return buildPublicMetadata({
+      title: "Listing not found",
+      description: "This open mic listing could not be found.",
+      path,
+      index: false,
+    });
   }
-  const place = [listing.city, listing.region].filter(Boolean).join(", ");
-  const title = place ? `${listing.name} open mic | ${place}` : `${listing.name} open mic`;
-  const description = `Open mic listing: ${listing.name}${place ? ` in ${place}` : ""}. Schedule, signup info, and host details on MicStage.`;
-  const indexable = listingIsPubliclyIndexable(listing);
+  const title = publicListingSeoTitle(listing);
+  const description = publicListingSeoDescription(listing);
+  const indexable = listingMeetsPublicSeoIndexGate(listing);
   return {
-    ...buildPublicMetadata({ title, description, path }),
+    ...buildPublicMetadata({ title, description, path, index: indexable }),
     title: { absolute: `${title} | MicStage` },
-    robots: indexable ? undefined : { index: false, follow: true },
   };
 }
 
@@ -62,14 +74,26 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
     if (venue) redirect(`/venues/${venue.slug}`);
   }
 
-  // Hide rejected/stale (OUTDATED), undiscovered (UNVERIFIED), and junk-named
+  // Hide rejected/stale (OUTDATED), removed, undiscovered (UNVERIFIED), and junk-named
   // rows entirely. VERIFIED renders publicly; NEEDS_REVIEW renders (noindexed,
   // absent from browse) so claim-invite recipients can still reach it.
   if (!isPublicListingRenderable(listing)) notFound();
 
-  const place = [listing.city, listing.region].filter(Boolean).join(", ");
+  const place = listingPlaceLabel(listing.city, listing.region);
   const path = `/open-mics/${listing.slug}`;
   const kind = listing.verificationStatus === "VERIFIED" ? "verified" : "unclaimed";
+
+  let cityHref: string | null = null;
+  const city = (listing.city ?? "").trim();
+  if (city) {
+    try {
+      const counts = await getVenueCityDiscoveryCounts();
+      const slug = primaryDiscoverySlugForVenue(city, listing.region, counts);
+      if (slug) cityHref = `/locations/${slug}/open-mics`;
+    } catch {
+      cityHref = null;
+    }
+  }
 
   const socials = [
     { label: "Website", href: safeExternalHref(listing.websiteUrl) },
@@ -83,34 +107,54 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: listing.name,
-    address: listing.formattedAddress,
+    ...(listing.formattedAddress?.trim()
+      ? { address: listing.formattedAddress.trim() }
+      : {}),
     ...(listing.lat != null && listing.lng != null
       ? { geo: { "@type": "GeoCoordinates", latitude: listing.lat, longitude: listing.lng } }
       : {}),
     url: absoluteUrl(path),
   };
 
+  const breadcrumbItems: Array<{ "@type": string; position: number; name: string; item: string }> = [
+    { "@type": "ListItem", position: 1, name: "Find open mics", item: absoluteUrl("/find-open-mics") },
+  ];
+  if (cityHref && place) {
+    breadcrumbItems.push({
+      "@type": "ListItem",
+      position: 2,
+      name: `Open mics in ${place}`,
+      item: absoluteUrl(cityHref),
+    });
+    breadcrumbItems.push({
+      "@type": "ListItem",
+      position: 3,
+      name: listing.name,
+      item: absoluteUrl(path),
+    });
+  } else {
+    breadcrumbItems.push({
+      "@type": "ListItem",
+      position: 2,
+      name: listing.name,
+      item: absoluteUrl(path),
+    });
+  }
+
   const jsonLdBreadcrumb = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Find open mics", item: absoluteUrl("/find-open-mics") },
-      { "@type": "ListItem", position: 2, name: listing.name, item: absoluteUrl(path) },
-    ],
+    itemListElement: breadcrumbItems,
   };
 
-  const eventJsonLd = listing.schedules.map((s) => ({
-    "@context": "https://schema.org",
-    "@type": "Event",
-    name: s.title ?? `${listing.name} open mic`,
-    location: { "@type": "Place", name: listing.name, address: listing.formattedAddress },
-    eventSchedule: {
-      "@type": "Schedule",
-      byDay: s.weekday,
-      startTime: minutesToTimeLabel(s.startTimeMin),
-      endTime: minutesToTimeLabel(s.endTimeMin),
-    },
-  }));
+  // Public listings store recurring weekdays only — never synthesize Event startDate.
+  // Event JSON-LD requires concrete occurrence startDate (none for typical listings).
+  const eventJsonLd = buildListingEventJsonLd({
+    listingName: listing.name,
+    formattedAddress: listing.formattedAddress,
+    url: absoluteUrl(path),
+    occurrences: [],
+  });
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -125,6 +169,14 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
           <Link href="/find-open-mics" className="hover:text-white">
             Find open mics
           </Link>
+          {cityHref && place ? (
+            <>
+              <span className="mx-2">/</span>
+              <Link href={cityHref} className="hover:text-white">
+                {place}
+              </Link>
+            </>
+          ) : null}
           <span className="mx-2">/</span>
           <span className="text-white/80">{listing.name}</span>
         </nav>

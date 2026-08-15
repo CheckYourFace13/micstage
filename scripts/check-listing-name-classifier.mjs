@@ -58,6 +58,10 @@ const MUST_REJECT = [
   "Open Mic No Longer Running",
   "Final Night Open Mic",
   "Postponed: Thursday Open Mic",
+  // stage-mic instructional / unrelated SERP intent
+  "How to mic a stage",
+  "How to mic a stage play",
+  "How to microphone a stage",
   // exact junk / platform fluff / editorial chrome (public display quality)
   "Instagram",
   "Must",

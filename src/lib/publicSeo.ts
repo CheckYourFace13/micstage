@@ -101,19 +101,25 @@ export function buildPublicMetadata(opts: {
   path: string;
   /** Absolute URLs or site-relative paths */
   images?: string[];
-  /** When false: noindex,follow (e.g. thin discovery URLs). */
+  /** When false: noindex (e.g. thin discovery URLs, claim forms). */
   index?: boolean;
+  /**
+   * When false with index:false, emits noindex,nofollow (claim / private flows).
+   * Defaults to true (noindex,follow) so discovery noindex pages can still pass PageRank.
+   */
+  follow?: boolean;
 }): Metadata {
   const canonical = absoluteUrl(opts.path);
   const imageUrls = resolveSocialImageUrls(opts.images);
   const index = opts.index !== false;
+  const follow = opts.follow !== false;
   return {
     title: opts.title,
     description: opts.description,
     alternates: { canonical },
     robots: index
       ? { index: true, follow: true, googleBot: { index: true, follow: true } }
-      : { index: false, follow: true, googleBot: { index: false, follow: true } },
+      : { index: false, follow, googleBot: { index: false, follow } },
     openGraph: {
       title: opts.title,
       description: opts.description,

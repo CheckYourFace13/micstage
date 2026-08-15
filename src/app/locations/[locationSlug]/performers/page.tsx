@@ -25,13 +25,13 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
   const slug = canonical ?? locationSlug;
   const place = await resolveLocationPlaceTitle(slug);
   const prisma = getPrismaOrNull();
-  let index = true;
+  let index = false;
   if (prisma) {
     try {
       const signals = await getDiscoveryMarketIndexSignals(prisma, slug);
       index = shouldIndexDiscoveryPage(signals);
     } catch {
-      index = true;
+      index = false;
     }
   }
   return buildPublicMetadata({

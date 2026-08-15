@@ -13,6 +13,7 @@ export function publicListingWhereDiscoverable() {
   return {
     claimedVenueId: null,
     verificationStatus: { in: [...PUBLIC_DISCOVERY_VERIFICATION] },
+    removedAt: null,
   };
 }
 

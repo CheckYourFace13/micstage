@@ -22,6 +22,7 @@ import {
   addPromoterNightAction,
   createPromoterSeriesAction,
 } from "./actions";
+import { listRemovableOpenMicsForPromoter } from "@/lib/publicListings/openMicSelfRemoval";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Promoter home",
@@ -52,9 +53,9 @@ export default async function PromoterDashboardPage(props: {
   }
 
   const prisma = requirePrisma();
-  const [seriesList, accessList, user] = await Promise.all([
+  const [seriesList, accessList, user, removableOpenMics] = await Promise.all([
     prisma.promoterSeries.findMany({
-      where: { promoterId: session.promoterId },
+      where: { promoterId: session.promoterId, archivedAt: null },
       orderBy: { updatedAt: "desc" },
       include: {
         nights: {
@@ -76,6 +77,7 @@ export default async function PromoterDashboardPage(props: {
         },
       },
     }),
+    listRemovableOpenMicsForPromoter(prisma, session.promoterId),
   ]);
 
   const cookieStore = await cookies();
@@ -149,6 +151,11 @@ export default async function PromoterDashboardPage(props: {
         return "Could not add that night. Try again.";
       case "forbidden":
         return "That open mic is not on your account.";
+      case "remove_missing":
+        return "That open mic is no longer on MicStage.";
+      case "remove_invalid":
+      case "remove_error":
+        return "Could not remove that open mic. Try again.";
       default:
         return null;
     }
@@ -156,9 +163,12 @@ export default async function PromoterDashboardPage(props: {
 
   const approvedVenues = accessList.filter((a) => a.status === PromoterVenueAccessStatus.APPROVED);
   const primaryVenue = approvedVenues[0]?.venue ?? accessList[0]?.venue ?? null;
+  // Upcoming nights are relative to "now" for the promoter dashboard (intentional).
+  // eslint-disable-next-line react-hooks/purity -- schedule horizon is relative to request time
+  const nowMs = Date.now();
   const upcomingNight = seriesList
     .flatMap((s) => s.nights.map((n) => ({ ...n, seriesName: s.name })))
-    .filter((n) => n.date.getTime() >= Date.now() - 12 * 3600 * 1000)
+    .filter((n) => n.date.getTime() >= nowMs - 12 * 3600 * 1000)
     .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
 
   const primaryPublicUrl = primaryVenue ? absoluteUrl(`/venues/${primaryVenue.slug}`) : null;
@@ -182,6 +192,38 @@ export default async function PromoterDashboardPage(props: {
           <div className="mt-6 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-white/90">
             {promoterNotice}
           </div>
+        ) : null}
+
+        {removableOpenMics.length > 0 ? (
+          <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-white">Your open mics on MicStage</h2>
+            <p className="mt-1 text-sm text-white/60">Manage listings linked to your promoter account.</p>
+            <ul className="mt-4 grid gap-3">
+              {removableOpenMics.map((m) => (
+                <li
+                  key={m.listingId}
+                  className="rounded-xl border border-white/10 bg-black/25 p-4"
+                >
+                  <p className="text-base font-semibold text-white">{m.listingName}</p>
+                  {m.placeLine ? <p className="mt-1 text-sm text-white/55">{m.placeLine}</p> : null}
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <Link
+                      href={`/open-mics/${m.listingSlug}`}
+                      className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
+                    >
+                      View listing
+                    </Link>
+                    <Link
+                      href={`/promoter/open-mics/${m.listingSlug}/remove`}
+                      className="inline-flex h-11 items-center justify-center rounded-md border border-red-400/35 bg-red-500/10 px-4 text-sm font-semibold text-red-50 hover:bg-red-500/20"
+                    >
+                      Remove this open mic
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         {(isLinked || justConnected) && primaryVenue ? (

@@ -19,6 +19,7 @@
     "test:instant-claim": "node scripts/check-instant-claim.mjs",
     "test:onboarding": "node scripts/check-onboarding-simplification.mjs",
     "test:product-audit": "node scripts/check-product-audit-p0.mjs",
+    "test:open-mic-removal": "node scripts/check-open-mic-self-removal.mjs",
     "audit:claim-invites": "node scripts/audit-historical-claim-invitations.mjs",
     "audit:duplicate-places": "node scripts/analyze-duplicate-google-places.mjs"
   },

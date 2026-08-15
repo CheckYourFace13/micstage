@@ -162,10 +162,14 @@ model PromoterSeries {
   slug        String
   description String?
 
+  /// Soft-remove from promoter dashboard when the open mic is taken off MicStage.
+  archivedAt DateTime?
+
   nights PromoterNight[]
 
   @@unique([promoterId, slug])
   @@index([promoterId, updatedAt])
+  @@index([promoterId, archivedAt])
 }
 
 model PromoterVenueAccess {
@@ -1451,6 +1455,9 @@ model PublicOpenMicListing {
   evidenceTerminalReason      String?
   evidenceAutomationStatus    ListingEvidenceAutomationStatus @default(PENDING)
 
+  /// Self-service removal by an authorized promoter or venue owner (soft; preserves history).
+  removedAt DateTime?
+
   schedules           PublicOpenMicSchedule[]
   claimRequests       ListingClaimRequest[]
   corrections         ListingCorrection[]
@@ -1464,6 +1471,7 @@ model PublicOpenMicListing {
   @@index([placeVerifyNextAttemptAt, googlePlaceId])
   @@index([evidenceEnrichNextAttemptAt, verificationStatus])
   @@index([evidenceAutomationStatus, updatedAt])
+  @@index([removedAt])
 }
 
 model PublicOpenMicSchedule {

@@ -7,6 +7,7 @@ export const CLAIM_INVITE_LISTING_WHERE = {
   claimedVenueId: null,
   claimStatus: { not: "CLAIMED" as const },
   verificationStatus: "VERIFIED" as const,
+  removedAt: null,
   growthLead: { contactEmailNormalized: { not: null } },
 } as const;
 

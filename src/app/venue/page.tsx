@@ -277,6 +277,7 @@ export default async function VenuePortalPage({
   const anyVenueOperational = operationalVenueIds.length > 0;
 
   let pendingPromoterAccessRows: PromoterVenueAccessPanelRow[] = [];
+  let removableClaimedListings: Array<{ slug: string; name: string }> = [];
   if (venues.length > 0) {
     try {
       const prisma = requirePrisma();
@@ -284,6 +285,15 @@ export default async function VenuePortalPage({
         where: { venueId: { in: venues.map((v) => v.id) }, status: "PENDING" },
         include: { promoter: { select: { email: true } }, venue: { select: { name: true, slug: true } } },
         orderBy: { createdAt: "asc" },
+      });
+      removableClaimedListings = await prisma.publicOpenMicListing.findMany({
+        where: {
+          claimedVenueId: { in: venues.map((v) => v.id) },
+          removedAt: null,
+          verificationStatus: { not: "OUTDATED" },
+        },
+        select: { slug: true, name: true },
+        take: 10,
       });
     } catch (e) {
       logVenuePortalFailure("promoterVenueAccess.pending", e);
@@ -657,6 +667,32 @@ export default async function VenuePortalPage({
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             You can&apos;t act on that request for this login. Refresh if your venue access changed.
           </div>
+        ) : null}
+
+        {pendingPromoterAccessRows.length > 0 ? (
+          <div className="mt-8">
+            <PromoterVenueAccessPanel rows={pendingPromoterAccessRows} />
+          </div>
+        ) : null}
+
+        {removableClaimedListings.length > 0 ? (
+          <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-white">Your open mics on MicStage</h2>
+            <p className="mt-1 text-sm text-white/60">Remove a listing from public search without deleting your venue account.</p>
+            <ul className="mt-4 grid gap-3">
+              {removableClaimedListings.map((m) => (
+                <li key={m.slug} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="font-semibold text-white">{m.name}</p>
+                  <Link
+                    href={`/venue/open-mics/${m.slug}/remove`}
+                    className="inline-flex h-11 items-center justify-center rounded-md border border-red-400/35 bg-red-500/10 px-4 text-sm font-semibold text-red-50 hover:bg-red-500/20"
+                  >
+                    Remove this open mic
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         {venues.length === 0 ? (

@@ -142,6 +142,16 @@ export async function consumeListingClaimInviteToken(
     }
     return { ok: false, reason: "expired" };
   }
+
+  // Soft-removed / non-VERIFIED listings cannot be claimed via an old invite link.
+  const listingLive = await prisma.publicOpenMicListing.findUnique({
+    where: { id: row.listingId },
+    select: { verificationStatus: true, removedAt: true },
+  });
+  if (!listingLive || listingLive.removedAt || listingLive.verificationStatus !== "VERIFIED") {
+    return { ok: false, reason: "revoked" };
+  }
+
   if (input.listingId && input.listingId !== row.listingId) {
     return { ok: false, reason: "wrong_listing" };
   }
@@ -196,6 +206,15 @@ export async function consumeListingClaimInviteTokenById(
     }
     return { ok: false, reason: "expired" };
   }
+
+  const listingLiveById = await prisma.publicOpenMicListing.findUnique({
+    where: { id: row.listingId },
+    select: { verificationStatus: true, removedAt: true },
+  });
+  if (!listingLiveById || listingLiveById.removedAt || listingLiveById.verificationStatus !== "VERIFIED") {
+    return { ok: false, reason: "revoked" };
+  }
+
   if (input.listingId && input.listingId !== row.listingId) {
     return { ok: false, reason: "wrong_listing" };
   }

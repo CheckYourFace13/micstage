@@ -60,6 +60,34 @@ export function MarketingTrackingClient() {
         trackMarketingEvent("promoter_mic_connected", { page_path: pathname });
       });
     }
+    if (
+      (pathname === "/promoter" && searchParams.get("promoter") === "night_ok") ||
+      (pathname === "/venue" && searchParams.get("scheduleSuccess"))
+    ) {
+      oncePerSession(`trk:schedule_confirmed:${pathname}:${searchParams.toString()}`, () => {
+        trackMarketingEvent("schedule_confirmed", { page_path: pathname });
+      });
+    }
+    if (pathname === "/venue" && searchParams.get("signups") === "enabled") {
+      oncePerSession("trk:performer_signups_enabled", () => {
+        trackMarketingEvent("performer_signups_enabled", { page_path: pathname });
+      });
+    }
+    if (
+      (pathname === "/venue" && searchParams.get("profile") === "saved") ||
+      (pathname === "/claim/invite" && searchParams.get("improved") === "1")
+    ) {
+      oncePerSession("trk:listing_improvement_completed", () => {
+        trackMarketingEvent("listing_improvement_completed", { page_path: pathname });
+      });
+    }
+    // Claim invite link click is the privacy-safe proxy for email engagement
+    // (no open-tracking pixel). Hitting /claim/invite/<token> counts as opened.
+    if (/^\/claim\/invite\/[^/]+$/.test(pathname)) {
+      oncePerSession(`trk:claim_email_opened:${pathname}`, () => {
+        trackMarketingEvent("claim_email_opened", { page_path: pathname });
+      });
+    }
     if (pathname === "/claim/invite" || pathname.startsWith("/claim/")) {
       oncePerSession(`trk:claim_started:${pathname}`, () => {
         trackMarketingEvent("claim_started", { page_path: pathname });

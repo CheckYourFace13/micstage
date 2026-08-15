@@ -58,6 +58,27 @@ const MUST_REJECT = [
   "Open Mic No Longer Running",
   "Final Night Open Mic",
   "Postponed: Thursday Open Mic",
+  // exact junk / platform fluff / editorial chrome (public display quality)
+  "Instagram",
+  "Must",
+  "Open",
+  "Find Events & Groups in Brooklyn New York NY",
+  "Find Events & Groups in Navi Mumbai IN",
+  "Open Mic Night Music Tickets Multiple dates",
+  "Step on the stage Comedians poets...",
+  "Looking for Live Music in KC...",
+  "Meet Our Song Creators",
+  "StoreFM",
+  "Celebrate Poetry in Chicago for National Poetry Month",
+  "Home Page",
+  "Top Conference & Summit Venues in Chicago, IL",
+  "Live Music & Concerts In Hamilton County",
+  "Find The Best Las Vegas Music Venues",
+  "Best Private Event Venue in Las Vegas",
+  "Open Mikes in SF Bay Area",
+  "Discovered lead",
+  "Event Spaces & Places",
+  "We Them One's Comedy Tour",
 ];
 
 // Real venue / event names — must pass.
@@ -71,6 +92,7 @@ const MUST_ALLOW = [
   "New Orleans Youth Open Mic Night",
   "Rambling House Open Mic",
   "Avalon Park Open Mic Night & Community Kick Back",
+  "Cafe Wha?",
 ];
 
 const failures = [];

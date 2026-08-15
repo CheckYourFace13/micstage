@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { requestPromoterVenueAccessByVenueIdAction } from "@/app/promoter/actions";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 
@@ -22,12 +22,15 @@ export function FindOpenMicPanel(props: {
     place: string | null;
     venueId?: string;
   }>;
+  /** Prefill search (e.g. venue name from promoter application notes). */
+  initialQuery?: string;
 }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(props.initialQuery?.trim() ?? "");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
+  const didInitSearch = useRef(false);
 
   function onQueryChange(value: string) {
     setQ(value);
@@ -57,6 +60,15 @@ export function FindOpenMicPanel(props: {
         });
     }, 280);
   }
+
+  useEffect(() => {
+    if (didInitSearch.current) return;
+    const initial = props.initialQuery?.trim() ?? "";
+    if (initial.length < 2) return;
+    didInitSearch.current = true;
+    onQueryChange(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot prefill on mount
+  }, []);
 
   const suggested = props.suggested ?? [];
 

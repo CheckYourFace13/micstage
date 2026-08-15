@@ -32,7 +32,41 @@ const CANCELLED_OR_CLOSED =
 
 /** Whole-name generic page titles (nav labels / scraped page chrome, not venues). */
 const GENERIC_PAGE_TITLE =
-  /^(write|events?|event\s+venue|stand|home(?:page)?|home-\d+|local\s+events|all\s+events|upcoming(?:\s+events)?|calendar|schedule|contact(?:\s+us)?|about(?:\s+us)?|menus?|hours|our\s+hours|directions|locations?|venues?|gallery|photos?|blog|news|faqs?|log\s?in|sign\s?in|sign\s?up|signup|register|search|tickets|buy\s+tickets|shop|store|privacy(?:\s+policy)?|terms(?:\s+of\s+service)?|page\s+not\s+found|not\s+found|404|error|coming\s+soon|under\s+construction|what'?s\s+on|book\s+now|reservations?|reserve|more\s+info|learn\s+more|read\s+more|click\s+here|untitled|default|sample\s+page|test|welcome|account\s+suspended|open\s?mic|open\s?mic\s+night)$/i;
+  /^(write|events?|event\s+venue|event\s+spaces?(?:\s*(?:&|and)\s*places?)?|stand|home(?:\s*page)?|homepage|home-\d+|local\s+events|all\s+events|upcoming(?:\s+events)?|calendar|schedule|contact(?:\s+us)?|about(?:\s+us)?|menus?|hours|our\s+hours|directions|locations?|venues?|gallery|photos?|blog|news|faqs?|log\s?in|sign\s?in|sign\s?up|signup|register|search|tickets|buy\s+tickets|shop|store|privacy(?:\s+policy)?|terms(?:\s+of\s+service)?|page\s+not\s+found|not\s+found|404|error|coming\s+soon|under\s+construction|what'?s\s+on|book\s+now|reservations?|reserve|more\s+info|learn\s+more|read\s+more|click\s+here|untitled|default|sample\s+page|test|welcome|account\s+suspended|open\s?mic|open\s?mic\s+night|instagram|facebook|twitter|tiktok|youtube|linkedin|music|live|tonight|ticket|must|open|entertainment|bookings?|groups?|meetup|directory|category|private\s+events?|discovered\s+lead)$/i;
+
+/**
+ * Exact junk tokens that are never a public open-mic identity (any casing).
+ * Covers short words that would otherwise pass the minimum length check.
+ */
+const EXACT_JUNK_NAME = new Set(
+  [
+    "open",
+    "must",
+    "music",
+    "live",
+    "tonight",
+    "calendar",
+    "home",
+    "welcome",
+    "instagram",
+    "facebook",
+    "twitter",
+    "tiktok",
+    "youtube",
+    "tickets",
+    "ticket",
+    "event",
+    "events",
+    "groups",
+    "meetup",
+    "entertainment",
+    "bookings",
+    "booking",
+    "directory",
+    "category",
+    "storefm",
+  ].map((s) => s.toLowerCase()),
+);
 
 /**
  * Listicle / number-led editorial titles ("10 Best...", "Top 12 Comedy Clubs...").
@@ -54,11 +88,15 @@ const DATE_ARTICLE =
 
 /** Non-venue editorial phrasing anywhere in the title. */
 const EDITORIAL =
-  /(\bthings\s+to\s+do\b)|(\bnight\s+of\s+laughs\b)|(\btour\s+of\s+comedy\b)|(\bbest\s+(live\s+music|bars|comedy|places|things)\b)|(\b(nightlife|city|bar|drink|dining|music|comedy|visitors?|travel|ultimate|summer|winter|spring|fall|autumn|holiday|weekend|seasonal|annual)\s+guide\b)|(\bguide\s*[:|-])|(\bguide\s+to\b)|(\bguide$)|(\bcalendar\b)|(\blive\s+music\s+calendar\b)|(\bconcerts?\s+(19|20)\d{2}\b)|(\b(19|20)\d{2}\s+schedule\b)|(\btop\s+ten\b)|(\btop\s+10\b)|(\blist\s+of\b)|(\bround-?up\b)|(\bthis\s+weekend\b)|(\bthis\s+week\b)|(\bnear\s+you\b)|(\bmust[-\s](see|visit|try)\b)|(\bmust-chicago\b)|(\bhow\s+to\b)|(\breview:)|(\brecap\b)|(\b(ways|reasons)\s+to\b)|(\bsoloing\s+wings\b)|(\bstretch\s+my\b)|(\bkaraoke\b)|(\btrivia\b)|(\bpub\s+trivia\b)|(\bbandmix\b)|(\bprivate\s+events\b)|(\blive\s+music\s+trail\b)|(\byou\s+have\s+to\s+(experience|see|visit|try)\b)|(\bmusic\s+venues?\s+you\b)|(\btop\s+singers?\b)|(\bartist\s+booking\b)|(\bbooking\s+information\b)|(\bvenue\s+rental\b)|(\brent\s+(this\s+)?venue\b)|(\bentertainment\s+directory\b)|(\btourism\b)|(\bvisitors?\s+guide\b)/i;
+  /(\bthings\s+to\s+do\b)|(\bnight\s+of\s+laughs\b)|(\btour\s+of\s+comedy\b)|(\bbest\s+(live\s+music|bars|comedy|places|things|private\s+event)\b)|(\bfind\s+the\s+best\b)|(\btop\s+(conference|summit|venues?|clubs?|bars?|spots?)\b)|(\blive\s+music\s*(?:&|and)\s*concerts?\b)|(\btickets?\s*(?:&|and)\s*schedule\b)|(\bevent\s+spaces?(?:\s*(?:&|and)\s*places?)?\b)|(\b(nightlife|city|bar|drink|dining|music|comedy|visitors?|travel|ultimate|summer|winter|spring|fall|autumn|holiday|weekend|seasonal|annual)\s+guide\b)|(\bguide\s*[:|-])|(\bguide\s+to\b)|(\bguide$)|(\bcalendar\b)|(\blive\s+music\s+calendar\b)|(\bconcerts?\s+(19|20)\d{2}\b)|(\b(19|20)\d{2}\s+schedule\b)|(\btop\s+ten\b)|(\btop\s+10\b)|(\blist\s+of\b)|(\bround-?up\b)|(\bthis\s+weekend\b)|(\bthis\s+week\b)|(\bnear\s+you\b)|(\bmust[-\s](see|visit|try)\b)|(\bmust-chicago\b)|(\bhow\s+to\b)|(\bhow\s+many\b)|(\bhow\s+\w[\w\s']{2,40}\s+still\b)|(\breview:)|(\brecap\b)|(\b(ways|reasons)\s+to\b)|(\bsoloing\s+wings\b)|(\bstretch\s+my\b)|(\bkaraoke\b)|(\btrivia\b)|(\bpub\s+trivia\b)|(\bbandmix\b)|(\bprivate\s+events?\b)|(\blive\s+music\s+trail\b)|(\byou\s+have\s+to\s+(experience|see|visit|try)\b)|(\bmusic\s+venues?\s+you\b)|(\btop\s+singers?\b)|(\bartist\s+booking\b)|(\bbooking\s+information\b)|(\bvenue\s+rental\b)|(\brent\s+(this\s+)?venue\b)|(\bentertainment\s+directory\b)|(\btourism\b)|(\bvisitors?\s+guide\b)|(\bwhere\s+to\b)|(\bour\s+picks\b)|(\bstep\s+on\s+the\s+stage\b)|(\blooking\s+for\s+live\s+music\b)|(\bcelebrate\s+poetry\b)|(\bnational\s+poetry\s+month\b)|(\bmeet\s+our\s+(song\s+)?creators?\b)|(\bfolk\s+and\s+acoustic\s+music\s*home\b)|(\bhosts?\s+open\s+mic\b[\s\S]*\braising\s+money\b)|(\bculture\s+is\s+prevention\b)|(\bsix\s+of\s+the\s+city'?s\s+best\b)|(\bmusic\s+festivals?\s*(?:&|and)\s*concerts?\b)|(\bshowcase\s+your\s+talent\b)|(\bi\s+wanna\b)|(\bi\s+want\s+to\b)|(\ball\s+posts?\b)|(\barchives?\b)|(\busing\s+\w+\s+at\s+an?\s+open\s+mic\b)|(\bmusic\s+venue\s+series\b)|(\bupcoming\s+events?\b)|(\bfilled\s+a\s+void\b)|(\bcolumnist\s+writes\b)|(\bnext\s+voices\b)|(\btap\s+comedians\b)|(\bpull\s+thirsty\b)|(\bwe\s+love\b)|(\ba\s+place\s+to\s+share\b)|(\bcatalog\s+of\b)|(\blocal\s+open\s+mic\b)|(\bcharms?\b)|(\bstill\s+shapes?\b)|(\bstill\s+have\s+reservations?\b)|(\brestaurants?\s+that\b)|(\bcomedy\s+tour\b)|(\b(how|what|where|why|when|who)\b[\s\S]{0,80}\?\s*$)/i;
 
 /** Exact generic page titles that are not venues even when they mention live music. */
 const GENERIC_LIVE_MUSIC_TITLE =
-  /^\s*(live\s+music\s+events?|live\s+music|music\s+venues?|artist\s+booking(?:\s+information)?)\s*$/i;
+  /^\s*(live\s+music\s+events?|live\s+music|music\s+venues?|artist\s+booking(?:\s+information)?|blues\s+jams?)\s*$/i;
+
+/** Platform / ticket / meetup chrome that is not a venue open mic. */
+const PLATFORM_OR_TICKET_FLUFF =
+  /(\beventbrite\b)|(\btickets?,?\s+multiple\s+dates\b)|(\bfind\s+events?\s*(?:&|and)\s*groups?\b)|(\bevents?\s*(?:&|and)\s*groups?\b)|(\bmeetup\.com\b)|(\bfind\s+events?\s*(?:&|and)\s*groups?\s+in\b)|(\bmusic\s+tickets?\b)|(\bevents?\s*&\s*tickets?\b)|(\|\s*events?\s*&\s*tickets?\b)/i;
 
 /** Scraped URL / path-fragment / artifact names ("a/stir", "open-mic-night-3", "www.foo.com", "X :: Y", stray quotes). */
 const PATH_OR_URL =
@@ -84,7 +122,7 @@ const VENUE_IDENTITY =
   /(\bat\s+[a-z0-9])|@|(\bpresented\s+by\b)|(\bhosted\s+by\b)|(\bfeat(?:uring)?\.?\s+[a-z])|([a-z](?:'|\u2019)s\b)|(\bw\/\s*[a-z])/i;
 
 const OPEN_MIC_DIRECTORY =
-  /\bfind\s+open[\s-]?mics?\b|\bopen[\s-]?mics?\s+(?:near|around|in|by|across|throughout|of)\b|\bopen[\s-]?mic\s+nights?\s+(?:in|near|around|across)\b|\bopen[\s-]?mic\s+(?:venues?|events?|calendar|schedule|lists?|listings?|info|guide|directory|resources?|roundup)\b|\b(?:list|directory|calendar|guide|resource|roundup)\s+of\s+open[\s-]?mics?\b|\bopen[\s-]?mics?\s*(?:and|&)\s*jams?\b|\bopen[\s-]?mics?\s+near\s+(?:me|you)\b/i;
+  /\bfind\s+open[\s-]?mi[ck]es?\b|\bopen[\s-]?mi[ck]es?\s+(?:near|around|in|by|across|throughout|of)\b|\bopen[\s-]?mic\s+nights?\s+(?:in|near|around|across)\b|\bopen[\s-]?mic\s+(?:venues?|events?|calendar|schedule|lists?|listings?|info|guide|directory|resources?|roundup)\b|\b(?:list|directory|calendar|guide|resource|roundup)\s+of\s+open[\s-]?mi[ck]es?\b|\bopen[\s-]?mi[ck]es?\s*(?:and|&)\s*jams?\b|\bopen[\s-]?mi[ck]es?\s+near\s+(?:me|you)\b/i;
 
 /**
  * Article / landing-page / aggregator phrasing that disqualifies a name even
@@ -95,7 +133,7 @@ const OPEN_MIC_DIRECTORY =
  * like "Live Music & Open Mic at The Wolf Cafe" are preserved.
  */
 const AGGREGATOR_PHRASE =
-  /(\bmeetup\s+group\b)|(\barts\s+agenda\b)|(\bget\s+on\s+stage\b)|(\bflourish\b)|(\bevery\s+night\b)|(\btonight\b)|(\bjoin\s+us\b)|(\bnavigating\b)|(\bwhere\s+and\s+when\b)|(\bmost\s+best\b)|(\bopen\s+mics\b\s*(?:&|and)\b)|(\b(?:and|&)\s+open\s+mics\b)|(\b(?:area|county|region|metro|greater)\s+open\s+mics?\b)|(\bopen\s+mics\b[\s\S]*\b(?:classes|slams|communities|directory|guides?|resources?|calendars?|roundup|support)\b)|(\bopen[\s-]?mics?\s+(?:nights?\s+)?(?:showcases?|highlights?|brings?|offers?|returns?|flourish(?:es)?|features?|celebrates?|draws?|attracts?)\b)|(\bshowcase\s+talent\s+in\b)/i;
+  /(\bmeetup\s+group\b)|(\barts\s+agenda\b)|(\bget\s+on\s+stage\b)|(\bflourish\b)|(\bevery\s+night\b)|(\btonight\b)|(\bjoin\s+us\b)|(\bnavigating\b)|(\bwhere\s+and\s+when\b)|(\bmost\s+best\b)|(\bopen\s+mics\b\s*(?:&|and)\b)|(\b(?:and|&)\s+open\s+mics\b)|(\b(?:area|county|region|metro|greater)\s+open\s+mics?\b)|(\bopen\s+mics\b[\s\S]*\b(?:classes|slams|communities|directory|guides?|resources?|calendars?|roundup|support)\b)|(\bopen[\s-]?mics?\s+(?:nights?\s+)?(?:showcases?|highlights?|brings?|offers?|returns?|flourish(?:es)?|features?|celebrates?|draws?|attracts?)\b)|(\bshowcase\s+talent\s+in\b)|(\bruns?\s+a\s+free\b)|(\bopen\s+mic\s+in\s+its\b)/i;
 
 /** Open-mic wording, performance categories, filler, and directory words — never distinctive on their own. */
 const AGG_GENERIC_TOKENS = new Set([
@@ -129,10 +167,10 @@ const AGG_GEO_TOKENS = new Set([
   "minneapolis", "tulsa", "tampa", "orleans", "wichita", "cleveland", "bakersfield", "aurora", "anaheim", "honolulu",
   "pittsburgh", "cincinnati", "orlando", "jacksonville", "louis", "paul", "salt", "brooklyn", "bronx", "queens",
   "manhattan", "harlem", "asheville", "savannah", "charleston", "richmond", "norfolk", "dayton", "akron", "toledo",
-  "madison", "evanston", "berwyn", "alsip", "doral", "decatur", "ballwin", "manchester",
+  "madison", "evanston", "berwyn", "alsip", "doral", "decatur", "ballwin", "manchester", "twin", "cities",
   "north", "south", "east", "west", "saint", "st", "ft", "mount", "mt", "port", "bay", "grand", "city", "valley",
   "springs", "heights", "park", "beach", "hills", "township", "county", "downtown", "uptown", "midtown", "metro",
-  "greater", "area", "village", "hollywood", "lake",
+  "greater", "area", "village", "borough", "lake", "sf",
 ]);
 
 function tokenizeName(name: string): string[] {
@@ -168,9 +206,15 @@ function looksLikeOpenMicAggregator(name: string): boolean {
 export function classifyListingName(name: string): ListingNameRejection | null {
   const n = (name ?? "").trim();
   if (!n || n.length < 4) return "TOO_SHORT";
+  if (EXACT_JUNK_NAME.has(n.toLowerCase())) return "GENERIC_PAGE_TITLE";
+  // Single-token genre/chrome labels are not venue open mics.
+  if (/^(poetry|comedy|jazz|blues|karaoke|trivia|music|live|events?|tickets?)$/i.test(n)) {
+    return "GENERIC_PAGE_TITLE";
+  }
   if (CANCELLED_OR_CLOSED.test(n)) return "CANCELLED_OR_CLOSED";
   if (GENERIC_PAGE_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
   if (GENERIC_LIVE_MUSIC_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
+  if (PLATFORM_OR_TICKET_FLUFF.test(n)) return "AGGREGATOR_OR_DIRECTORY";
   if (LISTICLE.test(n) || DATE_ARTICLE.test(n)) return "ARTICLE_OR_LISTICLE";
   if (PATH_OR_URL.test(n)) return "PATH_OR_URL_NAME";
   if (EDITORIAL.test(n)) return "NON_VENUE_TITLE";
@@ -182,6 +226,94 @@ export function classifyListingName(name: string): ListingNameRejection | null {
 /** True when a listing name is acceptable for public discovery. */
 export function isPublicListingNameOk(name: string): boolean {
   return classifyListingName(name) === null;
+}
+
+export type PublicDisplayBucket = "GOOD" | "TITLE_CLEANUP" | "AMBIGUOUS" | "BAD";
+
+export type PublicDisplayQuality = {
+  bucket: PublicDisplayBucket;
+  reason: string | null;
+  /** Deterministic cleaned title when bucket is TITLE_CLEANUP (or GOOD after noop). */
+  canonicalName: string | null;
+};
+
+/**
+ * Strip ticket/platform/date fluff from a title when a venue-like core remains.
+ * Returns null when cleanup is not safe/deterministic.
+ */
+export function suggestCanonicalListingName(name: string): string | null {
+  let n = (name ?? "").trim();
+  if (!n) return null;
+  const original = n;
+
+  n = n.replace(/\s*[|\u2013\u2014-]\s*Eventbrite\s*$/i, "");
+  n = n.replace(/\s*Tickets?,?\s+Multiple\s+dates?\s*$/i, "");
+  n = n.replace(/:?\s*Events?(?:\s*&\s*Tickets?)?\s*$/i, "");
+  n = n.replace(/\s*Tickets?\s*$/i, "");
+  n = n.replace(/\s*[|\u2013\u2014]\s*(Events?(?:\s*&\s*Tickets?)?|Live\s+Music|Calendar|Schedule|Entertainment|Private\s+Events?)\s*$/i, "");
+  n = n.replace(/\s*\(\s*@[^)]+\)\s*$/g, "");
+  n = n.replace(/\s*&\s*$/g, "");
+  n = n.replace(/\s{2,}/g, " ").trim();
+  // Drop trailing weekday/time crumbs: "Fri, Aug 14, 8:00 PM"
+  n = n.replace(
+    /,?\s*(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*,?\s+[A-Z][a-z]{2}\s+\d{1,2}(?:,?\s+\d{4})?(?:,?\s+\d{1,2}:\d{2}\s*(?:AM|PM)?)?\s*$/i,
+    "",
+  );
+  n = n.replace(/\s{2,}/g, " ").trim();
+
+  if (!n || n.length < 5) return null;
+  if (n.toLowerCase() === original.toLowerCase()) return null;
+  if (classifyListingName(n) !== null) return null;
+  // Require some venue-ish substance after cleanup
+  if (/^(open\s*mic|open\s*mic\s+night)$/i.test(n)) return null;
+  return n;
+}
+
+/**
+ * Public display suitability — orthogonal to place/evidence VERIFIED status.
+ * BAD → hide from discovery (quarantine). TITLE_CLEANUP → normalize name if safe.
+ * AMBIGUOUS → human review (do not auto-hide). GOOD → public-ready.
+ */
+export function classifyPublicDisplayQuality(input: {
+  name: string;
+  city?: string | null;
+  region?: string | null;
+  formattedAddress?: string | null;
+  googlePlaceId?: string | null;
+}): PublicDisplayQuality {
+  const name = (input.name ?? "").trim();
+  const reject = classifyListingName(name);
+  if (reject) {
+    const cleaned = suggestCanonicalListingName(name);
+    if (cleaned) {
+      return { bucket: "TITLE_CLEANUP", reason: reject, canonicalName: cleaned };
+    }
+    return { bucket: "BAD", reason: reject, canonicalName: null };
+  }
+
+  const place = [input.city, input.region].filter(Boolean).join(", ").trim();
+  const hasPlace =
+    Boolean(input.googlePlaceId) ||
+    Boolean(place) ||
+    Boolean(input.formattedAddress?.trim());
+
+  // Bare titles with no geography and no place id are weak public inventory.
+  if (!hasPlace && name.split(/\s+/).length <= 2 && !OPEN_MIC_NAME.test(name) && !VENUE_IDENTITY.test(name)) {
+    return { bucket: "AMBIGUOUS", reason: "WEAK_GEO_IDENTITY", canonicalName: null };
+  }
+
+  const cleaned = suggestCanonicalListingName(name);
+  if (cleaned) {
+    return { bucket: "TITLE_CLEANUP", reason: "TITLE_FLUFF", canonicalName: cleaned };
+  }
+
+  return { bucket: "GOOD", reason: null, canonicalName: null };
+}
+
+/** Discovery / sitemap / claim-invite display gate (name quality). */
+export function isPublicDisplayReady(name: string): boolean {
+  const q = classifyPublicDisplayQuality({ name });
+  return q.bucket === "GOOD" || (q.bucket === "TITLE_CLEANUP" && Boolean(q.canonicalName));
 }
 
 /**

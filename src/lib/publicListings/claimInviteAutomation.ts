@@ -10,6 +10,7 @@ import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteElig
 import { isFreeMailDomain } from "@/lib/publicListings/claimAutoApproval";
 import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
 import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
+import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 
 const CONTROL_ADAPTER = "claim_invite_control";
 const CONTROL_MARKET = "global";
@@ -358,6 +359,10 @@ export function listingPassesStagedClaimInviteSafety(listing: {
     })
   ) {
     return { ok: false, reason: "geo_conflict" };
+  }
+  // Public display quality — never invite owners to claim scrapy/article titles.
+  if (!isPublicListingNameOk(listing.name)) {
+    return { ok: false, reason: "public_display_quality" };
   }
   return { ok: true };
 }

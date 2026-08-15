@@ -6,7 +6,7 @@ import type {
 } from "@/generated/prisma/client";
 import { slugify } from "@/lib/slug";
 import { buildListingAboutFromLead } from "@/lib/publicListings/listingAboutFromLead";
-import { classifyListingName } from "@/lib/publicListings/listingQuality";
+import { classifyListingName, classifyPublicDisplayQuality } from "@/lib/publicListings/listingQuality";
 
 function uniqueSlug(base: string, used: Set<string>): string {
   let slug = base;
@@ -60,11 +60,25 @@ export async function publishGrowthLeadAsListing(
     return { created: false, skipReason: `failed_classifier_${nameReject}` };
   }
 
+  // Public display-quality gate: reject deterministic junk; prefer cleaned titles.
+  let publishName = baseName;
+  const displayQ = classifyPublicDisplayQuality({
+    name: baseName,
+    city: lead.city,
+    region: lead.region,
+  });
+  if (displayQ.bucket === "BAD") {
+    return { created: false, skipReason: `failed_display_quality_${displayQ.reason ?? "BAD"}` };
+  }
+  if (displayQ.bucket === "TITLE_CLEANUP" && displayQ.canonicalName) {
+    publishName = displayQ.canonicalName;
+  }
+
   const slugBase =
-    slugify(city ? `${baseName}-${city}` : baseName) || slugify(baseName) || `listing-${lead.id.slice(0, 8)}`;
+    slugify(city ? `${publishName}-${city}` : publishName) || slugify(publishName) || `listing-${lead.id.slice(0, 8)}`;
   const slug = uniqueSlug(slugBase, existingSlugs);
 
-  const formattedAddress = [baseName, city, lead.region].filter(Boolean).join(", ") || baseName;
+  const formattedAddress = [publishName, city, lead.region].filter(Boolean).join(", ") || publishName;
   // Auto-published discoveries are never publicly VERIFIED on creation: the
   // "open mic" signal comes from page-body text (which listicles also contain),
   // so at best this is medium-confidence and must be held for review. Google
@@ -82,7 +96,7 @@ export async function publishGrowthLeadAsListing(
 
   await prisma.publicOpenMicListing.create({
     data: {
-      name: baseName,
+      name: publishName,
       slug,
       formattedAddress,
       city: city || null,
@@ -99,7 +113,10 @@ export async function publishGrowthLeadAsListing(
       lastVerifiedAt: new Date(),
       growthLeadId: lead.id,
       about,
-      internalNotes: `Auto-published from growth lead ${lead.id}; held NEEDS_REVIEW pending verification`,
+      internalNotes:
+        publishName !== baseName
+          ? `Auto-published from growth lead ${lead.id}; held NEEDS_REVIEW pending verification; display_title_normalized from ${JSON.stringify(baseName)}`
+          : `Auto-published from growth lead ${lead.id}; held NEEDS_REVIEW pending verification`,
     },
   });
 

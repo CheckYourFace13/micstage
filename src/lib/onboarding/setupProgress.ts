@@ -120,18 +120,38 @@ export function setupCompletionPct(items: SetupChecklistItem[]): number {
   return Math.round((done / items.length) * 100);
 }
 
+/** Extract searchable venue/brand phrases from promoter application text. */
+export function extractPromoterVenueSearchNeedles(app: {
+  brandName?: string | null;
+  notes?: string | null;
+}): string[] {
+  const skip =
+    /^(weekly|monthly|biweekly|bi-weekly|fridays?|saturdays?|sundays?|mondays?|tuesdays?|wednesdays?|thursdays?|every\s+\w+|open\s*mic|nights?)$/i;
+  const parts = [app.brandName, app.notes]
+    .filter(Boolean)
+    .join(" | ")
+    .split(/[,.|/\n]+/)
+    .map((s) => s.trim().replace(/^the\s+/i, (m) => m)) // keep "The …" venue names
+    .map((s) => s.replace(/[.]+$/g, "").trim())
+    .filter((s) => s.length >= 4 && !skip.test(s));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const p of parts) {
+    const key = p.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 /** Suggest venues/listings from approved promoter application text. */
 export async function suggestOpenMicsForPromoterApplication(
   prisma: PrismaClient,
   app: { brandName?: string | null; notes?: string | null; cityRegion?: string | null },
 ): Promise<Array<{ kind: "venue" | "listing"; id: string; name: string; place: string | null; venueId?: string }>> {
-  const needles = [app.brandName, app.notes]
-    .filter(Boolean)
-    .join(" ")
-    .split(/[,.|/\n]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 4)
-    .slice(0, 6);
+  const needles = extractPromoterVenueSearchNeedles(app);
 
   const out: Array<{ kind: "venue" | "listing"; id: string; name: string; place: string | null; venueId?: string }> = [];
   const seen = new Set<string>();

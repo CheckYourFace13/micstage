@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { nationalDiscoveryMarketSlug } from "@/lib/growth/marketsConfig";
-import { serpApiKeyForDiscovery } from "@/lib/growth/discovery/autonomousConfig";
+import {
+  growthSerpApiDailyMax,
+  growthSerpApiMonthlySoftMax,
+  serpApiKeyForDiscovery,
+} from "@/lib/growth/discovery/autonomousConfig";
 import {
   clearSerpApiCircuitBreaker,
+  computeSerpDailyAllocation,
+  probeSerpApiAccount,
   readSerpApiProviderState,
   serpApiAvailabilityNow,
 } from "@/lib/growth/discovery/providerState";
@@ -20,14 +26,15 @@ function authorize(request: Request): boolean {
 }
 
 /**
- * Read-only SerpAPI account + MicStage circuit state (no API key in response).
- * POST ?action=clear_circuit&confirm=1 — clear stale disabledUntil (caps unchanged).
+ * Read-only SerpAPI account + MicStage circuit / free-plan allocation (no API key in response).
+ * Uses Account API (does not consume search quota).
+ * POST ?action=clear_circuit&confirm=1 — emergency manual clear only (prefer auto-recovery).
  */
 export async function GET(request: Request) {
   if (!authorize(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json(await buildStatus());
+  return NextResponse.json(await buildStatus(true));
 }
 
 export async function POST(request: Request) {
@@ -49,6 +56,7 @@ export async function POST(request: Request) {
       ok: true,
       action: "clear_circuit",
       market,
+      note: "Prefer automatic Account-API recovery after quota reset; manual clear is emergency-only.",
       before: {
         disabledUntilIso: before.disabledUntilIso,
         reason: before.reason,
@@ -61,27 +69,47 @@ export async function POST(request: Request) {
         last429AtIso: after.last429AtIso,
         callsMonth: after.callsMonth,
       },
-      account: await probeAccount(),
+      account: await probeSerpApiAccount(),
     });
   }
-  return NextResponse.json(await buildStatus());
+  return NextResponse.json(await buildStatus(true));
 }
 
-async function buildStatus() {
+async function buildStatus(forceProbe: boolean) {
   const prisma = getPrismaOrNull();
   const market = nationalDiscoveryMarketSlug();
-  const account = await probeAccount();
   if (!prisma) {
+    const account = await probeSerpApiAccount();
     return { ok: false, error: "database_unavailable", account };
   }
-  const state = await readSerpApiProviderState(prisma, market);
-  const avail = await serpApiAvailabilityNow(prisma, market);
+  const avail = await serpApiAvailabilityNow(prisma, market, new Date(), {
+    forceAccountProbe: forceProbe,
+  });
+  const state = avail.state;
+  const account = state.account;
+  const monthlyBudget = growthSerpApiMonthlySoftMax();
+  const alloc = computeSerpDailyAllocation({
+    now: new Date(),
+    callsMonth: state.callsMonth,
+    monthlyBudget,
+    planSearchesLeft: account?.planSearchesLeft ?? null,
+    planRenewalDate: account?.planRenewalDate ?? null,
+    configuredDailyMax: growthSerpApiDailyMax() > 0 ? growthSerpApiDailyMax() : 999,
+  });
   return {
     ok: true,
     now: new Date().toISOString(),
     market,
     keyPresent: Boolean(serpApiKeyForDiscovery()),
     availability: { enabled: avail.enabled, reason: avail.reason ?? null },
+    freePlanBudget: {
+      monthlySoftMax: monthlyBudget,
+      configuredDailyMax: growthSerpApiDailyMax(),
+      dailyAllocation: alloc.dailyAllocation,
+      daysRemaining: alloc.daysRemaining,
+      remainingBudget: alloc.remainingBudget,
+      micstageCallsMonth: state.callsMonth,
+    },
     circuit: {
       disabledUntilIso: state.disabledUntilIso,
       reason: state.reason,
@@ -91,79 +119,37 @@ async function buildStatus() {
       runsToday: state.runsToday,
       dayKey: state.dayKey,
       monthKey: state.monthKey,
+      dailyAllocation: state.dailyAllocation,
     },
-    account,
+    account: account
+      ? {
+          plan_id: account.planId,
+          plan_name: account.planName,
+          searches_per_month: account.searchesPerMonth,
+          plan_searches_left: account.planSearchesLeft,
+          this_month_usage: account.thisMonthUsage,
+          total_searches_left: account.totalSearchesLeft,
+          plan_renewal_date: account.planRenewalDate,
+          probed_at: account.probedAtIso,
+        }
+      : null,
     diagnosisHint: diagnose(state, account, avail.enabled),
+    policy:
+      "SerpAPI is optional growth. Exhausted Free quota pauses discovery searches only; product + backlog pipelines continue. Auto-recovers via Account API when plan_searches_left > 0.",
   };
 }
 
-async function probeAccount(): Promise<Record<string, unknown> | null> {
-  const apiKey = serpApiKeyForDiscovery();
-  if (!apiKey) return { error: "no_key_on_server" };
-  try {
-    const res = await fetch(`https://serpapi.com/account.json?api_key=${encodeURIComponent(apiKey)}`, {
-      signal: AbortSignal.timeout(15_000),
-    });
-    const text = await res.text();
-    let json: Record<string, unknown> = {};
-    try {
-      json = JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      return { httpStatus: res.status, parseError: true, bodyPreview: text.slice(0, 200) };
-    }
-    if (!res.ok) {
-      return {
-        httpStatus: res.status,
-        error: typeof json.error === "string" ? json.error : text.slice(0, 200),
-      };
-    }
-    return {
-      httpStatus: res.status,
-      account_email: typeof json.account_email === "string" ? redactEmail(json.account_email) : null,
-      plan_id: json.plan_id ?? null,
-      plan_name: json.plan_name ?? null,
-      searches_per_month: json.searches_per_month ?? null,
-      plan_searches_left: json.plan_searches_left ?? null,
-      this_month_usage: json.this_month_usage ?? null,
-      total_searches_left: json.total_searches_left ?? null,
-      this_hour_searches: json.this_hour_searches ?? null,
-      last_hour_searches: json.last_hour_searches ?? null,
-      account_rate_limit_per_hour: json.account_rate_limit_per_hour ?? null,
-      extra_credits: json.extra_credits ?? null,
-    };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
-  }
-}
-
-function redactEmail(email: string): string {
-  const at = email.indexOf("@");
-  if (at < 1) return "***";
-  return `${email[0]}***@${email.slice(at + 1, at + 3)}***`;
-}
-
 function diagnose(
-  state: { disabledUntilIso: string | null; reason: string | null; last429AtIso: string | null },
-  account: Record<string, unknown> | null,
+  state: { disabledUntilIso: string | null; reason: string | null },
+  account: { planSearchesLeft: number | null } | null,
   availEnabled: boolean,
 ): string {
-  const left = typeof account?.plan_searches_left === "number" ? account.plan_searches_left : null;
+  const left = account?.planSearchesLeft ?? null;
   const until = state.disabledUntilIso ? new Date(state.disabledUntilIso) : null;
   const locked = until && !Number.isNaN(until.getTime()) && until.getTime() > Date.now();
-  if (locked && left !== null && left > 0) {
-    return "micstage_circuit_stale_provider_has_searches";
-  }
-  if (locked && left === 0) {
-    return "provider_plan_quota_exhausted_and_micstage_circuit_open";
-  }
-  if (!availEnabled && left === 0) {
-    return "provider_plan_quota_exhausted";
-  }
-  if (availEnabled && left !== null && left > 0) {
-    return "healthy";
-  }
-  if (locked) {
-    return "micstage_circuit_open_account_unknown_or_error";
-  }
+  if (left === 0) return "discovery_paused_provider_quota_exhausted_auto_resume_on_reset";
+  if (locked && left !== null && left > 0) return "should_auto_recover_on_next_probe";
+  if (availEnabled && left !== null && left > 0) return "healthy";
+  if (locked) return "circuit_open_waiting_provider_reset_or_probe";
   return "see_availability_and_account";
 }

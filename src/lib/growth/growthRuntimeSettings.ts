@@ -43,10 +43,14 @@ export type GrowthPipelineRuntimeSnapshot = {
 };
 
 const DEFAULTS: Record<GrowthPipelineRuntimeKey, number> = {
-  GROWTH_SERPAPI_DAILY_MAX: 120,
-  GROWTH_SERPAPI_MONTHLY_SOFT_MAX: 2800,
-  GROWTH_SERPAPI_RUNS_PER_DAY: 36,
-  GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN: 12,
+  /** Soft ceiling per UTC day; free-plan allocation may be lower via Account API math. */
+  GROWTH_SERPAPI_DAILY_MAX: 8,
+  /** MicStage monthly SerpAPI budget on Free plan (~250 provider searches; leave margin). */
+  GROWTH_SERPAPI_MONTHLY_SOFT_MAX: 220,
+  /** Discovery cron may run 48×/day; SerpAPI run starts are independently capped. */
+  GROWTH_SERPAPI_RUNS_PER_DAY: 6,
+  /** One search query per Serp-backed adapter run on Free plan. */
+  GROWTH_DISCOVERY_AUTONOMOUS_SEARCH_CALLS_PER_RUN: 1,
   LISTING_BACKLOG_PUBLISH_PER_TICK: 50,
   LISTING_BACKLOG_GOOGLE_VERIFY_PER_TICK: 30,
   LISTING_BACKLOG_PROMOTE_PER_TICK: 60,

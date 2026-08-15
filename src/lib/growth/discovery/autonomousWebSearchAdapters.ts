@@ -201,8 +201,8 @@ function buildSearchQuery(cursorQi: number, geoScopes: string[]): string {
 /** Same-host deep pages per search hit (contact / events / team / booking). */
 const DEEP_PAGES_PER_HIT = 8;
 
-/** Extra throughput for the nationwide lane (env caps still apply via allocation + parseIntEnv). */
-const NATIONWIDE_WEB_SEARCH_VOLUME_MULT = 1.35;
+/** Extra throughput for the nationwide lane — disabled on Free-plan monthly budgets. */
+const NATIONWIDE_WEB_SEARCH_VOLUME_MULT = 1.0;
 
 /**
  * SerpAPI (primary) / Brave Search API (fallback) → open-mic venue queries → multi-page fetch → email extraction.

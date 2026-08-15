@@ -44,12 +44,6 @@ export async function SiteHeader() {
         >
           <span className="flex shrink-0 items-center gap-2">
             <span className="om-heading text-xl tracking-wide text-white sm:text-2xl">MicStage</span>
-            <span
-              className="rounded border border-[rgba(var(--om-neon),0.4)] bg-[rgba(var(--om-neon),0.1)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--om-neon))] sm:text-[10px]"
-              title="MicStage is in beta"
-            >
-              BETA
-            </span>
           </span>
           <span className="min-w-0 truncate text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 sm:text-[11px]">
             Open mics near you

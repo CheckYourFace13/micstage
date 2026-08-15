@@ -4,6 +4,11 @@
  */
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function hashClaimInviteToken(rawToken) {
   return crypto.createHash("sha256").update(rawToken).digest("hex");
@@ -332,6 +337,93 @@ function importedTemplateDefaults() {
   assert.equal(consumeOnce("ACTIVE"), true);
   assert.equal(consumeOnce("USED"), false);
   assert.equal(consumeOnce("EXPIRED"), false);
+}
+
+// Non-venue hosts (ticket/directories) never count as official website identity
+{
+  const NON_VENUE = [
+    "ticketnetwork.com",
+    "ticketmaster.com",
+    "eventbrite.com",
+    "facebook.com",
+    "yelp.com",
+  ];
+  function isNonVenueEvidenceHost(hostOrUrl) {
+    if (!hostOrUrl?.trim()) return false;
+    let host = hostOrUrl.trim().toLowerCase().replace(/^www\./, "");
+    try {
+      if (host.includes("/") || host.includes(":")) {
+        host = new URL(host.includes("://") ? host : `https://${host}`).hostname
+          .replace(/^www\./i, "")
+          .toLowerCase();
+      }
+    } catch {
+      return false;
+    }
+    return NON_VENUE.some((d) => host === d || host.endsWith(`.${d}`));
+  }
+  assert.equal(isNonVenueEvidenceHost("https://www.ticketnetwork.com/tickets/1"), true);
+  assert.equal(isNonVenueEvidenceHost("thefoxandhounds.net"), false);
+}
+
+// Official event path expansion for enrichment crawls
+{
+  const suffixes = [
+    "/events",
+    "/calendar",
+    "/music",
+    "/live-music",
+    "/open-mic",
+    "/openmic",
+    "/entertainment",
+    "/whats-on",
+    "/schedule",
+    "/weekly-events",
+  ];
+  function expandOfficialEvidenceUrls(seedUrls, maxUrls = 6) {
+    const out = [];
+    const seen = new Set();
+    for (const raw of seedUrls) {
+      const u = raw.trim();
+      if (!u) continue;
+      const key = u.replace(/\/$/, "").toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(u);
+      }
+      let origin;
+      try {
+        origin = new URL(u.includes("://") ? u : `https://${u}`).origin;
+      } catch {
+        continue;
+      }
+      for (const suffix of suffixes) {
+        const candidate = `${origin}${suffix}`;
+        const ck = candidate.replace(/\/$/, "").toLowerCase();
+        if (seen.has(ck)) continue;
+        seen.add(ck);
+        out.push(candidate);
+        if (out.length >= maxUrls) return out;
+      }
+    }
+    return out.slice(0, maxUrls);
+  }
+  const urls = expandOfficialEvidenceUrls(["https://www.thefoxandhounds.net/"], 6);
+  assert.equal(urls[0], "https://www.thefoxandhounds.net/");
+  assert.ok(urls.some((u) => u.endsWith("/events")));
+  assert.ok(urls.some((u) => u.endsWith("/open-mic")));
+  assert.ok(urls.length <= 6);
+}
+
+// Mobile claim form affordances (smoke)
+{
+  const claim = fs.readFileSync(path.join(__dirname, "../src/components/publicListings/InstantClaimForm.tsx"), "utf8");
+  assert.ok(/h-12/.test(claim), "touch-friendly input height");
+  assert.ok(/text-base/.test(claim), "16px inputs avoid iOS zoom");
+  assert.ok(/w-full/.test(claim), "full-width CTA");
+  assert.ok(/enterKeyHint/.test(claim), "mobile keyboard hints");
+  assert.ok(/Claim this free listing/.test(claim));
+  assert.ok(/does not turn on online signups or booking/.test(claim));
 }
 
 console.log(

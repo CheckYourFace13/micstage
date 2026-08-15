@@ -81,7 +81,9 @@ function LineupHelp(s) {
 {
   const claim = read("src/components/publicListings/InstantClaimForm.tsx");
   assert.ok(/authorized to manage this open mic/i.test(claim));
-  assert.ok(/Schedule, photos, and booking stay optional/i.test(claim));
+  assert.ok(/does not turn on online signups or booking/i.test(claim));
+  assert.ok(/update the schedule and details later/i.test(claim));
+  assert.ok(/Claim this free listing/i.test(claim));
   assert.ok(!/Post-claim activation/.test(claim));
 }
 

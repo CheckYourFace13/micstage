@@ -47,6 +47,39 @@ export function detectExplicitPhrase(text: string): string | null {
   return EXPLICIT_RE.exec(text)?.[0] ?? null;
 }
 
+/** Ticket/directory hosts are never an official venue website for evidence trust. */
+const NON_VENUE_EVIDENCE_HOSTS = [
+  "ticketnetwork.com",
+  "ticketmaster.com",
+  "eventbrite.com",
+  "facebook.com",
+  "fb.com",
+  "instagram.com",
+  "yelp.com",
+  "tripadvisor.com",
+  "bandsintown.com",
+  "songkick.com",
+  "meetup.com",
+  "allevents.in",
+  "timeout.com",
+  "dice.fm",
+];
+
+export function isNonVenueEvidenceHost(hostOrUrl: string | null | undefined): boolean {
+  if (!hostOrUrl?.trim()) return false;
+  let host = hostOrUrl.trim().toLowerCase().replace(/^www\./, "");
+  try {
+    if (host.includes("/") || host.includes(":")) {
+      host = new URL(host.includes("://") ? host : `https://${host}`).hostname
+        .replace(/^www\./i, "")
+        .toLowerCase();
+    }
+  } catch {
+    return false;
+  }
+  return NON_VENUE_EVIDENCE_HOSTS.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
 export type EvidenceTrustInput = {
   pageText: string;
   excerpt: string | null;

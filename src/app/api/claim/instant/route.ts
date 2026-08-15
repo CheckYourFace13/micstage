@@ -69,6 +69,25 @@ export async function POST(request: Request) {
   }
 
   const emailKey = loginEmail.trim().toLowerCase() || "unknown";
+  const listingForAudit = await prisma.publicOpenMicListing.findUnique({
+    where: { slug: listingSlug.trim() },
+    select: { id: true },
+  });
+  if (listingForAudit) {
+    await prisma.listingClaimAuditEvent.create({
+      data: {
+        listingId: listingForAudit.id,
+        eventType: "CLAIM_SUBMIT_ATTEMPT",
+        meta: {
+          listingSlug: listingSlug.trim().slice(0, 120),
+          hasSession: Boolean(claimSession),
+          // domain only — never full email
+          emailDomain: emailKey.includes("@") ? emailKey.slice(emailKey.indexOf("@") + 1) : null,
+        },
+      },
+    });
+  }
+
   const rlEmail = await consumeRateLimit({
     scope: "claim:instant:email",
     identifier: emailKey,

@@ -13,6 +13,7 @@ import {
   detectExplicitPhrase,
   evaluateFetchedEvidenceTrust,
   excerptAroundMatch,
+  isNonVenueEvidenceHost,
   listingHasGeoConflict,
   LISTING_EVIDENCE_REASON,
 } from "@/lib/publicListings/evidenceTrust";
@@ -32,6 +33,57 @@ function hostFromUrl(u: string | null | undefined): string | null {
 
 function hostsRelated(a: string, b: string): boolean {
   return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+}
+
+/** Common event/calendar paths on venue sites — follow after homepage when needed. */
+const EVENT_PATH_SUFFIXES = [
+  "/events",
+  "/calendar",
+  "/music",
+  "/live-music",
+  "/open-mic",
+  "/openmic",
+  "/entertainment",
+  "/whats-on",
+  "/schedule",
+  "/weekly-events",
+  "/events/",
+  "/calendar/",
+];
+
+function originOf(url: string): string | null {
+  try {
+    const u = new URL(url.includes("://") ? url : `https://${url}`);
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+/** Expand a venue homepage into homepage + likely event/calendar URLs (same origin). */
+export function expandOfficialEvidenceUrls(seedUrls: string[], maxUrls = 6): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of seedUrls) {
+    const u = raw.trim();
+    if (!u) continue;
+    const key = u.replace(/\/$/, "").toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(u);
+    }
+    const origin = originOf(u);
+    if (!origin) continue;
+    for (const suffix of EVENT_PATH_SUFFIXES) {
+      const candidate = `${origin}${suffix}`;
+      const ck = candidate.replace(/\/$/, "").toLowerCase();
+      if (seen.has(ck)) continue;
+      seen.add(ck);
+      out.push(candidate);
+      if (out.length >= maxUrls) return out;
+    }
+  }
+  return out.slice(0, maxUrls);
 }
 
 export type EvidenceEnrichBatchResult = {
@@ -179,12 +231,15 @@ export async function enrichListingsMissingTrustedEvidence(
       continue;
     }
 
-    const venueHost =
+    const rawVenueHost =
       hostFromUrl(row.websiteUrl) || hostFromUrl(row.growthLead?.websiteUrl) || hostFromUrl(row.sourceUrl);
-    const urls = [row.websiteUrl, row.growthLead?.websiteUrl, row.sourceUrl].filter(
-      (u): u is string => Boolean(u?.trim()),
+    // Never treat ticket/directory hosts as the venue's official domain.
+    const venueHost = rawVenueHost && !isNonVenueEvidenceHost(rawVenueHost) ? rawVenueHost : null;
+    const seedUrls = [row.websiteUrl, row.growthLead?.websiteUrl, row.sourceUrl].filter(
+      (u): u is string => Boolean(u?.trim()) && !isNonVenueEvidenceHost(u),
     );
-    const uniqueUrls = [...new Set(urls.map((u) => u.trim()))].slice(0, 3);
+    // Follow homepage + /events|/calendar|/open-mic etc. on the official origin.
+    const uniqueUrls = expandOfficialEvidenceUrls(seedUrls, 6);
     if (uniqueUrls.length === 0) {
       skipped += 1;
       await prisma.publicOpenMicListing.update({
@@ -199,13 +254,21 @@ export async function enrichListingsMissingTrustedEvidence(
     }
 
     let storedTrusted = false;
+    let fetchFailures = 0;
     for (const url of uniqueUrls) {
       try {
         const text = await discoveryFetchText(url);
-        if (!text) continue;
+        if (!text) {
+          fetchFailures += 1;
+          continue;
+        }
         const excerpt = excerptAroundMatch(text);
         const pageHost = hostFromUrl(url);
-        const onOfficial = Boolean(pageHost && venueHost && hostsRelated(pageHost, venueHost));
+        const pageIsNonVenue = isNonVenueEvidenceHost(pageHost);
+        const onOfficial = Boolean(
+          !pageIsNonVenue && pageHost && venueHost && hostsRelated(pageHost, venueHost),
+        );
+        // Ticket/third-party hosts are never treated as official venue domain.
         const trust = evaluateFetchedEvidenceTrust({
           pageText: text,
           excerpt,
@@ -242,25 +305,53 @@ export async function enrichListingsMissingTrustedEvidence(
           },
         });
         evidenceStored += 1;
-        if (trust.trusted) storedTrusted = true;
+
+        // Promote only when fetch trust AND listing-level evidence gate agree,
+        // after persisting the official source URL + structured title (not raw SERP).
+        if (trust.trusted && onOfficial && excerpt) {
+          const gate = evaluateOpenMicEvidence({
+            listingName: row.name,
+            schedules: row.schedules,
+            sourceTitle: excerpt,
+            sourceUrl: url,
+            websiteUrl: row.websiteUrl ?? row.growthLead?.websiteUrl,
+            sourceKind: "WEBSITE_CONTACT",
+          });
+          if (gate.trusted) {
+            await prisma.publicOpenMicListing.update({
+              where: { id: row.id },
+              data: {
+                verificationStatus: "VERIFIED",
+                lastVerifiedAt: new Date(),
+                sourceUrl: url,
+                sourceName: `Enrichment ${trust.reasonCode}`,
+                evidenceAutomationStatus: "PROMOTED",
+                evidenceTerminalReason: null,
+                internalNotes: [
+                  row.internalNotes,
+                  OPEN_MIC_EVIDENCE_REASON.CONFIRMED,
+                  `ENRICHMENT_TRUSTED ${trust.reasonCode}`,
+                  `evidenceUrl=${url}`,
+                  `evidenceSnippet=${excerpt.slice(0, 200)}`,
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              },
+              select: { id: true },
+            });
+            storedTrusted = true;
+            promoted += 1;
+            void sendListingClaimInviteIfNeeded(prisma, row.id).catch(() => undefined);
+            break;
+          }
+        }
       } catch {
-        // continue
+        fetchFailures += 1;
       }
     }
 
     if (storedTrusted) {
-      await prisma.publicOpenMicListing.update({
-        where: { id: row.id },
-        data: {
-          verificationStatus: "VERIFIED",
-          lastVerifiedAt: new Date(),
-          evidenceAutomationStatus: "PROMOTED",
-          internalNotes: [row.internalNotes, OPEN_MIC_EVIDENCE_REASON.CONFIRMED, "ENRICHMENT_TRUSTED"].filter(Boolean).join("\n"),
-        },
-        select: { id: true },
-      });
-      promoted += 1;
-      void sendListingClaimInviteIfNeeded(prisma, row.id).catch(() => undefined);
+      // already promoted inside the fetch loop
     } else if (attempt >= 5) {
       await prisma.publicOpenMicListing.update({
         where: { id: row.id },

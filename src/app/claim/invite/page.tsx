@@ -97,6 +97,8 @@ export default async function ClaimInviteSessionPage({
       slug: true,
       name: true,
       formattedAddress: true,
+      city: true,
+      region: true,
       claimedVenueId: true,
       about: true,
       schedules: {
@@ -116,6 +118,15 @@ export default async function ClaimInviteSessionPage({
     );
   }
 
+  // Privacy-safe funnel: page reached (no email, no token).
+  await prisma.listingClaimAuditEvent.create({
+    data: {
+      listingId: listing.id,
+      eventType: "CLAIM_PAGE_REACHED",
+      meta: { listingSlug: listing.slug },
+    },
+  });
+
   const scheduleBits = listing.schedules.map((s) => {
     const sh = Math.floor(s.startTimeMin / 60);
     const sm = String(s.startTimeMin % 60).padStart(2, "0");
@@ -127,6 +138,7 @@ export default async function ClaimInviteSessionPage({
       : listing.about?.slice(0, 180) || null;
 
   const invitedEmailMasked = maskClaimInviteEmail(session.intendedEmailNormalized);
+  const cityLine = [listing.city, listing.region].filter(Boolean).join(", ") || null;
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -134,17 +146,13 @@ export default async function ClaimInviteSessionPage({
         <Link href={`/open-mics/${listing.slug}`} className="text-sm text-[rgb(var(--om-neon))] underline">
           ← View public listing
         </Link>
-        <h1 className="om-heading mt-4 text-3xl">Claim your open mic</h1>
-        <p className="mt-2 text-sm text-white/70">
-          Secure invitation for <span className="font-semibold text-white">{listing.name}</span>. Claiming is
-          free. Online booking stays off until you enable it.
-        </p>
         <div className="mt-8">
           <InstantClaimForm
             listingSlug={listing.slug}
             listingName={listing.name}
             invitedEmailMasked={invitedEmailMasked}
             address={listing.formattedAddress}
+            cityLine={cityLine}
             evidenceSummary={evidenceSummary}
             authorityAffirmation={CLAIM_AUTHORITY_AFFIRMATION}
           />

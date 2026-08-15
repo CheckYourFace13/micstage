@@ -31,6 +31,7 @@
  * scripts/audit-verified-open-mic-evidence.mjs (scripts cannot import TS).
  */
 import { classifyListingName, isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { isNonVenueEvidenceHost } from "@/lib/publicListings/evidenceTrust";
 
 /** Machine-readable reasons recorded in internalNotes / used by callers. */
 export const OPEN_MIC_EVIDENCE_REASON = {
@@ -125,6 +126,7 @@ function sourceOnVenueDomain(sourceUrl?: string | null, websiteUrl?: string | nu
   const a = hostOf(sourceUrl);
   const b = hostOf(websiteUrl);
   if (!a || !b) return false;
+  if (isNonVenueEvidenceHost(a) || isNonVenueEvidenceHost(b)) return false;
   return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
 }
 

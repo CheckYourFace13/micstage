@@ -23,7 +23,9 @@
     "audit:claim-invites": "node scripts/audit-historical-claim-invitations.mjs",
     "audit:duplicate-places": "node scripts/analyze-duplicate-google-places.mjs",
     "backup:production": "node scripts/create-production-backup.mjs",
-    "backup:validate": "node scripts/validate-production-backup.mjs"
+    "backup:production:ps1": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-production-backup.ps1",
+    "backup:validate": "node scripts/validate-production-backup.mjs",
+    "backup:restore-validate": "node scripts/validate-backup-restore-local.mjs"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.5.0",

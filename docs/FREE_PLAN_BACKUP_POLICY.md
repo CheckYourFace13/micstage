@@ -18,12 +18,17 @@ Create a **manual logical production backup** (roles + schema + data SQL) and ke
 ### How to run
 
 ```bash
-# Optional: path to pg_dump if Docker Desktop is not installed
-# set PG_DUMP_PATH=%USERPROFILE%\Tools\pgsql-bin\bin\pg_dump.exe
+# PowerShell (preferred on Windows with PostgreSQL 17 installed)
+$env:PG_DUMP_PATH = "C:\Program Files\PostgreSQL\17\bin\pg_dump.exe"
+$env:MICSTAGE_BACKUP_DIR = "$env:USERPROFILE\Projects\OpenMic-private-backups"
+.\scripts\create-production-backup.ps1
 
-set MICSTAGE_BACKUP_DIR=%USERPROFILE%\Projects\OpenMic-private-backups
-node scripts/create-production-backup.mjs
-node scripts/validate-production-backup.mjs
+# Or Node helper
+npm run backup:production
+npm run backup:validate
+
+# Optional isolated restore check (local temp Postgres only — never production)
+node scripts/validate-backup-restore-local.mjs YYYY-MM-DD-HHMM
 ```
 
 Prefer `supabase db dump` when Docker Desktop is available (matches Supabase docs).  

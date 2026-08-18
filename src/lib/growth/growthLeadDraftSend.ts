@@ -6,7 +6,9 @@ import { venueLeadMailboxForOutreach } from "@/lib/growth/leadEmailValidation";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { isOnlyTransientMarketingThrottle } from "@/lib/marketing/sendCaps";
 import { sendThroughMarketingPipeline, type MarketingSendResult } from "@/lib/marketing/sendPipeline";
-import { leadBlocksGrowthOutreach } from "@/lib/publicListings/listingClaimInviteEmail";
+import { explainGrowthLeadOutreachEligibility } from "@/lib/growth/outreachContactEligible";
+import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
+import { appBaseUrl } from "@/lib/marketing/emailConfig";
 
 /**
  * Sends an outreach draft. APPROVED sends normally; PENDING_REVIEW sends only when the lead’s launch market
@@ -109,12 +111,9 @@ export async function sendApprovedGrowthLeadDraft(
     email = n;
   }
 
-  if (draft.lead.leadType === "VENUE" && (await leadBlocksGrowthOutreach(prisma, draft.leadId))) {
-    return {
-      ok: false,
-      blocked: true,
-      reasons: ["Venue has a public listing awaiting claim or go-live — cold outreach blocked"],
-    };
+  const eligibility = await explainGrowthLeadOutreachEligibility(prisma, draft.leadId);
+  if (!eligibility.eligible) {
+    return { ok: false, blocked: true, reasons: [`Outreach ineligible: ${eligibility.reason}`] };
   }
 
   const contact = await prisma.marketingContact.findUnique({ where: { emailNormalized: email } });
@@ -130,6 +129,14 @@ export async function sendApprovedGrowthLeadDraft(
 
   const templateKind = marketingTemplateKindForGrowthLeadType(draft.lead.leadType);
   const purposeKey = `growth-lead-draft:${draft.id}`;
+  const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
+  const baseUrl = appBaseUrl().replace(/\/$/, "");
+  const clickDestinationUrl =
+    draft.lead.leadType === "VENUE"
+      ? `${baseUrl}/register/venue?growthLead=${encodeURIComponent(draft.leadId)}`
+      : draft.lead.leadType === "PROMOTER_ACCOUNT"
+        ? `${baseUrl}/register/promoter?growthLead=${encodeURIComponent(draft.leadId)}`
+        : `${baseUrl}/register/musician?growthLead=${encodeURIComponent(draft.leadId)}`;
 
   const result = await sendThroughMarketingPipeline(prisma, {
     to: email,
@@ -141,6 +148,8 @@ export async function sendApprovedGrowthLeadDraft(
     textBody: draft.textBody,
     venueId: null,
     discoveryMarketSlug: draft.discoveryMarketSlug ?? draft.lead.discoveryMarketSlug,
+    clickDestinationUrl,
+    domainDailyCapOverride: outreachRuntime.effectiveDomainDailyMax,
   });
 
   if (result.ok) {

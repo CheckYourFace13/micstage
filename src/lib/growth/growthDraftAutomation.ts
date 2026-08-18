@@ -10,7 +10,8 @@ import {
   growthAutoDraftFitMin,
   growthOutreachMaxSendsPerMarketPerDay,
 } from "@/lib/growth/expansionConfig";
-import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
+import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
+import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { sendApprovedGrowthLeadDraft } from "@/lib/growth/growthLeadDraftSend";
 import {
@@ -165,8 +166,12 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const fitMin = growthAutoDraftFitMin();
   const venueAutoFitMin = Math.max(6, fitMin - 1);
   const limit = growthAutoDraftBatchLimit();
-  const runtime = await resolveClaimInviteRuntimeSnapshot(prisma);
-  const perCronSendCeiling = runtime.effectiveOutreachSendsPerCron;
+  const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
+  const outreachHealth = await evaluateOutreachSendHealth(prisma);
+  const perCronSendCeiling = Math.max(
+    0,
+    Math.floor(outreachRuntime.effectiveSendsPerCron * outreachHealth.sendMultiplier),
+  );
   const draftWorkTake = Math.min(limit, Math.max(24, Math.max(1, perCronSendCeiling) * 8));
   const venueReviewTake = Math.min(limit, Math.max(12, Math.max(1, perCronSendCeiling) * 6));
   let outreachSendsThisRun = 0;

@@ -666,6 +666,10 @@ enum MarketingEventType {
   EMAIL_SENT
   EMAIL_BLOCKED
   EMAIL_FAILED
+  EMAIL_DELIVERED
+  EMAIL_BOUNCED
+  EMAIL_COMPLAINED
+  EMAIL_CLICKED
 }
 
 enum MarketingContactStatus {
@@ -888,6 +892,9 @@ model MarketingEmailSend {
   blockedReason     String?
   providerMessageId String?
   sentAt            DateTime?
+  deliveredAt       DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
   failedAt          DateTime?
   lastError         String?
 
@@ -898,12 +905,28 @@ model MarketingEmailSend {
 
   outreachDraft            MarketingOutreachDraft?
   growthLeadOutreachDraft GrowthLeadOutreachDraft?
+  outreachClick            MarketingOutreachClick?
 
   @@index([contactId, createdAt])
   @@index([category, sentAt])
   @@index([toDomain, sentAt])
   @@index([status, createdAt])
   @@index([templateKind])
+}
+
+/// First unique click per outbound marketing send (duplicate clicks ignored for counts).
+model MarketingOutreachClick {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  sendId String @unique
+  send   MarketingEmailSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  destinationUrl String
+
+  @@index([createdAt])
+  @@index([contactId])
 }
 
 /// Inbound provider hooks (bounces/complaints) — populate when webhooks are configured.
@@ -917,6 +940,7 @@ model MarketingProviderWebhookEvent {
   payload    Json
   processedAt DateTime?
 
+  @@unique([provider, externalId])
   @@index([provider, createdAt])
   @@index([processedAt])
 }

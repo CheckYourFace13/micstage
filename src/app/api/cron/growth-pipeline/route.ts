@@ -21,7 +21,6 @@ import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaim
 import { runOnboardingSetupNudges } from "@/lib/onboarding/setupNudges";
 import {
   countPendingListingClaimInvitesWithEmail,
-  growthOutreachPausedWhileClaimInvitesPending,
   listingClaimInvitesPerCron,
   resendDailyBudgetSnapshot,
 } from "@/lib/resendDailyBudget";
@@ -33,7 +32,8 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 import { micstageDiscoveryKillSwitch } from "@/lib/publicListings/automationKillSwitches";
-import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
+import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
+import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
 import {
   growthRuntimeSnapshotForStatus,
   resolveGrowthPipelineRuntimeSnapshot,
@@ -181,16 +181,16 @@ async function handle(request: Request) {
       if (pendingClaimInvites == null) {
         pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
       }
-      const outreachRuntime = await resolveClaimInviteRuntimeSnapshot(prisma);
-      if (resendBudget.remaining <= 0) {
-        outreachSkippedReason = "resend daily budget exhausted";
-      } else if (
-        pendingClaimInvites > 0 &&
-        growthOutreachPausedWhileClaimInvitesPending()
-      ) {
-        outreachSkippedReason = "outreach paused while claim invites pending";
-      } else if (outreachRuntime.effectiveOutreachSendsPerCron <= 0) {
+      const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
+      const outreachHealth = await evaluateOutreachSendHealth(prisma);
+      if (!outreachRuntime.outreachMasterEnabled) {
+        outreachSkippedReason = "GROWTH_OUTREACH disabled or kill switch active";
+      } else if (!outreachHealth.ok || outreachHealth.sendMultiplier <= 0) {
+        outreachSkippedReason = `outreach health throttle: ${outreachHealth.reason ?? "stopped"}`;
+      } else if (outreachRuntime.effectiveSendsPerCron <= 0) {
         outreachSkippedReason = "GROWTH_OUTREACH_SENDS_PER_CRON_RUN=0";
+      } else if (resendBudget.remaining <= 0) {
+        outreachSkippedReason = "resend daily budget exhausted";
       } else {
         const lock = await tryOutreachLock(prisma);
         if (!lock) {

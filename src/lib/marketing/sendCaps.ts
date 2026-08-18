@@ -7,7 +7,9 @@ import {
   marketingSequenceDelayMinutes,
   micStageCategoryFromPrisma,
 } from "@/lib/marketing/emailConfig";
-import { growthOutreachDailyMax, growthOutreachDailyTarget } from "@/lib/growth/expansionConfig";
+import { growthOutreachDailyTarget } from "@/lib/growth/expansionConfig";
+import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
+import { marketingOutreachCapacitySnapshot } from "@/lib/resendDailyBudget";
 
 export function startOfUtcDay(d = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
@@ -72,6 +74,7 @@ export async function checkCategoryAndDomainCaps(
   prisma: PrismaClient,
   category: MarketingEmailCategory,
   toDomain: string,
+  opts?: { domainDailyCapOverride?: number },
 ): Promise<CapViolation> {
   const since = startOfUtcDay();
   const mic = micStageCategoryFromPrisma(category);
@@ -81,7 +84,7 @@ export async function checkCategoryAndDomainCaps(
     return { ok: false, reason: `Daily cap reached for category ${category} (${daily})` };
   }
   if (mic !== "transactional") {
-    const domCap = marketingPerDomainDailyCap(category);
+    const domCap = opts?.domainDailyCapOverride ?? marketingPerDomainDailyCap(category);
     const domCount = await countSendsTodayToDomain(prisma, category, toDomain, since);
     if (domCount >= domCap) {
       return { ok: false, reason: `Per-domain daily cap reached for ${toDomain} (${domCap}, ${category})` };
@@ -175,19 +178,24 @@ export async function remainingOutreachDailySends(prisma: PrismaClient): Promise
  * Use this (not {@link remainingOutreachDailySends} alone) so growth can respect a 50/day ceiling while global
  * marketing env may still cap lower.
  */
-export async function remainingGrowthOutreachAutomationBudget(prisma: PrismaClient): Promise<{
+export async function remainingGrowthOutreachAutomationBudget(
+  prisma: PrismaClient,
+): Promise<{
   sentTodayUtc: number;
   marketingOutreachCap: number;
   growthDailyMax: number;
   effectiveDailyMax: number;
   dailyTarget: number;
   remainingToEffectiveMax: number;
+  providerCapacity: Awaited<ReturnType<typeof marketingOutreachCapacitySnapshot>>;
 }> {
   const since = startOfUtcDay();
   const sentTodayUtc = await countSendsToday(prisma, "OUTREACH", since);
   const marketingOutreachCap = marketingDailyCap("outreach");
-  const growthDailyMax = growthOutreachDailyMax();
-  const effectiveDailyMax = Math.min(marketingOutreachCap, growthDailyMax);
+  const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
+  const growthDailyMax = outreachRuntime.effectiveDailyMax;
+  const providerCapacity = await marketingOutreachCapacitySnapshot(prisma, growthDailyMax);
+  const effectiveDailyMax = Math.min(marketingOutreachCap, providerCapacity.effectiveMarketingMax);
   const dailyTarget = growthOutreachDailyTarget();
   return {
     sentTodayUtc,
@@ -195,6 +203,7 @@ export async function remainingGrowthOutreachAutomationBudget(prisma: PrismaClie
     growthDailyMax,
     effectiveDailyMax,
     dailyTarget,
-    remainingToEffectiveMax: Math.max(0, effectiveDailyMax - sentTodayUtc),
+    remainingToEffectiveMax: Math.max(0, Math.min(effectiveDailyMax - sentTodayUtc, providerCapacity.remainingForOutreach)),
+    providerCapacity,
   };
 }

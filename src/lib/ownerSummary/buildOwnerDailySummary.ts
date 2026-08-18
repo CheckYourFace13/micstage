@@ -4,7 +4,9 @@ import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { loadDiscoveryInventoryStats } from "@/lib/publicListings/inventoryStats";
 import { classifyListingName, isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 import { PUBLIC_DISCOVERY_VERIFICATION } from "@/lib/publicListings/queries";
-import { countPendingListingClaimInvitesWithEmail } from "@/lib/resendDailyBudget";
+import { countPendingListingClaimInvitesWithEmail, marketingOutreachCapacitySnapshot } from "@/lib/resendDailyBudget";
+import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
+import { auditGeneralOutreachEligibility } from "@/lib/growth/outreachContactEligible";
 import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
 
 export type OwnerSummarySignupRow = {
@@ -101,6 +103,35 @@ export type OwnerDailySummaryData = {
   reviewQueue: OwnerSummaryReviewQueueRow[];
   reviewQueueTotal: number;
   reviewQueueAdminUrl: string;
+  marketing: {
+    eligibleNow: number;
+    sentToday: number;
+    deliveredToday: number;
+    bouncedToday: number;
+    complaintsToday: number;
+    unsubscribesToday: number;
+    uniqueClicksToday: number;
+    repliesToday: number;
+    claimsStartedToday: number;
+    claimsCompletedToday: number;
+    venueRegistrationsToday: number;
+    promoterRegistrationsToday: number;
+    sent7d: number;
+    delivered7d: number;
+    bounced7d: number;
+    complaints7d: number;
+    unsubscribes7d: number;
+    uniqueClicks7d: number;
+    replies7d: number;
+    claims7d: number;
+    registrations7d: number;
+    dailyCap: number;
+    sendsPerCron: number;
+    domainCap: number;
+    outreachEnabled: boolean;
+    killSwitch: boolean;
+    providerRemaining: number;
+  };
 };
 
 function cityState(city: string | null | undefined, region: string | null | undefined): string | null {
@@ -565,6 +596,86 @@ export async function buildOwnerDailySummary(
   const listingsNote =
     "Inventory includes unclaimed public listings. Strong place+evidence rows auto-promote to VERIFIED; junk names auto-reject to OUTDATED. Email shows top 20 review items only — full queue is in admin.";
 
+  const sevenDayStart = new Date(startUtc.getTime() - 7 * 86400000);
+  const [
+    outreachRuntime,
+    providerCapacity,
+    eligibilityAudit,
+    deliveredToday,
+    bouncedToday,
+    complaintsToday,
+    unsubscribesToday,
+    uniqueClicksToday,
+    delivered7d,
+    bounced7d,
+    complaints7d,
+    unsubscribes7d,
+    uniqueClicks7d,
+    sent7d,
+    replies7d,
+    claimsStartedToday,
+    claimsCompletedToday,
+    venueRegsToday,
+    promoterRegsToday,
+    claims7d,
+    venueRegs7d,
+    promoterRegs7d,
+  ] = await Promise.all([
+    resolveOutreachRuntimeSnapshot(prisma),
+    marketingOutreachCapacitySnapshot(prisma, 25),
+    auditGeneralOutreachEligibility(prisma),
+    prisma.marketingEmailSend.count({
+      where: { category: "OUTREACH", deliveredAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.marketingEmailSend.count({
+      where: { category: "OUTREACH", bouncedAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.marketingEmailSend.count({
+      where: { category: "OUTREACH", complainedAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.marketingContact.count({
+      where: { marketingUnsubscribedAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.marketingOutreachClick.count({
+      where: { createdAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.marketingEmailSend.count({
+      where: { category: "OUTREACH", deliveredAt: { gte: sevenDayStart, lt: endUtc } },
+    }),
+    prisma.marketingEmailSend.count({
+      where: { category: "OUTREACH", bouncedAt: { gte: sevenDayStart, lt: endUtc } },
+    }),
+    prisma.marketingEmailSend.count({
+      where: { category: "OUTREACH", complainedAt: { gte: sevenDayStart, lt: endUtc } },
+    }),
+    prisma.marketingContact.count({
+      where: { marketingUnsubscribedAt: { gte: sevenDayStart, lt: endUtc } },
+    }),
+    prisma.marketingOutreachClick.count({
+      where: { createdAt: { gte: sevenDayStart, lt: endUtc } },
+    }),
+    prisma.marketingEmailSend.count({
+      where: { category: "OUTREACH", status: "SENT", sentAt: { gte: sevenDayStart, lt: endUtc } },
+    }),
+    prisma.growthLeadResponse.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
+    prisma.growthLead.count({
+      where: { acquisitionStage: "CLICKED", updatedAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.growthLead.count({
+      where: { status: "JOINED", updatedAt: { gte: startUtc, lt: endUtc } },
+    }),
+    prisma.venueOwner.count({ where: { createdAt: { gte: startUtc, lt: endUtc } } }),
+    prisma.promoterUser.count({ where: { createdAt: { gte: startUtc, lt: endUtc } } }),
+    prisma.growthLead.count({
+      where: { status: "JOINED", updatedAt: { gte: sevenDayStart, lt: endUtc } },
+    }),
+    prisma.venueOwner.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
+    prisma.promoterUser.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
+  ]);
+
+  const clicksNoteUpdated =
+    "Unique clicks from first-party /api/marketing/click tracking on outreach emails.";
+
   return {
     windowLabel: `${reportLabel} (America/Chicago, last 24h through end of window)`,
     reportChicagoDate,
@@ -574,7 +685,7 @@ export async function buildOwnerDailySummary(
     leadsCreatedCount: leadsCreated,
     outreachEmailsSentCount: outreachSends,
     uniqueClickLeadsCount,
-    clicksNote,
+    clicksNote: clicksNoteUpdated,
     growthRepliesCount: responses,
     repliesNote,
     topItems: topItems.slice(0, 20),
@@ -609,5 +720,34 @@ export async function buildOwnerDailySummary(
     reviewQueue,
     reviewQueueTotal: needsReviewCount,
     reviewQueueAdminUrl,
+    marketing: {
+      eligibleNow: eligibilityAudit.netSendEligible,
+      sentToday: outreachSends,
+      deliveredToday,
+      bouncedToday,
+      complaintsToday,
+      unsubscribesToday,
+      uniqueClicksToday,
+      repliesToday: responses,
+      claimsStartedToday,
+      claimsCompletedToday,
+      venueRegistrationsToday: venueRegsToday,
+      promoterRegistrationsToday: promoterRegsToday,
+      sent7d,
+      delivered7d,
+      bounced7d,
+      complaints7d,
+      unsubscribes7d,
+      uniqueClicks7d,
+      replies7d,
+      claims7d,
+      registrations7d: venueRegs7d + promoterRegs7d,
+      dailyCap: outreachRuntime.effectiveDailyMax,
+      sendsPerCron: outreachRuntime.effectiveSendsPerCron,
+      domainCap: outreachRuntime.effectiveDomainDailyMax,
+      outreachEnabled: outreachRuntime.outreachMasterEnabled,
+      killSwitch: outreachRuntime.kill.effective,
+      providerRemaining: providerCapacity.remainingForOutreach,
+    },
   };
 }

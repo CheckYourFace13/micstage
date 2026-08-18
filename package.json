@@ -16,6 +16,7 @@
     "promote:reviewed-open-mic-listings": "node scripts/promote-reviewed-open-mic-listings.mjs",
     "test:listing-names": "node scripts/check-listing-name-classifier.mjs",
     "test:seo-indexability": "npx tsx scripts/check-seo-indexability.mjs",
+    "test:marketing-outreach": "npx tsx scripts/check-marketing-outreach.mjs",
     "test:open-mic-evidence": "node scripts/check-public-open-mic-evidence.mjs",
     "test:instant-claim": "node scripts/check-instant-claim.mjs",
     "test:onboarding": "node scripts/check-onboarding-simplification.mjs",
@@ -50,6 +51,7 @@
     "react-dom": "19.2.4",
     "react-qr-code": "^2.0.18",
     "resend": "^6.9.4",
+    "svix": "^1.99.1",
     "tz-lookup": "^6.1.25"
   },
   "devDependencies": {

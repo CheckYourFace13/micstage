@@ -72,6 +72,41 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
   return lines;
 }
 
+function renderMarketingText(data: OwnerDailySummaryData): string[] {
+  const m = data.marketing;
+  return [
+    "MARKETING",
+    `  Eligible now: ${m.eligibleNow}`,
+    `  Sent today: ${m.sentToday}`,
+    `  Delivered today: ${m.deliveredToday}`,
+    `  Bounced today: ${m.bouncedToday}`,
+    `  Complaints today: ${m.complaintsToday}`,
+    `  Unsubscribes today: ${m.unsubscribesToday}`,
+    `  Unique clicks today: ${m.uniqueClicksToday}`,
+    `  Replies today: ${m.repliesToday}`,
+    `  Claims started today: ${m.claimsStartedToday}`,
+    `  Claims completed today: ${m.claimsCompletedToday}`,
+    `  Venue registrations today: ${m.venueRegistrationsToday}`,
+    `  Promoter registrations today: ${m.promoterRegistrationsToday}`,
+    "  7 DAY",
+    `  Sent: ${m.sent7d}`,
+    `  Delivered: ${m.delivered7d}`,
+    `  Bounced: ${m.bounced7d}`,
+    `  Complaints: ${m.complaints7d}`,
+    `  Unsubscribes: ${m.unsubscribes7d}`,
+    `  Unique clicks: ${m.uniqueClicks7d}`,
+    `  Replies: ${m.replies7d}`,
+    `  Claims: ${m.claims7d}`,
+    `  Registrations: ${m.registrations7d}`,
+    `  Daily marketing cap: ${m.dailyCap}`,
+    `  Sends per cron: ${m.sendsPerCron}`,
+    `  Domain cap: ${m.domainCap}`,
+    `  Outreach enabled: ${m.outreachEnabled ? "yes" : "no"}`,
+    `  Kill switch: ${m.killSwitch ? "ON" : "off"}`,
+    `  Provider capacity remaining (marketing): ${m.providerRemaining}`,
+    "",
+  ];
+}
 function renderFunnelText(data: OwnerDailySummaryData): string[] {
   const f = data.growthFunnel;
   const lines: string[] = [
@@ -316,6 +351,7 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
     "",
   );
   lines.push(...renderRecentListingsText(data));
+  lines.push(...renderMarketingText(data));
   lines.push(...renderFunnelText(data));
   lines.push(...renderReviewQueueText(data));
   lines.push(

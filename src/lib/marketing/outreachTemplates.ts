@@ -15,10 +15,11 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Step 1 cold intro subjects (growth + venue marketing payload). Steps 2–3 use {@link growthOutreachSubject}. */
-export const GROWTH_VENUE_OUTREACH_SUBJECT = "MicStage — an easier way to run your open mic";
+/** Step 1 cold intro subject for venue/promoter open-mic outreach. */
+export const GROWTH_OPEN_MIC_OUTREACH_SUBJECT = "Your open mic on MicStage";
+export const GROWTH_VENUE_OUTREACH_SUBJECT = GROWTH_OPEN_MIC_OUTREACH_SUBJECT;
 export const GROWTH_ARTIST_OUTREACH_SUBJECT = "MicStage — find and sign up for nearby open mics";
-export const GROWTH_PROMOTER_OUTREACH_SUBJECT = "MicStage — tools for venues and open mic nights";
+export const GROWTH_PROMOTER_OUTREACH_SUBJECT = GROWTH_OPEN_MIC_OUTREACH_SUBJECT;
 
 export type GrowthOutreachSequenceStep = 1 | 2 | 3;
 
@@ -222,14 +223,49 @@ export function buildPromoterOutreachLetter(name: string): { textBody: string; h
   return { textBody, htmlBody };
 }
 
-/** Growth-lead cold sequence: fixed salutation, no mailbox-derived names. */
+const OPEN_MIC_TAGLINE = "Find it. Run it. Perform. Free.";
+
+function buildOpenMicIntroLetter(displayName: string, ctaUrl?: string | null): { textBody: string; htmlBody: string } {
+  const name = displayName.replace(/\s+/g, " ").trim() || "your open mic";
+  const cta = ctaUrl?.trim();
+  const paras = [
+    `We found ${name} while building MicStage, a free platform for finding and running open mics.`,
+    "If you host this open mic, you can claim or manage the listing free, update the schedule, and optionally let performers sign up online.",
+  ];
+  const textLines = [
+    "Hi,",
+    "",
+    ...paras,
+    "",
+    cta ? `Manage your listing: ${cta}` : "Manage your listing: reply to this email and we will send you the link.",
+    "",
+    "MicStage",
+    OPEN_MIC_TAGLINE,
+  ];
+  const htmlBody = [
+    "<p>Hi,</p>",
+    ...paras.map((p) => `<p>${escapeHtml(p)}</p>`),
+    cta
+      ? `<p>Manage your listing: <a href="${escapeHtml(cta)}">${escapeHtml(cta)}</a></p>`
+      : `<p>${escapeHtml("Manage your listing: reply to this email and we will send you the link.")}</p>`,
+    `<p>MicStage<br />${escapeHtml(OPEN_MIC_TAGLINE)}</p>`,
+  ].join("");
+  return { textBody: textLines.join("\n"), htmlBody };
+}
+
+/** Growth-lead cold sequence: fixed salutation replaced by concise open-mic intro on step 1. */
 export function buildVenueGrowthOutreachLetter(
-  _venueName: string,
+  venueName: string,
   step: GrowthOutreachSequenceStep,
   opts?: { claimVenueUrl?: string | null; areaLabel?: string | null },
 ): { textBody: string; htmlBody: string } {
   const claimVenueUrl = opts?.claimVenueUrl?.trim();
   const area = (opts?.areaLabel?.trim() || "your area").replace(/\s+/g, " ").trim();
+
+  if (step === 1) {
+    return buildOpenMicIntroLetter(venueName, claimVenueUrl);
+  }
+
   const sal = GROWTH_FIXED_SALUTATION;
 
   if (step === 2) {
@@ -276,39 +312,7 @@ export function buildVenueGrowthOutreachLetter(
     return { textBody, htmlBody };
   }
 
-  const coreText = venueCoreParagraphsText(claimVenueUrl);
-  const textBody = [sal.text, "", ...coreText, "", SIGN_OFF_TEXT].join("\n");
-  const htmlCoreParas = [
-    "We built MicStage to make open mic nights easier for venues, and it's completely free to use.",
-    "It gives you a simple way to set up and manage your open mic, helps market it for free, and makes signups easier for artists too — including QR code signup options we provide so performers can join quickly.",
-    "We're launching now, and you'd be one of the first venues on it.",
-    "Getting started is simple:",
-  ];
-  const bullets = [
-    "create your free account",
-    "set up your open mic schedule",
-    "share your link or QR code",
-    "let MicStage help do the rest",
-  ];
-  const afterList = [
-    "You can also require artists to be on-site before signing up if you want to confirm attendance first.",
-  ];
-  const ctaHtml = claimVenueUrl
-    ? [
-        "<p>Get started here:</p>",
-        `<p><a href="${escapeHtml(claimVenueUrl)}">${escapeHtml(claimVenueUrl)}</a></p>`,
-      ]
-    : ["<p>Get started here — reply to this email and I'll send you the venue signup link.</p>"];
-  const htmlBody = [
-    sal.html,
-    ...htmlCoreParas.map((p) => `<p>${escapeHtml(p)}</p>`),
-    `<ul style="margin:0 0 1em 1.2em;padding:0;">${bullets.map((b) => `<li style="margin:0.25em 0;">${escapeHtml(b)}</li>`).join("")}</ul>`,
-    ...afterList.map((p) => `<p>${escapeHtml(p)}</p>`),
-    ...ctaHtml,
-    "<p>If you want, just reply and I can help get it set up.</p>",
-    SIGN_OFF_HTML,
-  ].join("");
-  return { textBody, htmlBody };
+  return buildOpenMicIntroLetter(venueName, claimVenueUrl);
 }
 
 export function buildArtistGrowthOutreachLetter(

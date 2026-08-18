@@ -3,6 +3,7 @@ import { parseIntEnv } from "@/lib/marketing/emailConfig";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
 import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
+import { micstageTransactionalReserveSlots } from "@/lib/growth/outreachRuntimeSettings";
 
 /** Resend free tier is 100/day — stay under with headroom for password resets & booking reminders. */
 export function micstageResendDailyMax(): number {
@@ -29,6 +30,46 @@ export async function countMicstageResendSendsTodayUtc(prisma: PrismaClient): Pr
   return pipeline + claimInvites;
 }
 
+export async function countOutreachSendsTodayUtc(prisma: PrismaClient): Promise<number> {
+  return prisma.marketingEmailSend.count({
+    where: { category: "OUTREACH", status: "SENT", sentAt: { gte: startOfUtcDay() } },
+  });
+}
+
+/** Shared Resend account capacity with transactional reserve for marketing outreach only. */
+export async function marketingOutreachCapacitySnapshot(
+  prisma: PrismaClient,
+  configuredDailyMax: number,
+): Promise<{
+  providerMax: number;
+  sentTodayUtc: number;
+  transactionalReserve: number;
+  slotsAfterReserve: number;
+  configuredDailyMax: number;
+  outreachSentToday: number;
+  effectiveMarketingMax: number;
+  remainingForOutreach: number;
+}> {
+  const providerMax = micstageResendDailyMax();
+  const sentTodayUtc = await countMicstageResendSendsTodayUtc(prisma);
+  const transactionalReserve = micstageTransactionalReserveSlots();
+  const outreachSentToday = await countOutreachSendsTodayUtc(prisma);
+  const slotsLeft = Math.max(0, providerMax - sentTodayUtc);
+  const slotsAfterReserve = Math.max(0, slotsLeft - transactionalReserve);
+  const effectiveMarketingMax = Math.min(configuredDailyMax, slotsAfterReserve);
+  const remainingForOutreach = Math.max(0, effectiveMarketingMax - outreachSentToday);
+  return {
+    providerMax,
+    sentTodayUtc,
+    transactionalReserve,
+    slotsAfterReserve,
+    configuredDailyMax,
+    outreachSentToday,
+    effectiveMarketingMax,
+    remainingForOutreach,
+  };
+}
+
 export async function resendDailyBudgetSnapshot(prisma: PrismaClient): Promise<{
   max: number;
   sentTodayUtc: number;
@@ -43,7 +84,7 @@ export async function countPendingListingClaimInvitesWithEmail(prisma: PrismaCli
   return countEligiblePendingListingClaimInvites(prisma);
 }
 
-/** When true (default), cold outreach pauses while claim invites remain pending. */
+/** @deprecated Claim backlog no longer pauses general outreach — paths are separated by eligibility. */
 export function growthOutreachPausedWhileClaimInvitesPending(): boolean {
-  return process.env.GROWTH_OUTREACH_PAUSE_WHILE_CLAIM_INVITES_PENDING !== "false";
+  return false;
 }

@@ -13,6 +13,7 @@ import {
   isTransientMarketingThrottleReason,
 } from "@/lib/marketing/sendCaps";
 import { marketingUnsubscribeHttpsUrl } from "@/lib/marketing/unsubscribeSigning";
+import { marketingClickHttpsUrl } from "@/lib/marketing/clickTracking";
 
 export function buildMarketingIdempotencyKey(
   category: MicStageEmailCategory,
@@ -89,6 +90,10 @@ export async function sendThroughMarketingPipeline(
     discoveryMarketSlug?: string | null;
     /** When false, skip commercial footer + list-unsubscribe (not recommended). */
     includeCommercialCompliance?: boolean;
+    /** Optional first-party tracked destination (OUTREACH only). */
+    clickDestinationUrl?: string | null;
+    /** DB-backed outreach domain cap override. */
+    domainDailyCapOverride?: number;
   },
 ): Promise<MarketingSendResult> {
   const email = normalizeMarketingEmail(input.to);
@@ -138,7 +143,9 @@ export async function sendThroughMarketingPipeline(
     contact,
   });
 
-  const capCat = await checkCategoryAndDomainCaps(prisma, categoryPrisma, toDomain);
+  const capCat = await checkCategoryAndDomainCaps(prisma, categoryPrisma, toDomain, {
+    domainDailyCapOverride: input.domainDailyCapOverride,
+  });
   const capContact = await checkContactSendSpacing(prisma, contact.id, categoryPrisma);
 
   const reasons: string[] = [];
@@ -209,6 +216,13 @@ export async function sendThroughMarketingPipeline(
 
   const row = existing ?? (await prisma.marketingEmailSend.create({ data: queuedRowData() }));
   const sendId = row.id;
+
+  if (input.clickDestinationUrl?.trim() && input.category === "outreach") {
+    const dest = input.clickDestinationUrl.trim();
+    const tracked = marketingClickHttpsUrl(sendId, dest);
+    html = html.split(dest).join(tracked);
+    text = text.split(dest).join(tracked);
+  }
 
   let providerMessageId: string | null = null;
   try {

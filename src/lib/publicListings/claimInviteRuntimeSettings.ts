@@ -16,6 +16,11 @@
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
+import { OUTREACH_RUNTIME_KEYS } from "@/lib/growth/outreachRuntimeSettings";
+import {
+  validateOutreachRuntimeValue,
+  type OutreachRuntimeKey as GrowthOutreachRuntimeKey,
+} from "@/lib/growth/outreachRuntimeSettings";
 
 export const CLAIM_INVITE_RUNTIME_KEYS = [
   "MICSTAGE_CLAIM_INVITES_ENABLED",
@@ -24,7 +29,7 @@ export const CLAIM_INVITE_RUNTIME_KEYS = [
   "MICSTAGE_KILL_CLAIM_INVITES",
 ] as const;
 
-export const OUTREACH_RUNTIME_KEYS = ["GROWTH_OUTREACH_SENDS_PER_CRON_RUN"] as const;
+export const OUTREACH_RUNTIME_KEYS_REEXPORT = OUTREACH_RUNTIME_KEYS;
 
 export const OPERATIONAL_RUNTIME_KEYS = [
   ...CLAIM_INVITE_RUNTIME_KEYS,
@@ -32,7 +37,7 @@ export const OPERATIONAL_RUNTIME_KEYS = [
 ] as const;
 
 export type ClaimInviteRuntimeKey = (typeof CLAIM_INVITE_RUNTIME_KEYS)[number];
-export type OutreachRuntimeKey = (typeof OUTREACH_RUNTIME_KEYS)[number];
+export type OutreachRuntimeKey = GrowthOutreachRuntimeKey;
 export type OperationalRuntimeKey = (typeof OPERATIONAL_RUNTIME_KEYS)[number];
 
 export type SettingSource = "env_kill" | "db_kill" | "database" | "environment" | "default";
@@ -103,6 +108,10 @@ function listingClaimInviteCanaryMax(): number {
 
 function canaryModeOn(): boolean {
   return !envFalsyExplicit(process.env.MICSTAGE_CLAIM_INVITES_CANARY_MODE);
+}
+
+export function isOutreachRuntimeKey(key: string): key is OutreachRuntimeKey {
+  return (OUTREACH_RUNTIME_KEYS as readonly string[]).includes(key);
 }
 
 export function isClaimInviteRuntimeKey(key: string): key is ClaimInviteRuntimeKey {
@@ -279,6 +288,9 @@ export function validateClaimInviteRuntimeValue(
   key: OperationalRuntimeKey,
   value: unknown,
 ): { ok: true; valueType: "boolean" | "integer"; stored: string } | { ok: false; error: string } {
+  if (isOutreachRuntimeKey(key)) {
+    return validateOutreachRuntimeValue(key, value);
+  }
   if (typeof value === "boolean") {
     if (key === "MICSTAGE_CLAIM_INVITES_ENABLED" || key === "MICSTAGE_KILL_CLAIM_INVITES") {
       return { ok: true, valueType: "boolean", stored: value ? "true" : "false" };
@@ -292,10 +304,6 @@ export function validateClaimInviteRuntimeValue(
     }
     if (key === "MICSTAGE_CLAIM_INVITES_DAILY_MAX") {
       if (value < 0 || value > 50) return { ok: false, error: "daily_max_out_of_range" };
-      return { ok: true, valueType: "integer", stored: String(value) };
-    }
-    if (key === "GROWTH_OUTREACH_SENDS_PER_CRON_RUN") {
-      if (value < 0 || value > 50) return { ok: false, error: "outreach_per_cron_out_of_range" };
       return { ok: true, valueType: "integer", stored: String(value) };
     }
     return { ok: false, error: "integer_not_allowed_for_key" };
@@ -312,10 +320,6 @@ export function validateClaimInviteRuntimeValue(
     }
     if (n !== null && key === "MICSTAGE_CLAIM_INVITES_DAILY_MAX") {
       if (n < 0 || n > 50) return { ok: false, error: "daily_max_out_of_range" };
-      return { ok: true, valueType: "integer", stored: String(n) };
-    }
-    if (n !== null && key === "GROWTH_OUTREACH_SENDS_PER_CRON_RUN") {
-      if (n < 0 || n > 50) return { ok: false, error: "outreach_per_cron_out_of_range" };
       return { ok: true, valueType: "integer", stored: String(n) };
     }
   }

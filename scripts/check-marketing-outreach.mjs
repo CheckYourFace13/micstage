@@ -10,6 +10,7 @@ process.env.MARKETING_UNSUBSCRIBE_SECRET = "test-unsub-secret";
 
 const {
   evaluateGrowthLeadOutreachEligibility,
+  hasOtherInFlightOutreachDraft,
 } = await import("../src/lib/growth/outreachContactEligible.ts");
 const {
   buildMarketingClickToken,
@@ -84,6 +85,11 @@ assert.equal(
   evaluateGrowthLeadOutreachEligibility(baseLead({ contact: { status: "DO_NOT_CONTACT" } })).reason,
   "do_not_contact",
 );
+assert.equal(evaluateGrowthLeadOutreachEligibility(baseLead({ hasPendingDraft: true })).reason, "pending_draft");
+assert.equal(hasOtherInFlightOutreachDraft([{ id: "draft-a" }]), true);
+assert.equal(hasOtherInFlightOutreachDraft([{ id: "draft-a" }], "draft-a"), false);
+assert.equal(hasOtherInFlightOutreachDraft([{ id: "draft-a" }, { id: "draft-b" }], "draft-a"), true);
+assert.equal(hasOtherInFlightOutreachDraft([], "draft-a"), false);
 
 // Runtime validation
 assert.equal(validateOutreachRuntimeValue("GROWTH_OUTREACH_ENABLED", false).stored, "false");

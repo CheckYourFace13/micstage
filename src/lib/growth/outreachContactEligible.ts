@@ -200,10 +200,17 @@ export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachI
   return { eligible: true, reason: "eligible" };
 }
 
+/** True when another in-flight draft should block *new* outreach. The draft currently being sent is ignored. */
+export function hasOtherInFlightOutreachDraft(drafts: { id: string }[], ignoreDraftId?: string): boolean {
+  if (!ignoreDraftId) return drafts.length > 0;
+  return drafts.some((d) => d.id !== ignoreDraftId);
+}
+
 /** Load contextual flags and evaluate eligibility for one lead. */
 export async function explainGrowthLeadOutreachEligibility(
   prisma: PrismaClient,
   leadId: string,
+  opts?: { ignoreDraftId?: string },
 ): Promise<{ eligible: boolean; reason: OutreachEligibilityReason; lead: GrowthLead | null }> {
   const lead = await prisma.growthLead.findUnique({
     where: { id: leadId },
@@ -219,9 +226,12 @@ export async function explainGrowthLeadOutreachEligibility(
         take: 3,
       },
       outreachDrafts: {
-        where: { status: { in: ["PENDING_REVIEW", "APPROVED"] } },
+        where: {
+          status: { in: ["PENDING_REVIEW", "APPROVED"] },
+          ...(opts?.ignoreDraftId ? { id: { not: opts.ignoreDraftId } } : {}),
+        },
         select: { id: true },
-        take: 1,
+        take: 2,
       },
     },
   });
@@ -254,7 +264,7 @@ export async function explainGrowthLeadOutreachEligibility(
 
   const result = evaluateGrowthLeadOutreachEligibility({
     ...lead,
-    hasPendingDraft: lead.outreachDrafts.length > 0,
+    hasPendingDraft: hasOtherInFlightOutreachDraft(lead.outreachDrafts, opts?.ignoreDraftId),
     hasRecentOutreachSend: Boolean(recentSend),
     deferClaimPath: verifiedUnclaimed,
     listingRemoved: lead.publicListings.some((l) => l.removedAt != null),

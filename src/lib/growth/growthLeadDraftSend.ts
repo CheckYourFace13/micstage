@@ -111,7 +111,9 @@ export async function sendApprovedGrowthLeadDraft(
     email = n;
   }
 
-  const eligibility = await explainGrowthLeadOutreachEligibility(prisma, draft.leadId);
+  const eligibility = await explainGrowthLeadOutreachEligibility(prisma, draft.leadId, {
+    ignoreDraftId: draft.id,
+  });
   if (!eligibility.eligible) {
     return { ok: false, blocked: true, reasons: [`Outreach ineligible: ${eligibility.reason}`] };
   }

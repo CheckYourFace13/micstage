@@ -28,12 +28,28 @@ export function siteOrigin(): string {
   return normalizeSiteOrigin(process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://micstage.com");
 }
 
+function isNonPublicBindHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "0.0.0.0" || h === "::" || h === "";
+}
+
 /**
  * Canonical public base URL for server-issued redirects (e.g. admin logout).
  * Prefer `APP_URL`, then `NEXT_PUBLIC_APP_URL`, then `https://micstage.com` — do not use `request.url` origin.
+ * Bind-all hosts such as 0.0.0.0 (Hostinger/Node listen address) are never used as a browser redirect origin.
  */
 export function siteOriginForServerRedirect(): string {
-  return normalizeSiteOrigin(process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://micstage.com");
+  const configured = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://micstage.com";
+  const normalized = normalizeSiteOrigin(configured);
+  try {
+    const host = new URL(normalized).hostname;
+    if (isNonPublicBindHost(host)) {
+      return process.env.NODE_ENV === "production" ? "https://micstage.com" : "http://localhost:3000";
+    }
+  } catch {
+    return process.env.NODE_ENV === "production" ? "https://micstage.com" : "http://localhost:3000";
+  }
+  return normalized;
 }
 
 export function absoluteUrl(path: string): string {

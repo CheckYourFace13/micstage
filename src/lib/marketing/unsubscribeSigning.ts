@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
+import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 
 function unsubscribeSecret(): string {
   return (
@@ -29,4 +30,21 @@ export function marketingUnsubscribeHttpsUrl(contactId: string): string {
   const base = appBaseUrl().replace(/\/$/, "");
   const sig = marketingUnsubscribeSignature(contactId);
   return `${base}/api/marketing/unsubscribe?contactId=${encodeURIComponent(contactId)}&sig=${encodeURIComponent(sig)}`;
+}
+
+export type MarketingUnsubscribeConfirmResult = "ok" | "invalid" | "failed";
+
+/**
+ * Public confirmation page after unsubscribe. Never uses `request.url` origin
+ * (Hostinger listens on 0.0.0.0, which is not a user-facing host).
+ * `requestUrl` is accepted only so callers/tests can prove it is ignored.
+ */
+export function marketingUnsubscribeConfirmUrl(
+  result: MarketingUnsubscribeConfirmResult,
+  requestUrl?: string,
+): string {
+  void requestUrl;
+  const path =
+    result === "ok" ? "/unsubscribe?ok=1" : result === "invalid" ? "/unsubscribe?err=invalid" : "/unsubscribe?err=failed";
+  return absoluteServerRedirectUrl(path);
 }

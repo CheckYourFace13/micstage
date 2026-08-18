@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { verifyMarketingUnsubscribeSignature } from "@/lib/marketing/unsubscribeSigning";
+import {
+  marketingUnsubscribeConfirmUrl,
+  verifyMarketingUnsubscribeSignature,
+} from "@/lib/marketing/unsubscribeSigning";
 
 export const dynamic = "force-dynamic";
 
@@ -41,17 +44,16 @@ async function applyUnsubscribe(contactId: string): Promise<{ ok: true } | { ok:
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const base = new URL(req.url).origin;
   const contactId = url.searchParams.get("contactId")?.trim();
   const sig = url.searchParams.get("sig")?.trim();
   if (!contactId || !sig || !verifyMarketingUnsubscribeSignature(contactId, sig)) {
-    return NextResponse.redirect(new URL("/unsubscribe?err=invalid", base), 303);
+    return NextResponse.redirect(marketingUnsubscribeConfirmUrl("invalid", req.url), 303);
   }
   const r = await applyUnsubscribe(contactId);
   if (!r.ok) {
-    return NextResponse.redirect(new URL("/unsubscribe?err=failed", base), 303);
+    return NextResponse.redirect(marketingUnsubscribeConfirmUrl("failed", req.url), 303);
   }
-  return NextResponse.redirect(new URL("/unsubscribe?ok=1", base), 303);
+  return NextResponse.redirect(marketingUnsubscribeConfirmUrl("ok", req.url), 303);
 }
 
 /** RFC 8058 one-click: POST with body `List-Unsubscribe=One-Click`. */

@@ -19,6 +19,7 @@ const {
   validateOutreachRuntimeValue,
 } = await import("../src/lib/growth/outreachRuntimeSettings.ts");
 const { verifyResendWebhookPayload } = await import("../src/lib/marketing/resendWebhookHandler.ts");
+const { marketingUnsubscribeConfirmUrl } = await import("../src/lib/marketing/unsubscribeSigning.ts");
 
 function baseLead(overrides = {}) {
   return {
@@ -122,5 +123,30 @@ assert.equal(
   verifyResendWebhookPayload("{}", { svixId: "1", svixTimestamp: "1", svixSignature: "x" }),
   null,
 );
+
+// Unsubscribe confirmation must ignore Hostinger bind origin (0.0.0.0)
+{
+  const prevNodeEnv = process.env.NODE_ENV;
+  const prevAppUrl = process.env.APP_URL;
+  const prevPublic = process.env.NEXT_PUBLIC_APP_URL;
+  process.env.NODE_ENV = "production";
+  process.env.APP_URL = "https://micstage.com";
+  delete process.env.NEXT_PUBLIC_APP_URL;
+  const internalReq = "http://0.0.0.0:3000/api/marketing/unsubscribe?contactId=x&sig=y";
+  const okUrl = marketingUnsubscribeConfirmUrl("ok", internalReq);
+  const invalidUrl = marketingUnsubscribeConfirmUrl("invalid", internalReq);
+  assert.equal(okUrl, "https://micstage.com/unsubscribe?ok=1");
+  assert.equal(invalidUrl, "https://micstage.com/unsubscribe?err=invalid");
+  assert.equal(okUrl.includes("0.0.0.0"), false);
+  process.env.APP_URL = "http://0.0.0.0:3000";
+  const stillPublic = marketingUnsubscribeConfirmUrl("ok", internalReq);
+  assert.equal(stillPublic, "https://micstage.com/unsubscribe?ok=1");
+  if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = prevNodeEnv;
+  if (prevAppUrl === undefined) delete process.env.APP_URL;
+  else process.env.APP_URL = prevAppUrl;
+  if (prevPublic === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
+  else process.env.NEXT_PUBLIC_APP_URL = prevPublic;
+}
 
 console.log(JSON.stringify({ ok: true, checks: "marketing-outreach" }));

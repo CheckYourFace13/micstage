@@ -129,16 +129,20 @@ export async function sendApprovedGrowthLeadDraft(
     return { ok: false, blocked: true, reasons: block.reasons };
   }
 
-  const templateKind = marketingTemplateKindForGrowthLeadType(draft.lead.leadType);
+  const ctaKind = eligibility.target?.cta ?? (draft.lead.leadType === "PROMOTER_ACCOUNT" ? "promoter" : "venue");
+  const templateKind =
+    ctaKind === "promoter"
+      ? marketingTemplateKindForGrowthLeadType("PROMOTER_ACCOUNT")
+      : marketingTemplateKindForGrowthLeadType(draft.lead.leadType === "ARTIST" ? "ARTIST" : "VENUE");
   const purposeKey = `growth-lead-draft:${draft.id}`;
   const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
   const baseUrl = appBaseUrl().replace(/\/$/, "");
   const clickDestinationUrl =
-    draft.lead.leadType === "VENUE"
-      ? `${baseUrl}/register/venue?growthLead=${encodeURIComponent(draft.leadId)}`
-      : draft.lead.leadType === "PROMOTER_ACCOUNT"
-        ? `${baseUrl}/register/promoter?growthLead=${encodeURIComponent(draft.leadId)}`
-        : `${baseUrl}/register/musician?growthLead=${encodeURIComponent(draft.leadId)}`;
+    ctaKind === "promoter"
+      ? `${baseUrl}/register/promoter?growthLead=${encodeURIComponent(draft.leadId)}`
+      : draft.lead.leadType === "ARTIST"
+        ? `${baseUrl}/register/musician?growthLead=${encodeURIComponent(draft.leadId)}`
+        : `${baseUrl}/register/venue?growthLead=${encodeURIComponent(draft.leadId)}`;
 
   const result = await sendThroughMarketingPipeline(prisma, {
     to: email,

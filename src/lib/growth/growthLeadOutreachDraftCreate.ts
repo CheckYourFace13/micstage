@@ -17,7 +17,26 @@ export async function createPendingGrowthLeadOutreachDraft(
   leadId: string,
   opts?: { allowLowConfidenceEmail?: boolean },
 ): Promise<{ ok: true; draftId: string } | { ok: false; reason: string }> {
-  const lead = await prisma.growthLead.findUnique({ where: { id: leadId } });
+  const lead = await prisma.growthLead.findUnique({
+    where: { id: leadId },
+    include: {
+      publicListings: {
+        where: { removedAt: null },
+        select: {
+          name: true,
+          formattedAddress: true,
+          googlePlaceId: true,
+          lat: true,
+          lng: true,
+          websiteUrl: true,
+          sourceUrl: true,
+          city: true,
+          region: true,
+        },
+        take: 3,
+      },
+    },
+  });
   if (!lead) return { ok: false, reason: "Lead not found" };
 
   let email: string | null = null;
@@ -96,6 +115,12 @@ export async function createPendingGrowthLeadOutreachDraft(
     websiteUrl: lead.websiteUrl,
     leadId: lead.id,
     sequenceStep: nextSequenceStep,
+    identity:
+      eligibility.target?.identity === "PROMOTER"
+        ? "PROMOTER"
+        : eligibility.target?.identity === "VENUE"
+          ? "VENUE"
+          : undefined,
   });
 
   const draft = await prisma.growthLeadOutreachDraft.create({

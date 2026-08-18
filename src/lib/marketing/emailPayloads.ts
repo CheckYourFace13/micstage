@@ -1,8 +1,4 @@
-import {
-  buildVenueOutreachLetter,
-  GROWTH_VENUE_OUTREACH_SUBJECT,
-  OUTREACH_DRAFT_FOOTER_TEXT,
-} from "@/lib/marketing/outreachTemplates";
+import { buildVenueOutreachLetter, GROWTH_VENUE_OUTREACH_SUBJECT } from "@/lib/marketing/outreachTemplates";
 
 /**
  * Email bodies for future dispatch only — phase 1 generates structured payloads; nothing is sent.
@@ -49,8 +45,6 @@ export function buildVenueOutreachEmailPayload(input: {
     "",
     `Venue page: ${input.publicVenueUrl}`,
     input.locationPerformersUrl ? `Local discovery: ${input.locationPerformersUrl}` : null,
-    "",
-    `— ${OUTREACH_DRAFT_FOOTER_TEXT}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -59,13 +53,13 @@ export function buildVenueOutreachEmailPayload(input: {
     ? `<p><a href="${escapeHtml(input.locationPerformersUrl)}">Local discovery</a></p>`
     : "";
 
-  const htmlBody = `${coreHtml}<p><a href="${escapeHtml(input.publicVenueUrl)}">Venue page</a></p>${loc}<p><em>${escapeHtml(OUTREACH_DRAFT_FOOTER_TEXT)}</em></p>`;
+  const htmlBody = `${coreHtml}<p><a href="${escapeHtml(input.publicVenueUrl)}">Venue page</a></p>${loc}`;
 
   return {
     subject: GROWTH_VENUE_OUTREACH_SUBJECT,
     textBody,
     htmlBody,
-    tags: ["venue-outreach", "draft"],
+    tags: ["venue-outreach"],
   };
 }
 

@@ -14,6 +14,7 @@ import {
 } from "@/lib/marketing/sendCaps";
 import { marketingUnsubscribeHttpsUrl } from "@/lib/marketing/unsubscribeSigning";
 import { marketingClickHttpsUrl } from "@/lib/marketing/clickTracking";
+import { finalizeOutreachSendBodies } from "@/lib/marketing/outreachSendBodies";
 
 export function buildMarketingIdempotencyKey(
   category: MicStageEmailCategory,
@@ -203,6 +204,14 @@ export async function sendThroughMarketingPipeline(
 
   let html = input.htmlBody;
   let text = input.textBody;
+  if (input.category === "outreach" || input.category === "marketing") {
+    const finalized = finalizeOutreachSendBodies({ html, text });
+    if (!finalized.ok) {
+      return { ok: false, blocked: true, reasons: [finalized.reason] };
+    }
+    html = finalized.html;
+    text = finalized.text;
+  }
   let headers: Record<string, string> | undefined;
 
   if (includeCompliance) {

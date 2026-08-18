@@ -433,7 +433,7 @@ export function buildPromoterGrowthOutreachLetter(
   return { textBody, htmlBody };
 }
 
-export const OUTREACH_DRAFT_FOOTER_TEXT = "MicStage draft — not sent";
+export { OUTREACH_DRAFT_FOOTER_TEXT } from "@/lib/marketing/outreachSendBodies";
 
 /** Minimal HTML mirroring plain text (paragraphs + line breaks) for deliverability-friendly outreach. */
 export function outreachPlainLeanHtml(plainBody: string): string {

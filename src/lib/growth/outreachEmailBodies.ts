@@ -8,7 +8,6 @@ import {
   formatGrowthOutreachAreaLabel,
   growthOutreachSubject,
   type GrowthOutreachSequenceStep,
-  OUTREACH_DRAFT_FOOTER_TEXT,
   outreachPlainLeanHtml,
 } from "@/lib/marketing/outreachTemplates";
 
@@ -23,17 +22,20 @@ export function buildGrowthLeadOutreachPayload(input: {
   /** When set on VENUE leads, adds a tracked link to venue registration. */
   leadId?: string | null;
   sequenceStep?: GrowthOutreachSequenceStep;
+  /** Classified identity; do not force promoter/venue from leadType alone. */
+  identity?: "VENUE" | "PROMOTER" | "ARTIST";
 }): MarketingEmailPayload {
   const step: GrowthOutreachSequenceStep = input.sequenceStep ?? 1;
   const areaLabel = formatGrowthOutreachAreaLabel(input.city, input.discoveryMarketSlug);
+  const sendAs = input.identity ?? (input.leadType === "PROMOTER_ACCOUNT" ? "PROMOTER" : input.leadType === "ARTIST" ? "ARTIST" : "VENUE");
 
   const baseUrl = appBaseUrl().replace(/\/$/, "");
   const claimVenueUrl =
-    input.leadType === "VENUE" && input.leadId?.trim()
+    sendAs === "VENUE" && input.leadId?.trim()
       ? `${baseUrl}/register/venue?growthLead=${encodeURIComponent(input.leadId.trim())}`
       : undefined;
   const claimArtistUrl =
-    input.leadType === "ARTIST" && input.leadId?.trim()
+    sendAs === "ARTIST" && input.leadId?.trim()
       ? `${baseUrl}/register/musician?growthLead=${encodeURIComponent(input.leadId.trim())}`
       : undefined;
 
@@ -48,9 +50,9 @@ export function buildGrowthLeadOutreachPayload(input: {
   const promoterLetter = buildPromoterGrowthOutreachLetter(step, { areaLabel });
 
   const coreText =
-    input.leadType === "VENUE"
+    sendAs === "VENUE"
       ? venueLetter.textBody
-      : input.leadType === "ARTIST"
+      : sendAs === "ARTIST"
         ? artistLetter.textBody
         : promoterLetter.textBody;
 
@@ -60,25 +62,23 @@ export function buildGrowthLeadOutreachPayload(input: {
     if (input.websiteUrl) textBody += `\nSite: ${input.websiteUrl}`;
     if (input.contactUrl) textBody += `\nContact: ${input.contactUrl}`;
   }
-  textBody += `\n\n— ${OUTREACH_DRAFT_FOOTER_TEXT}`;
 
   const metaTail = [
     input.websiteUrl ? `Site: ${input.websiteUrl}` : "",
     input.contactUrl ? `Contact: ${input.contactUrl}` : "",
-    `— ${OUTREACH_DRAFT_FOOTER_TEXT}`,
   ]
     .filter(Boolean)
     .join("\n");
 
   const htmlBody =
-    input.leadType === "VENUE"
+    sendAs === "VENUE"
       ? venueLetter.htmlBody + outreachPlainLeanHtml(metaTail)
       : outreachPlainLeanHtml(textBody);
 
   return {
-    subject: growthOutreachSubject(input.leadType, step),
+    subject: growthOutreachSubject(sendAs === "PROMOTER" ? "PROMOTER_ACCOUNT" : sendAs === "ARTIST" ? "ARTIST" : "VENUE", step),
     textBody,
     htmlBody,
-    tags: ["growth-lead", input.leadType.toLowerCase(), "draft", `seq-${step}`],
+    tags: ["growth-lead", sendAs.toLowerCase(), `seq-${step}`],
   };
 }

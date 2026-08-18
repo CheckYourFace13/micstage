@@ -15,6 +15,10 @@ import type {
 import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
 import { isMarketingEmailSuppressed } from "@/lib/marketing/suppression";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
+import {
+  classifyOutreachTargetIdentity,
+  type OutreachTargetClassification,
+} from "@/lib/growth/outreachTargetIdentity";
 
 export type OutreachEligibilityReason =
   | "eligible"
@@ -25,6 +29,7 @@ export type OutreachEligibilityReason =
   | "weak_open_mic_signal"
   | "chamber_tourism"
   | "directory_aggregator"
+  | "service_company"
   | "free_mail_mismatch"
   | "domain_mismatch"
   | "role_mismatch"
@@ -38,7 +43,9 @@ export type OutreachEligibilityReason =
   | "pending_draft"
   | "already_contacted"
   | "defer_claim_path"
-  | "duplicate_recent_send";
+  | "duplicate_recent_send"
+  | "weak_identity"
+  | "needs_manual_review";
 
 const IMPORT_LIKE: GrowthLeadSourceKind[] = [
   "MANUAL_ADMIN",
@@ -143,12 +150,22 @@ export type GrowthLeadOutreachInput = Pick<
   listingRemoved?: boolean;
   contact?: MarketingContact | null;
   suppressionBlocked?: boolean;
+  formattedAddress?: string | null;
+  googlePlaceId?: string | null;
+  listingLat?: number | null;
+  listingLng?: number | null;
+  listingWebsiteUrl?: string | null;
+  listingSourceUrl?: string | null;
+  listingName?: string | null;
+  city?: string | null;
+  region?: string | null;
 };
 
 /** Pure eligibility evaluation (no DB). */
 export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachInput): {
   eligible: boolean;
   reason: OutreachEligibilityReason;
+  target?: OutreachTargetClassification;
 } {
   const email = normalizeMarketingEmail(input.contactEmailNormalized ?? "");
   if (!email) return { eligible: false, reason: "missing_email" };
@@ -184,20 +201,49 @@ export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachI
   }
   if (DIRECTORY_AGG.test(hay)) return { eligible: false, reason: "directory_aggregator" };
 
-  if (input.leadType === "VENUE" && !openMicSignalOk(input.openMicSignalTier, input.sourceKind)) {
-    return { eligible: false, reason: "weak_open_mic_signal" };
+  const target = classifyOutreachTargetIdentity({
+    name: input.name,
+    leadType: input.leadType,
+    websiteUrl: input.websiteUrl,
+    contactUrl: input.contactUrl,
+    websiteHostNormalized: input.websiteHostNormalized,
+    contactEmailNormalized: email,
+    sourceKind: input.sourceKind,
+    openMicSignalTier: input.openMicSignalTier,
+    city: input.city,
+    region: input.region,
+    formattedAddress: input.formattedAddress,
+    googlePlaceId: input.googlePlaceId,
+    listingLat: input.listingLat,
+    listingLng: input.listingLng,
+    listingWebsiteUrl: input.listingWebsiteUrl,
+    listingSourceUrl: input.listingSourceUrl,
+    listingName: input.listingName,
+  });
+  if (target.decision === "ineligible") {
+    if (target.reason === "chamber_tourism") return { eligible: false, reason: "chamber_tourism", target };
+    if (target.reason === "directory_aggregator") return { eligible: false, reason: "directory_aggregator", target };
+    if (target.reason === "service_company") return { eligible: false, reason: "service_company", target };
+    return { eligible: false, reason: "weak_identity", target };
+  }
+  if (target.decision === "manual_review") {
+    return { eligible: false, reason: "needs_manual_review", target };
+  }
+
+  if (target.identity === "VENUE" && !openMicSignalOk(input.openMicSignalTier, input.sourceKind)) {
+    return { eligible: false, reason: "weak_open_mic_signal", target };
   }
 
   if (isFreeMailHost(emailHost)) {
     if (!siteHost || !emailDomainMatchesSiteHost(email, siteHost)) {
-      return { eligible: false, reason: "free_mail_mismatch" };
+      return { eligible: false, reason: "free_mail_mismatch", target };
     }
   } else if (siteHost && emailHost && !emailDomainMatchesSiteHost(email, siteHost)) {
     const roleOk = PREFERRED_ROLE_LOCAL.test(email);
-    if (!roleOk) return { eligible: false, reason: "domain_mismatch" };
+    if (!roleOk) return { eligible: false, reason: "domain_mismatch", target };
   }
 
-  return { eligible: true, reason: "eligible" };
+  return { eligible: true, reason: "eligible", target };
 }
 
 /** True when another in-flight draft should block *new* outreach. The draft currently being sent is ignored. */
@@ -206,23 +252,67 @@ export function hasOtherInFlightOutreachDraft(drafts: { id: string }[], ignoreDr
   return drafts.some((d) => d.id !== ignoreDraftId);
 }
 
+const LISTING_IDENTITY_SELECT = {
+  verificationStatus: true,
+  claimStatus: true,
+  claimInviteEmailSentAt: true,
+  removedAt: true,
+  name: true,
+  formattedAddress: true,
+  googlePlaceId: true,
+  lat: true,
+  lng: true,
+  websiteUrl: true,
+  sourceUrl: true,
+  city: true,
+  region: true,
+} as const;
+
+function identityFieldsFromListings(
+  listings: Array<{
+    name: string;
+    formattedAddress: string | null;
+    googlePlaceId: string | null;
+    lat: number | null;
+    lng: number | null;
+    websiteUrl: string | null;
+    sourceUrl: string | null;
+    city: string | null;
+    region: string | null;
+  }>,
+) {
+  const listing =
+    listings.find((l) => l.googlePlaceId && l.lat != null && l.lng != null) ?? listings[0] ?? null;
+  return {
+    formattedAddress: listing?.formattedAddress ?? null,
+    googlePlaceId: listing?.googlePlaceId ?? null,
+    listingLat: listing?.lat ?? null,
+    listingLng: listing?.lng ?? null,
+    listingWebsiteUrl: listing?.websiteUrl ?? null,
+    listingSourceUrl: listing?.sourceUrl ?? null,
+    listingName: listing?.name ?? null,
+    listingCity: listing?.city ?? null,
+    listingRegion: listing?.region ?? null,
+  };
+}
+
 /** Load contextual flags and evaluate eligibility for one lead. */
 export async function explainGrowthLeadOutreachEligibility(
   prisma: PrismaClient,
   leadId: string,
   opts?: { ignoreDraftId?: string },
-): Promise<{ eligible: boolean; reason: OutreachEligibilityReason; lead: GrowthLead | null }> {
+): Promise<{
+  eligible: boolean;
+  reason: OutreachEligibilityReason;
+  lead: GrowthLead | null;
+  target?: OutreachTargetClassification;
+}> {
   const lead = await prisma.growthLead.findUnique({
     where: { id: leadId },
     include: {
       publicListings: {
         where: { removedAt: null },
-        select: {
-          verificationStatus: true,
-          claimStatus: true,
-          claimInviteEmailSentAt: true,
-          removedAt: true,
-        },
+        select: LISTING_IDENTITY_SELECT,
         take: 3,
       },
       outreachDrafts: {
@@ -262,8 +352,12 @@ export async function explainGrowthLeadOutreachEligibility(
       select: { id: true },
     }));
 
+  const ident = identityFieldsFromListings(lead.publicListings);
   const result = evaluateGrowthLeadOutreachEligibility({
     ...lead,
+    city: lead.city ?? ident.listingCity,
+    region: lead.region ?? ident.listingRegion,
+    ...ident,
     hasPendingDraft: hasOtherInFlightOutreachDraft(lead.outreachDrafts, opts?.ignoreDraftId),
     hasRecentOutreachSend: Boolean(recentSend),
     deferClaimPath: verifiedUnclaimed,
@@ -309,6 +403,9 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
     already_contacted: 0,
     defer_claim_path: 0,
     duplicate_recent_send: 0,
+    service_company: 0,
+    weak_identity: 0,
+    needs_manual_review: 0,
   } satisfies OutreachEligibilityAuditCounts;
 
   counts.totalLeads = await prisma.growthLead.count();
@@ -333,14 +430,11 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
         websiteHostNormalized: true,
         openMicSignalTier: true,
         sourceKind: true,
+        city: true,
+        region: true,
         publicListings: {
           where: { removedAt: null },
-          select: {
-            verificationStatus: true,
-            claimStatus: true,
-            claimInviteEmailSentAt: true,
-            removedAt: true,
-          },
+          select: LISTING_IDENTITY_SELECT,
           take: 3,
         },
         outreachDrafts: {
@@ -382,8 +476,12 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
           l.claimStatus !== "CLAIMED" &&
           !l.claimInviteEmailSentAt,
       );
+      const ident = identityFieldsFromListings(row.publicListings);
       const { reason } = evaluateGrowthLeadOutreachEligibility({
         ...row,
+        city: row.city ?? ident.listingCity,
+        region: row.region ?? ident.listingRegion,
+        ...ident,
         hasPendingDraft: row.outreachDrafts.length > 0,
         hasRecentOutreachSend: recentSet.has(email),
         deferClaimPath: verifiedUnclaimed,

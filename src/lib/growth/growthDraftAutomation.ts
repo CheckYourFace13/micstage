@@ -175,8 +175,9 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const draftWorkTake = Math.min(limit, Math.max(24, Math.max(1, perCronSendCeiling) * 8));
   const venueReviewTake = Math.min(limit, Math.max(12, Math.max(1, perCronSendCeiling) * 6));
   let outreachSendsThisRun = 0;
-  const allowMediumOutreach = process.env.GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE === "true";
-  const emailReadyLevels: GrowthLeadEmailConfidence[] = allowMediumOutreach ? ["HIGH", "MEDIUM"] : ["HIGH"];
+  // Eligibility is HIGH-only. Do not let GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE fill the cron window with unsendable drafts.
+  const allowMediumOutreach = false;
+  const emailReadyLevels: GrowthLeadEmailConfidence[] = ["HIGH"];
 
   const candidates = await prisma.growthLead.findMany({
     where: {

@@ -35,6 +35,8 @@ type Props = {
   heroBadge?: LineupBadge | null;
   /** Show share actions (hidden in embed mode) */
   showShareStrip?: boolean;
+  /** Override share/canonical URL (host night pages). */
+  shareCanonicalPath?: string;
 };
 
 function badgeLabel(b: LineupBadge): string {
@@ -61,10 +63,11 @@ export function VenueLineupBoard({
   embed,
   heroBadge,
   showShareStrip,
+  shareCanonicalPath,
 }: Props) {
   const isVenueStaffHere = session?.kind === "venue" && venueStaffVenueIds.includes(venue.id);
 
-  const canonicalPath = `/venues/${venue.slug}/lineup/${ymd}`;
+  const canonicalPath = shareCanonicalPath ?? `/venues/${venue.slug}/lineup/${ymd}`;
   const canonicalUrl = absoluteUrl(canonicalPath);
   const embedUrl = `${canonicalUrl}?embed=1`;
   const apiUrl = absoluteUrl(`/api/public/venues/${venue.slug}/lineup?date=${ymd}`);

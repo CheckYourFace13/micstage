@@ -46,7 +46,6 @@ export async function POST(request: Request) {
   }
 
   const claimSession = await getClaimInviteSession();
-  const legacyRawToken = typeof body.rawToken === "string" ? body.rawToken : "";
   const listingSlug = typeof body.listingSlug === "string" ? body.listingSlug : "";
   const contactName = typeof body.contactName === "string" ? body.contactName : "";
   const role = typeof body.role === "string" ? body.role : "";
@@ -58,7 +57,7 @@ export async function POST(request: Request) {
   if (!listingSlug) {
     return NextResponse.json({ ok: false, error: "Missing listing" }, { status: 400 });
   }
-  if (!claimSession && !legacyRawToken) {
+  if (!claimSession) {
     return NextResponse.json({ ok: false, error: "Invitation session expired" }, { status: 400 });
   }
   if (!CLAIM_AUTHORITY_ROLES.includes(role as ClaimAuthorityRole)) {
@@ -110,8 +109,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await submitInstantClaim(prisma, {
-      tokenId: claimSession?.tokenId,
-      rawToken: claimSession ? undefined : legacyRawToken || undefined,
+      tokenId: claimSession.tokenId,
       listingSlug,
       contactName,
       role: role as ClaimAuthorityRole,

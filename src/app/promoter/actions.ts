@@ -1,8 +1,11 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { Prisma, PromoterVenueAccessStatus } from "@/generated/prisma/client";
 import { requirePromoterSession } from "@/lib/authz";
 import { assertVenueExistsForHostNight } from "@/lib/host/hostAuthorization";
+import { provisionHostNightLineup } from "@/lib/host/hostNightProvisioning";
+import { resolveVenueForHostLocation } from "@/lib/host/resolveHostVenue";
 import { requirePrisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -37,6 +40,69 @@ function parseWeekday(raw: string): number | null {
 
 function addDaysUtc(d: Date, days: number): Date {
   return new Date(d.getTime() + days * 86400000);
+}
+
+export async function setupFirstHostNightAction(formData: FormData) {
+  const session = await requirePromoterSession();
+  const name = formData.get("name")?.toString().trim();
+  const dateRaw = formData.get("date")?.toString().trim();
+  if (!name || !dateRaw) redirect("/promoter/welcome?error=missing");
+
+  const date = parseYmdUtc(dateRaw);
+  if (!date) redirect("/promoter/welcome?error=date");
+
+  const signupEnabled = formData.get("signupEnabled") === "on";
+  const prisma = requirePrisma();
+
+  let venueId = formData.get("venueId")?.toString().trim() || null;
+  if (!venueId) {
+    const placeId = formData.get("googlePlaceId")?.toString().trim();
+    const venueName = formData.get("venueName")?.toString().trim();
+    const formattedAddress = formData.get("formattedAddress")?.toString().trim();
+    const lat = Number.parseFloat(formData.get("lat")?.toString() ?? "");
+    const lng = Number.parseFloat(formData.get("lng")?.toString() ?? "");
+    if (placeId && venueName && formattedAddress && Number.isFinite(lat) && Number.isFinite(lng)) {
+      const resolved = await resolveVenueForHostLocation(prisma, {
+        googlePlaceId: placeId,
+        venueName,
+        formattedAddress,
+        lat,
+        lng,
+        city: formData.get("city")?.toString(),
+        region: formData.get("region")?.toString(),
+        country: formData.get("country")?.toString(),
+      });
+      venueId = resolved.venueId;
+    }
+  }
+  if (!venueId || !(await assertVenueExistsForHostNight(prisma, venueId))) {
+    redirect("/promoter/welcome?error=venue");
+  }
+
+  let slugInput = slugifyName(name);
+  if (!SLUG_RE.test(slugInput)) redirect("/promoter/welcome?error=series");
+
+  try {
+    const series = await prisma.promoterSeries.create({
+      data: { promoterId: session.promoterId, name, slug: slugInput },
+    });
+    const night = await prisma.promoterNight.create({
+      data: { seriesId: series.id, venueId, date, signupEnabled },
+    });
+    await provisionHostNightLineup(prisma, night.id, { signupEnabled });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      redirect("/promoter/welcome?error=duplicate");
+    }
+    redirect("/promoter/welcome?error=save");
+  }
+
+  const store = await cookies();
+  store.set("om_promoter_welcome_seen", "1", { path: "/", maxAge: 60 * 60 * 24 * 365 });
+
+  revalidatePath("/promoter");
+  revalidatePath("/hosts");
+  redirect("/promoter?promoter=series_ok");
 }
 
 export async function createPromoterSeriesAction(formData: FormData) {
@@ -164,42 +230,77 @@ export async function requestPromoterVenueAccessAction(formData: FormData) {
   await requestAccessToVenueId(session.promoterId, venue.id);
 }
 
+function parseSignupEnabled(formData: FormData): boolean {
+  return formData.get("signupEnabled") === "on" || formData.get("signupEnabled") === "true";
+}
+
+async function resolveVenueIdFromForm(formData: FormData, prisma: ReturnType<typeof requirePrisma>): Promise<string | null> {
+  const venueId = formData.get("venueId")?.toString().trim();
+  if (venueId) return venueId;
+
+  const placeId = formData.get("googlePlaceId")?.toString().trim();
+  const venueName = formData.get("venueName")?.toString().trim();
+  const formattedAddress = formData.get("formattedAddress")?.toString().trim();
+  const lat = Number.parseFloat(formData.get("lat")?.toString() ?? "");
+  const lng = Number.parseFloat(formData.get("lng")?.toString() ?? "");
+  if (!placeId || !venueName || !formattedAddress || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  const { venueId: resolved } = await resolveVenueForHostLocation(prisma, {
+    googlePlaceId: placeId,
+    venueName,
+    formattedAddress,
+    lat,
+    lng,
+    city: formData.get("city")?.toString(),
+    region: formData.get("region")?.toString(),
+    country: formData.get("country")?.toString(),
+  });
+  return resolved;
+}
+
 /** Schedule a night at a venue location — no venue-ownership or PromoterVenueAccess approval required. */
 export async function addPromoterNightAction(formData: FormData) {
   const session = await requirePromoterSession();
   const seriesId = formData.get("seriesId");
-  const venueId = formData.get("venueId");
   const dateRaw = formData.get("date");
   const titleRaw = formData.get("title");
   if (typeof seriesId !== "string" || !seriesId.trim()) redirect("/promoter?promoter=night_invalid");
-  if (typeof venueId !== "string" || !venueId.trim()) redirect("/promoter?promoter=night_invalid");
   if (typeof dateRaw !== "string" || !dateRaw.trim()) redirect("/promoter?promoter=night_invalid");
 
   const date = parseYmdUtc(dateRaw.trim());
   if (!date) redirect("/promoter?promoter=night_bad_date");
 
   const title = typeof titleRaw === "string" && titleRaw.trim() ? titleRaw.trim() : undefined;
+  const signupEnabled = parseSignupEnabled(formData);
 
   const prisma = requirePrisma();
+  const resolvedVenueId = await resolveVenueIdFromForm(formData, prisma);
+  if (!resolvedVenueId) redirect("/promoter?promoter=night_invalid");
+
   const series = await prisma.promoterSeries.findFirst({
     where: { id: seriesId.trim(), promoterId: session.promoterId },
     select: { id: true },
   });
   if (!series) redirect("/promoter?promoter=forbidden");
 
-  if (!(await assertVenueExistsForHostNight(prisma, venueId.trim()))) {
+  if (!(await assertVenueExistsForHostNight(prisma, resolvedVenueId))) {
     redirect("/promoter?promoter=venue_missing");
   }
 
+  let nightId: string;
   try {
-    await prisma.promoterNight.create({
+    const night = await prisma.promoterNight.create({
       data: {
         seriesId: series.id,
-        venueId: venueId.trim(),
+        venueId: resolvedVenueId,
         date,
         title,
+        signupEnabled,
       },
     });
+    nightId = night.id;
+    await provisionHostNightLineup(prisma, nightId, { signupEnabled });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       redirect("/promoter?promoter=night_duplicate");
@@ -210,6 +311,7 @@ export async function addPromoterNightAction(formData: FormData) {
 
   revalidatePath("/promoter");
   revalidatePath("/hosts");
+  revalidatePath(`/nights/${nightId}/lineup`);
   redirect("/promoter?promoter=night_ok");
 }
 
@@ -217,25 +319,28 @@ export async function addPromoterNightAction(formData: FormData) {
 export async function addPromoterRecurringNightsAction(formData: FormData) {
   const session = await requirePromoterSession();
   const seriesId = formData.get("seriesId")?.toString().trim();
-  const venueId = formData.get("venueId")?.toString().trim();
   const startRaw = formData.get("startDate")?.toString().trim();
   const weekdayRaw = formData.get("weekday")?.toString().trim();
   const frequency = formData.get("frequency")?.toString().trim() || "weekly";
   const countRaw = formData.get("occurrences")?.toString().trim() || "8";
-  if (!seriesId || !venueId || !startRaw || !weekdayRaw) redirect("/promoter?promoter=night_invalid");
+  const signupEnabled = parseSignupEnabled(formData);
+  if (!seriesId || !startRaw || !weekdayRaw) redirect("/promoter?promoter=night_invalid");
+
+  const prisma = requirePrisma();
+  const resolvedVenueId = await resolveVenueIdFromForm(formData, prisma);
+  if (!resolvedVenueId) redirect("/promoter?promoter=night_invalid");
 
   const start = parseYmdUtc(startRaw);
   const weekday = parseWeekday(weekdayRaw);
   const occurrences = Math.min(26, Math.max(1, Number.parseInt(countRaw, 10) || 8));
   if (!start || weekday == null) redirect("/promoter?promoter=night_bad_date");
 
-  const prisma = requirePrisma();
   const series = await prisma.promoterSeries.findFirst({
     where: { id: seriesId, promoterId: session.promoterId },
     select: { id: true },
   });
   if (!series) redirect("/promoter?promoter=forbidden");
-  if (!(await assertVenueExistsForHostNight(prisma, venueId))) redirect("/promoter?promoter=venue_missing");
+  if (!(await assertVenueExistsForHostNight(prisma, resolvedVenueId))) redirect("/promoter?promoter=venue_missing");
 
   const stepDays = frequency === "monthly" ? 28 : frequency === "biweekly" ? 14 : 7;
   let cursor = start;
@@ -246,9 +351,10 @@ export async function addPromoterRecurringNightsAction(formData: FormData) {
   let created = 0;
   for (let i = 0; i < occurrences; i++) {
     try {
-      await prisma.promoterNight.create({
-        data: { seriesId: series.id, venueId, date: cursor },
+      const night = await prisma.promoterNight.create({
+        data: { seriesId: series.id, venueId: resolvedVenueId, date: cursor, signupEnabled },
       });
+      await provisionHostNightLineup(prisma, night.id, { signupEnabled });
       created += 1;
     } catch (e) {
       if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) {

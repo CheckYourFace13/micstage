@@ -37,6 +37,7 @@ import {
   detectRecurringLanguage,
   detectWeekdayTime,
 } from "@/lib/growth/outreachEvidenceCrawl";
+import { ingestHostLeadFromVenueEvidence } from "@/lib/growth/hostOutreachIngest";
 import type { OutreachOpenMicEvidenceResult } from "@/lib/growth/outreachOpenMicEvidence";
 
 export const OUTREACH_ENRICH_STATS_KEY = "GROWTH_OUTREACH_ENRICH_DAY_STATS";
@@ -671,6 +672,23 @@ export async function enrichGrowthLeadOfficialEvidence(
     const pageForSnippet = pages.find((p) => p.url === result.evidenceUrl) ?? pages[0];
     const snippet = pageForSnippet ? excerptAroundOpenMic(pageForSnippet.text) : result.matchedPhrase;
     const title = pageForSnippet?.title ?? result.matchedPhrase;
+
+    if (lead.leadType === "VENUE" && snippet && (result.tier === "A" || result.tier === "B")) {
+      try {
+        await ingestHostLeadFromVenueEvidence(prisma, {
+          venueLeadId: lead.id,
+          name: lead.name,
+          snippet,
+          eventName: title,
+          sourceUrl: result.evidenceUrl ?? pageForSnippet?.url ?? lead.websiteUrl,
+          city: lead.city,
+          discoveryMarketSlug: lead.discoveryMarketSlug,
+          contactEmail: lead.contactEmailNormalized,
+        });
+      } catch (e) {
+        console.warn("[outreachEvidenceEnrichment] host_lane_ingest_skipped", lead.id, e instanceof Error ? e.message : e);
+      }
+    }
 
     if (result.tier === "A" && result.autoSend) {
       sourceType = "official_website";

@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPromoterSessionOrNull } from "@/lib/authz";
 import { requirePrisma } from "@/lib/prisma";
-import { publicLineupHrefForVenueDate } from "@/lib/promoterLineup";
+import { publicLineupHrefForNight } from "@/lib/promoterLineup";
+import { publicLineupPathForNightId } from "@/lib/host/hostNightProvisioning";
 import { buildPublicMetadata, absoluteUrl } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
@@ -85,7 +86,7 @@ export default async function HostDashboardPage(props: {
   const nightLineupHrefs: Record<string, string | null> = {};
   await Promise.all(
     upcomingNights.map(async (n) => {
-      nightLineupHrefs[n.id] = await publicLineupHrefForVenueDate(prisma, n.venueId, n.date);
+      nightLineupHrefs[n.id] = await publicLineupHrefForNight(prisma, n.id);
     }),
   );
 
@@ -136,12 +137,20 @@ export default async function HostDashboardPage(props: {
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {nightLineupHrefs[nextNight.id] ? (
-                <Link
-                  href={nightLineupHrefs[nextNight.id]!}
-                  className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black"
-                >
-                  Manage lineup
-                </Link>
+                <>
+                  <Link
+                    href={`/promoter/nights/${nextNight.id}`}
+                    className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black"
+                  >
+                    Manage lineup
+                  </Link>
+                  <Link
+                    href={nightLineupHrefs[nextNight.id]!}
+                    className="inline-flex h-11 items-center justify-center rounded-md border border-white/25 px-4 text-sm font-semibold text-white"
+                  >
+                    Share signup
+                  </Link>
+                </>
               ) : null}
               {hostPublicUrl ? (
                 <SharePageButtons url={hostPublicUrl} label="Share host page" />

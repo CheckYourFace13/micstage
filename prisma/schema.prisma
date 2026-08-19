@@ -212,9 +212,49 @@ model PromoterNight {
   title String?
   notes String?
 
+  /// Host-controlled signup/lineup for this specific night (canonical event identity).
+  signupEnabled Boolean @default(false)
+  startTimeMin  Int     @default(1200)
+  endTimeMin    Int     @default(1380)
+  slotMinutes   Int     @default(5)
+  breakMinutes  Int     @default(0)
+
+  eventTemplate EventTemplate?
+  disputes      HostNightVenueDispute[]
+
   @@unique([seriesId, venueId, date])
   @@index([seriesId, date])
   @@index([venueId, date])
+}
+
+enum HostNightDisputeStatus {
+  PENDING
+  REVIEWED
+  SUPPRESSED
+  DISMISSED
+}
+
+/// Venue owner reports incorrect host–venue association (review queue; no auto-delete).
+model HostNightVenueDispute {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  promoterNight   PromoterNight @relation(fields: [promoterNightId], references: [id], onDelete: Cascade)
+  promoterNightId String
+
+  venue   Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venueId String
+
+  reason String @db.VarChar(500)
+  status HostNightDisputeStatus @default(PENDING)
+  notes  String?
+
+  reporterEmail String?
+  reporterVenueOwnerId String?
+
+  @@index([promoterNightId])
+  @@index([venueId, status])
 }
 
 model PromoterApplicationReviewToken {
@@ -321,6 +361,7 @@ model Venue {
 
   promoterVenueAccess PromoterVenueAccess[]
   promoterNights      PromoterNight[]
+  hostNightDisputes   HostNightVenueDispute[]
 
   /// Set when this venue was created or linked from a verified public listing claim.
   claimedFromListing PublicOpenMicListing?
@@ -518,6 +559,10 @@ model EventTemplate {
   onPremiseMaxDistanceMeters Int @default(1000)
 
   instances EventInstance[]
+
+  /// When set, this template belongs to a host night (not venue-owned schedule).
+  promoterNight   PromoterNight? @relation(fields: [promoterNightId], references: [id], onDelete: Cascade)
+  promoterNightId String?        @unique
 
   @@index([venueId, weekday])
 }

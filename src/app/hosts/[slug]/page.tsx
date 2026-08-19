@@ -56,8 +56,8 @@ export default async function PublicHostPage(props: { params: Promise<{ slug: st
       <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
         <p className="text-xs font-medium uppercase tracking-widest text-white/55">Open mic host</p>
         <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">{displayName}</h1>
-        <p className="mt-2 text-sm text-white/70">One link for every open mic {displayName.split(/\s+/)[0] ?? "they"} run.</p>
-        <p className="mt-4 text-xs text-white/45">{shareUrl}</p>
+        <p className="mt-2 text-sm text-white/70">Upcoming open mics from {displayName}</p>
+        <p className="mt-1 text-xs text-white/45">One link for every open mic you run · {shareUrl}</p>
 
         <section className="mt-10">
           <h2 className="text-lg font-semibold text-white">Open mics</h2>
@@ -83,6 +83,12 @@ export default async function PublicHostPage(props: { params: Promise<{ slug: st
                             {n.venue.city ? ` · ${n.venue.city}` : ""}
                           </div>
                           <div className="text-xs text-white/45">Hosted by {displayName}</div>
+                          <Link
+                            href={`/nights/${n.id}/lineup`}
+                            className="mt-2 inline-flex text-xs font-semibold text-[rgb(var(--om-neon))] underline"
+                          >
+                            {n.signupEnabled ? "Sign up for this night →" : "View lineup →"}
+                          </Link>
                         </li>
                       ))}
                     </ul>

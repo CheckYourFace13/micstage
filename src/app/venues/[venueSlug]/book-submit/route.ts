@@ -59,7 +59,6 @@ export async function POST(request: Request) {
   }
 
   const venueSlug = reqString(formData, "venueSlug");
-  const returnBase = safePublicVenueReturnPath(venueSlug, optString(formData, "returnPath"));
   const slotId = reqString(formData, "slotId");
   const notes = optString(formData, "notes");
 
@@ -76,6 +75,9 @@ export async function POST(request: Request) {
   if (!slotPreview) throw new Error("Slot not found");
   if (slotPreview.instance.template.venue.slug !== venueSlug) throw new Error("Venue mismatch");
   const venue = slotPreview.instance.template.venue;
+  const returnBase = safePublicVenueReturnPath(venueSlug, optString(formData, "returnPath"), {
+    nightId: slotPreview.instance.template.promoterNightId,
+  });
   if (slotPreview.instance.isCancelled) {
     return redirectTo(appendQueryToPath(returnBase, { bookError: "This date’s schedule was cancelled." }));
   }

@@ -8,6 +8,7 @@ import {
   registrationContentConsentChecked,
 } from "@/lib/registrationConsent";
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
+import { allocateUniqueHostSlug } from "@/lib/host/hostSlug";
 
 export const runtime = "nodejs";
 
@@ -31,9 +32,11 @@ export async function POST(request: Request) {
 
   let email: string;
   let password: string;
+  let displayName: string;
   try {
     email = reqString(formData, "email").toLowerCase();
     password = reqString(formData, "password");
+    displayName = reqString(formData, "displayName").slice(0, 80);
   } catch {
     return redirectTo("/register/promoter?error=unavailable");
   }
@@ -54,7 +57,7 @@ export async function POST(request: Request) {
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
-    console.error("[registerPromoter] database not configured");
+    console.error("[registerHost] database not configured");
     return redirectTo("/register/promoter?error=unavailable");
   }
 
@@ -62,27 +65,18 @@ export async function POST(request: Request) {
     const existingUser = await prisma.promoterUser.findUnique({ where: { email } });
     if (existingUser) return redirectTo("/login/promoter");
 
-    const approvedApp = await prisma.promoterApplication.findFirst({
-      where: { email, status: "APPROVED" },
-      orderBy: { reviewedAt: "desc" },
-      select: { id: true },
+    const hostSlug = await allocateUniqueHostSlug(displayName, async (slug) => {
+      const row = await prisma.promoterUser.findUnique({ where: { hostSlug: slug }, select: { id: true } });
+      return Boolean(row);
     });
-    if (!approvedApp) {
-      return redirectTo("/register/promoter?error=notApproved");
-    }
-
-    const alreadyLinked = await prisma.promoterUser.findUnique({
-      where: { applicationId: approvedApp.id },
-      select: { id: true },
-    });
-    if (alreadyLinked) return redirectTo("/login/promoter");
 
     const now = new Date();
     const promoter = await prisma.promoterUser.create({
       data: {
         email,
         passwordHash,
-        applicationId: approvedApp.id,
+        displayName,
+        hostSlug,
         registrationContentConsentAt: now,
         registrationContentConsentVersion: REGISTRATION_CONTENT_CONSENT_VERSION,
       },
@@ -91,7 +85,7 @@ export async function POST(request: Request) {
     await setSession({ kind: "promoter", promoterId: promoter.id, email: promoter.email });
     return redirectTo("/promoter/welcome");
   } catch (e) {
-    console.error("[registerPromoter]", e);
+    console.error("[registerHost]", e);
     return redirectTo("/register/promoter?error=unavailable");
   }
 }

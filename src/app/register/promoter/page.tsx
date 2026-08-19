@@ -3,15 +3,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PROMOTER_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
-import { getPrismaOrNull } from "@/lib/prisma";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { PROMOTER_REGISTER_SUBMIT_PATH } from "./actions";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Create your promoter account",
-  description: "Finish creating your MicStage promoter account after approval — name, email, and password only.",
+  title: "Create your free host account",
+  description: "Start hosting open mics on MicStage — one account for all your nights and venues. Free.",
   path: "/register/promoter",
 });
 
@@ -23,38 +22,21 @@ export default async function PromoterRegisterPage(props: {
   if (session?.kind === "promoter") redirect(PROMOTER_DASHBOARD_HREF);
 
   const prefillEmail = typeof emailParam === "string" ? emailParam.trim().toLowerCase() : "";
-  let approvedHint: { contactName: string; brandName: string | null } | null = null;
-  if (prefillEmail) {
-    const prisma = getPrismaOrNull();
-    if (prisma) {
-      const app = await prisma.promoterApplication.findFirst({
-        where: { email: prefillEmail, status: "APPROVED" },
-        orderBy: { reviewedAt: "desc" },
-        select: { contactName: true, brandName: true },
-      });
-      if (app) approvedHint = app;
-    }
-  }
 
   const showRate = error === "rate";
   const showUnavailable = error === "unavailable";
   const showConsent = error === "consent";
-  const showNotApproved = error === "notApproved";
 
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-4 py-12 sm:px-6 sm:py-16">
-        <Link className="text-sm text-white/70 hover:text-white" href="/">
-          &lt;- Back
+        <Link className="text-sm text-white/70 hover:text-white" href="/host">
+          ← For hosts
         </Link>
 
-        <h1 className="om-heading mt-6 text-3xl tracking-wide sm:text-4xl">Create your account</h1>
+        <h1 className="om-heading mt-6 text-3xl tracking-wide sm:text-4xl">Start hosting free</h1>
         <p className="mt-2 text-sm text-white/70">
-          {approvedHint
-            ? `Welcome${approvedHint.contactName ? `, ${approvedHint.contactName.split(/\s+/)[0]}` : ""}! Your promoter application is approved${
-                approvedHint.brandName ? ` for ${approvedHint.brandName}` : ""
-              }. Just set a password to get in.`
-            : "Use the same email from your approved promoter application. It only takes a minute."}
+          Name, email, password — under a minute. No application approval. Run open mics at any venue from one account.
         </p>
 
         <form
@@ -62,12 +44,6 @@ export default async function PromoterRegisterPage(props: {
           action={PROMOTER_REGISTER_SUBMIT_PATH}
           className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6"
         >
-          {showNotApproved ? (
-            <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
-              We don&apos;t see an approved application for this email yet. Apply first, then come back after approval —
-              or use the email from your approval message.
-            </div>
-          ) : null}
           {showRate ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Too many signup attempts. Please try again later.
@@ -84,13 +60,24 @@ export default async function PromoterRegisterPage(props: {
             </div>
           ) : null}
           <label className="grid gap-1 text-sm">
+            <span className="text-white/80">Your name</span>
+            <input
+              name="displayName"
+              type="text"
+              className="h-12 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white placeholder:text-white/40"
+              placeholder="Chris or your host brand"
+              required
+              autoComplete="name"
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
             <span className="text-white/80">Email</span>
             <input
               name="email"
               type="email"
               defaultValue={prefillEmail}
               className="h-12 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white placeholder:text-white/40"
-              placeholder="Same email as your application"
+              placeholder="you@example.com"
               required
               autoComplete="email"
             />
@@ -110,14 +97,14 @@ export default async function PromoterRegisterPage(props: {
           <RegistrationContentConsent />
 
           <FormSubmitButton
-            label="Create account"
+            label="Create host account"
             pendingLabel="Creating…"
-            className="mt-2 inline-flex h-12 min-w-[200px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+            className="mt-2 inline-flex h-12 min-w-[200px] items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-base font-semibold text-black hover:brightness-110 disabled:opacity-60"
           />
           <p className="text-xs text-white/55">
-            Haven&apos;t applied yet?{" "}
-            <Link className="underline hover:text-white" href="/promoter/apply">
-              Submit a short application
+            Manage the venue business itself?{" "}
+            <Link className="underline hover:text-white" href="/register/venue">
+              Register as a venue
             </Link>
             .
           </p>

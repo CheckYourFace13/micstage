@@ -50,7 +50,7 @@ export default function Home() {
                 Find open mics
               </Link>
               <Link
-                href="/register/venue"
+                href="/host"
                 data-track-event="homepage_cta_host"
                 className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/25 bg-white/8 px-6 text-base font-semibold text-white hover:bg-white/15"
               >
@@ -68,14 +68,23 @@ export default function Home() {
                 <li className="rounded-xl border border-white/10 bg-black/30 p-4">
                   <p className="font-semibold text-white">Performers</p>
                   <p className="mt-1 text-xs text-white/55">Find real open mics and sign up when available.</p>
+                  <Link href="/find-open-mics" className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-[rgb(var(--om-neon))] underline">
+                    Find open mics
+                  </Link>
                 </li>
                 <li className="rounded-xl border border-white/10 bg-black/30 p-4">
-                  <p className="font-semibold text-white">Hosts &amp; promoters</p>
-                  <p className="mt-1 text-xs text-white/55">Manage your night without spreadsheets.</p>
+                  <p className="font-semibold text-white">Hosts</p>
+                  <p className="mt-1 text-xs text-white/55">Run all your open mics — even across multiple venues.</p>
+                  <Link href="/host" className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-[rgb(var(--om-neon))] underline">
+                    Host an open mic
+                  </Link>
                 </li>
                 <li className="rounded-xl border border-white/10 bg-black/30 p-4">
                   <p className="font-semibold text-white">Venues</p>
-                  <p className="mt-1 text-xs text-white/55">Get discovered and make performer signup easier.</p>
+                  <p className="mt-1 text-xs text-white/55">Claim your venue and keep your listing accurate.</p>
+                  <Link href="/register/venue" className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-[rgb(var(--om-neon))] underline">
+                    Manage my venue
+                  </Link>
                 </li>
               </ul>
               <div className="mt-3 grid gap-2.5">

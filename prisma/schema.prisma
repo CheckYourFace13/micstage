@@ -140,6 +140,11 @@ model PromoterUser {
   email        String @unique
   passwordHash String
 
+  /// Public host display name (UI: "Host").
+  displayName String?
+  /// Public profile slug: /hosts/[hostSlug]
+  hostSlug    String? @unique
+
   registrationContentConsentAt      DateTime?
   registrationContentConsentVersion String?
 

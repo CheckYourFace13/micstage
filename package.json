@@ -23,6 +23,7 @@
     "test:product-audit": "node scripts/check-product-audit-p0.mjs",
     "test:open-mic-removal": "node scripts/check-open-mic-self-removal.mjs",
     "test:database-security": "npx tsx scripts/check-database-security.mjs",
+    "test:host-multi-venue": "npx tsx scripts/check-host-multi-venue.mjs",
     "audit:claim-invites": "node scripts/audit-historical-claim-invitations.mjs",
     "audit:duplicate-places": "node scripts/analyze-duplicate-google-places.mjs",
     "backup:production": "node scripts/create-production-backup.mjs",

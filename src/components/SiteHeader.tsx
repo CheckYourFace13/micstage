@@ -131,6 +131,12 @@ export async function SiteHeader() {
               </Link>
               <Link
                 className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
+                href="/host"
+              >
+                For Hosts
+              </Link>
+              <Link
+                className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-white/75 hover:bg-white/10 hover:text-white sm:min-h-0 sm:px-3 sm:py-1.5"
                 href="/register/venue"
               >
                 For Venues

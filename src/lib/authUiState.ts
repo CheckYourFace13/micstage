@@ -106,9 +106,17 @@ async function resolvePromoterLine(session: Extract<Session, { kind: "promoter" 
   signedInLine: string;
   signedInHref: string;
 }> {
-  const name = emailLocalPart(session.email) || "promoter";
+  const prisma = getPrismaOrNull();
+  let name = emailLocalPart(session.email) || "host";
+  if (prisma) {
+    const row = await prisma.promoterUser.findUnique({
+      where: { id: session.promoterId },
+      select: { displayName: true },
+    });
+    if (row?.displayName?.trim()) name = row.displayName.trim().split(/\s+/)[0] ?? name;
+  }
   return {
-    signedInLine: `You're organizing nights, ${name}`,
+    signedInLine: `Host dashboard — ${name}`,
     signedInHref: PROMOTER_DASHBOARD_HREF,
   };
 }

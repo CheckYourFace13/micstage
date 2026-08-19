@@ -12,6 +12,12 @@ import { countGrowthOpsInventory } from "@/lib/growth/growthOpsInventory";
 import { outreachAutoRampStatus } from "@/lib/growth/outreachAutoRamp";
 import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
 import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
+import {
+  loadHostAcquisitionMetrics,
+  loadVenueAcquisitionMetrics,
+  type HostAcquisitionMetrics,
+  type VenueAcquisitionMetrics,
+} from "@/lib/ownerSummary/hostAcquisitionMetrics";
 
 export type OwnerSummarySignupRow = {
   kind: "venue" | "artist";
@@ -192,6 +198,8 @@ export type OwnerDailySummaryData = {
     killStatus: boolean;
     nextRampCondition: string;
   };
+  hostAcquisition: HostAcquisitionMetrics;
+  venueAcquisition: VenueAcquisitionMetrics;
 };
 
 function cityState(city: string | null | undefined, region: string | null | undefined): string | null {
@@ -684,6 +692,8 @@ export async function buildOwnerDailySummary(
     opsInventory,
     autoRamp,
     outreachHealth,
+    hostAcquisition,
+    venueAcquisition,
   ] = await Promise.all([
     resolveOutreachRuntimeSnapshot(prisma),
     marketingOutreachCapacitySnapshot(prisma, 25),
@@ -739,6 +749,8 @@ export async function buildOwnerDailySummary(
     countGrowthOpsInventory(prisma),
     outreachAutoRampStatus(prisma),
     evaluateOutreachSendHealth(prisma),
+    loadHostAcquisitionMetrics(prisma, startUtc, endUtc, sevenDayStart),
+    loadVenueAcquisitionMetrics(prisma, startUtc, endUtc, sevenDayStart),
   ]);
 
   const clicksNoteUpdated =
@@ -872,5 +884,7 @@ export async function buildOwnerDailySummary(
       killStatus: outreachRuntime.kill.effective,
       nextRampCondition: autoRamp.nextCondition,
     },
+    hostAcquisition,
+    venueAcquisition,
   };
 }

@@ -26,6 +26,7 @@
     "test:host-multi-venue": "npx tsx scripts/check-host-multi-venue.mjs",
     "test:host-e2e": "npx tsx scripts/host-multi-venue-e2e.mjs",
     "backfill:host-identities": "npx tsx scripts/backfill-host-identities.mjs",
+    "backfill:host-night-lineups": "npx tsx scripts/backfill-host-night-lineups.mjs",
     "audit:claim-invites": "node scripts/audit-historical-claim-invitations.mjs",
     "audit:duplicate-places": "node scripts/analyze-duplicate-google-places.mjs",
     "backup:production": "node scripts/create-production-backup.mjs",

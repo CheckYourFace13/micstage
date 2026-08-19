@@ -5,6 +5,7 @@ import { Prisma, PromoterVenueAccessStatus } from "@/generated/prisma/client";
 import { requirePromoterSession } from "@/lib/authz";
 import { assertVenueExistsForHostNight } from "@/lib/host/hostAuthorization";
 import { provisionHostNightLineup } from "@/lib/host/hostNightProvisioning";
+import { maybeRecordHostSecondVenueActivation } from "@/lib/host/hostSecondVenueActivation";
 import { resolveVenueForHostLocation } from "@/lib/host/resolveHostVenue";
 import { requirePrisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -301,6 +302,7 @@ export async function addPromoterNightAction(formData: FormData) {
     });
     nightId = night.id;
     await provisionHostNightLineup(prisma, nightId, { signupEnabled });
+    await maybeRecordHostSecondVenueActivation(prisma, session.promoterId, resolvedVenueId, nightId);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       redirect("/promoter?promoter=night_duplicate");
@@ -355,6 +357,12 @@ export async function addPromoterRecurringNightsAction(formData: FormData) {
         data: { seriesId: series.id, venueId: resolvedVenueId, date: cursor, signupEnabled },
       });
       await provisionHostNightLineup(prisma, night.id, { signupEnabled });
+      await maybeRecordHostSecondVenueActivation(
+        prisma,
+        session.promoterId,
+        resolvedVenueId,
+        night.id,
+      );
       created += 1;
     } catch (e) {
       if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) {

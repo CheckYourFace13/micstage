@@ -64,7 +64,7 @@ export const MICSTAGE_APPLICATION_PUBLIC_TABLES = [
   "ListingOpenMicEvidence",
   "ListingCorrection",
   "OpenMicDemandRequest",
-  "_prisma_migrations",
+  "HostNightVenueDispute",
 ] as const;
 
 export type MicStageApplicationPublicTable = (typeof MICSTAGE_APPLICATION_PUBLIC_TABLES)[number];
@@ -89,6 +89,7 @@ export const SUPABASE_ADVISOR_FLAGGED_TABLES = [
   "PublicOpenMicListing",
   "PromoterApplication",
   "MarketingOutreachClick",
+  "HostNightVenueDispute",
 ] as const satisfies readonly MicStageApplicationPublicTable[];
 
 export async function isDatabaseRlsSecurityGateClear(prisma: PrismaClient): Promise<boolean> {

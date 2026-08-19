@@ -72,6 +72,118 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
   return lines;
 }
 
+function renderHostAcquisitionText(data: OwnerDailySummaryData): string[] {
+  const h = data.hostAcquisition;
+  return [
+    "HOST ACQUISITION",
+    `  Prospects found: ${h.prospectsFound}`,
+    `  Hosts with verified contacts: ${h.prospectsHighContact}`,
+    `  Host lane prospects: ${h.prospectsHostLane}`,
+    `  Outreach ready: ${h.outreachReady}`,
+    "",
+    "  TODAY (24h)",
+    `  Emails sent: ${h.emailsSent24h}`,
+    `  Delivered: ${h.delivered24h}`,
+    `  Clicks: ${h.clicks24h}`,
+    `  Registrations: ${h.registrations24h}`,
+    `  First series created: ${h.firstSeries24h}`,
+    `  First night created: ${h.firstNight24h}`,
+    `  Second venue added: ${h.secondVenueActivations24h}`,
+    "",
+    "  LAST 7 DAYS",
+    `  Emails sent: ${h.emailsSent7d}`,
+    `  Delivered: ${h.delivered7d}`,
+    `  Clicks: ${h.clicks7d}`,
+    `  Registrations: ${h.registrations7d}`,
+    `  First series created: ${h.firstSeries7d}`,
+    `  First night created: ${h.firstNight7d}`,
+    `  Second venue added: ${h.secondVenueActivations7d}`,
+    `  Second venue activations (all time): ${h.secondVenueActivationsTotal}`,
+    "",
+  ];
+}
+
+function renderVenueAcquisitionText(data: OwnerDailySummaryData): string[] {
+  const v = data.venueAcquisition;
+  return [
+    "VENUE ACQUISITION",
+    `  Prospects verified: ${v.prospectsVerified}`,
+    "",
+    "  TODAY (24h)",
+    `  Emails sent: ${v.emailsSent24h}`,
+    `  Delivered: ${v.delivered24h}`,
+    `  Clicks: ${v.clicks24h}`,
+    `  Claims: ${v.claims24h}`,
+    `  Venue registrations: ${v.registrations24h}`,
+    "",
+    "  LAST 7 DAYS",
+    `  Emails sent: ${v.emailsSent7d}`,
+    `  Delivered: ${v.delivered7d}`,
+    `  Clicks: ${v.clicks7d}`,
+    `  Claims: ${v.claims7d}`,
+    `  Venue registrations: ${v.registrations7d}`,
+    "",
+  ];
+}
+
+function renderHostAcquisitionHtml(data: OwnerDailySummaryData): string {
+  const h = data.hostAcquisition;
+  return `
+<h2 style="margin:24px 0 8px;font-size:16px">Host acquisition</h2>
+<table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
+  <tr><td style="padding:4px 0">Prospects found</td><td style="text-align:right">${h.prospectsFound}</td></tr>
+  <tr><td style="padding:4px 0">Verified contacts</td><td style="text-align:right">${h.prospectsHighContact}</td></tr>
+  <tr><td style="padding:4px 0">Host lane</td><td style="text-align:right">${h.prospectsHostLane}</td></tr>
+  <tr><td style="padding:4px 0">Outreach ready</td><td style="text-align:right">${h.outreachReady}</td></tr>
+</table>
+<p style="margin:12px 0 4px;font-weight:600;font-size:13px">Today (24h)</p>
+<table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
+  <tr><td>Sent</td><td style="text-align:right">${h.emailsSent24h}</td></tr>
+  <tr><td>Delivered</td><td style="text-align:right">${h.delivered24h}</td></tr>
+  <tr><td>Clicks</td><td style="text-align:right">${h.clicks24h}</td></tr>
+  <tr><td>Registrations</td><td style="text-align:right">${h.registrations24h}</td></tr>
+  <tr><td>First series</td><td style="text-align:right">${h.firstSeries24h}</td></tr>
+  <tr><td>First night</td><td style="text-align:right">${h.firstNight24h}</td></tr>
+  <tr><td>Second venue</td><td style="text-align:right">${h.secondVenueActivations24h}</td></tr>
+</table>
+<p style="margin:12px 0 4px;font-weight:600;font-size:13px">Last 7 days</p>
+<table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
+  <tr><td>Sent</td><td style="text-align:right">${h.emailsSent7d}</td></tr>
+  <tr><td>Delivered</td><td style="text-align:right">${h.delivered7d}</td></tr>
+  <tr><td>Clicks</td><td style="text-align:right">${h.clicks7d}</td></tr>
+  <tr><td>Registrations</td><td style="text-align:right">${h.registrations7d}</td></tr>
+  <tr><td>First series</td><td style="text-align:right">${h.firstSeries7d}</td></tr>
+  <tr><td>First night</td><td style="text-align:right">${h.firstNight7d}</td></tr>
+  <tr><td>Second venue</td><td style="text-align:right">${h.secondVenueActivations7d}</td></tr>
+  <tr><td>Second venue (all time)</td><td style="text-align:right">${h.secondVenueActivationsTotal}</td></tr>
+</table>`;
+}
+
+function renderVenueAcquisitionHtml(data: OwnerDailySummaryData): string {
+  const v = data.venueAcquisition;
+  return `
+<h2 style="margin:24px 0 8px;font-size:16px">Venue acquisition</h2>
+<table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
+  <tr><td style="padding:4px 0">Prospects verified</td><td style="text-align:right">${v.prospectsVerified}</td></tr>
+</table>
+<p style="margin:12px 0 4px;font-weight:600;font-size:13px">Today (24h)</p>
+<table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
+  <tr><td>Sent</td><td style="text-align:right">${v.emailsSent24h}</td></tr>
+  <tr><td>Delivered</td><td style="text-align:right">${v.delivered24h}</td></tr>
+  <tr><td>Clicks</td><td style="text-align:right">${v.clicks24h}</td></tr>
+  <tr><td>Claims</td><td style="text-align:right">${v.claims24h}</td></tr>
+  <tr><td>Registrations</td><td style="text-align:right">${v.registrations24h}</td></tr>
+</table>
+<p style="margin:12px 0 4px;font-weight:600;font-size:13px">Last 7 days</p>
+<table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
+  <tr><td>Sent</td><td style="text-align:right">${v.emailsSent7d}</td></tr>
+  <tr><td>Delivered</td><td style="text-align:right">${v.delivered7d}</td></tr>
+  <tr><td>Clicks</td><td style="text-align:right">${v.clicks7d}</td></tr>
+  <tr><td>Claims</td><td style="text-align:right">${v.claims7d}</td></tr>
+  <tr><td>Registrations</td><td style="text-align:right">${v.registrations7d}</td></tr>
+</table>`;
+}
+
 function renderGrowthEngineText(data: OwnerDailySummaryData): string[] {
   const g = data.growthEngine;
   const m = data.marketing;
@@ -432,6 +544,8 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
     "",
   );
   lines.push(...renderRecentListingsText(data));
+  lines.push(...renderHostAcquisitionText(data));
+  lines.push(...renderVenueAcquisitionText(data));
   lines.push(...renderGrowthEngineText(data));
   lines.push(...renderMarketingText(data));
   lines.push(...renderFunnelText(data));
@@ -510,6 +624,10 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
   </ul>
 
   ${renderRecentListingsHtml(data)}
+
+  ${renderHostAcquisitionHtml(data)}
+
+  ${renderVenueAcquisitionHtml(data)}
 
   ${renderGrowthEngineHtml(data)}
 

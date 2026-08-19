@@ -139,7 +139,7 @@ export async function sendApprovedGrowthLeadDraft(
   const baseUrl = appBaseUrl().replace(/\/$/, "");
   const clickDestinationUrl =
     ctaKind === "promoter"
-      ? `${baseUrl}/register/promoter?growthLead=${encodeURIComponent(draft.leadId)}`
+      ? `${baseUrl}/host?growthLead=${encodeURIComponent(draft.leadId)}`
       : draft.lead.leadType === "ARTIST"
         ? `${baseUrl}/register/musician?growthLead=${encodeURIComponent(draft.leadId)}`
         : `${baseUrl}/register/venue?growthLead=${encodeURIComponent(draft.leadId)}`;

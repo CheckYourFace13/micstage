@@ -424,9 +424,9 @@ export function buildPromoterGrowthOutreachLetter(
   }
 
   const paras = [
-    "MicStage is a new, free platform focused on open mic nights: venues get a simple signup flow (including optional QR codes in the room), and artists get one place to find and register for nearby mics.",
-    "We are rolling out market by market and trying to keep the onboarding light — mostly setup help and feedback loops with hosts.",
-    "If you are open to a short overview (or a 10-minute call), reply here and I will follow up.",
+    "MicStage is a free host app for open mic nights: run every mic you host from one account — even across multiple venues — with signups, lineups, and a shareable host page.",
+    "You do not need to own the venue; just pick where each night happens. Performers get one place to find and register for nearby mics.",
+    "If you want a quick overview or help setting up your first series, reply here and I will follow up.",
   ];
   const textBody = [sal.text, "", ...paras, "", SIGN_OFF_TEXT].join("\n");
   const htmlBody = [sal.html, ...paras.map((p) => `<p>${escapeHtml(p)}</p>`), SIGN_OFF_HTML].join("");

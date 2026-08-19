@@ -154,7 +154,7 @@ export default function ComparePage() {
               Find open mics
             </Link>
             <Link
-              href="/register/venue"
+              href="/host"
               className="inline-flex h-12 items-center justify-center rounded-md border border-white/20 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10"
             >
               Run your open mic free

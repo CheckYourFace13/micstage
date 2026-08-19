@@ -3,6 +3,7 @@
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { extractHostIdentityFromEvidence } from "@/lib/growth/hostIdentityExtraction";
+import { tagHostMultiVenueProspect } from "@/lib/growth/hostMultiVenueProspect";
 import { HOST_OUTREACH_CTA_PATH } from "@/lib/growth/hostOutreachSignals";
 import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
 import { mergeVenueDiscoveryHints } from "@/lib/growth/growthLeadDiscoveryHintsMerge";
@@ -28,13 +29,20 @@ export async function ingestHostLeadFromVenueEvidence(
   });
   if (!extracted) return { created: false, hostBrand: null };
 
+  const hostHints = {
+    hostOutreachLane: true,
+    hostBrand: extracted.hostBrand,
+    hostPersonName: extracted.hostPersonName,
+    evidenceSnippet: extracted.evidenceSnippet,
+    hostCtaPath: HOST_OUTREACH_CTA_PATH,
+  };
+
   if (!input.contactEmail?.trim()) {
-    await mergeVenueDiscoveryHints(prisma, input.venueLeadId, {
-      hostOutreachLane: true,
+    await mergeVenueDiscoveryHints(prisma, input.venueLeadId, hostHints);
+    await tagHostMultiVenueProspect(prisma, {
       hostBrand: extracted.hostBrand,
-      hostPersonName: extracted.hostPersonName,
-      evidenceSnippet: extracted.evidenceSnippet,
-      hostCtaPath: HOST_OUTREACH_CTA_PATH,
+      venueLeadId: input.venueLeadId,
+      city: input.city,
     });
     return { created: false, hostBrand: extracted.hostBrand };
   }
@@ -49,13 +57,19 @@ export async function ingestHostLeadFromVenueEvidence(
     sourceKind: "EVENT_LISTING",
     source: "host_evidence_extraction",
     discoveryHints: {
-      hostOutreachLane: true,
-      hostCtaPath: HOST_OUTREACH_CTA_PATH,
+      ...hostHints,
       extractedFromVenueLeadId: input.venueLeadId,
-      hostPersonName: extracted.hostPersonName,
-      evidenceSnippet: extracted.evidenceSnippet,
       evidenceReason: extracted.evidenceReason,
     },
+  });
+
+  const promoterLeadId =
+    result.status === "created" ? result.id : result.status === "duplicate" ? result.existingId : null;
+  await tagHostMultiVenueProspect(prisma, {
+    hostBrand: extracted.hostBrand,
+    venueLeadId: input.venueLeadId,
+    promoterLeadId,
+    city: input.city,
   });
 
   return {

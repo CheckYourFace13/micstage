@@ -665,6 +665,7 @@ export async function buildOwnerDailySummary(
     "Inventory includes unclaimed public listings. Strong place+evidence rows auto-promote to VERIFIED; junk names auto-reject to OUTDATED.";
 
   const sevenDayStart = new Date(startUtc.getTime() - 7 * 86400000);
+  const thirtyDayStart = new Date(startUtc.getTime() - 30 * 86400000);
   const [
     outreachRuntime,
     providerCapacity,
@@ -749,7 +750,7 @@ export async function buildOwnerDailySummary(
     countGrowthOpsInventory(prisma),
     outreachAutoRampStatus(prisma),
     evaluateOutreachSendHealth(prisma),
-    loadHostAcquisitionMetrics(prisma, startUtc, endUtc, sevenDayStart),
+    loadHostAcquisitionMetrics(prisma, startUtc, endUtc, sevenDayStart, thirtyDayStart),
     loadVenueAcquisitionMetrics(prisma, startUtc, endUtc, sevenDayStart),
   ]);
 

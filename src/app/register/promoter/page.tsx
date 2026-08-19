@@ -7,6 +7,8 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { RegistrationContentConsent } from "@/components/RegistrationContentConsent";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { PROMOTER_REGISTER_SUBMIT_PATH } from "./actions";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { getPrismaOrNull } from "@/lib/prisma";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Create your free host account",
@@ -15,13 +17,22 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default async function PromoterRegisterPage(props: {
-  searchParams: Promise<{ error?: string; email?: string }>;
+  searchParams: Promise<{ error?: string; email?: string; growthLead?: string }>;
 }) {
-  const { error, email: emailParam } = await props.searchParams;
+  const { error, email: emailParam, growthLead } = await props.searchParams;
   const session = await getSession();
   if (session?.kind === "promoter") redirect(PROMOTER_DASHBOARD_HREF);
 
   const prefillEmail = typeof emailParam === "string" ? emailParam.trim().toLowerCase() : "";
+  const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
+  const traceId = typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim()) ? growthLead.trim() : "";
+
+  if (traceId) {
+    const prisma = getPrismaOrNull();
+    if (prisma) {
+      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "SIGNUP_STARTED");
+    }
+  }
 
   const showRate = error === "rate";
   const showUnavailable = error === "unavailable";
@@ -44,6 +55,7 @@ export default async function PromoterRegisterPage(props: {
           action={PROMOTER_REGISTER_SUBMIT_PATH}
           className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6"
         >
+          {traceId ? <input type="hidden" name="growthTraceLeadId" value={traceId} /> : null}
           {showRate ? (
             <div className="rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
               Too many signup attempts. Please try again later.

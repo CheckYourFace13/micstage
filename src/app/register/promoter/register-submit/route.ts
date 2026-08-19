@@ -9,6 +9,7 @@ import {
 } from "@/lib/registrationConsent";
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 import { allocateUniqueHostSlug } from "@/lib/host/hostSlug";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 
 export const runtime = "nodejs";
 
@@ -33,10 +34,15 @@ export async function POST(request: Request) {
   let email: string;
   let password: string;
   let displayName: string;
+  let growthTraceLeadId: string | null = null;
   try {
     email = reqString(formData, "email").toLowerCase();
     password = reqString(formData, "password");
     displayName = reqString(formData, "displayName").slice(0, 80);
+    const trace = formData.get("growthTraceLeadId");
+    if (typeof trace === "string" && /^c[a-z0-9]{24}$/i.test(trace.trim())) {
+      growthTraceLeadId = trace.trim();
+    }
   } catch {
     return redirectTo("/register/promoter?error=unavailable");
   }
@@ -83,6 +89,20 @@ export async function POST(request: Request) {
     });
 
     await setSession({ kind: "promoter", promoterId: promoter.id, email: promoter.email });
+
+    if (growthTraceLeadId) {
+      const lead = await prisma.growthLead.findFirst({
+        where: { id: growthTraceLeadId, leadType: "PROMOTER_ACCOUNT" },
+        select: { id: true, contactEmailNormalized: true },
+      });
+      if (lead) {
+        await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "ACCOUNT_CREATED");
+        if (lead.contactEmailNormalized?.toLowerCase() === email) {
+          await prisma.growthLead.update({ where: { id: lead.id }, data: { status: "JOINED" } });
+        }
+      }
+    }
+
     return redirectTo("/promoter/welcome");
   } catch (e) {
     console.error("[registerHost]", e);

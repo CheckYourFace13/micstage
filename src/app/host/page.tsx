@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPublicMetadata } from "@/lib/publicSeo";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { getPrismaOrNull } from "@/lib/prisma";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Run every open mic you host — free | MicStage",
@@ -9,13 +11,36 @@ export const metadata: Metadata = buildPublicMetadata({
   path: "/host",
 });
 
-export default function HostLandingPage() {
+const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
+
+export default async function HostLandingPage(props: { searchParams: Promise<{ growthLead?: string }> }) {
+  const { growthLead } = await props.searchParams;
+  const traceId = typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim()) ? growthLead.trim() : "";
+  if (traceId) {
+    const prisma = getPrismaOrNull();
+    if (prisma) {
+      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED");
+      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "SIGNUP_STARTED");
+    }
+  }
+
+  const registerHref = traceId ? `/register/promoter?growthLead=${encodeURIComponent(traceId)}` : "/register/promoter";
+
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-16">
         <Link href="/" className="text-sm text-white/70 hover:text-white">
           ← MicStage
         </Link>
+
+        {traceId ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] px-4 py-3 text-sm text-white">
+            <p className="font-medium text-white">You are joining from MicStage host outreach</p>
+            <p className="mt-1 text-white/80">
+              Create your free host account in under a minute — one login for every open mic you run, at any venue.
+            </p>
+          </div>
+        ) : null}
 
         <p className="mt-6 text-xs font-medium uppercase tracking-widest text-[rgb(var(--om-neon))]">
           For hosts
@@ -45,7 +70,7 @@ export default function HostLandingPage() {
 
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
           <Link
-            href="/register/promoter"
+            href={registerHref}
             className="inline-flex min-h-12 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-6 text-base font-semibold text-black hover:brightness-110"
           >
             Start hosting free

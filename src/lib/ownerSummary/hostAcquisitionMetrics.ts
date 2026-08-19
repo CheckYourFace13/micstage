@@ -3,9 +3,11 @@
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { HOST_SECOND_VENUE_EVENT } from "@/lib/host/hostSecondVenueActivation";
+import { HOST_MULTI_VENUE_PROSPECT } from "@/lib/growth/hostMultiVenueProspect";
 
 export type HostAcquisitionMetrics = {
   prospectsFound: number;
+  multiVenueProspects: number;
   prospectsHighContact: number;
   prospectsHostLane: number;
   outreachReady: number;
@@ -23,6 +25,10 @@ export type HostAcquisitionMetrics = {
   firstSeries7d: number;
   firstNight7d: number;
   secondVenueActivations7d: number;
+  emailsSent30d: number;
+  delivered30d: number;
+  clicks30d: number;
+  registrations30d: number;
   secondVenueActivationsTotal: number;
 };
 
@@ -55,9 +61,12 @@ export async function loadHostAcquisitionMetrics(
   startUtc: Date,
   endUtc: Date,
   sevenDayStart: Date,
+  thirtyDayStart?: Date,
 ): Promise<HostAcquisitionMetrics> {
+  const t30 = thirtyDayStart ?? new Date(startUtc.getTime() - 30 * 86400000);
   const [
     prospectsFound,
+    multiVenueProspects,
     prospectsHighContact,
     prospectsHostLane,
     outreachReady,
@@ -76,8 +85,20 @@ export async function loadHostAcquisitionMetrics(
     firstNight7d,
     secondVenue7d,
     secondVenueTotal,
+    hostSends30d,
+    hostDelivered30d,
+    hostClicks30d,
+    hostRegs30d,
   ] = await Promise.all([
     prisma.growthLead.count({ where: { leadType: "PROMOTER_ACCOUNT" } }),
+    prisma.growthLead.count({
+      where: {
+        OR: [
+          { discoveryHints: { string_contains: "hostMultiVenueProspect" } },
+          { discoveryHints: { string_contains: HOST_MULTI_VENUE_PROSPECT } },
+        ],
+      },
+    }),
     prisma.growthLead.count({
       where: { leadType: "PROMOTER_ACCOUNT", contactEmailConfidence: "HIGH" },
     }),
@@ -158,10 +179,33 @@ export async function loadHostAcquisitionMetrics(
         payload: { path: ["event"], equals: HOST_SECOND_VENUE_EVENT },
       },
     }),
+    prisma.marketingEmailSend.count({
+      where: {
+        category: "OUTREACH",
+        status: "SENT",
+        sentAt: { gte: t30, lt: endUtc },
+        growthLeadOutreachDraft: { lead: { leadType: "PROMOTER_ACCOUNT" } },
+      },
+    }),
+    prisma.marketingEmailSend.count({
+      where: {
+        category: "OUTREACH",
+        deliveredAt: { gte: t30, lt: endUtc },
+        growthLeadOutreachDraft: { lead: { leadType: "PROMOTER_ACCOUNT" } },
+      },
+    }),
+    prisma.marketingOutreachClick.count({
+      where: {
+        createdAt: { gte: t30, lt: endUtc },
+        send: { growthLeadOutreachDraft: { lead: { leadType: "PROMOTER_ACCOUNT" } } },
+      },
+    }),
+    prisma.promoterUser.count({ where: { createdAt: { gte: t30, lt: endUtc } } }),
   ]);
 
   return {
     prospectsFound,
+    multiVenueProspects,
     prospectsHighContact,
     prospectsHostLane,
     outreachReady,
@@ -179,6 +223,10 @@ export async function loadHostAcquisitionMetrics(
     firstSeries7d,
     firstNight7d,
     secondVenueActivations7d: secondVenue7d,
+    emailsSent30d: hostSends30d,
+    delivered30d: hostDelivered30d,
+    clicks30d: hostClicks30d,
+    registrations30d: hostRegs30d,
     secondVenueActivationsTotal: secondVenueTotal,
   };
 }

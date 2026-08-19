@@ -77,6 +77,7 @@ function renderHostAcquisitionText(data: OwnerDailySummaryData): string[] {
   return [
     "HOST ACQUISITION",
     `  Prospects found: ${h.prospectsFound}`,
+    `  Multi-venue prospects: ${h.multiVenueProspects}`,
     `  Hosts with verified contacts: ${h.prospectsHighContact}`,
     `  Host lane prospects: ${h.prospectsHostLane}`,
     `  Outreach ready: ${h.outreachReady}`,
@@ -98,6 +99,12 @@ function renderHostAcquisitionText(data: OwnerDailySummaryData): string[] {
     `  First series created: ${h.firstSeries7d}`,
     `  First night created: ${h.firstNight7d}`,
     `  Second venue added: ${h.secondVenueActivations7d}`,
+    "",
+    "  LAST 30 DAYS",
+    `  Emails sent: ${h.emailsSent30d}`,
+    `  Delivered: ${h.delivered30d}`,
+    `  Clicks: ${h.clicks30d}`,
+    `  Registrations: ${h.registrations30d}`,
     `  Second venue activations (all time): ${h.secondVenueActivationsTotal}`,
     "",
   ];

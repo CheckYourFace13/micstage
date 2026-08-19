@@ -15,6 +15,8 @@ type HealthBody = {
   timestamp: string;
   /** Database probe result only — no host, URL, or errors */
   database: "up" | "down" | "unconfigured";
+  /** Optional deploy marker when DEPLOY_GIT_SHA is set on the host */
+  deployCommit?: string;
 };
 
 function json(body: HealthBody, status: number) {
@@ -36,6 +38,7 @@ function json(body: HealthBody, status: number) {
  */
 export async function GET() {
   const timestamp = new Date().toISOString();
+  const deployCommit = process.env.DEPLOY_GIT_SHA?.trim() || undefined;
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
@@ -45,6 +48,7 @@ export async function GET() {
         ok: false,
         timestamp,
         database: "unconfigured",
+        ...(deployCommit ? { deployCommit } : {}),
       },
       503,
     );
@@ -58,6 +62,7 @@ export async function GET() {
         ok: true,
         timestamp,
         database: "up",
+        ...(deployCommit ? { deployCommit } : {}),
       },
       200,
     );
@@ -68,6 +73,7 @@ export async function GET() {
         ok: false,
         timestamp,
         database: "down",
+        ...(deployCommit ? { deployCommit } : {}),
       },
       503,
     );

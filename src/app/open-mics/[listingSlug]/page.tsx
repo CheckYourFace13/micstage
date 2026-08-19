@@ -18,6 +18,7 @@ import {
   buildListingEventJsonLd,
 } from "@/lib/publicListings/listingSeo";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
+import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { displayListingAddress } from "@/lib/publicListings/discoveryMerge";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
@@ -56,12 +57,23 @@ export async function generateMetadata(props: { params: Promise<{ listingSlug: s
   };
 }
 
-export default async function PublicOpenMicListingPage(props: { params: Promise<{ listingSlug: string }> }) {
+export default async function PublicOpenMicListingPage(props: {
+  params: Promise<{ listingSlug: string }>;
+  searchParams: Promise<{ growthLead?: string }>;
+}) {
   const { listingSlug } = await props.params;
+  const { growthLead } = await props.searchParams;
   if (!isValidPublicSlug(listingSlug)) notFound();
+
+  const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
+  const traceId = typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim()) ? growthLead.trim() : "";
 
   const prisma = getPrismaOrNull();
   if (!prisma) return <PublicDataUnavailable title="Listing unavailable" />;
+
+  if (traceId) {
+    await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: "VENUE" });
+  }
 
   const listing = await loadPublicOpenMicListingBySlug(prisma, listingSlug);
   if (!listing) notFound();
@@ -210,7 +222,9 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
         </header>
 
         <div className="mt-4 rounded-lg border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-50/95">
-          Listed by MicStage. This open mic is not yet managed by the venue.
+          {traceId
+            ? "This is your open mic on MicStage — claim it free to manage schedule, signups, and lineup."
+            : "Listed by MicStage. This open mic is not yet managed by the venue."}
         </div>
 
         {listing.about ? (
@@ -314,10 +328,10 @@ export default async function PublicOpenMicListingPage(props: { params: Promise<
             <h2 className="text-lg font-semibold">Run this open mic?</h2>
             <p className="mt-1 text-sm text-white/65">Claim this page to manage schedule, bookings, and lineup on MicStage.</p>
             <Link
-              href={`/claim/${listing.slug}`}
+              href={`/claim/${listing.slug}${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
               className="mt-3 inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
             >
-              Claim this open mic
+              {traceId ? "Claim this open mic free" : "Claim this open mic"}
             </Link>
           </div>
 

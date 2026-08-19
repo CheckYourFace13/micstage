@@ -469,6 +469,10 @@ export async function enrichGrowthLeadOfficialEvidence(
     .map((row) => {
       const state = parseOutreachEvidenceState(row.discoveryHints);
       const listing = row.publicListings[0] ?? null;
+      const hints =
+        row.discoveryHints && typeof row.discoveryHints === "object" && !Array.isArray(row.discoveryHints)
+          ? (row.discoveryHints as Record<string, unknown>)
+          : {};
       const due = isOutreachEvidenceRecheckDue(state, now);
       const score = scoreResearchPriority({
         opsState: state?.opsState ?? null,
@@ -477,7 +481,11 @@ export async function enrichGrowthLeadOfficialEvidence(
         googlePlaceId: Boolean(listing?.googlePlaceId),
         openMicSignalTier: row.openMicSignalTier,
         contactHigh: row.contactEmailConfidence === "HIGH",
-        evidenceAutoSend: state?.opsState === "AUTO_SEND_READY" || (state?.tier === "A" || state?.tier === "B"),
+        evidenceAutoSend: state?.opsState === "AUTO_SEND_READY" || state?.tier === "A" || state?.tier === "B",
+        leadType: row.leadType,
+        hostOutreachLane: hints.hostOutreachLane === true,
+        hostMultiVenueProspect: hints.hostMultiVenueProspect === true,
+        hostIdentityDetected: Boolean(hints.hostBrand || hints.hostOutreachLane),
       });
       return { row, state, due, score };
     })

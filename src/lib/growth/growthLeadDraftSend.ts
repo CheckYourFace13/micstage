@@ -8,6 +8,7 @@ import { isOnlyTransientMarketingThrottle } from "@/lib/marketing/sendCaps";
 import { sendThroughMarketingPipeline, type MarketingSendResult } from "@/lib/marketing/sendPipeline";
 import { explainGrowthLeadOutreachEligibility } from "@/lib/growth/outreachContactEligible";
 import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
+import { resolveGrowthLeadClickDestination } from "@/lib/growth/outreachClickDestination";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 
 /**
@@ -136,13 +137,9 @@ export async function sendApprovedGrowthLeadDraft(
       : marketingTemplateKindForGrowthLeadType(draft.lead.leadType === "ARTIST" ? "ARTIST" : "VENUE");
   const purposeKey = `growth-lead-draft:${draft.id}`;
   const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
-  const baseUrl = appBaseUrl().replace(/\/$/, "");
   const clickDestinationUrl =
-    ctaKind === "promoter"
-      ? `${baseUrl}/host?growthLead=${encodeURIComponent(draft.leadId)}`
-      : draft.lead.leadType === "ARTIST"
-        ? `${baseUrl}/register/musician?growthLead=${encodeURIComponent(draft.leadId)}`
-        : `${baseUrl}/register/venue?growthLead=${encodeURIComponent(draft.leadId)}`;
+    (await resolveGrowthLeadClickDestination(prisma, draft.leadId)) ??
+    `${appBaseUrl().replace(/\/$/, "")}/register/venue?growthLead=${encodeURIComponent(draft.leadId)}`;
 
   const result = await sendThroughMarketingPipeline(prisma, {
     to: email,
@@ -176,6 +173,8 @@ export async function sendApprovedGrowthLeadDraft(
     });
     if (draft.lead.leadType === "VENUE") {
       await advanceGrowthLeadAcquisitionStage(prisma, draft.leadId, "OUTREACH_SENT", { leadType: "VENUE" });
+    } else if (draft.lead.leadType === "PROMOTER_ACCOUNT") {
+      await advanceGrowthLeadAcquisitionStage(prisma, draft.leadId, "OUTREACH_SENT");
     }
   } else if (!isOnlyTransientMarketingThrottle(result.reasons)) {
     await prisma.growthLeadOutreachDraft.update({

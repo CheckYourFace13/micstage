@@ -63,12 +63,23 @@ export function scoreResearchPriority(input: {
   openMicSignalTier: string | null;
   contactHigh: boolean;
   evidenceAutoSend: boolean;
+  leadType?: "VENUE" | "PROMOTER_ACCOUNT" | "ARTIST";
+  hostOutreachLane?: boolean;
+  hostMultiVenueProspect?: boolean;
+  hostIdentityDetected?: boolean;
 }): number {
   if (input.skipPermanent || input.opsState === "HARD_REJECT") return -1;
   if (!input.hasWebsite) return 5;
+  // Growth priority queue: Host multi-venue → Host lane → proven mic + host → venue contact gap → retry → send-ready.
+  if (input.hostMultiVenueProspect && input.hostOutreachLane) return 125;
+  if (input.hostMultiVenueProspect) return 120;
+  if (input.leadType === "PROMOTER_ACCOUNT" && input.hostOutreachLane && input.contactHigh) return 115;
+  if (input.hostOutreachLane && input.hostIdentityDetected && input.evidenceAutoSend) return 112;
+  if (input.hostOutreachLane && input.evidenceAutoSend) return 110;
   const likelyMic =
     input.openMicSignalTier === "EXPLICIT_OPEN_MIC" || input.openMicSignalTier === "STRONG_LIVE_EVENT";
   if (input.googlePlaceId && likelyMic && !input.evidenceAutoSend) return 100;
+  if (input.hostIdentityDetected && likelyMic && !input.contactHigh) return 95;
   if (input.evidenceAutoSend && !input.contactHigh) return 90;
   if (input.contactHigh && !input.evidenceAutoSend) return 80;
   if (input.opsState === "AUTO_RESEARCH_RETRY" || input.opsState == null) return 60;

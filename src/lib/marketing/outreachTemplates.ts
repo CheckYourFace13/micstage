@@ -225,19 +225,26 @@ export function buildPromoterOutreachLetter(name: string): { textBody: string; h
 
 const OPEN_MIC_TAGLINE = "Find it. Run it. Perform. Free.";
 
-function buildOpenMicIntroLetter(displayName: string, ctaUrl?: string | null): { textBody: string; htmlBody: string } {
+function buildOpenMicIntroLetter(
+  displayName: string,
+  ctaUrl?: string | null,
+  opts?: { listingFirst?: boolean },
+): { textBody: string; htmlBody: string } {
   const name = displayName.replace(/\s+/g, " ").trim() || "your open mic";
   const cta = ctaUrl?.trim();
+  const ctaLabel = opts?.listingFirst ? "Claim this open mic free" : "Manage your listing";
   const paras = [
     `We found ${name} while building MicStage, a free platform for finding and running open mics.`,
-    "If you host this open mic, you can claim or manage the listing free, update the schedule, and optionally let performers sign up online.",
+    opts?.listingFirst
+      ? "Your open mic is already listed — click below to see it and claim management free."
+      : "If you host this open mic, you can claim or manage the listing free, update the schedule, and optionally let performers sign up online.",
   ];
   const textLines = [
     "Hi,",
     "",
     ...paras,
     "",
-    cta ? `Manage your listing: ${cta}` : "Manage your listing: reply to this email and we will send you the link.",
+    cta ? `${ctaLabel}: ${cta}` : `${ctaLabel}: reply to this email and we will send you the link.`,
     "",
     "MicStage",
     OPEN_MIC_TAGLINE,
@@ -246,8 +253,8 @@ function buildOpenMicIntroLetter(displayName: string, ctaUrl?: string | null): {
     "<p>Hi,</p>",
     ...paras.map((p) => `<p>${escapeHtml(p)}</p>`),
     cta
-      ? `<p>Manage your listing: <a href="${escapeHtml(cta)}">${escapeHtml(cta)}</a></p>`
-      : `<p>${escapeHtml("Manage your listing: reply to this email and we will send you the link.")}</p>`,
+      ? `<p>${escapeHtml(ctaLabel)}: <a href="${escapeHtml(cta)}">${escapeHtml(ctaLabel)}</a></p>`
+      : `<p>${escapeHtml(`${ctaLabel}: reply to this email and we will send you the link.`)}</p>`,
     `<p>MicStage<br />${escapeHtml(OPEN_MIC_TAGLINE)}</p>`,
   ].join("");
   return { textBody: textLines.join("\n"), htmlBody };
@@ -257,13 +264,13 @@ function buildOpenMicIntroLetter(displayName: string, ctaUrl?: string | null): {
 export function buildVenueGrowthOutreachLetter(
   venueName: string,
   step: GrowthOutreachSequenceStep,
-  opts?: { claimVenueUrl?: string | null; areaLabel?: string | null },
+  opts?: { claimVenueUrl?: string | null; areaLabel?: string | null; listingFirst?: boolean },
 ): { textBody: string; htmlBody: string } {
   const claimVenueUrl = opts?.claimVenueUrl?.trim();
   const area = (opts?.areaLabel?.trim() || "your area").replace(/\s+/g, " ").trim();
 
   if (step === 1) {
-    return buildOpenMicIntroLetter(venueName, claimVenueUrl);
+    return buildOpenMicIntroLetter(venueName, claimVenueUrl, { listingFirst: opts?.listingFirst });
   }
 
   const sal = GROWTH_FIXED_SALUTATION;
@@ -398,9 +405,11 @@ export function buildArtistGrowthOutreachLetter(
 
 export function buildPromoterGrowthOutreachLetter(
   step: GrowthOutreachSequenceStep,
-  opts?: { areaLabel?: string | null },
+  opts?: { areaLabel?: string | null; hostUrl?: string | null; openMicName?: string | null },
 ): { textBody: string; htmlBody: string } {
   const area = (opts?.areaLabel?.trim() || "your area").replace(/\s+/g, " ").trim();
+  const hostUrl = opts?.hostUrl?.trim();
+  const openMicName = opts?.openMicName?.replace(/\s+/g, " ").trim();
   const sal = GROWTH_FIXED_SALUTATION;
 
   if (step === 2) {
@@ -424,12 +433,24 @@ export function buildPromoterGrowthOutreachLetter(
   }
 
   const paras = [
-    "MicStage is a free host app for open mic nights: run every mic you host from one account — even across multiple venues — with signups, lineups, and a shareable host page.",
-    "You do not need to own the venue; just pick where each night happens. Performers get one place to find and register for nearby mics.",
-    "If you want a quick overview or help setting up your first series, reply here and I will follow up.",
+    openMicName
+      ? `We noticed ${openMicName} while mapping open mics on MicStage.`
+      : "MicStage is a free host app for open mic nights.",
+    "Run every open mic you host from one free account — even across multiple venues — with signups, lineups, and a shareable host page.",
+    "You do not need to own the venue; just pick where each night happens.",
   ];
-  const textBody = [sal.text, "", ...paras, "", SIGN_OFF_TEXT].join("\n");
-  const htmlBody = [sal.html, ...paras.map((p) => `<p>${escapeHtml(p)}</p>`), SIGN_OFF_HTML].join("");
+  const ctaLines = hostUrl
+    ? ["Start hosting free:", hostUrl]
+    : ["If you want a quick overview, reply here and I will follow up."];
+  const textBody = [sal.text, "", ...paras, "", ...ctaLines, "", SIGN_OFF_TEXT].join("\n");
+  const htmlBody = [
+    sal.html,
+    ...paras.map((p) => `<p>${escapeHtml(p)}</p>`),
+    hostUrl
+      ? `<p><a href="${escapeHtml(hostUrl)}">Start hosting free</a></p>`
+      : `<p>${escapeHtml("If you want a quick overview, reply here and I will follow up.")}</p>`,
+    SIGN_OFF_HTML,
+  ].join("");
   return { textBody, htmlBody };
 }
 

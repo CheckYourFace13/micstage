@@ -21,6 +21,9 @@ export function buildGrowthLeadOutreachPayload(input: {
   websiteUrl: string | null;
   /** When set on VENUE leads, adds a tracked link to venue registration. */
   leadId?: string | null;
+  /** Pre-resolved first-party click destination (listing page preferred for venues). */
+  clickDestinationUrl?: string | null;
+  listingName?: string | null;
   sequenceStep?: GrowthOutreachSequenceStep;
   /** Classified identity; do not force promoter/venue from leadType alone. */
   identity?: "VENUE" | "PROMOTER" | "ARTIST";
@@ -30,24 +33,40 @@ export function buildGrowthLeadOutreachPayload(input: {
   const sendAs = input.identity ?? (input.leadType === "PROMOTER_ACCOUNT" ? "PROMOTER" : input.leadType === "ARTIST" ? "ARTIST" : "VENUE");
 
   const baseUrl = appBaseUrl().replace(/\/$/, "");
+  const resolvedClick = input.clickDestinationUrl?.trim();
   const claimVenueUrl =
-    sendAs === "VENUE" && input.leadId?.trim()
-      ? `${baseUrl}/register/venue?growthLead=${encodeURIComponent(input.leadId.trim())}`
+    sendAs === "VENUE"
+      ? resolvedClick ||
+        (input.leadId?.trim()
+          ? `${baseUrl}/register/venue?growthLead=${encodeURIComponent(input.leadId.trim())}`
+          : undefined)
       : undefined;
   const claimArtistUrl =
-    sendAs === "ARTIST" && input.leadId?.trim()
-      ? `${baseUrl}/register/musician?growthLead=${encodeURIComponent(input.leadId.trim())}`
+    sendAs === "ARTIST"
+      ? resolvedClick ||
+        (input.leadId?.trim()
+          ? `${baseUrl}/register/musician?growthLead=${encodeURIComponent(input.leadId.trim())}`
+          : undefined)
+      : undefined;
+  const claimHostUrl =
+    sendAs === "PROMOTER"
+      ? resolvedClick || `${baseUrl}/host?growthLead=${encodeURIComponent(input.leadId?.trim() ?? "")}`
       : undefined;
 
   const venueLetter = buildVenueGrowthOutreachLetter(input.name, step, {
     claimVenueUrl,
     areaLabel,
+    listingFirst: Boolean(resolvedClick?.includes("/open-mics/")),
   });
   const artistLetter = buildArtistGrowthOutreachLetter(input.name, step, {
     claimArtistUrl,
     areaLabel,
   });
-  const promoterLetter = buildPromoterGrowthOutreachLetter(step, { areaLabel });
+  const promoterLetter = buildPromoterGrowthOutreachLetter(step, {
+    areaLabel,
+    hostUrl: claimHostUrl,
+    openMicName: input.listingName ?? input.name,
+  });
 
   const coreText =
     sendAs === "VENUE"

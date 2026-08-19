@@ -2,6 +2,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { MarketingContactStatus } from "@/generated/prisma/client";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { buildGrowthLeadOutreachPayload } from "@/lib/growth/outreachEmailBodies";
+import { buildGrowthLeadClickDestination, pickListingForOutreachClick } from "@/lib/growth/outreachClickDestination";
 import { venueLeadMailboxForOutreach } from "@/lib/growth/leadEmailValidation";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { checkContactSendSpacing } from "@/lib/marketing/sendCaps";
@@ -24,6 +25,9 @@ export async function createPendingGrowthLeadOutreachDraft(
         where: { removedAt: null },
         select: {
           name: true,
+          slug: true,
+          claimStatus: true,
+          verificationStatus: true,
           formattedAddress: true,
           googlePlaceId: true,
           lat: true,
@@ -106,6 +110,9 @@ export async function createPendingGrowthLeadOutreachDraft(
     }
   }
 
+  const listing = pickListingForOutreachClick(lead.publicListings);
+  const clickUrl = buildGrowthLeadClickDestination(lead, listing);
+
   const payload = buildGrowthLeadOutreachPayload({
     leadType: lead.leadType,
     name: lead.name,
@@ -115,6 +122,8 @@ export async function createPendingGrowthLeadOutreachDraft(
     websiteUrl: lead.websiteUrl,
     leadId: lead.id,
     sequenceStep: nextSequenceStep,
+    clickDestinationUrl: clickUrl,
+    listingName: listing ? lead.name : null,
     identity:
       eligibility.target?.identity === "PROMOTER"
         ? "PROMOTER"

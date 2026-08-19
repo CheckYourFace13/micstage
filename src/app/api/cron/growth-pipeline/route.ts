@@ -35,6 +35,7 @@ import { micstageDiscoveryKillSwitch } from "@/lib/publicListings/automationKill
 import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
 import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
 import { evaluateOutreachTargetingIntegrity } from "@/lib/growth/outreachTargetingIntegrity";
+import { applyOutreachAutoRamp } from "@/lib/growth/outreachAutoRamp";
 import {
   growthRuntimeSnapshotForStatus,
   resolveGrowthPipelineRuntimeSnapshot,
@@ -182,6 +183,7 @@ async function handle(request: Request) {
       if (pendingClaimInvites == null) {
         pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
       }
+      await applyOutreachAutoRamp(prisma);
       const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
       const outreachHealth = await evaluateOutreachSendHealth(prisma);
       const targeting = await evaluateOutreachTargetingIntegrity(prisma);

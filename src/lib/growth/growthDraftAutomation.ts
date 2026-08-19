@@ -14,6 +14,7 @@ import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSett
 import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
 import { createPendingGrowthLeadOutreachDraft } from "@/lib/growth/growthLeadOutreachDraftCreate";
 import { sendApprovedGrowthLeadDraft } from "@/lib/growth/growthLeadDraftSend";
+import { explainGrowthLeadOutreachEligibility } from "@/lib/growth/outreachContactEligible";
 import {
   countOutreachSendsTodayByMarket,
   isOnlyTransientMarketingThrottle,
@@ -325,6 +326,18 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     bumpAutoApprovedVenueCount: boolean,
   ): Promise<void> {
     if (outreachSendsThisRun >= outreachSendCapPerRun || remainingHeadroom <= 0) return;
+    const elig = await explainGrowthLeadOutreachEligibility(prisma, d.leadId, { ignoreDraftId: d.id });
+    if (!elig.eligible) {
+      await prisma.growthLeadOutreachDraft.update({
+        where: { id: d.id },
+        data: {
+          status: "REJECTED",
+          lastError: `auto_not_send_ready: ${elig.reason}`.slice(0, 2000),
+        },
+      });
+      bumpReason(`draft_rejected: ${elig.reason}`);
+      return;
+    }
     await prisma.growthLeadOutreachDraft.update({
       where: { id: d.id },
       data: {
@@ -444,6 +457,15 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
           abortBacklogForGlobalCap = true;
           break;
         } else if (!isOnlyTransientMarketingThrottle(sent.reasons)) {
+          if (sent.reasons.some((r) => r.startsWith("Outreach ineligible"))) {
+            await prisma.growthLeadOutreachDraft.update({
+              where: { id: d.id },
+              data: {
+                status: "REJECTED",
+                lastError: sent.reasons.join(" | ").slice(0, 2000),
+              },
+            });
+          }
           for (const reason of sent.reasons) {
             bumpReason(`queue_send_blocked: ${reason}`);
           }

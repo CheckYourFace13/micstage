@@ -37,6 +37,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export type OutreachEvidenceRecheckKind =
   | "permanent_skip"
   | "no_evidence_real_venue"
+  | "weak_evidence"
+  | "stale_evidence"
   | "tier_c"
   | "tier_b"
   | "tier_a"
@@ -58,6 +60,7 @@ export type OutreachEvidenceState = {
   skipReason: string | null;
   tier: string | null;
   confidence: number | null;
+  opsState: "AUTO_SEND_READY" | "AUTO_RESEARCH_RETRY" | "HARD_REJECT" | null;
 };
 
 export type CrawledPage = {
@@ -212,18 +215,19 @@ export function outreachEvidenceRecheckDelayMs(kind: OutreachEvidenceRecheckKind
   switch (kind) {
     case "permanent_skip":
       return 10 * 365 * DAY_MS;
-    case "no_evidence_real_venue":
-      return 45 * DAY_MS;
-    case "tier_c":
-      return 14 * DAY_MS;
-    case "tier_b":
-      return 45 * DAY_MS;
-    case "tier_a":
-      return 60 * DAY_MS;
     case "crawl_failed":
       return 7 * DAY_MS;
+    case "weak_evidence":
+    case "tier_c":
+      return 14 * DAY_MS;
+    case "no_evidence_real_venue":
+    case "stale_evidence":
+      return 30 * DAY_MS;
+    case "tier_b":
+    case "tier_a":
+      return 60 * DAY_MS;
     default:
-      return 45 * DAY_MS;
+      return 30 * DAY_MS;
   }
 }
 
@@ -253,6 +257,10 @@ export function parseOutreachEvidenceState(hints: unknown): OutreachEvidenceStat
     skipReason: str("skipReason"),
     tier: str("tier"),
     confidence: typeof r.confidence === "number" ? r.confidence : null,
+    opsState:
+      r.opsState === "AUTO_SEND_READY" || r.opsState === "AUTO_RESEARCH_RETRY" || r.opsState === "HARD_REJECT"
+        ? r.opsState
+        : null,
   };
 }
 
@@ -408,9 +416,10 @@ export function classifyCrawledPagesForOutreach(input: {
 }
 
 export function recheckKindFromEvidence(result: OutreachOpenMicEvidenceResult, crawled: boolean): OutreachEvidenceRecheckKind {
-  if (result.tier === "A") return "tier_a";
-  if (result.tier === "B") return "tier_b";
-  if (result.tier === "C") return "tier_c";
+  if (result.rejectClass === "stale_open_mic_evidence") return "stale_evidence";
+  if (result.tier === "A" && result.autoSend) return "tier_a";
+  if (result.tier === "B" && result.autoSend) return "tier_b";
+  if (result.tier === "C") return "weak_evidence";
   if (!crawled) return "crawl_failed";
   return "no_evidence_real_venue";
 }

@@ -25,6 +25,7 @@ import {
   classifyOutreachOpenMicEvidence,
   type OutreachOpenMicEvidenceResult,
 } from "@/lib/growth/outreachOpenMicEvidence";
+import { classifyGrowthOpsState } from "@/lib/growth/growthOpsState";
 import type { StoredEvidenceRow } from "@/lib/publicListings/publicOpenMicEvidenceGate";
 
 export type OutreachEligibilityReason =
@@ -59,7 +60,8 @@ export type OutreachEligibilityReason =
   | "defer_claim_path"
   | "duplicate_recent_send"
   | "weak_identity"
-  | "needs_manual_review";
+  | "needs_manual_review"
+  | "auto_research_retry";
 
 const IMPORT_LIKE: GrowthLeadSourceKind[] = [
   "MANUAL_ADMIN",
@@ -257,6 +259,15 @@ export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachI
     return { eligible: false, reason: "weak_identity", target };
   }
   if (target.decision === "manual_review") {
+    const ops = classifyGrowthOpsState({
+      hardReject: null,
+      identityDecision: target.decision,
+      evidenceAutoSend: false,
+      contactHigh: input.contactEmailConfidence === "HIGH",
+    });
+    if (ops.state === "AUTO_RESEARCH_RETRY") {
+      return { eligible: false, reason: "auto_research_retry", target };
+    }
     return { eligible: false, reason: "needs_manual_review", target };
   }
 
@@ -312,7 +323,7 @@ export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachI
           : evidence.rejectClass === "microphone_equipment_false_positive"
             ? "microphone_equipment_false_positive"
             : evidence.tier === "C"
-              ? "needs_manual_review"
+              ? "auto_research_retry"
               : "no_target_bound_open_mic_evidence";
     return { eligible: false, reason, target, evidence };
   }
@@ -529,6 +540,7 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
     service_company: 0,
     weak_identity: 0,
     needs_manual_review: 0,
+    auto_research_retry: 0,
     no_target_bound_open_mic_evidence: 0,
     stale_open_mic_evidence: 0,
     artist_bio_false_positive: 0,

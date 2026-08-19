@@ -49,7 +49,7 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Pending claim invites (has email): ${inv.pendingClaimInvites}`,
     `  Venue leads waiting to publish: ${inv.leadsAwaitingPublish}`,
     `  Google Business verified: ${inv.googleVerifiedListings}`,
-    `  Hidden review queue: ${inv.needsReviewCount}`,
+    `  Hidden listing backlog (NEEDS_REVIEW): ${inv.needsReviewCount}`,
     `  Note: ${inv.listingsNote}`,
     "",
     data.listingsInventory.listingsCreatedCount > 0
@@ -72,85 +72,104 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
   return lines;
 }
 
-function renderGrowthAutomationText(data: OwnerDailySummaryData): string[] {
-  const g = data.growthAutomation;
+function renderGrowthEngineText(data: OwnerDailySummaryData): string[] {
+  const g = data.growthEngine;
+  const m = data.marketing;
   return [
-    "OUTREACH",
-    `  Tier A ready: ${g.tierAReady}`,
-    `  Sent today: ${g.sentToday}`,
+    "GROWTH ENGINE",
+    `  Ready to send: ${g.autoSendReady}`,
+    `  Researching: ${g.autoResearchRetry}`,
+    `  Retry scheduled: ${g.retryScheduled}`,
+    `  Hard rejected: ${g.hardReject}`,
+    "",
+    "TODAY",
+    `  Leads researched: ${g.leadsResearchedToday}`,
+    `  Official sites checked: ${g.officialSitesCheckedToday}`,
+    `  Open mics verified: ${g.openMicsVerifiedToday}`,
+    `  New HIGH contacts: ${g.newHighContactsToday}`,
+    `  New send-ready: ${g.newSendReadyToday}`,
+    `  Emails sent: ${g.emailsSentToday}`,
     `  Delivered: ${g.deliveredToday}`,
     `  Clicks: ${g.clicksToday}`,
     `  Replies: ${g.repliesToday}`,
     `  Claims: ${g.claimsToday}`,
     `  Registrations: ${g.registrationsToday}`,
     "",
-    "EVIDENCE ENRICHMENT",
-    `  Candidates checked today: ${g.evidenceCheckedToday}`,
-    `  Official sites crawled: ${g.officialSitesCrawledToday}`,
-    `  New Tier A: ${g.newTierAToday}`,
-    `  New Tier B: ${g.newTierBToday}`,
-    `  Manual review: ${g.evidenceManualReviewToday}`,
-    `  Rejected: ${g.evidenceRejectedToday}`,
-    `  No evidence found: ${g.noEvidenceToday}`,
-    `  Rechecks scheduled: ${g.rechecksScheduledToday}`,
+    "LAST 7 DAYS",
+    `  Emails sent: ${g.emailsSent7d}`,
+    `  Delivered: ${g.delivered7d}`,
+    `  Clicks: ${g.clicks7d}`,
+    `  Replies: ${g.replies7d}`,
+    `  Claims: ${g.claims7d}`,
+    `  Registrations: ${g.registrations7d}`,
     "",
-    "CONTACT MINING",
-    `  Domains checked: ${g.contactDomainsCheckedToday}`,
-    `  New HIGH contacts: ${g.newHighContactsToday}`,
-    `  New send-ready contacts: ${g.newSendReadyContactsToday}`,
-    "",
-    "PIPELINE",
-    `  Discovered: ${g.pipelineDiscovered}`,
-    `  Verified: ${g.pipelineVerified}`,
-    `  Evidence-qualified: ${g.pipelineEvidenceQualified}`,
-    `  Contact-qualified: ${g.pipelineContactQualified}`,
-    `  Sent: ${g.pipelineSent}`,
-    `  Converted: ${g.pipelineConverted}`,
+    "HEALTH & CAPACITY",
+    `  Marketing daily cap: ${g.dailyCap}`,
+    `  Provider headroom: ${g.providerHeadroom}`,
+    `  Bounce rate: ${(g.bounceRate * 100).toFixed(2)}%`,
+    `  Complaint rate: ${(g.complaintRate * 100).toFixed(3)}%`,
+    `  Kill switch: ${g.killStatus ? "ON" : "off"}`,
+    `  Next auto-ramp: ${g.nextRampCondition}`,
+    `  Outreach enabled: ${m.outreachEnabled ? "yes" : "no"}`,
     "",
   ];
 }
 
-function renderGrowthAutomationHtml(data: OwnerDailySummaryData): string {
-  const g = data.growthAutomation;
-  const row = (label: string, value: number) =>
-    `<li><strong>${esc(label)}:</strong> ${value}</li>`;
+function renderGrowthEngineHtml(data: OwnerDailySummaryData): string {
+  const g = data.growthEngine;
+  const m = data.marketing;
+  const pct = (n: number) => `${(n * 100).toFixed(n >= 0.01 ? 2 : 3)}%`;
+  const row = (label: string, value: string | number) =>
+    `<li><strong>${esc(label)}:</strong> ${typeof value === "number" ? value : esc(value)}</li>`;
   return `
-  <h2 style="font-size:15px;margin:20px 0 8px">Outreach</h2>
+  <h2 style="font-size:15px;margin:20px 0 8px">Growth engine</h2>
   <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
-    ${row("Tier A ready", g.tierAReady)}
-    ${row("Sent today", g.sentToday)}
+    ${row("Ready to send", g.autoSendReady)}
+    ${row("Researching", g.autoResearchRetry)}
+    ${row("Retry scheduled", g.retryScheduled)}
+    ${row("Hard rejected", g.hardReject)}
+  </ul>
+  <h3 style="font-size:14px;margin:12px 0 6px">Today</h3>
+  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6;font-size:13px">
+    ${row("Leads researched", g.leadsResearchedToday)}
+    ${row("Official sites checked", g.officialSitesCheckedToday)}
+    ${row("Open mics verified", g.openMicsVerifiedToday)}
+    ${row("New HIGH contacts", g.newHighContactsToday)}
+    ${row("New send-ready", g.newSendReadyToday)}
+    ${row("Emails sent", g.emailsSentToday)}
     ${row("Delivered", g.deliveredToday)}
     ${row("Clicks", g.clicksToday)}
     ${row("Replies", g.repliesToday)}
     ${row("Claims", g.claimsToday)}
     ${row("Registrations", g.registrationsToday)}
   </ul>
-  <h2 style="font-size:15px;margin:20px 0 8px">Evidence enrichment</h2>
-  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
-    ${row("Candidates checked today", g.evidenceCheckedToday)}
-    ${row("Official sites crawled", g.officialSitesCrawledToday)}
-    ${row("New Tier A", g.newTierAToday)}
-    ${row("New Tier B", g.newTierBToday)}
-    ${row("Manual review", g.evidenceManualReviewToday)}
-    ${row("Rejected", g.evidenceRejectedToday)}
-    ${row("No evidence found", g.noEvidenceToday)}
-    ${row("Rechecks scheduled", g.rechecksScheduledToday)}
+  <h3 style="font-size:14px;margin:12px 0 6px">Last 7 days</h3>
+  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6;font-size:13px">
+    ${row("Emails sent", g.emailsSent7d)}
+    ${row("Delivered", g.delivered7d)}
+    ${row("Clicks", g.clicks7d)}
+    ${row("Replies", g.replies7d)}
+    ${row("Claims", g.claims7d)}
+    ${row("Registrations", g.registrations7d)}
   </ul>
-  <h2 style="font-size:15px;margin:20px 0 8px">Contact mining</h2>
-  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
-    ${row("Domains checked", g.contactDomainsCheckedToday)}
-    ${row("New HIGH contacts", g.newHighContactsToday)}
-    ${row("New send-ready contacts", g.newSendReadyContactsToday)}
-  </ul>
-  <h2 style="font-size:15px;margin:20px 0 8px">Pipeline</h2>
-  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
-    ${row("Discovered", g.pipelineDiscovered)}
-    ${row("Verified", g.pipelineVerified)}
-    ${row("Evidence-qualified", g.pipelineEvidenceQualified)}
-    ${row("Contact-qualified", g.pipelineContactQualified)}
-    ${row("Sent", g.pipelineSent)}
-    ${row("Converted", g.pipelineConverted)}
+  <h3 style="font-size:14px;margin:12px 0 6px">Health &amp; capacity</h3>
+  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6;font-size:13px">
+    ${row("Marketing daily cap", g.dailyCap)}
+    ${row("Provider headroom", g.providerHeadroom)}
+    ${row("Bounce rate", pct(g.bounceRate))}
+    ${row("Complaint rate", pct(g.complaintRate))}
+    ${row("Kill switch", g.killStatus ? "ON" : "off")}
+    ${row("Next auto-ramp", g.nextRampCondition)}
+    ${row("Outreach enabled", m.outreachEnabled ? "yes" : "no")}
   </ul>`;
+}
+
+function renderGrowthAutomationText(data: OwnerDailySummaryData): string[] {
+  return renderGrowthEngineText(data);
+}
+
+function renderGrowthAutomationHtml(data: OwnerDailySummaryData): string {
+  return renderGrowthEngineHtml(data);
 }
 
 function renderMarketingText(data: OwnerDailySummaryData): string[] {
@@ -191,27 +210,17 @@ function renderMarketingText(data: OwnerDailySummaryData): string[] {
 function renderFunnelText(data: OwnerDailySummaryData): string[] {
   const f = data.growthFunnel;
   const lines: string[] = [
-    "GROWTH FUNNEL",
+    "LISTING PIPELINE",
     `  Waiting verification (no place yet): ${f.waitingVerification}`,
     `  Waiting evidence (place ok): ${f.waitingEnrichment}`,
     `  Waiting HIGH official email: ${f.waitingEmail}`,
     `  Invite-ready: ${f.inviteReady}`,
-    `  NEEDS_REVIEW total: ${f.needsReviewTotal}`,
     `  Backlog processed (approx 24h): ${f.backlogProcessedApprox}`,
     `  Auto-verified (24h): ${f.autoVerifiedToday}`,
     `  Auto-rejected (24h): ${f.autoRejectedToday}`,
     `  HIGH contacts touched (24h): ${f.highContactsRecoveredToday}`,
     "",
-    "REVIEW REASON BUCKETS",
   ];
-  if (f.reviewReasonBuckets.length === 0) {
-    lines.push("  (none)", "");
-  } else {
-    for (const b of f.reviewReasonBuckets) {
-      lines.push(`  • ${b.reason}: ${b.count}`);
-    }
-    lines.push("");
-  }
   return lines;
 }
 
@@ -243,23 +252,16 @@ function renderReviewQueueText(data: OwnerDailySummaryData): string[] {
 
 function renderFunnelHtml(data: OwnerDailySummaryData): string {
   const f = data.growthFunnel;
-  const buckets =
-    f.reviewReasonBuckets.length === 0
-      ? "<li>(none)</li>"
-      : f.reviewReasonBuckets.map((b) => `<li>${esc(b.reason)}: <strong>${b.count}</strong></li>`).join("");
   return `
-  <h2 style="font-size:15px;margin:20px 0 8px">Growth funnel</h2>
+  <h2 style="font-size:15px;margin:20px 0 8px">Listing pipeline</h2>
   <ul style="margin:0 0 12px;padding-left:18px;font-size:13px;line-height:1.5">
     <li>Waiting verification: <strong>${f.waitingVerification}</strong></li>
     <li>Waiting evidence: <strong>${f.waitingEnrichment}</strong></li>
     <li>Waiting HIGH official email: <strong>${f.waitingEmail}</strong></li>
     <li>Invite-ready: <strong>${f.inviteReady}</strong></li>
-    <li>NEEDS_REVIEW total: <strong>${f.needsReviewTotal}</strong></li>
     <li>Auto-verified (24h): <strong>${f.autoVerifiedToday}</strong> · Auto-rejected: <strong>${f.autoRejectedToday}</strong></li>
     <li>HIGH contacts touched (24h): <strong>${f.highContactsRecoveredToday}</strong></li>
-  </ul>
-  <h3 style="font-size:14px;margin:12px 0 6px">Review reason buckets</h3>
-  <ul style="margin:0 0 12px;padding-left:18px;font-size:13px">${buckets}</ul>`;
+  </ul>`;
 }
 
 function renderReviewQueueHtml(data: OwnerDailySummaryData): string {
@@ -379,7 +381,7 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>MicStage venues:</strong> ${inv.claimedVenues} registered · ${inv.bookableVenues} bookable with schedule</li>
     <li><strong>New listings (24h):</strong> ${inv.listingsCreatedCount} · <strong>Claim invites sent (24h):</strong> ${inv.claimInvitesSentCount}</li>
     <li><strong>Pending claim invites:</strong> ${inv.pendingClaimInvites} · <strong>Leads waiting to publish:</strong> ${inv.leadsAwaitingPublish} · <strong>Google verified:</strong> ${inv.googleVerifiedListings}</li>
-    <li><strong>Hidden review queue:</strong> ${inv.needsReviewCount}</li>
+    <li><strong>Hidden listing backlog (NEEDS_REVIEW):</strong> ${inv.needsReviewCount}</li>
   </ul>
   <p style="margin:0 0 12px;color:#6b7280;font-size:12px">${esc(inv.listingsNote)}</p>
   <h3 style="font-size:14px;margin:16px 0 8px">${esc(heading)}</h3>
@@ -392,12 +394,10 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
 }
 
 export function ownerDailySummarySubject(data: OwnerDailySummaryData): string {
-  const n = data.reviewQueueTotal ?? data.reviewQueue.length;
+  const ready = data.growthEngine.autoSendReady;
   const verified = data.listingsInventory.verifiedListings;
-  if (n > 0) {
-    return `MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified · ${n} review`;
-  }
-  return `MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified`;
+  const sent = data.growthEngine.emailsSentToday;
+  return `MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified · ${ready} send-ready · ${sent} sent`;
 }
 
 export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string {
@@ -432,12 +432,11 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
     "",
   );
   lines.push(...renderRecentListingsText(data));
-  lines.push(...renderGrowthAutomationText(data));
+  lines.push(...renderGrowthEngineText(data));
   lines.push(...renderMarketingText(data));
   lines.push(...renderFunnelText(data));
-  lines.push(...renderReviewQueueText(data));
   lines.push(
-    "TOP ITEMS (up to 20, prioritized)",
+    "HIGHLIGHTS (conversions & engagement, up to 20)",
   );
 
   if (data.topItems.length === 0) {
@@ -512,13 +511,11 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
 
   ${renderRecentListingsHtml(data)}
 
-  ${renderGrowthAutomationHtml(data)}
+  ${renderGrowthEngineHtml(data)}
 
   ${renderFunnelHtml(data)}
 
-  ${renderReviewQueueHtml(data)}
-
-  <h2 style="font-size:15px;margin:20px 0 8px">Top 20 (action list)</h2>
+  <h2 style="font-size:15px;margin:20px 0 8px">Highlights (conversions &amp; engagement)</h2>
   <table style="width:100%;border-collapse:collapse;font-size:13px">${topRows}</table>
 
   <p style="margin-top:20px;font-size:12px;color:#9ca3af">Automated from MicStage · Resend · America/Chicago window</p>

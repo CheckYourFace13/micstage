@@ -8,6 +8,9 @@ import { countPendingListingClaimInvitesWithEmail, marketingOutreachCapacitySnap
 import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
 import { auditGeneralOutreachEligibility } from "@/lib/growth/outreachContactEligible";
 import { readOutreachEnrichDayStats } from "@/lib/growth/outreachEvidenceEnrichment";
+import { countGrowthOpsInventory } from "@/lib/growth/growthOpsInventory";
+import { outreachAutoRampStatus } from "@/lib/growth/outreachAutoRamp";
+import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
 import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
 
 export type OwnerSummarySignupRow = {
@@ -158,6 +161,36 @@ export type OwnerDailySummaryData = {
     pipelineContactQualified: number;
     pipelineSent: number;
     pipelineConverted: number;
+  };
+  /** Autonomous growth engine inventory + health (no human-review homework). */
+  growthEngine: {
+    autoSendReady: number;
+    autoResearchRetry: number;
+    hardReject: number;
+    retryScheduled: number;
+    leadsResearchedToday: number;
+    officialSitesCheckedToday: number;
+    openMicsVerifiedToday: number;
+    newHighContactsToday: number;
+    newSendReadyToday: number;
+    emailsSentToday: number;
+    deliveredToday: number;
+    clicksToday: number;
+    repliesToday: number;
+    claimsToday: number;
+    registrationsToday: number;
+    emailsSent7d: number;
+    delivered7d: number;
+    clicks7d: number;
+    replies7d: number;
+    claims7d: number;
+    registrations7d: number;
+    dailyCap: number;
+    providerHeadroom: number;
+    bounceRate: number;
+    complaintRate: number;
+    killStatus: boolean;
+    nextRampCondition: string;
   };
 };
 
@@ -621,7 +654,7 @@ export async function buildOwnerDailySummary(
     .slice(0, 12);
 
   const listingsNote =
-    "Inventory includes unclaimed public listings. Strong place+evidence rows auto-promote to VERIFIED; junk names auto-reject to OUTDATED. Email shows top 20 review items only — full queue is in admin.";
+    "Inventory includes unclaimed public listings. Strong place+evidence rows auto-promote to VERIFIED; junk names auto-reject to OUTDATED.";
 
   const sevenDayStart = new Date(startUtc.getTime() - 7 * 86400000);
   const [
@@ -648,6 +681,9 @@ export async function buildOwnerDailySummary(
     venueRegs7d,
     promoterRegs7d,
     enrichStats,
+    opsInventory,
+    autoRamp,
+    outreachHealth,
   ] = await Promise.all([
     resolveOutreachRuntimeSnapshot(prisma),
     marketingOutreachCapacitySnapshot(prisma, 25),
@@ -700,6 +736,9 @@ export async function buildOwnerDailySummary(
     prisma.venueOwner.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
     prisma.promoterUser.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
     readOutreachEnrichDayStats(prisma, now),
+    countGrowthOpsInventory(prisma),
+    outreachAutoRampStatus(prisma),
+    evaluateOutreachSendHealth(prisma),
   ]);
 
   const clicksNoteUpdated =
@@ -803,6 +842,35 @@ export async function buildOwnerDailySummary(
       pipelineContactQualified: eligibilityAudit.highConfidenceContacts,
       pipelineSent: outreachSends,
       pipelineConverted: claimsCompletedToday + venueRegsToday + promoterRegsToday,
+    },
+    growthEngine: {
+      autoSendReady: opsInventory.autoSendReady,
+      autoResearchRetry: opsInventory.autoResearchRetry,
+      hardReject: opsInventory.hardReject,
+      retryScheduled: opsInventory.retryScheduled,
+      leadsResearchedToday: enrichStats.candidatesChecked,
+      officialSitesCheckedToday: enrichStats.officialSitesCrawled,
+      openMicsVerifiedToday: enrichStats.newTierA + enrichStats.newTierB,
+      newHighContactsToday: enrichStats.newHighContacts,
+      newSendReadyToday: enrichStats.newSendReady,
+      emailsSentToday: outreachSends,
+      deliveredToday,
+      clicksToday: uniqueClicksToday,
+      repliesToday: responses,
+      claimsToday: claimsCompletedToday,
+      registrationsToday: venueRegsToday + promoterRegsToday,
+      emailsSent7d: sent7d,
+      delivered7d,
+      clicks7d: uniqueClicks7d,
+      replies7d,
+      claims7d,
+      registrations7d: venueRegs7d + promoterRegs7d,
+      dailyCap: outreachRuntime.effectiveDailyMax,
+      providerHeadroom: providerCapacity.remainingForOutreach,
+      bounceRate: outreachHealth.hardBounceRate,
+      complaintRate: outreachHealth.complaintRate,
+      killStatus: outreachRuntime.kill.effective,
+      nextRampCondition: autoRamp.nextCondition,
     },
   };
 }

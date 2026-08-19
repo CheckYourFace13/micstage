@@ -10,6 +10,8 @@ import { pickPrimaryVenueOutreachEmail } from "@/lib/growth/discovery/venueEmail
 import { persistGrowthLeadEmailContacts } from "@/lib/growth/growthLeadContactAutomation";
 import { parseGrowthLeadEmailInput } from "@/lib/growth/leadEmailValidation";
 import { classifyOutreachTargetIdentity } from "@/lib/growth/outreachTargetIdentity";
+import { countGrowthOpsInventory, ensureGrowthOpsMigration } from "@/lib/growth/growthOpsInventory";
+import { classifyGrowthOpsState, scoreResearchPriority, type GrowthOpsState } from "@/lib/growth/growthOpsState";
 import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
 import { isFreeMailDomain } from "@/lib/publicListings/claimAutoApproval";
 import { isBlockedClaimInviteDomain } from "@/lib/publicListings/claimInviteAutomation";
@@ -166,10 +168,12 @@ function buildEvidenceState(opts: {
   skipPermanent: boolean;
   skipReason: string | null;
   now: Date;
+  opsState: GrowthOpsState | null;
+  crawled: boolean;
 }): OutreachEvidenceState {
   const kind = opts.skipPermanent
     ? "permanent_skip"
-    : recheckKindFromEvidence(opts.result, !opts.skipPermanent);
+    : recheckKindFromEvidence(opts.result, opts.crawled);
   const next = nextOutreachEvidenceRecheckAt(kind, opts.now);
   const firstSeen =
     opts.prev?.firstSeenAt && opts.result.tier === opts.prev.tier
@@ -194,6 +198,7 @@ function buildEvidenceState(opts: {
     skipReason: opts.skipReason,
     tier: opts.result.tier,
     confidence: opts.result.autoSend ? 90 : opts.result.tier === "C" ? 40 : 10,
+    opsState: opts.opsState,
   };
 }
 
@@ -346,6 +351,7 @@ type EnrichLeadRow = {
   source: string | null;
   discoveryConfidence: number | null;
   fitScore: number | null;
+  openMicSignalTier: string | null;
   discoveryHints: unknown;
   publicListings: Array<{
     id: string;
@@ -410,6 +416,8 @@ export async function enrichGrowthLeadOfficialEvidence(
   };
   if (limit <= 0) return out;
 
+  await ensureGrowthOpsMigration(prisma);
+
   const rows = (await prisma.growthLead.findMany({
     where: {
       leadType: { in: ["VENUE", "PROMOTER_ACCOUNT"] },
@@ -433,6 +441,7 @@ export async function enrichGrowthLeadOfficialEvidence(
       source: true,
       discoveryConfidence: true,
       fitScore: true,
+      openMicSignalTier: true,
       discoveryHints: true,
       publicListings: {
         where: { removedAt: null },
@@ -451,20 +460,30 @@ export async function enrichGrowthLeadOfficialEvidence(
       },
     },
     orderBy: { updatedAt: "asc" },
-    take: Math.max(40, limit * 10),
+    take: Math.max(150, limit * 20),
   })) as EnrichLeadRow[];
 
   const now = new Date();
-  const due: EnrichLeadRow[] = [];
-  for (const row of rows) {
-    const state = parseOutreachEvidenceState(row.discoveryHints);
-    if (!isOutreachEvidenceRecheckDue(state, now)) {
-      out.skippedDue += 1;
-      continue;
-    }
-    due.push(row);
-    if (due.length >= limit) break;
-  }
+  const scored = rows
+    .map((row) => {
+      const state = parseOutreachEvidenceState(row.discoveryHints);
+      const listing = row.publicListings[0] ?? null;
+      const due = isOutreachEvidenceRecheckDue(state, now);
+      const score = scoreResearchPriority({
+        opsState: state?.opsState ?? null,
+        skipPermanent: state?.skipPermanent === true,
+        hasWebsite: Boolean(row.websiteUrl || listing?.websiteUrl),
+        googlePlaceId: Boolean(listing?.googlePlaceId),
+        openMicSignalTier: row.openMicSignalTier,
+        contactHigh: row.contactEmailConfidence === "HIGH",
+        evidenceAutoSend: state?.opsState === "AUTO_SEND_READY" || (state?.tier === "A" || state?.tier === "B"),
+      });
+      return { row, state, due, score };
+    })
+    .filter((x) => x.due && x.score >= 0)
+    .sort((a, b) => b.score - a.score);
+  out.skippedDue += Math.max(0, rows.length - scored.length);
+  const due = scored.slice(0, limit).map((x) => x.row);
 
   const robotsCache = new Map<string, ReturnType<typeof parseRobotsTxtForCrawler> | null>();
 
@@ -504,25 +523,74 @@ export async function enrichGrowthLeadOfficialEvidence(
     const prev = parseOutreachEvidenceState(lead.discoveryHints);
 
     if (skip) {
+      const ident = classifyOutreachTargetIdentity({
+        name: lead.name,
+        leadType: lead.leadType,
+        websiteUrl: lead.websiteUrl,
+        websiteHostNormalized: lead.websiteHostNormalized,
+        contactEmailNormalized: lead.contactEmailNormalized,
+        city: lead.city,
+        googlePlaceId: listing?.googlePlaceId ?? null,
+        formattedAddress: listing?.formattedAddress ?? null,
+        listingName: listing?.name ?? null,
+      });
+      const ops = classifyGrowthOpsState({
+        hardReject: skip,
+        identityDecision: ident.decision,
+        evidenceAutoSend: false,
+        contactHigh: lead.contactEmailConfidence === "HIGH",
+      });
       const state = buildEvidenceState({
         prev,
         result: emptyResult(),
         snippet: null,
         title: null,
         sourceType: "none",
-        skipPermanent: true,
+        skipPermanent: ops.state === "HARD_REJECT",
         skipReason: skip,
         now,
+        opsState: ops.state,
+        crawled: false,
       });
       await writeLeadEvidence(prisma, lead.id, lead.discoveryHints, state);
       out.rejected += 1;
-      out.rechecksScheduled += 1;
       continue;
     }
 
     const website = lead.websiteUrl || listing?.websiteUrl;
     if (!website) {
+      const ident = classifyOutreachTargetIdentity({
+        name: lead.name,
+        leadType: lead.leadType,
+        websiteUrl: lead.websiteUrl,
+        websiteHostNormalized: lead.websiteHostNormalized,
+        contactEmailNormalized: lead.contactEmailNormalized,
+        city: lead.city,
+        googlePlaceId: listing?.googlePlaceId ?? null,
+        formattedAddress: listing?.formattedAddress ?? null,
+        listingName: listing?.name ?? null,
+      });
+      const ops = classifyGrowthOpsState({
+        hardReject: null,
+        identityDecision: ident.decision,
+        evidenceAutoSend: false,
+        contactHigh: lead.contactEmailConfidence === "HIGH",
+      });
+      const state = buildEvidenceState({
+        prev,
+        result: emptyResult(),
+        snippet: null,
+        title: null,
+        sourceType: "none",
+        skipPermanent: false,
+        skipReason: "no_website",
+        now,
+        opsState: ops.state,
+        crawled: false,
+      });
+      await writeLeadEvidence(prisma, lead.id, lead.discoveryHints, state);
       out.noEvidence += 1;
+      out.rechecksScheduled += 1;
       continue;
     }
 
@@ -633,26 +701,10 @@ export async function enrichGrowthLeadOfficialEvidence(
       out.noEvidence += 1;
     }
 
-    const state = buildEvidenceState({
-      prev,
-      result,
-      snippet,
-      title,
-      sourceType,
-      skipPermanent: false,
-      skipReason: null,
-      now,
-    });
-    await writeLeadEvidence(prisma, lead.id, lead.discoveryHints, state);
-    out.rechecksScheduled += 1;
-
-    if (listing && (result.tier === "A" || result.tier === "B")) {
-      await persistListingEvidence(prisma, listing.id, result, snippet, title, now);
-    }
-
+    let contactHigh = lead.contactEmailConfidence === "HIGH";
     if ((result.tier === "A" || result.tier === "B") && result.autoSend) {
       let extraPages: CrawledPage[] = [];
-      if (lead.contactEmailConfidence !== "HIGH" && Date.now() < leadDeadline) {
+      if (!contactHigh && Date.now() < leadDeadline) {
         try {
           const origin = new URL(website.includes("://") ? website : `https://${website}`).origin;
           const extraUrls = CONTACT_PATHS.map((p) => `${origin}${p}`).filter((u) => !robots || robotsAllowsUrl(u, robots));
@@ -662,8 +714,42 @@ export async function enrichGrowthLeadOfficialEvidence(
         }
       }
       const mined = await maybeMineOfficialEmail(prisma, lead, tagged, extraPages);
-      if (mined.high) out.newHighContacts += 1;
-      if (mined.sendReady && result.tier === "A") out.newSendReady += 1;
+      if (mined.high) {
+        out.newHighContacts += 1;
+        contactHigh = true;
+      }
+    }
+
+    const crawled = pages.length > 0;
+    const ops = classifyGrowthOpsState({
+      hardReject: null,
+      identityDecision: ident.decision,
+      evidenceAutoSend: result.autoSend,
+      contactHigh,
+    });
+    if (ops.state === "AUTO_SEND_READY" && prev?.opsState !== "AUTO_SEND_READY") {
+      out.newSendReady += 1;
+    } else if (ops.state === "AUTO_RESEARCH_RETRY" && result.tier !== "C") {
+      /* already counted via noEvidence / weak */
+    }
+
+    const state = buildEvidenceState({
+      prev,
+      result,
+      snippet,
+      title,
+      sourceType,
+      skipPermanent: false,
+      skipReason: null,
+      now,
+      opsState: ops.state,
+      crawled,
+    });
+    await writeLeadEvidence(prisma, lead.id, lead.discoveryHints, state);
+    if (ops.state === "AUTO_RESEARCH_RETRY") out.rechecksScheduled += 1;
+
+    if (listing && (result.tier === "A" || result.tier === "B")) {
+      await persistListingEvidence(prisma, listing.id, result, snippet, title, now);
     }
   }
 

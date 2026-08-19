@@ -47,6 +47,18 @@ export async function evaluateOutreachSendHealth(prisma: PrismaClient): Promise<
   ]);
 
   if (sentSample < outreachHealthMinSample()) {
+    if (complaints >= 1) {
+      return {
+        ok: true,
+        reason: "early_complaint_throttle",
+        sendMultiplier: 0.25,
+        sentSample,
+        hardBounces,
+        complaints,
+        hardBounceRate: sentSample ? hardBounces / sentSample : 0,
+        complaintRate: sentSample ? complaints / sentSample : 0,
+      };
+    }
     return {
       ok: true,
       sendMultiplier: 1,

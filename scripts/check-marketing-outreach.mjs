@@ -582,10 +582,21 @@ const {
   robotsAllowsPath,
   isOutreachEvidenceRecheckDue,
   nextOutreachEvidenceRecheckAt,
+  outreachEvidenceRecheckDelayMs,
   permanentSkipReasonForLead,
   classifyCrawledPagesForOutreach,
 } = await import("../src/lib/growth/outreachEvidenceCrawl.ts");
 const { pickPrimaryVenueOutreachEmail } = await import("../src/lib/growth/discovery/venueEmailExtraction.ts");
+const {
+  classifyGrowthOpsState,
+  reclassifyFormerManualReview,
+  GROWTH_OPS_NO_HUMAN_APPROVAL,
+  scoreResearchPriority,
+} = await import("../src/lib/growth/growthOpsState.ts");
+const {
+  evaluateOutreachAutoRamp,
+  providerMarketingCeiling,
+} = await import("../src/lib/growth/outreachAutoRamp.ts");
 
 assert.equal(
   classifyOutreachOpenMicEvidence({
@@ -710,7 +721,7 @@ assert.equal(
       schedules: [{ title: "Open Mic", description: "Weekly open mic every Tuesday. Performers can sign up.", isActive: true }],
     }),
   ).reason,
-  "needs_manual_review",
+  "auto_research_retry",
 );
 
 assert.equal(
@@ -797,5 +808,92 @@ if (leaked.ok) {
   assert.equal(leaked.text.includes("[micstage_email_meta]"), false);
   assert.equal(leaked.text.toLowerCase().includes("not sent"), false);
 }
+
+// Autonomous ops states — no human review queue
+assert.equal(GROWTH_OPS_NO_HUMAN_APPROVAL, true);
+assert.equal(
+  classifyGrowthOpsState({
+    hardReject: null,
+    identityDecision: "manual_review",
+    evidenceAutoSend: false,
+    contactHigh: false,
+  }).state,
+  "AUTO_RESEARCH_RETRY",
+);
+assert.equal(
+  classifyGrowthOpsState({
+    hardReject: null,
+    identityDecision: "eligible_venue",
+    evidenceAutoSend: true,
+    contactHigh: true,
+  }).state,
+  "AUTO_SEND_READY",
+);
+assert.equal(
+  classifyGrowthOpsState({
+    hardReject: "directory",
+    identityDecision: "manual_review",
+    evidenceAutoSend: true,
+    contactHigh: true,
+  }).state,
+  "HARD_REJECT",
+);
+assert.equal(
+  reclassifyFormerManualReview({
+    hardReject: null,
+    identityDecision: "manual_review",
+    evidenceAutoSend: false,
+    contactHigh: false,
+  }).state,
+  "AUTO_RESEARCH_RETRY",
+);
+assert.equal(
+  scoreResearchPriority({
+    opsState: "HARD_REJECT",
+    skipPermanent: true,
+    hasWebsite: true,
+    googlePlaceId: true,
+    openMicSignalTier: "EXPLICIT_OPEN_MIC",
+    contactHigh: false,
+    evidenceAutoSend: false,
+  }),
+  -1,
+);
+assert.equal(outreachEvidenceRecheckDelayMs("crawl_failed"), 7 * 86400000);
+assert.equal(outreachEvidenceRecheckDelayMs("weak_evidence"), 14 * 86400000);
+assert.equal(outreachEvidenceRecheckDelayMs("no_evidence_real_venue"), 30 * 86400000);
+assert.equal(outreachEvidenceRecheckDelayMs("tier_a"), 60 * 86400000);
+
+const rampNow = new Date("2026-08-20T00:00:00.000Z");
+const rampEntered = new Date("2026-08-17T00:00:00.000Z");
+const healthyRamp = evaluateOutreachAutoRamp({
+  currentDailyMax: 25,
+  stageEnteredAt: rampEntered,
+  now: rampNow,
+  sentInWindow: 25,
+  complaints: 0,
+  hardBounceRate: 0.01,
+  bounceStopRate: 0.05,
+  healthOk: true,
+  targetingOk: true,
+  earlyComplaintThrottle: false,
+});
+assert.equal(healthyRamp.ramp, true);
+assert.equal(healthyRamp.nextDailyMax, 50);
+const blockedRamp = evaluateOutreachAutoRamp({
+  currentDailyMax: 25,
+  stageEnteredAt: rampEntered,
+  now: rampNow,
+  sentInWindow: 25,
+  complaints: 1,
+  hardBounceRate: 0.01,
+  bounceStopRate: 0.05,
+  healthOk: true,
+  targetingOk: true,
+  earlyComplaintThrottle: false,
+});
+assert.equal(blockedRamp.ramp, false);
+assert.equal(blockedRamp.reason, "hold_unhealthy");
+assert.equal(providerMarketingCeiling(95, 35), 60);
 
 console.log(JSON.stringify({ ok: true, checks: "marketing-outreach" }));

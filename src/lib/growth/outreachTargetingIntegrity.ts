@@ -10,7 +10,6 @@ const TARGETING_FAIL_REASONS = new Set([
   "service_company",
   "chamber_tourism",
   "weak_identity",
-  "needs_manual_review",
   "no_target_bound_open_mic_evidence",
   "festival_event_not_venue",
   "geography_conflict",

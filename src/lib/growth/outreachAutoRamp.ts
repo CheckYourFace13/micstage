@@ -6,6 +6,11 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
 import { micstageTransactionalReserveSlots } from "@/lib/growth/outreachRuntimeSettings";
 import { micstageResendDailyMax } from "@/lib/resendDailyBudget";
+import {
+  clampOutreachDailyMaxForRlsGate,
+  DATABASE_RLS_SECURITY_OUTREACH_CAP,
+  isDatabaseRlsSecurityGateClear,
+} from "@/lib/database/databaseRlsSecurity";
 
 export const OUTREACH_AUTORAMP_KEY = "GROWTH_OUTREACH_AUTORAMP_STATE";
 export const OUTREACH_AUTORAMP_STAGES = [25, 50, 60] as const;
@@ -41,9 +46,17 @@ export function evaluateOutreachAutoRamp(input: {
   healthOk: boolean;
   targetingOk: boolean;
   earlyComplaintThrottle: boolean;
+  securityGateClear: boolean;
 }): OutreachAutoRampDecision {
   const ceiling = Math.min(OUTREACH_AUTORAMP_ARCH_CEILING, providerMarketingCeiling());
   const current = Math.min(input.currentDailyMax, ceiling);
+  if (!input.securityGateClear) {
+    return {
+      ramp: false,
+      nextDailyMax: Math.min(current, DATABASE_RLS_SECURITY_OUTREACH_CAP),
+      reason: "hold_rls_security_gate",
+    };
+  }
   if (input.earlyComplaintThrottle || !input.healthOk || !input.targetingOk || input.complaints > 0) {
     return { ramp: false, nextDailyMax: current, reason: "hold_unhealthy" };
   }
@@ -111,7 +124,7 @@ export async function applyOutreachAutoRamp(prisma: PrismaClient, now = new Date
   }
 
   const since = new Date(rampState.stageEnteredAt);
-  const [sentInWindow, complaints, health] = await Promise.all([
+  const [sentInWindow, complaints, health, securityGateClear] = await Promise.all([
     prisma.marketingEmailSend.count({
       where: { category: "OUTREACH", status: "SENT", sentAt: { gte: since } },
     }),
@@ -119,10 +132,11 @@ export async function applyOutreachAutoRamp(prisma: PrismaClient, now = new Date
       where: { category: "OUTREACH", complainedAt: { gte: since } },
     }),
     evaluateOutreachSendHealth(prisma),
+    isDatabaseRlsSecurityGateClear(prisma),
   ]);
   const bounceStopRate = Number.parseFloat(process.env.GROWTH_OUTREACH_HEALTH_HARD_BOUNCE_STOP_RATE?.trim() || "0.05");
   const targeting = health.ok && health.sendMultiplier > 0;
-  const decision = evaluateOutreachAutoRamp({
+  let decision = evaluateOutreachAutoRamp({
     currentDailyMax,
     stageEnteredAt: new Date(rampState.stageEnteredAt),
     now,
@@ -133,7 +147,13 @@ export async function applyOutreachAutoRamp(prisma: PrismaClient, now = new Date
     healthOk: health.ok && health.sendMultiplier >= 1,
     targetingOk: targeting,
     earlyComplaintThrottle: Boolean(health.reason?.startsWith("early_complaint")),
+    securityGateClear,
   });
+
+  const gatedDailyMax = clampOutreachDailyMaxForRlsGate(decision.nextDailyMax, securityGateClear);
+  if (gatedDailyMax !== decision.nextDailyMax) {
+    decision = { ramp: false, nextDailyMax: gatedDailyMax, reason: "hold_rls_security_gate" };
+  }
 
   const nextState: OutreachAutoRampState = {
     stage: decision.nextDailyMax,

@@ -11,6 +11,10 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
 import type { SettingSource } from "@/lib/publicListings/claimInviteRuntimeSettings";
+import {
+  clampOutreachDailyMaxForRlsGate,
+  isDatabaseRlsSecurityGateClear,
+} from "@/lib/database/databaseRlsSecurity";
 
 export const OUTREACH_RUNTIME_KEYS = [
   "GROWTH_OUTREACH_ENABLED",
@@ -183,8 +187,11 @@ export async function resolveOutreachRuntimeSnapshot(prisma: PrismaClient): Prom
   const domainDailyMax = resolveInt("GROWTH_OUTREACH_DOMAIN_DAILY_MAX", db, { min: 0, max: 10 });
 
   const outreachMasterEnabled = !killEffective && enabledBase.effective;
+  const rlsGateClear = await isDatabaseRlsSecurityGateClear(prisma);
   const effectiveSendsPerCron = outreachMasterEnabled ? sendsPerCron.effective : 0;
-  const effectiveDailyMax = outreachMasterEnabled ? dailyMax.effective : 0;
+  const effectiveDailyMax = outreachMasterEnabled
+    ? clampOutreachDailyMaxForRlsGate(dailyMax.effective, rlsGateClear)
+    : 0;
   const effectiveDomainDailyMax = outreachMasterEnabled ? domainDailyMax.effective : 0;
 
   return {

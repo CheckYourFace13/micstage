@@ -877,6 +877,7 @@ const healthyRamp = evaluateOutreachAutoRamp({
   healthOk: true,
   targetingOk: true,
   earlyComplaintThrottle: false,
+  securityGateClear: true,
 });
 assert.equal(healthyRamp.ramp, true);
 assert.equal(healthyRamp.nextDailyMax, 50);
@@ -891,9 +892,31 @@ const blockedRamp = evaluateOutreachAutoRamp({
   healthOk: true,
   targetingOk: true,
   earlyComplaintThrottle: false,
+  securityGateClear: true,
 });
 assert.equal(blockedRamp.ramp, false);
 assert.equal(blockedRamp.reason, "hold_unhealthy");
 assert.equal(providerMarketingCeiling(95, 35), 60);
+
+const blockedSecurityRamp = evaluateOutreachAutoRamp({
+  currentDailyMax: 25,
+  stageEnteredAt: rampEntered,
+  now: rampNow,
+  sentInWindow: 25,
+  complaints: 0,
+  hardBounceRate: 0.01,
+  bounceStopRate: 0.05,
+  healthOk: true,
+  targetingOk: true,
+  earlyComplaintThrottle: false,
+  securityGateClear: false,
+});
+assert.equal(blockedSecurityRamp.ramp, false);
+assert.equal(blockedSecurityRamp.reason, "hold_rls_security_gate");
+assert.equal(blockedSecurityRamp.nextDailyMax, 25);
+
+const { clampOutreachDailyMaxForRlsGate } = await import("../src/lib/database/databaseRlsSecurity.ts");
+assert.equal(clampOutreachDailyMaxForRlsGate(50, false), 25);
+assert.equal(clampOutreachDailyMaxForRlsGate(50, true), 50);
 
 console.log(JSON.stringify({ ok: true, checks: "marketing-outreach" }));

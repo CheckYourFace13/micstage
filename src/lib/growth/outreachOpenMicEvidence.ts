@@ -105,6 +105,26 @@ function hintStrings(hints: unknown): string[] {
   return out;
 }
 
+function outreachEvidenceFromHints(hints: unknown): {
+  url: string | null;
+  text: string;
+  date: Date | null;
+} | null {
+  if (!hints || typeof hints !== "object" || Array.isArray(hints)) return null;
+  const raw = (hints as Record<string, unknown>).outreachEvidence;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const snippet = typeof r.snippet === "string" ? r.snippet : "";
+  const title = typeof r.title === "string" ? r.title : "";
+  const eventName = typeof r.eventName === "string" ? r.eventName : "";
+  const text = [title, eventName, snippet].filter(Boolean).join(" — ").trim();
+  if (!text) return null;
+  const url = typeof r.url === "string" ? r.url : null;
+  const dateRaw = typeof r.evidenceDate === "string" ? r.evidenceDate : typeof r.lastCheckedAt === "string" ? r.lastCheckedAt : null;
+  const date = dateRaw ? new Date(dateRaw) : null;
+  return { url, text, date: date && !Number.isNaN(date.getTime()) ? date : null };
+}
+
 function isFirstPartyHost(url: string | null | undefined, vHost: string | null): boolean {
   const h = hostOf(url);
   if (!h || !vHost) return false;
@@ -189,8 +209,19 @@ function collectCandidates(input: OutreachOpenMicEvidenceInput): Candidate[] {
         : null;
     push(text, url, {
       firstParty: Boolean(e.trusted) && !e.reviewOnly,
+      social: SOCIAL_HOST_RE.test(url || ""),
       structured: Boolean(e.trusted),
       date: e.evidenceDate ?? e.fetchedAt ?? null,
+    });
+  }
+
+  const storedHintEvidence = outreachEvidenceFromHints(input.discoveryHints);
+  if (storedHintEvidence) {
+    push(storedHintEvidence.text, storedHintEvidence.url, {
+      firstParty: isFirstPartyHost(storedHintEvidence.url, vHost),
+      social: SOCIAL_HOST_RE.test(storedHintEvidence.url || ""),
+      structured: true,
+      date: storedHintEvidence.date,
     });
   }
 

@@ -72,6 +72,87 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
   return lines;
 }
 
+function renderGrowthAutomationText(data: OwnerDailySummaryData): string[] {
+  const g = data.growthAutomation;
+  return [
+    "OUTREACH",
+    `  Tier A ready: ${g.tierAReady}`,
+    `  Sent today: ${g.sentToday}`,
+    `  Delivered: ${g.deliveredToday}`,
+    `  Clicks: ${g.clicksToday}`,
+    `  Replies: ${g.repliesToday}`,
+    `  Claims: ${g.claimsToday}`,
+    `  Registrations: ${g.registrationsToday}`,
+    "",
+    "EVIDENCE ENRICHMENT",
+    `  Candidates checked today: ${g.evidenceCheckedToday}`,
+    `  Official sites crawled: ${g.officialSitesCrawledToday}`,
+    `  New Tier A: ${g.newTierAToday}`,
+    `  New Tier B: ${g.newTierBToday}`,
+    `  Manual review: ${g.evidenceManualReviewToday}`,
+    `  Rejected: ${g.evidenceRejectedToday}`,
+    `  No evidence found: ${g.noEvidenceToday}`,
+    `  Rechecks scheduled: ${g.rechecksScheduledToday}`,
+    "",
+    "CONTACT MINING",
+    `  Domains checked: ${g.contactDomainsCheckedToday}`,
+    `  New HIGH contacts: ${g.newHighContactsToday}`,
+    `  New send-ready contacts: ${g.newSendReadyContactsToday}`,
+    "",
+    "PIPELINE",
+    `  Discovered: ${g.pipelineDiscovered}`,
+    `  Verified: ${g.pipelineVerified}`,
+    `  Evidence-qualified: ${g.pipelineEvidenceQualified}`,
+    `  Contact-qualified: ${g.pipelineContactQualified}`,
+    `  Sent: ${g.pipelineSent}`,
+    `  Converted: ${g.pipelineConverted}`,
+    "",
+  ];
+}
+
+function renderGrowthAutomationHtml(data: OwnerDailySummaryData): string {
+  const g = data.growthAutomation;
+  const row = (label: string, value: number) =>
+    `<li><strong>${esc(label)}:</strong> ${value}</li>`;
+  return `
+  <h2 style="font-size:15px;margin:20px 0 8px">Outreach</h2>
+  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
+    ${row("Tier A ready", g.tierAReady)}
+    ${row("Sent today", g.sentToday)}
+    ${row("Delivered", g.deliveredToday)}
+    ${row("Clicks", g.clicksToday)}
+    ${row("Replies", g.repliesToday)}
+    ${row("Claims", g.claimsToday)}
+    ${row("Registrations", g.registrationsToday)}
+  </ul>
+  <h2 style="font-size:15px;margin:20px 0 8px">Evidence enrichment</h2>
+  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
+    ${row("Candidates checked today", g.evidenceCheckedToday)}
+    ${row("Official sites crawled", g.officialSitesCrawledToday)}
+    ${row("New Tier A", g.newTierAToday)}
+    ${row("New Tier B", g.newTierBToday)}
+    ${row("Manual review", g.evidenceManualReviewToday)}
+    ${row("Rejected", g.evidenceRejectedToday)}
+    ${row("No evidence found", g.noEvidenceToday)}
+    ${row("Rechecks scheduled", g.rechecksScheduledToday)}
+  </ul>
+  <h2 style="font-size:15px;margin:20px 0 8px">Contact mining</h2>
+  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
+    ${row("Domains checked", g.contactDomainsCheckedToday)}
+    ${row("New HIGH contacts", g.newHighContactsToday)}
+    ${row("New send-ready contacts", g.newSendReadyContactsToday)}
+  </ul>
+  <h2 style="font-size:15px;margin:20px 0 8px">Pipeline</h2>
+  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
+    ${row("Discovered", g.pipelineDiscovered)}
+    ${row("Verified", g.pipelineVerified)}
+    ${row("Evidence-qualified", g.pipelineEvidenceQualified)}
+    ${row("Contact-qualified", g.pipelineContactQualified)}
+    ${row("Sent", g.pipelineSent)}
+    ${row("Converted", g.pipelineConverted)}
+  </ul>`;
+}
+
 function renderMarketingText(data: OwnerDailySummaryData): string[] {
   const m = data.marketing;
   return [
@@ -351,6 +432,7 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
     "",
   );
   lines.push(...renderRecentListingsText(data));
+  lines.push(...renderGrowthAutomationText(data));
   lines.push(...renderMarketingText(data));
   lines.push(...renderFunnelText(data));
   lines.push(...renderReviewQueueText(data));
@@ -429,6 +511,8 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
   </ul>
 
   ${renderRecentListingsHtml(data)}
+
+  ${renderGrowthAutomationHtml(data)}
 
   ${renderFunnelHtml(data)}
 

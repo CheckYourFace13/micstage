@@ -6,6 +6,7 @@ import { enrichListingsMissingTrustedEvidence } from "@/lib/publicListings/evide
 import { verifyPublicListingsWithGoogle } from "@/lib/publicListings/googlePlacesVerify";
 import { promotePlaceConfirmedListings } from "@/lib/publicListings/promotePlaceConfirmedListings";
 import { mineVerifiedListingOfficialEmails } from "@/lib/publicListings/mineVerifiedListingContacts";
+import { enrichGrowthLeadOfficialEvidence } from "@/lib/growth/outreachEvidenceEnrichment";
 import { micstagePromotionKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 import {
   resolveGrowthPipelineRuntimeSnapshot,
@@ -30,6 +31,7 @@ export type ListingBacklogProcessorResult = {
   junkRejected: number;
   junkByReason: Record<string, number>;
   evidenceEnrich: Awaited<ReturnType<typeof enrichListingsMissingTrustedEvidence>>;
+  outreachEvidenceEnrich: Awaited<ReturnType<typeof enrichGrowthLeadOfficialEvidence>>;
   contactMine: Awaited<ReturnType<typeof mineVerifiedListingOfficialEmails>>;
   leadsReprocessed: number;
   stagesRun: string[];
@@ -59,6 +61,20 @@ export async function runListingBacklogProcessor(
     failed: 0,
     byFailureReason: {} as Record<string, number>,
   };
+  const emptyOutreachEvidence = {
+    processed: 0,
+    crawled: 0,
+    newTierA: 0,
+    newTierB: 0,
+    manualReview: 0,
+    rejected: 0,
+    noEvidence: 0,
+    rechecksScheduled: 0,
+    skippedDue: 0,
+    newHighContacts: 0,
+    newSendReady: 0,
+    skippedForBudget: false,
+  };
 
   if (micstagePromotionKillSwitch()) {
     return {
@@ -72,6 +88,7 @@ export async function runListingBacklogProcessor(
       junkRejected: 0,
       junkByReason: {},
       evidenceEnrich: emptyEnrich,
+      outreachEvidenceEnrich: emptyOutreachEvidence,
       contactMine: emptyMine,
       leadsReprocessed: 0,
       stagesRun,
@@ -149,6 +166,17 @@ export async function runListingBacklogProcessor(
     stagesSkippedForBudget.push("evidence_enrich");
   }
 
+  let outreachEvidenceEnrich = emptyOutreachEvidence;
+  if (canRun(12_000)) {
+    outreachEvidenceEnrich = await enrichGrowthLeadOfficialEvidence(prisma, {
+      limit: runtime.outreachEvidenceEnrichPerTick.effective,
+      budgetMs: Math.max(1_000, Math.min(14_000, remaining() - 2_000)),
+    });
+    stagesRun.push("outreach_evidence_enrich");
+  } else {
+    stagesSkippedForBudget.push("outreach_evidence_enrich");
+  }
+
   let contactMine = emptyMine;
   if (canRun(12_000)) {
     contactMine = await mineVerifiedListingOfficialEmails(prisma, {
@@ -178,6 +206,7 @@ export async function runListingBacklogProcessor(
     junkRejected: junk.rejected,
     junkByReason: junk.byReason,
     evidenceEnrich,
+    outreachEvidenceEnrich,
     contactMine,
     leadsReprocessed,
     stagesRun,

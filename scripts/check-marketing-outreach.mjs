@@ -573,6 +573,204 @@ const scoredReal = scoreOpenMicVenueProspect({
 });
 assert.equal(scoredReal.tier, "EXPLICIT_OPEN_MIC");
 
+const {
+  expandOutreachEvidenceUrls,
+  filterSameDomainUrls,
+  mergeCrawlUrlPlan,
+  OUTREACH_EVIDENCE_MAX_PAGES,
+  parseRobotsTxtForCrawler,
+  robotsAllowsPath,
+  isOutreachEvidenceRecheckDue,
+  nextOutreachEvidenceRecheckAt,
+  permanentSkipReasonForLead,
+  classifyCrawledPagesForOutreach,
+} = await import("../src/lib/growth/outreachEvidenceCrawl.ts");
+const { pickPrimaryVenueOutreachEmail } = await import("../src/lib/growth/discovery/venueEmailExtraction.ts");
+
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "The Fox",
+    websiteUrl: "https://thefox.com/",
+    websiteHostNormalized: "thefox.com",
+    sourceUrl: "https://thefox.com/calendar",
+    sourceTitle: "Calendar",
+    about: "The Fox hosts an open jam every Thursday. Performers can sign up at the door.",
+  }).tier,
+  "A",
+);
+
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "The Fox",
+    websiteUrl: "https://thefox.com/",
+    websiteHostNormalized: "thefox.com",
+    sourceUrl: "https://thefox.com/",
+    about: "Craft beer, trivia on Tuesdays, and private events.",
+  }).autoSend,
+  false,
+);
+
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "The Fox",
+    websiteUrl: "https://thefox.com/",
+    websiteHostNormalized: "thefox.com",
+    sourceUrl: "https://www.yelp.com/biz/the-fox-chicago",
+    sourceSnippet: "Open mic every Tuesday at The Fox. Performers can sign up.",
+  }).tier === "A",
+  false,
+);
+
+const beforeEnrich = classifyOutreachOpenMicEvidence({
+  name: "River Bar",
+  websiteUrl: "https://riverbar.com/",
+  websiteHostNormalized: "riverbar.com",
+  sourceUrl: "https://riverbar.com/",
+  about: "Neighborhood bar with craft beer.",
+});
+assert.equal(beforeEnrich.autoSend, false);
+const afterEnrich = classifyCrawledPagesForOutreach({
+  name: "River Bar",
+  websiteUrl: "https://riverbar.com/",
+  websiteHostNormalized: "riverbar.com",
+  pages: [
+    {
+      url: "https://riverbar.com/calendar",
+      title: "Events",
+      text: "River Bar hosts a weekly open mic every Monday. Sign up at 7pm.",
+    },
+  ],
+});
+assert.equal(afterEnrich.tier, "A");
+assert.equal(afterEnrich.autoSend, true);
+
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(
+    baseLead({
+      name: "River Bar",
+      websiteUrl: "https://riverbar.com/",
+      websiteHostNormalized: "riverbar.com",
+      contactEmailNormalized: null,
+      contactEmailConfidence: null,
+      schedules: [],
+      discoveryHints: {
+        outreachEvidence: {
+          url: "https://riverbar.com/calendar",
+          snippet: "River Bar hosts a weekly open mic every Monday. Sign up at 7pm.",
+          title: "Events",
+          eventName: "weekly open mic",
+          sourceType: "official_website",
+          tier: "A",
+        },
+      },
+    }),
+  ).reason,
+  "missing_email",
+);
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(
+    baseLead({
+      name: "River Bar",
+      websiteUrl: "https://riverbar.com/",
+      websiteHostNormalized: "riverbar.com",
+      contactEmailNormalized: "events@riverbar.com",
+      contactEmailConfidence: "HIGH",
+      schedules: [],
+      discoveryHints: {
+        outreachEvidence: {
+          url: "https://riverbar.com/calendar",
+          snippet: "River Bar hosts a weekly open mic every Monday. Sign up at 7pm.",
+          title: "Events",
+          eventName: "weekly open mic",
+          sourceType: "official_website",
+          tier: "A",
+        },
+      },
+    }),
+  ).reason,
+  "eligible",
+);
+
+const mined = pickPrimaryVenueOutreachEmail(
+  [
+    { email: "events@riverbar.com", source: "mailto" },
+    { email: "noreply@mailchimp.com", source: "body" },
+  ],
+  "riverbar.com",
+);
+assert.equal(mined.primary, "events@riverbar.com");
+
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(
+    baseLead({
+      name: "City Lights Entertainment",
+      websiteUrl: "https://citylightsent.com/",
+      websiteHostNormalized: "citylightsent.com",
+      contactEmailNormalized: "hello@citylightsent.com",
+      schedules: [{ title: "Open Mic", description: "Weekly open mic every Tuesday. Performers can sign up.", isActive: true }],
+    }),
+  ).reason,
+  "needs_manual_review",
+);
+
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(
+    baseLead({
+      status: "DISCOVERED",
+      name: "The Cove Lounge",
+      websiteUrl: "https://covelounge.com/",
+      websiteHostNormalized: "covelounge.com",
+      contactEmailNormalized: "events@covelounge.com",
+      sourceUrl: "https://covelounge.com/events/open-mic",
+    }),
+  ).reason,
+  "eligible",
+);
+
+const skipDir = permanentSkipReasonForLead({
+  name: "Best Open Mics Near You",
+  leadType: "VENUE",
+  websiteUrl: "https://opencomedy.com/chicago",
+  websiteHostNormalized: "opencomedy.com",
+});
+assert.equal(skipDir, "directory");
+
+const future = nextOutreachEvidenceRecheckAt("no_evidence_real_venue", new Date("2026-08-18T00:00:00.000Z"));
+assert.equal(future.getTime() > new Date("2026-09-15T00:00:00.000Z").getTime(), true);
+assert.equal(
+  isOutreachEvidenceRecheckDue(
+    { skipPermanent: true, nextCheckAt: new Date("2020-01-01").toISOString() },
+    new Date(),
+  ),
+  false,
+);
+assert.equal(
+  isOutreachEvidenceRecheckDue(
+    { skipPermanent: false, nextCheckAt: new Date("2026-07-01").toISOString() },
+    new Date("2026-08-18T00:00:00.000Z"),
+  ),
+  true,
+);
+
+const expanded = expandOutreachEvidenceUrls("https://thefox.com/", OUTREACH_EVIDENCE_MAX_PAGES);
+assert.equal(expanded.length <= OUTREACH_EVIDENCE_MAX_PAGES, true);
+assert.equal(expanded.some((u) => u.includes("/events")), true);
+assert.equal(expanded.some((u) => u.includes("/open-mics")), true);
+
+const sameHost = filterSameDomainUrls(
+  ["https://thefox.com/events", "https://yelp.com/biz/the-fox", "https://calendar.thefox.com/open-mic"],
+  "thefox.com",
+);
+assert.equal(sameHost.includes("https://thefox.com/events"), true);
+assert.equal(sameHost.some((u) => u.includes("yelp.com")), false);
+
+const plan = mergeCrawlUrlPlan("https://thefox.com/", ["https://evil.example/open-mic", "https://thefox.com/comedy"], 8);
+assert.equal(plan.some((u) => u.includes("evil.example")), false);
+assert.equal(plan.length <= 8, true);
+
+const robots = parseRobotsTxtForCrawler(`User-agent: *\nDisallow: /admin\nAllow: /\n`);
+assert.equal(robotsAllowsPath("/events", robots), true);
+assert.equal(robotsAllowsPath("/admin/secret", robots), false);
 
 // Draft-only copy must not survive into production send representation
 const draftPayload = buildGrowthLeadOutreachPayload({

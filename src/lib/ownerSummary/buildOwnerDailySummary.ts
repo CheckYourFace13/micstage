@@ -7,6 +7,7 @@ import { PUBLIC_DISCOVERY_VERIFICATION } from "@/lib/publicListings/queries";
 import { countPendingListingClaimInvitesWithEmail, marketingOutreachCapacitySnapshot } from "@/lib/resendDailyBudget";
 import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
 import { auditGeneralOutreachEligibility } from "@/lib/growth/outreachContactEligible";
+import { readOutreachEnrichDayStats } from "@/lib/growth/outreachEvidenceEnrichment";
 import { countEligiblePendingListingClaimInvites } from "@/lib/publicListings/claimInvitePendingCount";
 
 export type OwnerSummarySignupRow = {
@@ -131,6 +132,32 @@ export type OwnerDailySummaryData = {
     outreachEnabled: boolean;
     killSwitch: boolean;
     providerRemaining: number;
+  };
+  growthAutomation: {
+    tierAReady: number;
+    sentToday: number;
+    deliveredToday: number;
+    clicksToday: number;
+    repliesToday: number;
+    claimsToday: number;
+    registrationsToday: number;
+    evidenceCheckedToday: number;
+    officialSitesCrawledToday: number;
+    newTierAToday: number;
+    newTierBToday: number;
+    evidenceManualReviewToday: number;
+    evidenceRejectedToday: number;
+    noEvidenceToday: number;
+    rechecksScheduledToday: number;
+    contactDomainsCheckedToday: number;
+    newHighContactsToday: number;
+    newSendReadyContactsToday: number;
+    pipelineDiscovered: number;
+    pipelineVerified: number;
+    pipelineEvidenceQualified: number;
+    pipelineContactQualified: number;
+    pipelineSent: number;
+    pipelineConverted: number;
   };
 };
 
@@ -620,6 +647,7 @@ export async function buildOwnerDailySummary(
     claims7d,
     venueRegs7d,
     promoterRegs7d,
+    enrichStats,
   ] = await Promise.all([
     resolveOutreachRuntimeSnapshot(prisma),
     marketingOutreachCapacitySnapshot(prisma, 25),
@@ -671,6 +699,7 @@ export async function buildOwnerDailySummary(
     }),
     prisma.venueOwner.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
     prisma.promoterUser.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
+    readOutreachEnrichDayStats(prisma, now),
   ]);
 
   const clicksNoteUpdated =
@@ -748,6 +777,32 @@ export async function buildOwnerDailySummary(
       outreachEnabled: outreachRuntime.outreachMasterEnabled,
       killSwitch: outreachRuntime.kill.effective,
       providerRemaining: providerCapacity.remainingForOutreach,
+    },
+    growthAutomation: {
+      tierAReady: eligibilityAudit.netSendEligible,
+      sentToday: outreachSends,
+      deliveredToday,
+      clicksToday: uniqueClicksToday,
+      repliesToday: responses,
+      claimsToday: claimsCompletedToday,
+      registrationsToday: venueRegsToday + promoterRegsToday,
+      evidenceCheckedToday: enrichStats.candidatesChecked,
+      officialSitesCrawledToday: enrichStats.officialSitesCrawled,
+      newTierAToday: enrichStats.newTierA,
+      newTierBToday: enrichStats.newTierB,
+      evidenceManualReviewToday: enrichStats.manualReview,
+      evidenceRejectedToday: enrichStats.rejected,
+      noEvidenceToday: enrichStats.noEvidence,
+      rechecksScheduledToday: enrichStats.rechecksScheduled,
+      contactDomainsCheckedToday: enrichStats.domainsChecked,
+      newHighContactsToday: enrichStats.newHighContacts,
+      newSendReadyContactsToday: enrichStats.newSendReady,
+      pipelineDiscovered: leadsCreated,
+      pipelineVerified: googleVerifiedListings,
+      pipelineEvidenceQualified: eligibilityAudit.netSendEligible,
+      pipelineContactQualified: eligibilityAudit.highConfidenceContacts,
+      pipelineSent: outreachSends,
+      pipelineConverted: claimsCompletedToday + venueRegsToday + promoterRegsToday,
     },
   };
 }

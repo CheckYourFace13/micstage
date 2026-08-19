@@ -34,6 +34,7 @@ import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 import { micstageDiscoveryKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSettings";
 import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
+import { evaluateOutreachTargetingIntegrity } from "@/lib/growth/outreachTargetingIntegrity";
 import {
   growthRuntimeSnapshotForStatus,
   resolveGrowthPipelineRuntimeSnapshot,
@@ -183,7 +184,10 @@ async function handle(request: Request) {
       }
       const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
       const outreachHealth = await evaluateOutreachSendHealth(prisma);
-      if (!outreachRuntime.outreachMasterEnabled) {
+      const targeting = await evaluateOutreachTargetingIntegrity(prisma);
+      if (targeting.killed) {
+        outreachSkippedReason = targeting.reason ?? "targeting integrity auto-kill";
+      } else if (!outreachRuntime.outreachMasterEnabled) {
         outreachSkippedReason = "GROWTH_OUTREACH disabled or kill switch active";
       } else if (!outreachHealth.ok || outreachHealth.sendMultiplier <= 0) {
         outreachSkippedReason = `outreach health throttle: ${outreachHealth.reason ?? "stopped"}`;

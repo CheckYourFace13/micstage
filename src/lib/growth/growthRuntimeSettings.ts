@@ -15,6 +15,7 @@ export const GROWTH_PIPELINE_RUNTIME_KEYS = [
   "LISTING_BACKLOG_GOOGLE_VERIFY_PER_TICK",
   "LISTING_BACKLOG_PROMOTE_PER_TICK",
   "LISTING_BACKLOG_EVIDENCE_ENRICH_PER_TICK",
+  "GROWTH_OUTREACH_EVIDENCE_ENRICH_PER_TICK",
   "LISTING_AUTO_REJECT_JUNK_PER_RUN",
   "LISTING_VERIFIED_CONTACT_MINE_PER_TICK",
 ] as const;
@@ -38,6 +39,7 @@ export type GrowthPipelineRuntimeSnapshot = {
   backlogGoogleVerifyPerTick: GrowthIntSetting;
   backlogPromotePerTick: GrowthIntSetting;
   backlogEvidenceEnrichPerTick: GrowthIntSetting;
+  outreachEvidenceEnrichPerTick: GrowthIntSetting;
   autoRejectJunkPerRun: GrowthIntSetting;
   verifiedContactMinePerTick: GrowthIntSetting;
 };
@@ -55,6 +57,7 @@ const DEFAULTS: Record<GrowthPipelineRuntimeKey, number> = {
   LISTING_BACKLOG_GOOGLE_VERIFY_PER_TICK: 30,
   LISTING_BACKLOG_PROMOTE_PER_TICK: 60,
   LISTING_BACKLOG_EVIDENCE_ENRICH_PER_TICK: 30,
+  GROWTH_OUTREACH_EVIDENCE_ENRICH_PER_TICK: 4,
   LISTING_AUTO_REJECT_JUNK_PER_RUN: 80,
   LISTING_VERIFIED_CONTACT_MINE_PER_TICK: 20,
 };
@@ -68,6 +71,7 @@ const CLAMPS: Record<GrowthPipelineRuntimeKey, { min: number; max: number }> = {
   LISTING_BACKLOG_GOOGLE_VERIFY_PER_TICK: { min: 0, max: 80 },
   LISTING_BACKLOG_PROMOTE_PER_TICK: { min: 0, max: 120 },
   LISTING_BACKLOG_EVIDENCE_ENRICH_PER_TICK: { min: 0, max: 80 },
+  GROWTH_OUTREACH_EVIDENCE_ENRICH_PER_TICK: { min: 0, max: 12 },
   LISTING_AUTO_REJECT_JUNK_PER_RUN: { min: 0, max: 300 },
   LISTING_VERIFIED_CONTACT_MINE_PER_TICK: { min: 0, max: 60 },
 };
@@ -127,6 +131,7 @@ export async function resolveGrowthPipelineRuntimeSnapshot(
     backlogGoogleVerifyPerTick: resolveOne("LISTING_BACKLOG_GOOGLE_VERIFY_PER_TICK", db),
     backlogPromotePerTick: resolveOne("LISTING_BACKLOG_PROMOTE_PER_TICK", db),
     backlogEvidenceEnrichPerTick: resolveOne("LISTING_BACKLOG_EVIDENCE_ENRICH_PER_TICK", db),
+    outreachEvidenceEnrichPerTick: resolveOne("GROWTH_OUTREACH_EVIDENCE_ENRICH_PER_TICK", db),
     autoRejectJunkPerRun: resolveOne("LISTING_AUTO_REJECT_JUNK_PER_RUN", db),
     verifiedContactMinePerTick: resolveOne("LISTING_VERIFIED_CONTACT_MINE_PER_TICK", db),
   };
@@ -150,6 +155,7 @@ export function growthRuntimeSnapshotForStatus(snap: GrowthPipelineRuntimeSnapsh
     LISTING_BACKLOG_GOOGLE_VERIFY_PER_TICK: pack(snap.backlogGoogleVerifyPerTick),
     LISTING_BACKLOG_PROMOTE_PER_TICK: pack(snap.backlogPromotePerTick),
     LISTING_BACKLOG_EVIDENCE_ENRICH_PER_TICK: pack(snap.backlogEvidenceEnrichPerTick),
+    GROWTH_OUTREACH_EVIDENCE_ENRICH_PER_TICK: pack(snap.outreachEvidenceEnrichPerTick),
     LISTING_AUTO_REJECT_JUNK_PER_RUN: pack(snap.autoRejectJunkPerRun),
     LISTING_VERIFIED_CONTACT_MINE_PER_TICK: pack(snap.verifiedContactMinePerTick),
   };

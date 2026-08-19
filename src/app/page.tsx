@@ -51,7 +51,7 @@ export default function Home() {
               </Link>
               <Link
                 href="/host"
-                data-track-event="homepage_cta_host"
+                data-track-event="host_cta_click"
                 className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/25 bg-white/8 px-6 text-base font-semibold text-white hover:bg-white/15"
               >
                 Run your open mic free

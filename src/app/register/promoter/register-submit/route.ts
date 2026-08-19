@@ -7,6 +7,7 @@ import {
   REGISTRATION_CONTENT_CONSENT_VERSION,
   registrationContentConsentChecked,
 } from "@/lib/registrationConsent";
+import { JOINED_HOST, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 import { allocateUniqueHostSlug } from "@/lib/host/hostSlug";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return redirectTo("/promoter/welcome");
+    return redirectTo(`/promoter/welcome?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_HOST}`);
   } catch (e) {
     console.error("[registerHost]", e);
     return redirectTo("/register/promoter?error=unavailable");

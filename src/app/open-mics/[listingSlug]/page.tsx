@@ -330,6 +330,8 @@ export default async function PublicOpenMicListingPage(props: {
             <Link
               href={`/claim/${listing.slug}${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
               className="mt-3 inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
+              data-track-event="listing_claim_cta_click"
+              data-listing-slug={listing.slug}
             >
               {traceId ? "Claim this open mic free" : "Claim this open mic"}
             </Link>

@@ -4,22 +4,18 @@ import Script from "next/script";
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  oncePerSession,
+  refreshConversionAttribution,
+} from "@/lib/conversionAttribution";
+import {
   GA4_MEASUREMENT_ID,
   META_PIXEL_ID,
+  trackConversionEvent,
   trackMarketingEvent,
   trackPageView,
+  trackTrackedElementEvent,
 } from "@/lib/marketingTracking";
 import { isAnalyticsDisabled } from "@/lib/productAnalytics";
-
-function oncePerSession(key: string, fn: () => void) {
-  try {
-    if (sessionStorage.getItem(key) === "1") return;
-    fn();
-    sessionStorage.setItem(key, "1");
-  } catch {
-    // Ignore storage failures in strict/privacy contexts.
-  }
-}
 
 export function MarketingTrackingClient() {
   const pathname = usePathname();
@@ -33,6 +29,7 @@ export function MarketingTrackingClient() {
     if (lastPathRef.current === key) return;
     lastPathRef.current = key;
 
+    refreshConversionAttribution(pathname, searchParams);
     trackPageView(pathname, search);
 
     if (pathname === "/register/venue") {
@@ -91,6 +88,7 @@ export function MarketingTrackingClient() {
     if (pathname === "/claim/invite" || pathname.startsWith("/claim/")) {
       oncePerSession(`trk:claim_started:${pathname}`, () => {
         trackMarketingEvent("claim_started", { page_path: pathname });
+        trackConversionEvent("venue_claim_start", { page_path: pathname });
       });
     }
     if (pathname === "/map") {
@@ -108,8 +106,10 @@ export function MarketingTrackingClient() {
       const target = e.target as Element | null;
       const eventEl = target?.closest("[data-track-event]") as HTMLElement | null;
       if (eventEl?.dataset.trackEvent) {
-        trackMarketingEvent(eventEl.dataset.trackEvent as Parameters<typeof trackMarketingEvent>[0], {
+        const listingSlug = eventEl.dataset.listingSlug;
+        trackTrackedElementEvent(eventEl.dataset.trackEvent, {
           page_path: window.location.pathname,
+          ...(listingSlug ? { listing_slug: listingSlug } : {}),
         });
       }
       const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
@@ -139,7 +139,7 @@ export function MarketingTrackingClient() {
       if (!form) return;
       const eventName = form.dataset.trackEvent;
       if (!eventName) return;
-      trackMarketingEvent(eventName as Parameters<typeof trackMarketingEvent>[0], {
+      trackTrackedElementEvent(eventName, {
         page_path: window.location.pathname,
       });
     };

@@ -1,6 +1,7 @@
 "use client";
 
 import { track as vercelTrack } from "@vercel/analytics/react";
+import { conversionEventParams } from "@/lib/conversionAttribution";
 import { isAnalyticsDisabled } from "@/lib/productAnalytics";
 
 export const GA4_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID?.trim() ?? "";
@@ -8,7 +9,21 @@ export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim() ?? ""
 
 type VercelProp = string | number | boolean | null | undefined;
 
+/** GA4 conversion events (canonical funnel names). */
+export type ConversionEventName =
+  | "listing_claim_cta_click"
+  | "venue_claim_start"
+  | "venue_claim_complete"
+  | "venue_registration_complete"
+  | "host_registration_complete"
+  | "host_first_series"
+  | "host_first_night"
+  | "host_second_venue"
+  | "performer_signup_complete"
+  | "host_cta_click";
+
 export type MarketingEventName =
+  | ConversionEventName
   | "homepage_cta_find"
   | "homepage_cta_host"
   | "venue_signup_started"
@@ -87,13 +102,20 @@ export function trackMarketingEvent(name: MarketingEventName, params?: Record<st
     : undefined;
   vercelTrack(name, vercelProps);
 
-  // Lightweight mapping for common ad-platform optimization signals.
   if (window.gtag && GA4_MEASUREMENT_ID) {
     if (name === "search_performed") window.gtag("event", "search", params ?? {});
     if (name === "contact_click") window.gtag("event", "contact", params ?? {});
   }
   if (window.fbq && META_PIXEL_ID) {
-    if (name === "booking_completed" || name === "venue_signup_completed" || name === "performer_signup_completed") {
+    const registrationEvents: MarketingEventName[] = [
+      "booking_completed",
+      "venue_signup_completed",
+      "venue_registration_complete",
+      "performer_signup_completed",
+      "performer_signup_complete",
+      "host_registration_complete",
+    ];
+    if (registrationEvents.includes(name)) {
       window.fbq("track", "CompleteRegistration", params ?? {});
     } else if (name === "booking_started") {
       window.fbq("track", "InitiateCheckout", params ?? {});
@@ -103,6 +125,32 @@ export function trackMarketingEvent(name: MarketingEventName, params?: Record<st
       window.fbq("track", "Contact", params ?? {});
     }
   }
+}
+
+/** Fires a canonical conversion event with session attribution dimensions. */
+export function trackConversionEvent(name: ConversionEventName, params?: Record<string, unknown>) {
+  trackMarketingEvent(name, conversionEventParams(params));
+}
+
+const CONVERSION_EVENT_NAMES = new Set<string>([
+  "listing_claim_cta_click",
+  "venue_claim_start",
+  "venue_claim_complete",
+  "venue_registration_complete",
+  "host_registration_complete",
+  "host_first_series",
+  "host_first_night",
+  "host_second_venue",
+  "performer_signup_complete",
+  "host_cta_click",
+]);
+
+export function trackTrackedElementEvent(eventName: string, params?: Record<string, unknown>) {
+  if (CONVERSION_EVENT_NAMES.has(eventName)) {
+    trackConversionEvent(eventName as ConversionEventName, params);
+    return;
+  }
+  trackMarketingEvent(eventName as MarketingEventName, params);
 }
 
 export function trackPageView(pathname: string, search: string) {
@@ -128,13 +176,4 @@ export function trackPageView(pathname: string, search: string) {
   if (window.fbq && META_PIXEL_ID) {
     window.fbq("track", "PageView");
   }
-}
-
-/**
- * Placeholder for future conversion plumbing:
- * - Google Ads conversions can be added via gtag "conversion" events.
- * - Meta Conversions API should be server-side (not client-only) when implemented.
- */
-export function trackFutureConversionPlaceholder(_name: string, _params?: Record<string, unknown>) {
-  // Intentionally no-op until Ads/CAPI backends are configured.
 }

@@ -7,9 +7,20 @@ import { assertVenueExistsForHostNight } from "@/lib/host/hostAuthorization";
 import { provisionHostNightLineup } from "@/lib/host/hostNightProvisioning";
 import { maybeRecordHostSecondVenueActivation } from "@/lib/host/hostSecondVenueActivation";
 import { resolveVenueForHostLocation } from "@/lib/host/resolveHostVenue";
+import {
+  HOST_MILESTONE_FIRST_NIGHT,
+  HOST_MILESTONE_FIRST_SERIES,
+  HOST_MILESTONE_SECOND_VENUE,
+  PRODUCT_ANALYTICS_QS,
+} from "@/lib/productAnalytics";
 import { requirePrisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+
+function hostMilestoneQuery(milestones: string[]): string {
+  if (milestones.length === 0) return "";
+  return `&${PRODUCT_ANALYTICS_QS.hostMilestone}=${milestones.join(",")}`;
+}
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
@@ -103,7 +114,9 @@ export async function setupFirstHostNightAction(formData: FormData) {
 
   revalidatePath("/promoter");
   revalidatePath("/hosts");
-  redirect("/promoter?promoter=series_ok");
+  redirect(
+    `/promoter?promoter=series_ok${hostMilestoneQuery([HOST_MILESTONE_FIRST_SERIES, HOST_MILESTONE_FIRST_NIGHT])}`,
+  );
 }
 
 export async function createPromoterSeriesAction(formData: FormData) {
@@ -125,6 +138,9 @@ export async function createPromoterSeriesAction(formData: FormData) {
   const description = descriptionParts.length ? descriptionParts.join("\n") : undefined;
 
   const prisma = requirePrisma();
+  const priorSeriesCount = await prisma.promoterSeries.count({
+    where: { promoterId: session.promoterId },
+  });
   for (let attempt = 0; attempt < 8; attempt++) {
     const candidate = attempt === 0 ? slugInput : `${slugInput}-${attempt + 1}`;
     try {
@@ -138,10 +154,12 @@ export async function createPromoterSeriesAction(formData: FormData) {
       });
       revalidatePath("/promoter");
       revalidatePath("/promoter/welcome");
+      const milestoneQs =
+        priorSeriesCount === 0 ? hostMilestoneQuery([HOST_MILESTONE_FIRST_SERIES]) : "";
       if (venueName) {
-        redirect(`/promoter?promoter=series_ok&focus=find&q=${encodeURIComponent(venueName)}`);
+        redirect(`/promoter?promoter=series_ok&focus=find&q=${encodeURIComponent(venueName)}${milestoneQs}`);
       }
-      redirect("/promoter?promoter=series_ok&focus=schedule");
+      redirect(`/promoter?promoter=series_ok&focus=schedule${milestoneQs}`);
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         continue;
@@ -276,6 +294,9 @@ export async function addPromoterNightAction(formData: FormData) {
   const signupEnabled = parseSignupEnabled(formData);
 
   const prisma = requirePrisma();
+  const priorNightCount = await prisma.promoterNight.count({
+    where: { series: { promoterId: session.promoterId } },
+  });
   const resolvedVenueId = await resolveVenueIdFromForm(formData, prisma);
   if (!resolvedVenueId) redirect("/promoter?promoter=night_invalid");
 
@@ -290,6 +311,7 @@ export async function addPromoterNightAction(formData: FormData) {
   }
 
   let nightId: string;
+  let secondVenueActivated = false;
   try {
     const night = await prisma.promoterNight.create({
       data: {
@@ -302,7 +324,12 @@ export async function addPromoterNightAction(formData: FormData) {
     });
     nightId = night.id;
     await provisionHostNightLineup(prisma, nightId, { signupEnabled });
-    await maybeRecordHostSecondVenueActivation(prisma, session.promoterId, resolvedVenueId, nightId);
+    secondVenueActivated = await maybeRecordHostSecondVenueActivation(
+      prisma,
+      session.promoterId,
+      resolvedVenueId,
+      nightId,
+    );
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       redirect("/promoter?promoter=night_duplicate");
@@ -314,7 +341,10 @@ export async function addPromoterNightAction(formData: FormData) {
   revalidatePath("/promoter");
   revalidatePath("/hosts");
   revalidatePath(`/nights/${nightId}/lineup`);
-  redirect("/promoter?promoter=night_ok");
+  const milestones: string[] = [];
+  if (priorNightCount === 0) milestones.push(HOST_MILESTONE_FIRST_NIGHT);
+  if (secondVenueActivated) milestones.push(HOST_MILESTONE_SECOND_VENUE);
+  redirect(`/promoter?promoter=night_ok${hostMilestoneQuery(milestones)}`);
 }
 
 /** Add recurring weekly/biweekly/monthly nights at a venue (bounded). */
@@ -329,6 +359,9 @@ export async function addPromoterRecurringNightsAction(formData: FormData) {
   if (!seriesId || !startRaw || !weekdayRaw) redirect("/promoter?promoter=night_invalid");
 
   const prisma = requirePrisma();
+  const priorNightCount = await prisma.promoterNight.count({
+    where: { series: { promoterId: session.promoterId } },
+  });
   const resolvedVenueId = await resolveVenueIdFromForm(formData, prisma);
   if (!resolvedVenueId) redirect("/promoter?promoter=night_invalid");
 
@@ -351,18 +384,23 @@ export async function addPromoterRecurringNightsAction(formData: FormData) {
   }
 
   let created = 0;
+  let secondVenueActivated = false;
   for (let i = 0; i < occurrences; i++) {
     try {
       const night = await prisma.promoterNight.create({
         data: { seriesId: series.id, venueId: resolvedVenueId, date: cursor, signupEnabled },
       });
       await provisionHostNightLineup(prisma, night.id, { signupEnabled });
-      await maybeRecordHostSecondVenueActivation(
-        prisma,
-        session.promoterId,
-        resolvedVenueId,
-        night.id,
-      );
+      if (
+        await maybeRecordHostSecondVenueActivation(
+          prisma,
+          session.promoterId,
+          resolvedVenueId,
+          night.id,
+        )
+      ) {
+        secondVenueActivated = true;
+      }
       created += 1;
     } catch (e) {
       if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) {
@@ -373,7 +411,14 @@ export async function addPromoterRecurringNightsAction(formData: FormData) {
   }
 
   revalidatePath("/promoter");
-  redirect(created > 0 ? "/promoter?promoter=night_ok" : "/promoter?promoter=night_duplicate");
+  const milestones: string[] = [];
+  if (priorNightCount === 0 && created > 0) milestones.push(HOST_MILESTONE_FIRST_NIGHT);
+  if (secondVenueActivated) milestones.push(HOST_MILESTONE_SECOND_VENUE);
+  redirect(
+    created > 0
+      ? `/promoter?promoter=night_ok${hostMilestoneQuery(milestones)}`
+      : "/promoter?promoter=night_duplicate",
+  );
 }
 
 /** Change venue for one night or this and future nights in the same series. */

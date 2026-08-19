@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ClaimAuthorityRole } from "@/lib/publicListings/claimAutoApproval";
-import { trackMarketingEvent } from "@/lib/marketingTracking";
+import { trackConversionEvent, trackMarketingEvent } from "@/lib/marketingTracking";
+import { oncePerSession } from "@/lib/conversionAttribution";
 
 const ROLES: { value: ClaimAuthorityRole; label: string }[] = [
   { value: "owner", label: "I own this venue" },
@@ -35,7 +36,10 @@ export function InstantClaimForm(props: {
   const startedRef = useRef(false);
 
   useEffect(() => {
-    trackMarketingEvent("claim_page_reached", { listing_slug: props.listingSlug });
+    oncePerSession(`conv:venue_claim_start:${props.listingSlug}`, () => {
+      trackMarketingEvent("claim_page_reached", { listing_slug: props.listingSlug });
+      trackConversionEvent("venue_claim_start", { listing_slug: props.listingSlug });
+    });
   }, [props.listingSlug]);
 
   function markStarted() {
@@ -90,11 +94,19 @@ export function InstantClaimForm(props: {
       if (data.decision === "AUTO_APPROVED" && data.activationPath) {
         trackMarketingEvent("claim_submit_success", { listing_slug: props.listingSlug, decision: "auto" });
         trackMarketingEvent("claim_auto_approved", { listing_slug: props.listingSlug });
+        trackConversionEvent("venue_claim_complete", {
+          listing_slug: props.listingSlug,
+          decision: "auto",
+        });
         router.push(`${data.activationPath}?claimed=1`);
         return;
       }
       trackMarketingEvent("claim_submit_success", { listing_slug: props.listingSlug, decision: "manual" });
       trackMarketingEvent("claim_manual_review", { listing_slug: props.listingSlug });
+      trackConversionEvent("venue_claim_complete", {
+        listing_slug: props.listingSlug,
+        decision: "manual",
+      });
       setManualReason(data.reason ?? "manual_review");
       setStatus("done");
     } catch {

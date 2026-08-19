@@ -19,6 +19,13 @@ import {
   classifyOutreachTargetIdentity,
   type OutreachTargetClassification,
 } from "@/lib/growth/outreachTargetIdentity";
+import { classifyOutreachNameQuality } from "@/lib/growth/outreachNameQuality";
+import { classifyOutreachGeoIdentity } from "@/lib/growth/outreachGeoIdentity";
+import {
+  classifyOutreachOpenMicEvidence,
+  type OutreachOpenMicEvidenceResult,
+} from "@/lib/growth/outreachOpenMicEvidence";
+import type { StoredEvidenceRow } from "@/lib/publicListings/publicOpenMicEvidenceGate";
 
 export type OutreachEligibilityReason =
   | "eligible"
@@ -27,6 +34,13 @@ export type OutreachEligibilityReason =
   | "wrong_lead_type"
   | "wrong_status"
   | "weak_open_mic_signal"
+  | "no_target_bound_open_mic_evidence"
+  | "stale_open_mic_evidence"
+  | "artist_bio_false_positive"
+  | "microphone_equipment_false_positive"
+  | "name_quality"
+  | "geography_conflict"
+  | "festival_event_not_venue"
   | "chamber_tourism"
   | "directory_aggregator"
   | "service_company"
@@ -159,6 +173,21 @@ export type GrowthLeadOutreachInput = Pick<
   listingName?: string | null;
   city?: string | null;
   region?: string | null;
+  discoveryMarketSlug?: string | null;
+  internalNotes?: string | null;
+  discoveryHints?: unknown;
+  sourceTitle?: string | null;
+  sourceSnippet?: string | null;
+  sourceUrl?: string | null;
+  about?: string | null;
+  lastVerifiedAt?: Date | null;
+  schedules?: Array<{
+    title: string | null;
+    description: string | null;
+    weekday?: string | null;
+    isActive?: boolean | null;
+  }> | null;
+  storedEvidence?: StoredEvidenceRow[] | null;
 };
 
 /** Pure eligibility evaluation (no DB). */
@@ -166,6 +195,7 @@ export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachI
   eligible: boolean;
   reason: OutreachEligibilityReason;
   target?: OutreachTargetClassification;
+  evidence?: OutreachOpenMicEvidenceResult;
 } {
   const email = normalizeMarketingEmail(input.contactEmailNormalized ?? "");
   if (!email) return { eligible: false, reason: "missing_email" };
@@ -230,8 +260,61 @@ export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachI
     return { eligible: false, reason: "needs_manual_review", target };
   }
 
-  if (target.identity === "VENUE" && !openMicSignalOk(input.openMicSignalTier, input.sourceKind)) {
-    return { eligible: false, reason: "weak_open_mic_signal", target };
+  const nameQ = classifyOutreachNameQuality({ name: input.name, listingName: input.listingName });
+  if (nameQ.festival) {
+    return { eligible: false, reason: "festival_event_not_venue", target };
+  }
+  if (!nameQ.ok) {
+    return { eligible: false, reason: "name_quality", target };
+  }
+
+  const geo = classifyOutreachGeoIdentity({
+    name: input.name,
+    city: input.city,
+    region: input.region,
+    formattedAddress: input.formattedAddress,
+    listingCity: input.listingName ? input.city : input.city,
+    listingRegion: input.region,
+    websiteHostNormalized: input.websiteHostNormalized,
+    websiteUrl: input.websiteUrl,
+    discoveryMarketSlug: input.discoveryMarketSlug,
+  });
+  if (geo.conflict) {
+    return { eligible: false, reason: "geography_conflict", target };
+  }
+
+  const evidence = classifyOutreachOpenMicEvidence({
+    name: input.name,
+    listingName: input.listingName,
+    websiteUrl: input.websiteUrl,
+    websiteHostNormalized: input.websiteHostNormalized,
+    city: input.city,
+    region: input.region,
+    sourceKind: input.sourceKind,
+    internalNotes: input.internalNotes,
+    discoveryHints: input.discoveryHints,
+    sourceTitle: input.sourceTitle,
+    sourceSnippet: input.sourceSnippet,
+    sourceUrl: input.sourceUrl || input.listingSourceUrl,
+    listingSourceUrl: input.listingSourceUrl,
+    listingWebsiteUrl: input.listingWebsiteUrl,
+    about: input.about,
+    lastVerifiedAt: input.lastVerifiedAt,
+    schedules: input.schedules,
+    storedEvidence: input.storedEvidence,
+  });
+  if (!evidence.autoSend) {
+    const reason: OutreachEligibilityReason =
+      evidence.rejectClass === "stale_open_mic_evidence"
+        ? "stale_open_mic_evidence"
+        : evidence.rejectClass === "artist_bio_false_positive"
+          ? "artist_bio_false_positive"
+          : evidence.rejectClass === "microphone_equipment_false_positive"
+            ? "microphone_equipment_false_positive"
+            : evidence.tier === "C"
+              ? "needs_manual_review"
+              : "no_target_bound_open_mic_evidence";
+    return { eligible: false, reason, target, evidence };
   }
 
   if (isFreeMailHost(emailHost)) {
@@ -243,7 +326,7 @@ export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachI
     if (!roleOk) return { eligible: false, reason: "domain_mismatch", target };
   }
 
-  return { eligible: true, reason: "eligible", target };
+  return { eligible: true, reason: "eligible", target, evidence };
 }
 
 /** True when another in-flight draft should block *new* outreach. The draft currently being sent is ignored. */
@@ -264,8 +347,32 @@ const LISTING_IDENTITY_SELECT = {
   lng: true,
   websiteUrl: true,
   sourceUrl: true,
+  sourceName: true,
+  about: true,
+  lastVerifiedAt: true,
+  googlePlaceVerifiedAt: true,
   city: true,
   region: true,
+  schedules: {
+    where: { isActive: true },
+    select: { title: true, description: true, weekday: true, isActive: true },
+    take: 8,
+  },
+  openMicEvidenceRows: {
+    select: {
+      trusted: true,
+      reviewOnly: true,
+      detectedPhrase: true,
+      evidenceExcerpt: true,
+      evidenceTitle: true,
+      evidenceDate: true,
+      fetchedAt: true,
+      sourceType: true,
+      reasonCode: true,
+      evidenceUrl: true,
+    },
+    take: 8,
+  },
 } as const;
 
 function identityFieldsFromListings(
@@ -277,8 +384,18 @@ function identityFieldsFromListings(
     lng: number | null;
     websiteUrl: string | null;
     sourceUrl: string | null;
+    sourceName?: string | null;
+    about?: string | null;
+    lastVerifiedAt?: Date | null;
     city: string | null;
     region: string | null;
+    schedules?: Array<{
+      title: string | null;
+      description: string | null;
+      weekday?: string | null;
+      isActive?: boolean | null;
+    }>;
+    openMicEvidenceRows?: StoredEvidenceRow[];
   }>,
 ) {
   const listing =
@@ -293,6 +410,12 @@ function identityFieldsFromListings(
     listingName: listing?.name ?? null,
     listingCity: listing?.city ?? null,
     listingRegion: listing?.region ?? null,
+    sourceTitle: listing?.sourceName ?? null,
+    sourceUrl: listing?.sourceUrl ?? null,
+    about: listing?.about ?? null,
+    lastVerifiedAt: listing?.lastVerifiedAt ?? null,
+    schedules: listing?.schedules ?? null,
+    storedEvidence: listing?.openMicEvidenceRows ?? null,
   };
 }
 
@@ -406,6 +529,13 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
     service_company: 0,
     weak_identity: 0,
     needs_manual_review: 0,
+    no_target_bound_open_mic_evidence: 0,
+    stale_open_mic_evidence: 0,
+    artist_bio_false_positive: 0,
+    microphone_equipment_false_positive: 0,
+    name_quality: 0,
+    geography_conflict: 0,
+    festival_event_not_venue: 0,
   } satisfies OutreachEligibilityAuditCounts;
 
   counts.totalLeads = await prisma.growthLead.count();
@@ -432,6 +562,9 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
         sourceKind: true,
         city: true,
         region: true,
+        discoveryMarketSlug: true,
+        internalNotes: true,
+        discoveryHints: true,
         publicListings: {
           where: { removedAt: null },
           select: LISTING_IDENTITY_SELECT,

@@ -1,18 +1,5 @@
 import type { GrowthLeadOpenMicSignalTier, GrowthLeadPerformanceTag } from "@/generated/prisma/client";
-
-const EXPLICIT_PATTERNS: RegExp[] = [
-  /\bopen\s*mic\b/i,
-  /\bopen\s*mic\s*night\b/i,
-  /\bmic\s*night\b/i,
-  /\bacoustic\s*open\s*mic\b/i,
-  /\bcomedy\s*open\s*mic\b/i,
-  /\bpoetry\s*open\s*mic\b/i,
-  /\bjam\s*night\b/i,
-  /\bsinger[\s-]*songwriter\s*night\b/i,
-  /\bamateur\s*night\b/i,
-  /\bshowcase\s*night\b/i,
-  /\bopen\s*stage\b/i,
-];
+import { hasOpenMicEventSemantics, stripDiscoveryQueryNoise } from "@/lib/growth/openMicPhraseSemantics";
 
 const STRONG_PATTERNS: RegExp[] = [
   /\brecurring\s+(event|show|night)s?\b/i,
@@ -78,10 +65,12 @@ export function scoreOpenMicVenueProspect(input: {
   hasContactPath: boolean;
   hasSocial: boolean;
 }): OpenMicVenueScoreResult {
-  const bundle = `${input.searchQuery}\n${input.title}\n${input.snippet}\n${input.pageTextSample}`.slice(0, 120_000);
-  const lower = bundle.toLowerCase();
+  const pageBundle = stripDiscoveryQueryNoise(
+    `${input.title}\n${input.snippet}\n${input.pageTextSample}`.slice(0, 120_000),
+  );
+  const lower = pageBundle.toLowerCase();
 
-  const explicit = hasAny(lower, EXPLICIT_PATTERNS);
+  const explicit = hasOpenMicEventSemantics(pageBundle);
   const strong = hasAny(lower, STRONG_PATTERNS);
   const venueCtx = hasAny(lower, VENUE_CONTEXT_PATTERNS);
 

@@ -251,7 +251,10 @@ function looksLikeServiceCompany(input: OutreachTargetIdentityInput): boolean {
 }
 
 function looksLikeChamber(input: OutreachTargetIdentityInput): boolean {
-  return CHAMBER_RE.test(haystack(input));
+  if (CHAMBER_RE.test(haystack(input))) return true;
+  const host = hostOf(input);
+  if (host && /^(visit|explore|discover)[a-z0-9-]*\.(com|org|net)$/i.test(host)) return true;
+  return false;
 }
 
 function promoterPositive(input: OutreachTargetIdentityInput): boolean {

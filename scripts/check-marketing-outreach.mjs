@@ -22,6 +22,14 @@ const {
 const { verifyResendWebhookPayload } = await import("../src/lib/marketing/resendWebhookHandler.ts");
 const { marketingUnsubscribeConfirmUrl } = await import("../src/lib/marketing/unsubscribeSigning.ts");
 const { classifyOutreachTargetIdentity } = await import("../src/lib/growth/outreachTargetIdentity.ts");
+const { classifyOutreachOpenMicEvidence } = await import("../src/lib/growth/outreachOpenMicEvidence.ts");
+const { classifyOutreachNameQuality } = await import("../src/lib/growth/outreachNameQuality.ts");
+const { classifyOutreachGeoIdentity } = await import("../src/lib/growth/outreachGeoIdentity.ts");
+const {
+  classifyFalseOpenMicSemantics,
+  hasOpenMicEventSemantics,
+} = await import("../src/lib/growth/openMicPhraseSemantics.ts");
+const { scoreOpenMicVenueProspect } = await import("../src/lib/growth/discovery/venueOpenMicSignals.ts");
 const {
   finalizeOutreachSendBodies,
   OUTREACH_DRAFT_FOOTER_TEXT,
@@ -41,6 +49,9 @@ function baseLead(overrides = {}) {
     websiteHostNormalized: "bluenote.com",
     openMicSignalTier: "EXPLICIT_OPEN_MIC",
     sourceKind: "WEBSITE_CONTACT",
+    schedules: [
+      { title: "Open Mic", description: "Weekly open mic every Tuesday. Performers can sign up.", weekday: "TUESDAY", isActive: true },
+    ],
     hasPendingDraft: false,
     hasRecentOutreachSend: false,
     deferClaimPath: false,
@@ -257,6 +268,14 @@ assert.equal(ident({ name: "The Green Mill", websiteUrl: "https://www.yelp.com/b
 assert.equal(ident({ name: "Open Mic Night", websiteUrl: "https://www.eventbrite.com/o/some-organizer", websiteHostNormalized: "eventbrite.com" }).rejectClass, "directory");
 assert.equal(ident({ name: "Visit Phoenix Tourism Bureau", websiteUrl: "https://visitphoenix.com/", websiteHostNormalized: "visitphoenix.com" }).rejectClass, "chamber_tourism");
 assert.equal(
+  ident({
+    name: "Bricktown Comedy Club",
+    websiteUrl: "https://www.visitokc.com/event/open-mic-night",
+    websiteHostNormalized: "visitokc.com",
+  }).rejectClass,
+  "chamber_tourism",
+);
+assert.equal(
   evaluateGrowthLeadOutreachEligibility(
     baseLead({ name: "Austin Chamber of Commerce", websiteUrl: "https://austinchamber.com", websiteHostNormalized: "austinchamber.com", contactEmailNormalized: "info@austinchamber.com" }),
   ).reason,
@@ -386,7 +405,174 @@ assert.equal(
   "manual_review",
 );
 
-assert.equal(evaluateGrowthLeadOutreachEligibility(baseLead({ name: "SILO Dallas in Texas", websiteUrl: "https://silodallas.com/", websiteHostNormalized: "silodallas.com", contactEmailNormalized: "info@silodallas.com" })).eligible, true);
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(
+    baseLead({
+      name: "SILO Dallas in Texas",
+      websiteUrl: "https://silodallas.com/",
+      websiteHostNormalized: "silodallas.com",
+      contactEmailNormalized: "info@silodallas.com",
+      schedules: [],
+    }),
+  ).eligible,
+  false,
+);
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(
+    baseLead({
+      name: "SILO Dallas in Texas",
+      websiteUrl: "https://silodallas.com/",
+      websiteHostNormalized: "silodallas.com",
+      contactEmailNormalized: "info@silodallas.com",
+      schedules: [{ title: "Open Mic", description: "Weekly open mic every Tuesday. Performers can sign up.", weekday: "TUESDAY", isActive: true }],
+    }),
+  ).eligible,
+  true,
+);
+
+// --- Target-bound open-mic evidence (auto-send vs false positives) ---
+assert.equal(hasOpenMicEventSemantics("Open Mike Eagle at Higher Ground"), false);
+assert.equal(classifyFalseOpenMicSemantics("Higher Ground presents Open Mike Eagle tonight"), "open_mike_person");
+assert.equal(classifyFalseOpenMicSemantics("She started at open mics in Chicago before touring"), "artist_bio");
+assert.equal(classifyFalseOpenMicSemantics("wireless mic available for your event"), "microphone_equipment");
+assert.equal(classifyFalseOpenMicSemantics("speaker and mic rental packages"), "microphone_equipment");
+assert.equal(classifyFalseOpenMicSemantics("The patio is open to the public"), "generic_open_copy");
+assert.equal(hasOpenMicEventSemantics("find open mic nights near you in a search result about another city"), false);
+
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "Higher Ground",
+    websiteUrl: "https://highergroundmusic.com/",
+    websiteHostNormalized: "highergroundmusic.com",
+    sourceSnippet: "Open Mike Eagle headlines Friday at Higher Ground",
+    internalNotes: "Snippet: Open Mike Eagle at Higher Ground.",
+  }).autoSend,
+  false,
+);
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "14TENN",
+    websiteUrl: "https://14tenn.828venues.com/",
+    websiteHostNormalized: "14tenn.828venues.com",
+    sourceSnippet: "wireless mic available, speaker and mic rental on site",
+  }).rejectClass,
+  "microphone_equipment_false_positive",
+);
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "The Cove Lounge",
+    websiteUrl: "https://covelounge.com/events/open-mic",
+    websiteHostNormalized: "covelounge.com",
+    sourceUrl: "https://covelounge.com/events/open-mic",
+    sourceTitle: "Open Mic",
+    sourceSnippet: "The Cove Lounge hosts a weekly Open Mic. Performers can sign up at the door.",
+    schedules: [{ title: "Open Mic", description: "Weekly open mic every Tuesday", isActive: true }],
+  }).tier,
+  "A",
+);
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "River Bar",
+    websiteUrl: "https://riverbar.com/",
+    websiteHostNormalized: "riverbar.com",
+    sourceUrl: "https://riverbar.com/calendar",
+    sourceTitle: "Calendar",
+    about: "River Bar hosts a weekly open mic. Sign up for our open jam.",
+  }).autoSend,
+  true,
+);
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "The Fox",
+    websiteUrl: "https://thefox.com/",
+    websiteHostNormalized: "thefox.com",
+    sourceSnippet: "Open mic every Tuesday at The Fox. Performers can sign up.",
+    sourceUrl: "https://thefox.com/events/open-mic",
+  }).autoSend,
+  true,
+);
+assert.equal(
+  classifyOutreachOpenMicEvidence({
+    name: "The Fox",
+    websiteUrl: "https://thefox.com/",
+    websiteHostNormalized: "thefox.com",
+    sourceSnippet: "Open mic night in 2021 at The Fox. Looking back at our archive.",
+    lastVerifiedAt: new Date("2021-04-01T00:00:00.000Z"),
+    storedEvidence: [{ trusted: true, evidenceExcerpt: "Open mic night in 2021", evidenceDate: new Date("2021-04-01T00:00:00.000Z") }],
+  }).rejectClass,
+  "stale_open_mic_evidence",
+);
+
+assert.equal(classifyOutreachNameQuality({ name: "Under Construtcion" }).reason, "under_construction");
+assert.equal(
+  classifyOutreachNameQuality({
+    name: "Downtown EDM, Themed Bar, Brunch Party, Bottomless Mimosas, Bottle Service Deal, Pizza, Happy Hour Las Vegas NV",
+  }).ok,
+  false,
+);
+assert.equal(classifyOutreachNameQuality({ name: "Salt Lake City Jazz Festival" }).festival, true);
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(
+    baseLead({
+      name: "Salt Lake City Jazz Festival",
+      websiteUrl: "https://slcjazzfestival.com/",
+      websiteHostNormalized: "slcjazzfestival.com",
+      contactEmailNormalized: "info@slcjazzfestival.com",
+    }),
+  ).reason,
+  "festival_event_not_venue",
+);
+assert.equal(
+  classifyOutreachGeoIdentity({
+    name: "Cactus Club",
+    city: "Toronto",
+    region: "ON",
+    websiteHostNormalized: "cactusclubmilwaukee.com",
+    websiteUrl: "https://www.cactusclubmilwaukee.com/",
+  }).conflict,
+  true,
+);
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(
+    baseLead({
+      name: "Cactus Club",
+      city: "Toronto",
+      region: "ON",
+      websiteUrl: "https://www.cactusclubmilwaukee.com/",
+      websiteHostNormalized: "cactusclubmilwaukee.com",
+      contactEmailNormalized: "info@cactusclubmilwaukee.com",
+      schedules: [{ title: "Open Mic", description: "Weekly open mic", isActive: true }],
+    }),
+  ).reason,
+  "geography_conflict",
+);
+assert.equal(
+  evaluateGrowthLeadOutreachEligibility(baseLead({ name: "Under Construtcion", websiteUrl: "https://internationalbarslc.com/", websiteHostNormalized: "internationalbarslc.com" })).reason,
+  "name_quality",
+);
+
+const scoredQueryPoison = scoreOpenMicVenueProspect({
+  snippet: "Book our room for private events. Wireless mic available.",
+  pageTextSample: "speaker and mic rental",
+  title: "14TENN event spaces",
+  searchQuery: "open mic nashville 14TENN",
+  hasEmail: true,
+  hasContactPath: true,
+  hasSocial: false,
+});
+assert.equal(scoredQueryPoison.tier === "EXPLICIT_OPEN_MIC", false);
+
+const scoredReal = scoreOpenMicVenueProspect({
+  snippet: "Join us for weekly open mic every Tuesday. Performers can sign up.",
+  pageTextSample: "The Cove Lounge hosts a weekly open mic.",
+  title: "Open Mic at The Cove Lounge",
+  searchQuery: "open mic chicago",
+  hasEmail: true,
+  hasContactPath: true,
+  hasSocial: false,
+});
+assert.equal(scoredReal.tier, "EXPLICIT_OPEN_MIC");
+
 
 // Draft-only copy must not survive into production send representation
 const draftPayload = buildGrowthLeadOutreachPayload({

@@ -83,6 +83,12 @@ const MUST_REJECT = [
   "Discovered lead",
   "Event Spaces & Places",
   "We Them One's Comedy Tour",
+  "Best Dive Bar in New Orleans, LA",
+  "Best Music Venue in Greenville, SC",
+  "Chicago Music: 30 Must",
+  "Chance the Rapper hosts open mic night",
+  "Chattanooga's Open Mic Nights",
+  "Crave live music? These nine music venues in Boston, Cambridge, and Somerville will keep you grooving.",
 ];
 
 // Real venue / event names — must pass.
@@ -96,6 +102,7 @@ const MUST_ALLOW = [
   "New Orleans Youth Open Mic Night",
   "Rambling House Open Mic",
   "Avalon Park Open Mic Night & Community Kick Back",
+  "Zack's Open Mic Night",
   "Cafe Wha?",
 ];
 

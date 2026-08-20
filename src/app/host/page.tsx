@@ -98,6 +98,40 @@ export default async function HostLandingPage(props: { searchParams: Promise<{ g
             hop between venues every week. No spreadsheets. No pretending you own the bar.
           </p>
         </section>
+
+        <section className="mt-12">
+          <h2 className="text-lg font-semibold text-white">Host FAQ</h2>
+          <dl className="mt-4 grid gap-4 text-sm">
+            <div>
+              <dt className="font-medium text-white">Can I host at multiple venues?</dt>
+              <dd className="mt-1 text-white/70">
+                Yes. One host account can run nights at different rooms. Add each night and pick where it happens.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-white">Do I need to own the venue?</dt>
+              <dd className="mt-1 text-white/70">
+                No. Hosts run the show; venue accounts are for the business that operates the space.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-white">Can I run multiple open mics?</dt>
+              <dd className="mt-1 text-white/70">
+                Yes. Recurring weekly nights and extra rooms all sit on the same login and public host page.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-white">Can performers sign up online?</dt>
+              <dd className="mt-1 text-white/70">
+                When you publish a night, you can take signups and share a lineup from MicStage instead of DMs.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-white">Is MicStage free?</dt>
+              <dd className="mt-1 text-white/70">Yes. Hosting, performer signup, and listing a venue are free.</dd>
+            </div>
+          </dl>
+        </section>
       </main>
     </div>
   );

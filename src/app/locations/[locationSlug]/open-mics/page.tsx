@@ -20,6 +20,8 @@ import type { Weekday } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
 
+const WEEKDAY_ORDER: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
 function listingCard(v: OpenMicFinderVenue) {
   return (
     <li key={`${v.href}-${v.slug}`}>
@@ -106,6 +108,11 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
   const todayWeekday = jsDayToWeekday(new Date().getDay());
   const tonight = listings.filter((l) => (l.scheduleWeekdays ?? []).includes(todayWeekday));
   const tonightLabel = weekdayToLabel(todayWeekday);
+  const thisWeekByDay = WEEKDAY_ORDER.map((day) => ({
+    day,
+    label: weekdayToLabel(day),
+    rows: listings.filter((l) => (l.scheduleWeekdays ?? []).includes(day)),
+  })).filter((g) => g.rows.length > 0);
 
   const comedy = listings.filter((l) =>
     (l.performanceFormats ?? []).some((f) => f === "COMEDY" || f === "COMEDY_SPOKEN_WORD"),
@@ -202,6 +209,31 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
                 .
               </p>
             )}
+
+            {thisWeekByDay.length > 0 ? (
+              <section>
+                <h2 className="text-lg font-semibold">Recurring nights this week</h2>
+                <p className="mt-1 text-xs text-white/55">
+                  From published weekly schedules — confirm with the venue before you go.
+                </p>
+                <div className="mt-3 grid gap-3">
+                  {thisWeekByDay.map((g) => (
+                    <div key={g.day}>
+                      <h3 className="text-sm font-medium text-white/80">{g.label}</h3>
+                      <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-white/70">
+                        {g.rows.map((v) => (
+                          <li key={`${g.day}-${v.slug}`}>
+                            <Link href={v.href} className="underline hover:text-white">
+                              {v.name}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <section>
               <h2 className="text-lg font-semibold">Open mics in {placeTitle}</h2>

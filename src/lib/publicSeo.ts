@@ -20,9 +20,9 @@ function normalizeSiteOrigin(raw: string): string {
 }
 
 /** Production default; override with APP_URL / NEXT_PUBLIC_APP_URL in env (metadata / OG). */
-/** Shared copy: MicStage = open mic platform (not stage sound / theater micing). */
+/** Shared copy for default meta / Organization JSON-LD. */
 export const OPEN_MIC_PLATFORM_DESCRIPTION =
-  "MicStage is an open mic night platform for performers and venues — find local open mics, sign up when available, and list your room. Not stage sound equipment or theater microphone placement.";
+  "MicStage is a free open mic platform for performers, hosts, and venues — find local nights, see schedules and signup details, and run your room from one place.";
 
 export function siteOrigin(): string {
   return normalizeSiteOrigin(process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "https://micstage.com");

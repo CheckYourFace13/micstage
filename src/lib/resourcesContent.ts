@@ -807,6 +807,71 @@ const ARTICLES: ResourceArticle[] = [
       { href: "/performers", label: "Performers" },
     ],
   },
+  {
+    slug: "how-micstage-verifies-open-mic-listings",
+    title: "How MicStage verifies and updates open mic listings",
+    description:
+      "What “verified” means on MicStage: place identity, explicit open-mic evidence, last-confirmed dates, corrections, and claiming a listing you run.",
+    category: "strategy",
+    readingMinutes: 8,
+    publishedAt: "2026-08-20",
+    updatedAt: "2026-08-20",
+    intro:
+      "MicStage listings are meant to answer a practical question: does this room actually run an open mic, and what do we know about it? This page explains the public bar — not internal crawler labels — so performers, hosts, and venue operators can trust what they see and fix what is wrong.",
+    practicalTips: [
+      "Read the last-confirmed date before you travel on a holiday week.",
+      "If a time or host name is missing, it is unknown — we do not fill gaps with guesses.",
+      "Suggest a correction on the listing when the door list disagrees with the page.",
+      "If you run the night, claim it so the public page is the same system as signups.",
+    ],
+    sections: [
+      {
+        heading: "Verified means place + open mic, not “we found a webpage”",
+        paragraphs: [
+          "A Google Place (or similar) can prove a bar exists. It does not prove that bar hosts an open mic. Public verified listings need both: a real location, and explicit open-mic language tied to that room — the listing name, a published schedule, or a trusted source page for that venue.",
+          "Search snippets and directory chrome are not enough. Article titles and “best of” listicles never become public listings.",
+        ],
+      },
+      {
+        heading: "What you will see on a listing",
+        paragraphs: [
+          "When we have the facts: name, venue/address, city, weekly schedule, type, signup method, host, and a last-confirmed date. Nearby listings appear when other verified nights exist in the same city.",
+          "When we do not have a fact, the field is omitted. Unclaimed pages are research listings until a host or venue claims them.",
+        ],
+      },
+      {
+        heading: "Updates, corrections, and claims",
+        paragraphs: [
+          "Schedules drift. Last-confirmed dates tell you how recently the night was checked. Anyone can suggest a correction. Claiming moves the listing onto a venue or host account so the people who run the door maintain it.",
+          "Host accounts are for people who run nights at rooms they may not own. Venue accounts are for the business that operates the space.",
+        ],
+      },
+    ],
+    faq: [
+      {
+        q: "Why is a listing on the site if nobody from the bar claimed it?",
+        a: "Unclaimed listings are research pages so performers can still find the night. Claiming lets the host or venue take over the same URL’s facts.",
+      },
+      {
+        q: "Does “scheduled for Tuesday” mean tonight is definitely on?",
+        a: "It means a recurring Tuesday is on file. Confirm with the venue when the last-confirmed date is old or a holiday might cancel the night.",
+      },
+    ],
+    relatedGuides: [
+      { slug: "how-micstage-helps-venues-and-performers-connect", label: "How MicStage helps venues and performers connect" },
+      { slug: "list-your-open-mic-venue-on-micstage", label: "List your venue" },
+    ],
+    keyTakeaways: [
+      "Verified listings need a real place and explicit open-mic evidence.",
+      "Missing fields mean unknown — not invented.",
+      "Corrections and claims keep public pages aligned with the door.",
+    ],
+    relatedDiscoveryLinks: [
+      { href: "/about", label: "About MicStage" },
+      { href: "/find-open-mics", label: "Find open mics" },
+      { href: "/host", label: "For hosts" },
+    ],
+  },
 ];
 
 export function getAllResourceArticles(): ResourceArticle[] {

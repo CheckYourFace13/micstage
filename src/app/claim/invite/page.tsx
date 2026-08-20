@@ -9,6 +9,7 @@ import {
   maskClaimInviteEmail,
 } from "@/lib/publicListings/claimInviteSession";
 import { consumeListingClaimInviteTokenById } from "@/lib/publicListings/claimInviteToken";
+import { sanitizePublicListingAbout } from "@/lib/publicListings/listingAboutFromLead";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
@@ -136,7 +137,7 @@ export default async function ClaimInviteSessionPage({
   const evidenceSummary =
     scheduleBits.length > 0
       ? `Recurring schedule on file: ${scheduleBits.join("; ")}.`
-      : listing.about?.slice(0, 180) || null;
+      : sanitizePublicListingAbout(listing.about)?.slice(0, 180) || null;
 
   const invitedEmailMasked = maskClaimInviteEmail(session.intendedEmailNormalized);
   const cityLine = [listing.city, listing.region].filter(Boolean).join(", ") || null;

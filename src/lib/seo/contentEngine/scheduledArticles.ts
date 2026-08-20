@@ -9,50 +9,44 @@ export const SCHEDULED_RESOURCE_ARTICLES: ResourceArticle[] = [
     slug: "open-mics-tonight-near-me",
     title: "Open mics tonight near me: how to find a show you can actually play",
     description:
-      "Practical ways to find open mic nights happening tonight near you — search tools, venue pages, sign-up windows, and what to check before you leave home.",
+      "How to confirm an open mic is happening tonight: weekday match, signup cutoff, format, and what to check before you leave.",
     category: "performer",
-    readingMinutes: 9,
+    readingMinutes: 6,
     publishedAt: "2026-06-19",
-    updatedAt: "2026-06-19",
+    updatedAt: "2026-08-20",
     intro:
-      "If you searched “open mics tonight near me,” you probably need three answers fast: is there a show, what time do signups close, and is the room right for your act. MicStage is an open mic night platform for performers and venues — not stage sound equipment or theater mic placement. This guide walks through how to find real open mic events tonight, how to confirm they are still happening, and how to show up prepared.",
+      "If you searched “open mics tonight near me,” you need three answers fast: is there a show tonight, when do signups close, and is the room right for your act. This guide is the day-of checklist — not a general tutorial on finding rooms (use the nearby-nights guide for that).",
     practicalTips: [
-      "Search by city or ZIP on MicStage’s finder, then filter for tonight’s weekday on the venue or map view.",
-      "Confirm sign-up cutoff — many open mics stop taking names 30–60 minutes before the first act.",
-      "Read the venue’s format (music-only, comedy, mixed) so you do not book a poetry night with a full band.",
-      "Save the venue’s public MicStage page — schedules update there instead of scattered social posts.",
-      "Bring a short set list and a backup song; hosts appreciate performers who respect the clock.",
+      "Filter for today’s weekday, then open the listing and read signup cutoff before you travel.",
+      "Many rooms stop taking names 30–60 minutes before the first act.",
+      "Match format: comedy, music, poetry, or mixed — don’t assume mixed.",
+      "Treat last-confirmed dates as a hint, not a live guarantee. Holidays cancel nights.",
+      "Bring a timed set. Hosts keep the night moving.",
     ],
     sections: [
       {
-        heading: "Start with a live directory, not a generic web search",
+        heading: "Confirm it is actually tonight",
         paragraphs: [
-          "Generic searches often mix open mic nights with unrelated results about microphones on stage. Use an open mic–specific directory so results are venues and nights, not sound-tech tutorials.",
-          "MicStage lists public venue pages with schedules and booking links where venues enable them. The map and find-open-mics tools sort by distance when you share location or enter a ZIP.",
+          "A listing with a weekly Tuesday schedule is not automatically running on a holiday Tuesday. Check the listing’s last-confirmed date, the venue website or social if linked, and whether the host posted a cancelation.",
+          "On MicStage city hubs, “scheduled for [weekday]” means a recurring night is on file for that day — not a live check-in from the door.",
         ],
       },
       {
-        heading: "What to verify before you drive over",
+        heading: "Signup windows kill more nights than talent",
         paragraphs: [
-          "Check whether the night is recurring or a one-off cancellation. Holidays and private events sometimes pause an open mic without updating every social channel.",
-          "Look for host contact, slot length, and whether the room is 21+. Beginners especially should know cover charges and gear expectations upfront.",
-        ],
-      },
-      {
-        heading: "For venues: make tonight discoverable",
-        paragraphs: [
-          "If you run an open mic venue, publish tonight’s start time and sign-up rules on your MicStage page. Performers searching tonight are high-intent — missing info costs you walk-ins.",
+          "If the listing says list-at-the-door, arrive in the posted window. If it offers online signup, complete it before you leave home so you are not arguing with the list.",
+          "Slot length and 21+ rules belong in the same pass. A 4-minute comedy list is not a 12-minute band slot.",
         ],
       },
     ],
     faq: [
       {
-        q: "Is MicStage the same as advice about micing a stage for theater?",
-        a: "No. MicStage helps people find open mic nights and sign up for performance spots at venues when online signups are enabled. It is not a guide for sound engineers placing microphones on a theater stage.",
+        q: "Can I sign up for a spot tonight on MicStage?",
+        a: "Only when that listing enables online signups. Otherwise use the posted door list or host process.",
       },
       {
-        q: "Can I sign up for an open mic spot tonight on MicStage?",
-        a: "When a venue enables online signups on MicStage, you can sign up from their public page. Otherwise, show up during the venue’s posted sign-up window.",
+        q: "Why does a listing say the schedule may have changed?",
+        a: "Recurring nights get canceled for private events and holidays. Confirm with the venue when the last-confirmed date is old.",
       },
     ],
     relatedGuides: [
@@ -60,58 +54,56 @@ export const SCHEDULED_RESOURCE_ARTICLES: ResourceArticle[] = [
       { slug: "what-to-expect-at-your-first-open-mic", label: "Your first open mic" },
     ],
     keyTakeaways: [
-      "Use open mic–specific tools to avoid irrelevant “stage microphone” search results.",
-      "Confirm sign-up time, format, and age policy before leaving home.",
-      "Venues should publish tonight’s details on a single canonical page.",
+      "Tonight means: weekday match + signup window + format fit.",
+      "Recurring schedules are not live confirmation.",
+      "Use the general finder guide when you are planning later in the week.",
     ],
     relatedDiscoveryLinks: [
       { href: "/find-open-mics", label: "Find open mics near you" },
       { href: "/map", label: "Open mic map" },
-      { href: "/venues", label: "Venue directory" },
     ],
   },
   {
     slug: "how-to-find-open-mic-nights-near-you",
     title: "How to find open mic nights near you (performers & venues)",
     description:
-      "A step-by-step guide to finding open mic nights by city, metro, or ZIP — built for singers, comedians, poets, and venue owners listing their room.",
+      "Find open mic nights by city, ZIP, or map — then use the listing for day, time, format, and signup rules.",
     category: "performer",
-    readingMinutes: 10,
+    readingMinutes: 8,
     publishedAt: "2026-06-19",
-    updatedAt: "2026-06-19",
+    updatedAt: "2026-08-20",
     intro:
-      "Whether you are a performer looking for stage time or a venue owner comparing how other rooms promote their night, the goal is the same: accurate, local information about open mic events. MicStage connects open mic venues and artists through public schedules and discovery pages — not audio engineering for stage plays.",
+      "The useful search is not “is there live music somewhere.” It is: which rooms near me publish a recurring open mic, on which night, with which signup rules. MicStage is built for that — public listings, city hubs, and a map.",
     practicalTips: [
-      "Use ZIP or city search first, then browse metro hubs for smaller towns rolled into a region.",
-      "Follow venue pages that match your format (acoustic, comedy, poetry, mixed).",
-      "Compare weeknight vs weekend options — many strong open mics are Tuesday–Thursday.",
-      "Venue owners: claim your listing so performers see the same schedule your staff uses.",
+      "Start with ZIP or city search, then open a listing instead of stopping at the result title.",
+      "Use metro hubs when a small town rolls up to a larger market.",
+      "Weeknights (Tue–Thu) often have more open mics than Friday.",
+      "Venue and host operators: claim the listing so the public page matches the door list.",
     ],
     sections: [
       {
-        heading: "Search by location on MicStage",
+        heading: "Search, then read the listing",
         paragraphs: [
-          "Start at find-open-mics or the open mic map. Enter your city or ZIP to sort venues by distance. Metro and regional pages group activity when a town does not yet have enough listings for its own hub.",
+          "Use find-open-mics or the map. Distance is only half the decision. The listing should show location, recurring schedule when we have it, type, and signup method.",
+          "If a fact is missing, we leave it blank rather than guess. Suggest a correction or ask the host.",
         ],
       },
       {
-        heading: "Evaluate a room before your first visit",
+        heading: "City hubs vs a single listing",
         paragraphs: [
-          "Read slot length, sign-up style (list vs lottery vs online), and house gear. Performers waste less time when expectations are posted.",
-          "Artists can browse the performers directory by stage name when looking for collaborators who play local open mics.",
-        ],
-      },
-      {
-        heading: "Venues: get found by the right searches",
-        paragraphs: [
-          "List your open mic night with a clear title, neighborhood, and weekly time. Phrases like “open mic night” and your city help search engines show your page to performers — not unrelated “mic stage” sound topics.",
+          "City pages group tonight, this week, and categories (music, comedy, spoken word) from real listings — not a generic essay about the town.",
+          "Thin markets stay out of search indexes until there is enough inventory to be useful.",
         ],
       },
     ],
     faq: [
       {
         q: "What is the difference between /venues and /locations?",
-        a: "Venue pages are individual rooms with addresses and schedules. Location pages group performer activity by metro or region.",
+        a: "Venue pages are individual rooms with addresses and schedules. Location pages group listings (and performer activity) by metro or region.",
+      },
+      {
+        q: "Where do I look for tonight specifically?",
+        a: "Use the tonight checklist guide, or a city hub’s “scheduled for [weekday]” section.",
       },
     ],
     relatedGuides: [
@@ -119,9 +111,9 @@ export const SCHEDULED_RESOURCE_ARTICLES: ResourceArticle[] = [
       { slug: "list-your-open-mic-venue-on-micstage", label: "List your venue" },
     ],
     keyTakeaways: [
-      "Search by ZIP/city, then drill into venue pages for exact times.",
-      "Format and sign-up rules matter as much as distance.",
-      "Venues should use clear “open mic night” language on public pages.",
+      "Search by ZIP/city, then read schedule and signup on the listing.",
+      "City hubs summarize real nights — they are not travel articles.",
+      "Claimed listings stay more accurate than unclaimed research pages.",
     ],
     relatedDiscoveryLinks: [
       { href: "/find-open-mics", label: "Find open mics" },
@@ -133,53 +125,57 @@ export const SCHEDULED_RESOURCE_ARTICLES: ResourceArticle[] = [
     slug: "list-your-open-mic-venue-on-micstage",
     title: "List your open mic venue on MicStage (free venue guide)",
     description:
-      "How bar, café, and club owners list an open mic night on MicStage so local performers can find your room, see your schedule, and sign up for spots when the venue enables online signups.",
+      "How bar, café, and club operators list an open mic on MicStage so performers can see the real schedule and signup rules.",
     category: "venue-ops",
-    readingMinutes: 8,
+    readingMinutes: 7,
     publishedAt: "2026-06-19",
-    updatedAt: "2026-06-19",
+    updatedAt: "2026-08-20",
     intro:
-      "MicStage is a free open mic platform for venues and artists. Listing your room helps performers searching for open mic nights in your city — and helps you run a clearer schedule than scattered social posts. This is not about microphone placement for theater productions; it is about marketing your recurring open mic to the local music and comedy scene.",
+      "A public MicStage page is the stable URL for your night: day, time, signup rules, and format. Social posts expire; performers comparing two rooms the same evening need one place that matches what the door staff says.",
     practicalTips: [
-      "Register as a venue, then add your weekly open mic time and sign-up rules.",
-      "Upload a recognizable room name and neighborhood — performers search by city first.",
-      "Enable public schedules so discovery pages and search engines can index your listing.",
-      "Share your MicStage venue link on Instagram bio and printed flyers at the bar.",
+      "Register as a venue, then publish weekly time and signup rules.",
+      "Use the name people actually search — room plus neighborhood.",
+      "Share the MicStage link on your Instagram bio and a flyer at the bar.",
+      "If you host at rooms you do not own, use a host account instead of a venue account.",
     ],
     sections: [
       {
-        heading: "Why list on a dedicated open mic platform",
+        heading: "Why a dedicated page beats a feed post",
         paragraphs: [
-          "Social posts expire; a canonical venue page stays findable. Performers comparing multiple rooms in one evening need stable URLs with times and format.",
-          "MicStage discovery surfaces venues on maps, directories, and regional guides as your market grows.",
+          "Performers bookmark a URL. They do not scroll six months of Stories to find signups. A canonical page also helps hosts who rotate rooms keep one public identity.",
         ],
       },
       {
-        heading: "What to put on your public page",
+        heading: "What to publish",
         paragraphs: [
-          "Include day of week, door time, sign-up cutoff, slot length, PA/backline notes, and age policy. The more complete the page, the fewer repetitive DMs your staff answers.",
+          "Day of week, start time, signup cutoff, slot length, house gear, and age policy. Incomplete pages create DMs your staff should not have to answer.",
         ],
       },
     ],
     faq: [
       {
         q: "Does MicStage charge venues to list an open mic?",
-        a: "MicStage is built to be free for artists and venues during beta. List your room and publish your schedule to start appearing in discovery.",
+        a: "No. Listing a room and publishing a schedule is free.",
+      },
+      {
+        q: "I run the night but I don’t own the bar. What do I register as?",
+        a: "Register as a host. Venue accounts are for the business that operates the space.",
       },
     ],
     relatedGuides: [
       { slug: "why-open-mic-nights-work-for-venues", label: "Why open mics work for venues" },
       { slug: "how-to-run-a-successful-open-mic-night", label: "Run a successful open mic" },
+      { slug: "how-micstage-verifies-open-mic-listings", label: "How listings are verified" },
     ],
     keyTakeaways: [
-      "A dedicated venue page beats one-off social posts for discovery.",
-      "Complete schedules attract better-fit performers.",
-      "MicStage is for open mic events — not stage sound engineering.",
+      "Publish day, time, and signup rules on one page.",
+      "Hosts and venue owners use different account types.",
+      "Free to list; claim existing research listings when they are yours.",
     ],
     relatedDiscoveryLinks: [
       { href: "/register/venue", label: "Register your venue" },
+      { href: "/host", label: "Host an open mic" },
       { href: "/venues", label: "See other venue listings" },
-      { href: "/resources/why-open-mic-nights-work-for-venues", label: "Why open mics work" },
     ],
   },
 ];

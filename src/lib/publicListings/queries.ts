@@ -159,3 +159,35 @@ export async function loadFeaturedPublicListings(
   });
   return rows.filter((l) => listingPassesPublicOpenMicGate(l)).slice(0, limit);
 }
+
+/** Other discoverable listings in the same city (or region fallback). Does not invent rows. */
+export async function loadNearbyPublicListings(
+  prisma: PrismaClient,
+  opts: {
+    excludeSlug: string;
+    city: string | null;
+    region: string | null;
+    limit?: number;
+  },
+): Promise<Array<{ slug: string; name: string; city: string | null; region: string | null }>> {
+  const limit = opts.limit ?? 6;
+  const city = opts.city?.trim() || null;
+  const region = opts.region?.trim() || null;
+  if (!city && !region) return [];
+
+  const rows = await prisma.publicOpenMicListing.findMany({
+    where: {
+      ...publicListingWhereDiscoverable(),
+      slug: { not: opts.excludeSlug },
+      ...(city ? { city: { equals: city, mode: "insensitive" } } : { region: { equals: region!, mode: "insensitive" } }),
+    },
+    orderBy: [{ lastVerifiedAt: "desc" }, { name: "asc" }],
+    take: limit * 4,
+    select: listingSelect,
+  });
+
+  return rows
+    .filter((l) => listingPassesPublicOpenMicGate(l))
+    .slice(0, limit)
+    .map((l) => ({ slug: l.slug, name: l.name, city: l.city, region: l.region }));
+}

@@ -8,8 +8,8 @@ import { getAllResourceArticles } from "@/lib/resourcesContent";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic resources and guides",
-  description:
-    "Guides for open mic venues and performers: find open mic nights near you, run signups, list your room on MicStage, and grow your local scene. Not stage sound or theater mic placement.",
+    description:
+    "Guides for open mic venues, hosts, and performers: find nights near you, run signups, list a room, and keep schedules accurate.",
   path: "/resources",
 });
 
@@ -24,7 +24,7 @@ const CATEGORY_ORDER = ["venue-ops", "strategy", "performer", "community"] as co
 
 const FEATURED_SLUGS = [
   "what-to-expect-at-your-first-open-mic",
-  "how-micstage-helps-venues-and-performers-connect",
+  "how-micstage-verifies-open-mic-listings",
   "how-to-run-a-successful-open-mic-night",
   "why-open-mic-nights-work-for-venues",
 ] as const;

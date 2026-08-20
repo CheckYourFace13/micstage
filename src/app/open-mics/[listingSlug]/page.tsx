@@ -8,8 +8,13 @@ import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { safeExternalHref } from "@/lib/externalUrl";
 import { isValidPublicSlug } from "@/lib/locationSlugValidation";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { loadPublicOpenMicListingBySlug } from "@/lib/publicListings/queries";
-import { isPublicListingRenderable } from "@/lib/publicListings/listingQuality";
+import { loadNearbyPublicListings, loadPublicOpenMicListingBySlug } from "@/lib/publicListings/queries";
+import { isPublicListingRenderable, suggestCanonicalListingName } from "@/lib/publicListings/listingQuality";
+import {
+  isPublicListingSourceUrl,
+  publicListingSourceLabel,
+  sanitizePublicListingAbout,
+} from "@/lib/publicListings/listingAboutFromLead";
 import {
   listingMeetsPublicSeoIndexGate,
   listingPlaceLabel,
@@ -48,8 +53,8 @@ export async function generateMetadata(props: { params: Promise<{ listingSlug: s
       index: false,
     });
   }
-  const title = publicListingSeoTitle(listing);
-  const description = publicListingSeoDescription(listing);
+  const title = publicListingSeoTitle({ ...listing, name: suggestCanonicalListingName(listing.name) ?? listing.name });
+  const description = publicListingSeoDescription({ ...listing, name: suggestCanonicalListingName(listing.name) ?? listing.name });
   const indexable = listingMeetsPublicSeoIndexGate(listing);
   return {
     ...buildPublicMetadata({ title, description, path, index: indexable }),
@@ -91,6 +96,18 @@ export default async function PublicOpenMicListingPage(props: {
   // absent from browse) so claim-invite recipients can still reach it.
   if (!isPublicListingRenderable(listing)) notFound();
 
+  const displayName = suggestCanonicalListingName(listing.name) ?? listing.name;
+  const publicAbout = sanitizePublicListingAbout(listing.about);
+  const sourceLabel = publicListingSourceLabel(listing.sourceName);
+  const sourceHref = isPublicListingSourceUrl(listing.sourceUrl) ? listing.sourceUrl!.trim() : null;
+  const nearby = await loadNearbyPublicListings(prisma, {
+    excludeSlug: listing.slug,
+    city: listing.city,
+    region: listing.region,
+    limit: 6,
+  });
+  const listingType = [...new Set(listing.schedules.map((s) => performanceFormatLabel(s.performanceFormat)).filter(Boolean))];
+
   const place = listingPlaceLabel(listing.city, listing.region);
   const path = `/open-mics/${listing.slug}`;
   const kind = listing.verificationStatus === "VERIFIED" ? "verified" : "unclaimed";
@@ -118,7 +135,7 @@ export default async function PublicOpenMicListingPage(props: {
   const jsonLdLocalBusiness = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
-    name: listing.name,
+    name: displayName,
     ...(listing.formattedAddress?.trim()
       ? { address: listing.formattedAddress.trim() }
       : {}),
@@ -141,14 +158,14 @@ export default async function PublicOpenMicListingPage(props: {
     breadcrumbItems.push({
       "@type": "ListItem",
       position: 3,
-      name: listing.name,
+      name: displayName,
       item: absoluteUrl(path),
     });
   } else {
     breadcrumbItems.push({
       "@type": "ListItem",
       position: 2,
-      name: listing.name,
+      name: displayName,
       item: absoluteUrl(path),
     });
   }
@@ -162,7 +179,7 @@ export default async function PublicOpenMicListingPage(props: {
   // Public listings store recurring weekdays only — never synthesize Event startDate.
   // Event JSON-LD requires concrete occurrence startDate (none for typical listings).
   const eventJsonLd = buildListingEventJsonLd({
-    listingName: listing.name,
+    listingName: displayName,
     formattedAddress: listing.formattedAddress,
     url: absoluteUrl(path),
     occurrences: [],
@@ -190,7 +207,7 @@ export default async function PublicOpenMicListingPage(props: {
             </>
           ) : null}
           <span className="mx-2">/</span>
-          <span className="text-white/80">{listing.name}</span>
+          <span className="text-white/80">{displayName}</span>
         </nav>
 
         <header className="mt-4">
@@ -203,7 +220,7 @@ export default async function PublicOpenMicListingPage(props: {
               </span>
             ) : null}
           </div>
-          <h1 className="om-heading mt-3 text-3xl sm:text-4xl">{listing.name}</h1>
+          <h1 className="om-heading mt-3 text-3xl sm:text-4xl">{displayName}</h1>
           {(() => {
             const addr = displayListingAddress(listing.name, listing.formattedAddress, listing.city, listing.region);
             if (!addr && !place) return null;
@@ -227,10 +244,10 @@ export default async function PublicOpenMicListingPage(props: {
             : "Listed by MicStage. This open mic is not yet managed by the venue."}
         </div>
 
-        {listing.about ? (
+        {publicAbout ? (
           <section className="mt-8">
             <h2 className="text-lg font-semibold">About</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/75">{listing.about}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/75">{publicAbout}</p>
           </section>
         ) : null}
 
@@ -261,6 +278,12 @@ export default async function PublicOpenMicListingPage(props: {
         </section>
 
         <section className="mt-8 grid gap-3 sm:grid-cols-2">
+          {listingType.length > 0 ? (
+            <div>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-white/50">Type</h3>
+              <p className="mt-1 text-sm">{listingType.join(" · ")}</p>
+            </div>
+          ) : null}
           {listing.hostName ? (
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-white/50">Host</h3>
@@ -309,13 +332,13 @@ export default async function PublicOpenMicListingPage(props: {
           </section>
         ) : null}
 
-        {(listing.sourceName || listing.sourceUrl) && (
+        {(sourceLabel || sourceHref) && (
           <section className="mt-6 text-xs text-white/45">
-            Source: {listing.sourceName ?? "MicStage research"}
-            {listing.sourceUrl ? (
+            {sourceLabel ? <span>Source: {sourceLabel}</span> : null}
+            {sourceHref ? (
               <>
-                {" · "}
-                <a href={safeExternalHref(listing.sourceUrl)!} target="_blank" rel="noopener noreferrer" className="underline">
+                {sourceLabel ? " · " : ""}
+                <a href={safeExternalHref(sourceHref)!} target="_blank" rel="noopener noreferrer" className="underline">
                   View source
                 </a>
               </>
@@ -351,6 +374,22 @@ export default async function PublicOpenMicListingPage(props: {
               <ListingCorrectionForm listingSlug={listing.slug} listingName={listing.name} />
             </div>
           </div>
+
+          {nearby.length > 0 ? (
+            <div>
+              <h2 className="text-base font-semibold">Nearby open mics</h2>
+              <ul className="mt-3 grid gap-2">
+                {nearby.map((n) => (
+                  <li key={n.slug}>
+                    <Link href={`/open-mics/${n.slug}`} className="text-sm text-[rgb(var(--om-neon))] underline">
+                      {n.name}
+                    </Link>
+                    {n.city ? <span className="ml-2 text-xs text-white/50">{n.city}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <div>
             <h2 className="text-base font-semibold">Share</h2>

@@ -15,6 +15,11 @@ import {
   buildListingEventJsonLd,
   venueIsSitemapEligible,
 } from "../src/lib/publicListings/listingSeo.ts";
+import {
+  sanitizePublicListingAbout,
+  publicListingSourceLabel,
+  isPublicListingSourceUrl,
+} from "../src/lib/publicListings/listingAboutFromLead.ts";
 import { shouldIndexDiscoveryPage } from "../src/lib/seo/discoveryIndex.ts";
 import { buildPublicMetadata } from "../src/lib/publicSeo.ts";
 
@@ -179,5 +184,26 @@ assert.equal(
   }),
   false,
 );
+
+assert.equal(
+  sanitizePublicListingAbout(
+    "Open mic venue identified from public listings and web search. Discovered via autonomous_web_search.",
+  ),
+  null,
+);
+assert.equal(
+  sanitizePublicListingAbout(
+    "Open mic venue identified from public listings and web search. Performers: live music. Come for <strong>night</strong> of talent 2025-01-06 18:00:00",
+  ),
+  null,
+);
+assert.match(
+  sanitizePublicListingAbout("Typical formats: comedy, live music. A weekly songwriter night with a posted door list.") ?? "",
+  /songwriter/,
+);
+assert.equal(publicListingSourceLabel("autonomous web search"), null);
+assert.equal(publicListingSourceLabel("The Hideout events calendar"), "The Hideout events calendar");
+assert.equal(isPublicListingSourceUrl("https://www.google.com/search?q=open+mic"), false);
+assert.equal(isPublicListingSourceUrl("https://hideoutchicago.com/open-mic"), true);
 
 console.log(JSON.stringify({ ok: true, checks: "seo-indexability" }));

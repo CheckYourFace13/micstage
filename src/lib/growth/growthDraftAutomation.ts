@@ -22,6 +22,7 @@ import {
   remainingGrowthOutreachAutomationBudget,
   startOfUtcDay,
 } from "@/lib/marketing/sendCaps";
+import { computeOutreachSendPacing, type OutreachSendPacing } from "@/lib/growth/outreachSendPacing";
 
 type GrowthDraftWithLead = GrowthLeadOutreachDraft & { lead: GrowthLead };
 
@@ -160,6 +161,10 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     backlogOtherMedium: number;
   };
   nonEmailVenuePathsQueued: number;
+  /** APPROVED drafts rejected because lead confidence/email no longer qualifies. */
+  purgedStaleApproved: number;
+  /** Daytime send spread applied this run (caps burst sending). */
+  sendPacing: OutreachSendPacing;
   skipped: number;
   errors: string[];
   rejectionReasonsByCount: Record<string, number>;
@@ -169,16 +174,33 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const limit = growthAutoDraftBatchLimit();
   const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
   const outreachHealth = await evaluateOutreachSendHealth(prisma);
-  const perCronSendCeiling = Math.max(
+  const configuredSendCeiling = Math.max(
     0,
     Math.floor(outreachRuntime.effectiveSendsPerCron * outreachHealth.sendMultiplier),
   );
-  const draftWorkTake = Math.min(limit, Math.max(24, Math.max(1, perCronSendCeiling) * 8));
-  const venueReviewTake = Math.min(limit, Math.max(12, Math.max(1, perCronSendCeiling) * 6));
+  const draftWorkTake = Math.min(limit, Math.max(24, Math.max(1, configuredSendCeiling) * 8));
+  const venueReviewTake = Math.min(limit, Math.max(12, Math.max(1, configuredSendCeiling) * 6));
   let outreachSendsThisRun = 0;
+  let purgedStaleApproved = 0;
   // Eligibility is HIGH-only. Do not let GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE fill the cron window with unsendable drafts.
   const allowMediumOutreach = false;
   const emailReadyLevels: GrowthLeadEmailConfidence[] = ["HIGH"];
+
+  // Approved drafts whose lead no longer qualifies block every cron send attempt — purge them first.
+  const staleApprovedPurge = await prisma.growthLeadOutreachDraft.updateMany({
+    where: {
+      status: "APPROVED",
+      marketingEmailSendId: null,
+      lead: {
+        OR: [{ contactEmailConfidence: { not: "HIGH" } }, { contactEmailNormalized: null }],
+      },
+    },
+    data: {
+      status: "REJECTED",
+      lastError: "auto_purge: lead no longer HIGH confidence or missing email",
+    },
+  });
+  purgedStaleApproved = staleApprovedPurge.count;
 
   const candidates = await prisma.growthLead.findMany({
     where: {
@@ -228,15 +250,41 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   });
   const activeMarketSet = new Set(activeMarkets.map((m) => m.discoveryMarketSlug.trim().toLowerCase()));
 
-  for (const c of candidates) {
-    const r = await createPendingGrowthLeadOutreachDraft(prisma, c.id);
+  // Priority: net-send-eligible leads (including AUTO_SEND_READY) before generic fit/tier heuristics.
+  const priorityScan = await prisma.growthLead.findMany({
+    where: {
+      contactEmailNormalized: { not: null },
+      contactEmailConfidence: { in: emailReadyLevels },
+      leadType: { in: ["VENUE", "PROMOTER_ACCOUNT"] },
+      status: { in: ["DISCOVERED", "REVIEWED", "APPROVED"] },
+      outreachDrafts: { none: { status: { in: ["PENDING_REVIEW", "APPROVED"] } } },
+      ...LISTING_BLOCKS_OUTREACH,
+    },
+    select: { id: true },
+    orderBy: [{ fitScore: "desc" }, { updatedAt: "desc" }],
+    take: Math.min(64, draftWorkTake * 2),
+  });
+  const priorityEligibleIds: string[] = [];
+  for (const row of priorityScan) {
+    const elig = await explainGrowthLeadOutreachEligibility(prisma, row.id);
+    if (elig.eligible) priorityEligibleIds.push(row.id);
+  }
+  const genericIds = candidates.map((c) => c.id);
+  const seenCandidateIds = new Set(priorityEligibleIds);
+  const orderedCandidateIds = [
+    ...priorityEligibleIds,
+    ...genericIds.filter((id) => !seenCandidateIds.has(id)),
+  ].slice(0, draftWorkTake);
+
+  for (const leadId of orderedCandidateIds) {
+    const r = await createPendingGrowthLeadOutreachDraft(prisma, leadId);
     if (r.ok) {
       created++;
     } else {
       skipped++;
       bumpReason(r.reason);
       if (!r.reason.includes("already has")) {
-        errors.push(`${c.id}: ${r.reason}`);
+        errors.push(`${leadId}: ${r.reason}`);
       }
     }
   }
@@ -278,6 +326,10 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   });
 
   const outreachAutomationBudget = await remainingGrowthOutreachAutomationBudget(prisma);
+  const sendPacing = computeOutreachSendPacing({
+    remainingDailyBudget: outreachAutomationBudget.remainingToEffectiveMax,
+    configuredMaxPerCron: configuredSendCeiling,
+  });
   const perMarketSendCap = growthOutreachMaxSendsPerMarketPerDay();
   const marketSendsToday =
     perMarketSendCap > 0
@@ -285,7 +337,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       : new Map<string, number>();
   const outreachSendCapPerRun = Math.min(
     outreachAutomationBudget.remainingToEffectiveMax,
-    perCronSendCeiling,
+    sendPacing.sendsThisCron,
   );
   let remainingHeadroom = outreachAutomationBudget.remainingToEffectiveMax;
 
@@ -491,6 +543,8 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     fitMin,
     venueAutoFitMin,
     createdDrafts: created,
+    purgedStaleApproved,
+    sendPacing,
     autoApprovedVenue,
     autoSentVenue,
     approvedQueueDrained,
@@ -515,6 +569,8 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     outreachAutomationBudget,
     outreachSendsByFallbackWave,
     nonEmailVenuePathsQueued,
+    purgedStaleApproved,
+    sendPacing,
     skipped,
     errors,
     rejectionReasonsByCount,

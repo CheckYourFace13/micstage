@@ -5,14 +5,14 @@
 SECRET="YOUR_CRON_SECRET"
 BASE="https://micstage.com"
 
-# --- Job 1: every 15 min — mine venue emails + claim invites + outreach ---
+# --- Job 1: every 15 min — mine venue emails + backlog + claim invites + paced outreach ---
 # Schedule: */15 * * * *
 curl -fsS -m 360 -X POST \
   -H "Authorization: Bearer $SECRET" \
   "$BASE/api/cron/growth-pipeline?phase=tick"
 
-# --- Job 2: every 30 min — nationwide discovery + publish/verify/promote ---
-# Schedule: */30 * * * *
+# --- Job 2: every 30 min at :00 and :30 — nationwide discovery + publish/verify/promote ---
+# Schedule: 0,30 * * * *
 # curl -fsS -m 300 -X POST \
 #   -H "Authorization: Bearer $SECRET" \
 #   "$BASE/api/cron/growth-pipeline?phase=discovery"

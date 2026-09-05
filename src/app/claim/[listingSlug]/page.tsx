@@ -22,8 +22,12 @@ export async function generateMetadata(props: { params: Promise<{ listingSlug: s
   });
 }
 
-export default async function ClaimListingPage(props: { params: Promise<{ listingSlug: string }> }) {
+export default async function ClaimListingPage(props: {
+  params: Promise<{ listingSlug: string }>;
+  searchParams: Promise<{ growthLead?: string }>;
+}) {
   const { listingSlug } = await props.params;
+  const { growthLead } = await props.searchParams;
   if (!isValidPublicSlug(listingSlug)) notFound();
 
   const prisma = getPrismaOrNull();
@@ -40,6 +44,23 @@ export default async function ClaimListingPage(props: { params: Promise<{ listin
     if (venue) redirect(`/venues/${venue.slug}`);
   }
 
+  const growthFromListing = await prisma.publicOpenMicListing.findUnique({
+    where: { id: listing.id },
+    select: { growthLeadId: true },
+  });
+  const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
+  const growthLeadId =
+    (typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim())
+      ? growthLead.trim()
+      : null) ||
+    (growthFromListing?.growthLeadId && GROWTH_LEAD_ID_RE.test(growthFromListing.growthLeadId)
+      ? growthFromListing.growthLeadId
+      : "");
+
+  const venueRegisterQs = new URLSearchParams({ claimListing: listing.slug });
+  if (growthLeadId) venueRegisterQs.set("growthLead", growthLeadId);
+  const hostQs = growthLeadId ? `?growthLead=${encodeURIComponent(growthLeadId)}` : "";
+
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
@@ -52,18 +73,18 @@ export default async function ClaimListingPage(props: { params: Promise<{ listin
         </p>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <Link
-            href="/host"
+            href={`/host${hostQs}`}
             className="rounded-xl border border-violet-400/35 bg-violet-500/15 p-4 text-sm hover:bg-violet-500/25"
           >
             <p className="font-semibold text-white">I host this open mic</p>
-            <p className="mt-1 text-white/70">Connect as a Host — manage nights, signups, and lineups. You don&apos;t need to own the venue.</p>
+            <p className="mt-1 text-white/70">Start hosting free — manage nights, signups, and lineups. You don&apos;t need to own the venue.</p>
           </Link>
           <Link
-            href={`/register/venue?claimListing=${listing.slug}`}
+            href={`/register/venue?${venueRegisterQs.toString()}`}
             className="rounded-xl border border-white/15 bg-white/5 p-4 text-sm hover:bg-white/10"
           >
             <p className="font-semibold text-white">I manage this venue</p>
-            <p className="mt-1 text-white/70">Claim the venue business profile — address, photos, and venue-wide settings.</p>
+            <p className="mt-1 text-white/70">Claim / manage free — address, photos, and venue-wide settings.</p>
           </Link>
         </div>
         <p className="mt-6 text-xs text-white/50">Or submit a manual claim request below.</p>

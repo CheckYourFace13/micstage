@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 
+/**
+ * Secondary setup-help request — collapsed by default so it never competes with signup.
+ */
 export function VenueSetupRequestForm() {
+  const [open, setOpen] = useState(false);
   const [venueName, setVenueName] = useState("");
   const [city, setCity] = useState("");
   const [contactName, setContactName] = useState("");
@@ -48,18 +52,35 @@ export function VenueSetupRequestForm() {
   if (status === "done") {
     return (
       <div className="rounded-xl border border-emerald-500/35 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-100">
-        Thanks — we received your request and will follow up by email to help set up your open mic.
+        Thanks — we received your request and will follow up by email.
       </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <p className="text-center text-sm text-white/55">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="underline hover:text-white"
+        >
+          Want us to set it up for you instead?
+        </button>
+      </p>
     );
   }
 
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <div>
-        <p className="text-sm font-semibold text-white">Want us to set it up for you?</p>
-        <p className="mt-1 text-xs text-white/60">
-          No password needed — tell us about your room and we will help you get listed and bookable.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">Want us to set it up for you?</p>
+          <p className="mt-1 text-xs text-white/60">Tell us about your room — we&apos;ll follow up by email.</p>
+        </div>
+        <button type="button" onClick={() => setOpen(false)} className="text-xs text-white/50 underline hover:text-white">
+          Close
+        </button>
       </div>
       <label className="grid gap-1 text-sm">
         <span className="text-white/80">Venue / open mic name</span>
@@ -97,7 +118,7 @@ export function VenueSetupRequestForm() {
         />
       </label>
       <label className="grid gap-1 text-sm">
-        <span className="text-white/80">Open mic day (if known)</span>
+        <span className="text-white/80">Open mic day (optional)</span>
         <input
           value={openMicDay}
           onChange={(e) => setOpenMicDay(e.target.value)}
@@ -110,7 +131,7 @@ export function VenueSetupRequestForm() {
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          rows={3}
+          rows={2}
           className="resize-y rounded-md border border-white/10 bg-black/40 px-3 py-2 text-white placeholder:text-white/40"
         />
       </label>

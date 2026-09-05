@@ -86,7 +86,7 @@ export default async function HostLandingPage(props: { searchParams: Promise<{ g
         <p className="mt-8 text-sm text-white/55">
           Own or manage the <em>venue business</em> itself?{" "}
           <Link href="/register/venue" className="underline hover:text-white">
-            Manage my venue
+            Claim / manage free
           </Link>{" "}
           instead — that&apos;s a separate account.
         </p>

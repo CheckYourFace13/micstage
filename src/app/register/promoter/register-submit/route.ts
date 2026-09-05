@@ -24,6 +24,18 @@ function redirectTo(path: string) {
   return NextResponse.redirect(absoluteServerRedirectUrl(path));
 }
 
+function registerErrorPath(
+  code: string,
+  opts?: { email?: string; displayName?: string; growthTraceLeadId?: string | null },
+) {
+  const qs = new URLSearchParams();
+  qs.set("error", code);
+  if (opts?.email) qs.set("email", opts.email);
+  if (opts?.displayName) qs.set("displayName", opts.displayName);
+  if (opts?.growthTraceLeadId) qs.set("growthLead", opts.growthTraceLeadId);
+  return `/register/promoter?${qs.toString()}`;
+}
+
 export async function POST(request: Request) {
   let formData: FormData;
   try {
@@ -48,8 +60,10 @@ export async function POST(request: Request) {
     return redirectTo("/register/promoter?error=unavailable");
   }
 
+  const errOpts = { email, displayName, growthTraceLeadId };
+
   if (!registrationContentConsentChecked(formData)) {
-    return redirectTo("/register/promoter?error=consent");
+    return redirectTo(registerErrorPath("consent", errOpts));
   }
 
   const rl = await consumeRateLimit({
@@ -58,19 +72,19 @@ export async function POST(request: Request) {
     limit: 6,
     windowSec: 60 * 60,
   });
-  if (!rl.allowed) return redirectTo("/register/promoter?error=rate");
+  if (!rl.allowed) return redirectTo(registerErrorPath("rate", errOpts));
 
   const passwordHash = await bcrypt.hash(password, 12);
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[registerHost] database not configured");
-    return redirectTo("/register/promoter?error=unavailable");
+    return redirectTo(registerErrorPath("unavailable", errOpts));
   }
 
   try {
     const existingUser = await prisma.promoterUser.findUnique({ where: { email } });
-    if (existingUser) return redirectTo("/login/promoter");
+    if (existingUser) return redirectTo(registerErrorPath("exists", errOpts));
 
     const hostSlug = await allocateUniqueHostSlug(displayName, async (slug) => {
       const row = await prisma.promoterUser.findUnique({ where: { hostSlug: slug }, select: { id: true } });
@@ -107,6 +121,6 @@ export async function POST(request: Request) {
     return redirectTo(`/promoter/welcome?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_HOST}`);
   } catch (e) {
     console.error("[registerHost]", e);
-    return redirectTo("/register/promoter?error=unavailable");
+    return redirectTo(registerErrorPath("unavailable", errOpts));
   }
 }

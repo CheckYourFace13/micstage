@@ -701,8 +701,8 @@ export default async function VenuePortalPage({
               <p className="font-medium text-white/90">You haven&apos;t connected an open mic yet.</p>
               <p className="mt-2">
                 Claim a listing from its public page, or{" "}
-                <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/register/venue">
-                  register a new venue
+                <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/venue/setup">
+                  find and connect your venue
                 </Link>
                 .
               </p>

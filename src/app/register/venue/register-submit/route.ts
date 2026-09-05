@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import tzLookup from "tz-lookup";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
-import { slugify } from "@/lib/slug";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { JOINED_VENUE, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
-import { sendVenueSignupThankYouEmailIfNeeded } from "@/lib/venueSignupThankYouEmail";
 import {
   REGISTRATION_CONTENT_CONSENT_VERSION,
   registrationContentConsentChecked,
@@ -16,14 +13,6 @@ import {
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 
 export const runtime = "nodejs";
-
-class RedirectSignal extends Error {
-  readonly path: string;
-  constructor(path: string) {
-    super(path);
-    this.path = path;
-  }
-}
 
 function reqString(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -40,6 +29,15 @@ function optString(formData: FormData, key: string): string | undefined {
 
 function redirectTo(path: string) {
   return NextResponse.redirect(absoluteServerRedirectUrl(path));
+}
+
+function registerErrorPath(code: string, email?: string, claimListing?: string, growthTraceLeadId?: string) {
+  const qs = new URLSearchParams();
+  qs.set("error", code);
+  if (email) qs.set("email", email);
+  if (claimListing) qs.set("claimListing", claimListing);
+  if (growthTraceLeadId) qs.set("growthLead", growthTraceLeadId);
+  return `/register/venue?${qs.toString()}`;
 }
 
 export async function POST(request: Request) {
@@ -59,105 +57,48 @@ export async function POST(request: Request) {
     return redirectTo("/register/venue?error=unavailable");
   }
 
+  const growthTraceLeadId = optString(formData, "growthTraceLeadId");
+  const claimListing = optString(formData, "claimListing");
+
   const rl = await consumeRateLimit({
     scope: "register:venue",
     identifier: email,
     limit: 6,
     windowSec: 60 * 60,
   });
-  if (!rl.allowed) return redirectTo("/register/venue?error=rate");
-
-  const venueName = optString(formData, "venueName");
-  const googlePlaceId = optString(formData, "googlePlaceId");
-  const formattedAddress = optString(formData, "formattedAddress");
-  const city = optString(formData, "city");
-  const region = optString(formData, "region");
-  const country = optString(formData, "country");
-  const growthTraceLeadId = optString(formData, "growthTraceLeadId");
-  const latRaw = formData.get("lat");
-  const lngRaw = formData.get("lng");
-  const lat =
-    typeof latRaw === "string" && latRaw.trim() ? Number.parseFloat(latRaw.trim()) : Number.NaN;
-  const lng =
-    typeof lngRaw === "string" && lngRaw.trim() ? Number.parseFloat(lngRaw.trim()) : Number.NaN;
-
-  if (!googlePlaceId || !venueName || !formattedAddress || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return redirectTo("/register/venue?error=place");
-  }
+  if (!rl.allowed) return redirectTo(registerErrorPath("rate", email, claimListing, growthTraceLeadId));
 
   if (!registrationContentConsentChecked(formData)) {
-    return redirectTo("/register/venue?error=consent");
+    return redirectTo(registerErrorPath("consent", email, claimListing, growthTraceLeadId));
   }
 
-  const timeZone = tzLookup(lat, lng);
   const passwordHash = await bcrypt.hash(password, 12);
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[registerVenue] database not configured");
-    return redirectTo("/register/venue?error=unavailable");
+    return redirectTo(registerErrorPath("unavailable", email, claimListing, growthTraceLeadId));
   }
 
   try {
-    const baseSlug = slugify(venueName) || "venue";
-    let slug = baseSlug;
-    for (let i = 0; i < 25; i++) {
-      const exists = await prisma.venue.findUnique({ where: { slug } });
-      if (!exists) break;
-      slug = `${baseSlug}-${i + 2}`;
+    const existing = await prisma.venueOwner.findUnique({ where: { email } });
+    if (existing) {
+      return redirectTo(registerErrorPath("exists", email, claimListing, growthTraceLeadId));
     }
 
-    let newVenueId: string | null = null;
     const consentAt = new Date();
     const consentVer = REGISTRATION_CONTENT_CONSENT_VERSION;
 
-    await prisma.$transaction(async (tx) => {
-      const existing = await tx.venueOwner.findUnique({ where: { email } });
-      let owner;
-      if (existing) {
-        const ok = await bcrypt.compare(password, existing.passwordHash);
-        if (!ok) throw new RedirectSignal("/login/venue?error=invalid");
-        owner = await tx.venueOwner.update({
-          where: { id: existing.id },
-          data: {
-            registrationContentConsentAt: consentAt,
-            registrationContentConsentVersion: consentVer,
-          },
-        });
-      } else {
-        owner = await tx.venueOwner.create({
-          data: {
-            email,
-            passwordHash,
-            registrationContentConsentAt: consentAt,
-            registrationContentConsentVersion: consentVer,
-          },
-        });
-      }
-
-      const created = await tx.venue.create({
-        data: {
-          ownerId: owner.id,
-          name: venueName,
-          slug,
-          googlePlaceId,
-          formattedAddress,
-          city,
-          region,
-          country,
-          lat,
-          lng,
-          timeZone,
-        },
-      });
-      newVenueId = created.id;
-
-      await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
+    const owner = await prisma.venueOwner.create({
+      data: {
+        email,
+        passwordHash,
+        registrationContentConsentAt: consentAt,
+        registrationContentConsentVersion: consentVer,
+      },
     });
 
-    if (newVenueId) {
-      await sendVenueSignupThankYouEmailIfNeeded(prisma, newVenueId, email);
-    }
+    await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
 
     if (growthTraceLeadId) {
       const lead = await prisma.growthLead.findFirst({
@@ -177,11 +118,13 @@ export async function POST(request: Request) {
       }
     }
 
-    return redirectTo(`/venue?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_VENUE}`);
+    const setupQs = new URLSearchParams();
+    setupQs.set(PRODUCT_ANALYTICS_QS.joined, JOINED_VENUE);
+    if (growthTraceLeadId) setupQs.set("growthLead", growthTraceLeadId);
+    if (claimListing) setupQs.set("claimListing", claimListing);
+    return redirectTo(`/venue/setup?${setupQs.toString()}`);
   } catch (e) {
-    if (e instanceof RedirectSignal) return redirectTo(e.path);
     console.error("[registerVenue]", e);
-    return redirectTo("/register/venue?error=unavailable");
+    return redirectTo(registerErrorPath("unavailable", email, claimListing, growthTraceLeadId));
   }
 }
-

@@ -55,6 +55,7 @@ export function MicStageProductAnalytics() {
       if (send) {
         oncePerSession("conv:performer_signup_complete", () => {
           trackConversionEvent("performer_signup_complete");
+          trackMarketingEvent("registration_completed_performer", { role: "performer" });
         });
       }
       next.delete(PRODUCT_ANALYTICS_QS.joined);
@@ -63,6 +64,7 @@ export function MicStageProductAnalytics() {
       if (send) {
         oncePerSession("conv:venue_registration_complete", () => {
           trackConversionEvent("venue_registration_complete");
+          trackMarketingEvent("registration_completed_venue", { role: "venue" });
         });
       }
       next.delete(PRODUCT_ANALYTICS_QS.joined);
@@ -71,6 +73,7 @@ export function MicStageProductAnalytics() {
       if (send) {
         oncePerSession("conv:host_registration_complete", () => {
           trackConversionEvent("host_registration_complete");
+          trackMarketingEvent("registration_completed_host", { role: "host" });
         });
       }
       next.delete(PRODUCT_ANALYTICS_QS.joined);

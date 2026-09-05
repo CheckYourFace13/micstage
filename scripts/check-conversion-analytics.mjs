@@ -42,4 +42,14 @@ assert.match(read("src/app/page.tsx"), /host_cta_click/);
 assert.match(read("src/app/register/promoter/register-submit/route.ts"), /JOINED_HOST/);
 assert.match(read("src/app/promoter/actions.ts"), /hostMilestoneQuery/);
 
+assert.match(read("src/components/MicStageProductAnalytics.tsx"), /registration_completed_venue/);
+assert.match(read("src/components/MicStageProductAnalytics.tsx"), /registration_completed_host/);
+assert.match(read("src/components/MicStageProductAnalytics.tsx"), /registration_completed_performer/);
+assert.match(read("src/components/register/RegistrationFunnelTracker.tsx"), /registration_page_view/);
+assert.match(read("src/components/register/RegistrationFunnelTracker.tsx"), /registration_form_started/);
+assert.match(read("src/components/register/RegistrationFunnelTracker.tsx"), /registration_submitted/);
+assert.match(read("src/app/register/venue/page.tsx"), /Create your free venue account/);
+assert.match(read("src/app/register/venue/register-submit/route.ts"), /\/venue\/setup/);
+assert.match(read("src/app/venue/setup/page.tsx"), /Find your venue/);
+
 console.log(JSON.stringify({ ok: true, conversionEvents: conversionEvents.length }, null, 2));

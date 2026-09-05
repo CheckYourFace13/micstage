@@ -31,10 +31,18 @@ function optString(formData: FormData, key: string): string | null {
   return v.trim();
 }
 
-function registerErrorPath(code: string, next: string | null) {
-  const base = `/register/musician?error=${code}`;
-  if (!next) return base;
-  return `${base}&next=${encodeURIComponent(next)}`;
+function registerErrorPath(
+  code: string,
+  next: string | null,
+  opts?: { email?: string; stageName?: string; growthTraceLeadId?: string | null },
+) {
+  const qs = new URLSearchParams();
+  qs.set("error", code);
+  if (next) qs.set("next", next);
+  if (opts?.email) qs.set("email", opts.email);
+  if (opts?.stageName) qs.set("stageName", opts.stageName);
+  if (opts?.growthTraceLeadId) qs.set("growthLead", opts.growthTraceLeadId);
+  return `/register/musician?${qs.toString()}`;
 }
 
 function withJoinedAnalytics(dest: string): string {
@@ -63,8 +71,11 @@ export async function POST(request: Request) {
     return redirectTo(registerErrorPath("unavailable", nextRaw));
   }
 
+  const growthTraceLeadId = optString(formData, "growthTraceLeadId");
+  const errOpts = { email, stageName, growthTraceLeadId };
+
   if (!registrationContentConsentChecked(formData)) {
-    return redirectTo(registerErrorPath("consent", nextRaw));
+    return redirectTo(registerErrorPath("consent", nextRaw, errOpts));
   }
 
   const rl = await consumeRateLimit({
@@ -73,22 +84,20 @@ export async function POST(request: Request) {
     limit: 6,
     windowSec: 60 * 60,
   });
-  if (!rl.allowed) return redirectTo(registerErrorPath("rate", nextRaw));
+  if (!rl.allowed) return redirectTo(registerErrorPath("rate", nextRaw, errOpts));
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const growthTraceLeadId = optString(formData, "growthTraceLeadId");
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[registerMusician] database not configured");
-    return redirectTo(registerErrorPath("unavailable", nextRaw));
+    return redirectTo(registerErrorPath("unavailable", nextRaw, errOpts));
   }
 
   try {
     const existing = await prisma.musicianUser.findUnique({ where: { email } });
     if (existing) {
-      const loginNext = nextRaw ? `?next=${encodeURIComponent(nextRaw)}` : "";
-      return redirectTo(`/login/musician${loginNext}`);
+      return redirectTo(registerErrorPath("exists", nextRaw, errOpts));
     }
 
     const now = new Date();
@@ -126,6 +135,6 @@ export async function POST(request: Request) {
     return redirectTo(withJoinedAnalytics(dest));
   } catch (e) {
     console.error("[registerMusician]", e);
-    return redirectTo(registerErrorPath("unavailable", nextRaw));
+    return redirectTo(registerErrorPath("unavailable", nextRaw, errOpts));
   }
 }

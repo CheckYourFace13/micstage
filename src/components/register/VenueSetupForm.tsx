@@ -18,11 +18,13 @@ export type ClaimListingSeed = {
 
 export function VenueSetupForm(props: {
   submitPath: string;
+  /** Always post this slug when present so claim context survives even if seed/prefill is unavailable. */
+  claimListingSlug?: string;
   claimListing?: ClaimListingSeed | null;
   growthLeadId?: string;
   error?: string | null;
 }) {
-  const { submitPath, claimListing, growthLeadId, error } = props;
+  const { submitPath, claimListingSlug, claimListing, growthLeadId, error } = props;
   const canUseListingPlace =
     Boolean(claimListing?.googlePlaceId) &&
     claimListing?.lat != null &&
@@ -32,11 +34,12 @@ export function VenueSetupForm(props: {
 
   const [mode, setMode] = useState<"listing" | "search">(canUseListingPlace ? "listing" : "search");
   const [place, setPlace] = useState<PlaceData | null>(null);
+  const claimSlug = (claimListingSlug || claimListing?.slug || "").trim();
 
   return (
     <form method="post" action={submitPath} className="mt-6 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
       {growthLeadId ? <input type="hidden" name="growthTraceLeadId" value={growthLeadId} /> : null}
-      {claimListing ? <input type="hidden" name="claimListing" value={claimListing.slug} /> : null}
+      {claimSlug ? <input type="hidden" name="claimListing" value={claimSlug} /> : null}
 
       {error === "place" ? (
         <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white">

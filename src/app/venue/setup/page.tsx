@@ -117,6 +117,7 @@ export default async function VenueSetupPage(props: {
 
         <VenueSetupForm
           submitPath="/venue/setup/setup-submit"
+          claimListingSlug={claimSlug || undefined}
           claimListing={claimSeed}
           growthLeadId={growthLeadId || undefined}
           error={typeof error === "string" ? error : null}

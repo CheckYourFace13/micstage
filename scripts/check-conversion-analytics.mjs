@@ -52,4 +52,21 @@ assert.match(read("src/app/register/venue/page.tsx"), /Create your free venue ac
 assert.match(read("src/app/register/venue/register-submit/route.ts"), /\/venue\/setup/);
 assert.match(read("src/app/venue/setup/page.tsx"), /Find your venue/);
 
+assert.match(read("src/components/register/VenueSetupForm.tsx"), /claimListingSlug/);
+assert.match(read("src/components/register/VenueSetupForm.tsx"), /name=\"claimListing\"/);
+assert.match(read("src/components/register/VenueSetupForm.tsx"), /name=\"growthTraceLeadId\"/);
+assert.match(read("src/app/register/venue/register-submit/route.ts"), /setupQs\.set\(\"growthLead\"/);
+assert.match(read("src/app/register/venue/register-submit/route.ts"), /setupQs\.set\(\"claimListing\"/);
+assert.match(read("src/app/claim/[listingSlug]/page.tsx"), /claimListing/);
+assert.match(read("src/app/claim/[listingSlug]/page.tsx"), /growthLead/);
+assert.match(read("src/components/RegistrationContentConsent.tsx"), /I agree to the/);
+assert.match(read("src/components/RegistrationContentConsent.tsx"), /href=\"\/terms\"/);
+assert.match(read("src/components/RegistrationContentConsent.tsx"), /href=\"\/privacy\"/);
+assert.match(read("src/app/register/venue/page.tsx"), /Looks like you already have an account/);
+assert.match(read("src/app/register/promoter/page.tsx"), /Looks like you already have an account/);
+assert.match(read("src/app/register/musician/page.tsx"), /Looks like you already have an account/);
+assert.match(read("src/app/register/venue/page.tsx"), /href=\"\/login\/venue\"/);
+assert.match(read("src/app/register/promoter/page.tsx"), /href=\"\/login\/promoter\"/);
+assert.match(read("src/app/register/musician/page.tsx"), /href=\"\/login\/musician\"/);
+
 console.log(JSON.stringify({ ok: true, conversionEvents: conversionEvents.length }, null, 2));

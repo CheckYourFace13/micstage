@@ -40,6 +40,8 @@ type Props = {
   /** `HH:MM` 24h; prefilled from the venue's current schedule so edits start from live times. */
   defaultStartTime?: string;
   defaultEndTime?: string;
+  /** Nights the venue already runs, so re-saving the schedule doesn't start from zero weekdays. */
+  defaultWeekdays?: Weekday[];
   bookingRestrictionMode: string;
   restrictionHoursBefore: number;
   onPremiseMaxDistanceMeters: number;
@@ -59,6 +61,7 @@ export function WeeklyScheduleForm({
   defaultDescription,
   defaultStartTime = "17:00",
   defaultEndTime = "21:00",
+  defaultWeekdays,
   bookingRestrictionMode,
   restrictionHoursBefore,
   onPremiseMaxDistanceMeters,
@@ -81,7 +84,7 @@ export function WeeklyScheduleForm({
   const [endTime, setEndTime] = useState(defaultEndTime);
   const [slotMinutes, setSlotMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
-  const [weekdays, setWeekdays] = useState<Set<Weekday>>(() => new Set());
+  const [weekdays, setWeekdays] = useState<Set<Weekday>>(() => new Set(defaultWeekdays ?? []));
 
   const toggleWeekday = (w: Weekday) => {
     setWeekdays((prev) => {

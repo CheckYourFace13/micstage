@@ -95,6 +95,8 @@ export async function sendThroughMarketingPipeline(
     clickDestinationUrl?: string | null;
     /** DB-backed outreach domain cap override. */
     domainDailyCapOverride?: number;
+    /** DB-backed category daily cap override (keeps the outreach ceiling movable without a redeploy). */
+    categoryDailyCapOverride?: number;
   },
 ): Promise<MarketingSendResult> {
   const email = normalizeMarketingEmail(input.to);
@@ -146,6 +148,7 @@ export async function sendThroughMarketingPipeline(
 
   const capCat = await checkCategoryAndDomainCaps(prisma, categoryPrisma, toDomain, {
     domainDailyCapOverride: input.domainDailyCapOverride,
+    categoryDailyCapOverride: input.categoryDailyCapOverride,
   });
   const capContact = await checkContactSendSpacing(prisma, contact.id, categoryPrisma);
 

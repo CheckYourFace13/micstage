@@ -332,10 +332,10 @@ export default async function VenuePublicPage(props: {
             </div>
             <p className="mt-2 hidden text-sm text-white/60 md:block">
               <span className="text-white/80">Open</span> slots can be claimed by artists; tap{" "}
-              <span className="font-medium text-white/85">Perform</span> (sign in or create a free profile if needed).
+              <span className="font-medium text-white/85">Sign up</span> (sign in or create a free profile if needed).
             </p>
             <p className="mt-2 text-sm text-white/60 md:hidden">
-              <span className="text-white/80">Open</span> slots: tap <span className="font-medium text-white/85">Perform</span>{" "}
+              <span className="text-white/80">Open</span> slots: tap <span className="font-medium text-white/85">Sign up</span>{" "}
               (sign in if needed).
             </p>
 

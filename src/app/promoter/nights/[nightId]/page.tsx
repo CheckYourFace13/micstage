@@ -11,7 +11,9 @@ import { scheduleWindowLabel } from "@/lib/scheduleWindow";
 import { lineupNavLabelFromYmd, minutesToTimeInputValue, minutesToTimeLabel } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { HostNightVenueEditor } from "@/components/host/HostNightVenueEditor";
 import { SharePageButtons } from "@/components/onboarding/SharePageButtons";
+import { changePromoterNightVenueAction } from "../../actions";
 import {
   hostHouseBookSlotAction,
   hostRemoveBookingAction,
@@ -64,7 +66,9 @@ export default async function HostNightManagePage(props: {
 
         {saved ? (
           <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm">
-            Saved. Your public lineup shows the new day and times now.
+            {saved === "venue"
+              ? "Moved. Your public lineup and signup link now point at the new venue."
+              : "Saved. Your public lineup shows the new day and times now."}
           </div>
         ) : null}
         {error ? (
@@ -75,7 +79,9 @@ export default async function HostNightManagePage(props: {
                 ? "Enter a valid date for this night."
                 : error === "duplicate_date"
                   ? "You already have a night at this venue on that date."
-                  : "That slot was already taken."}
+                  : error === "venue_missing"
+                    ? "Pick a venue from the list (or add one from Google) and try again."
+                    : "That slot was already taken."}
           </div>
         ) : null}
 
@@ -149,6 +155,15 @@ export default async function HostNightManagePage(props: {
           </label>
           <FormSubmitButton label="Save night" className="h-12 w-full rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold sm:w-fit" />
         </form>
+
+        <HostNightVenueEditor
+          nightId={nightId}
+          currentVenueName={ctx.night.venue.name}
+          currentVenuePlace={
+            [ctx.night.venue.city, ctx.night.venue.region].filter(Boolean).join(", ") || null
+          }
+          changeVenueAction={changePromoterNightVenueAction}
+        />
 
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Lineup ({slots.length} slots)</h2>

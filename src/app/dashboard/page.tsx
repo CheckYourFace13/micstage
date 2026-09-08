@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 export default async function DashboardPage() {
   const s = await getSession();
-  if (!s) redirect("/");
+  if (!s) redirect("/login");
   if (s.kind === "venue") redirect("/venue");
   if (s.kind === "musician") redirect(ARTIST_DASHBOARD_HREF);
   redirect("/");

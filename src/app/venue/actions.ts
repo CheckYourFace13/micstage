@@ -1030,7 +1030,8 @@ export async function updateEventTemplateTimes(formData: FormData): Promise<Venu
 
     await prisma.eventTemplate.update({
       where: { id: templateId },
-      data: { weekday, startTimeMin, endTimeMin },
+      // Saving here is the venue confirming the night, so it goes public like the other schedule forms.
+      data: { weekday, startTimeMin, endTimeMin, isPublic: true },
     });
 
     const specs = generateSlotsForWindow({

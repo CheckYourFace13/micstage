@@ -74,11 +74,11 @@ export async function checkCategoryAndDomainCaps(
   prisma: PrismaClient,
   category: MarketingEmailCategory,
   toDomain: string,
-  opts?: { domainDailyCapOverride?: number },
+  opts?: { domainDailyCapOverride?: number; categoryDailyCapOverride?: number },
 ): Promise<CapViolation> {
   const since = startOfUtcDay();
   const mic = micStageCategoryFromPrisma(category);
-  const daily = marketingDailyCap(mic);
+  const daily = opts?.categoryDailyCapOverride ?? marketingDailyCap(mic);
   const catCount = await countSendsToday(prisma, category, since);
   if (catCount >= daily) {
     return { ok: false, reason: `Daily cap reached for category ${category} (${daily})` };
@@ -191,8 +191,8 @@ export async function remainingGrowthOutreachAutomationBudget(
 }> {
   const since = startOfUtcDay();
   const sentTodayUtc = await countSendsToday(prisma, "OUTREACH", since);
-  const marketingOutreachCap = marketingDailyCap("outreach");
   const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
+  const marketingOutreachCap = outreachRuntime.effectiveMarketingOutreachDailyCap;
   const growthDailyMax = outreachRuntime.effectiveDailyMax;
   const providerCapacity = await marketingOutreachCapacitySnapshot(prisma, growthDailyMax);
   const effectiveDailyMax = Math.min(marketingOutreachCap, providerCapacity.effectiveMarketingMax);

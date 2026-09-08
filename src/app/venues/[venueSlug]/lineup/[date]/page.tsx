@@ -104,7 +104,7 @@ export default async function VenueLineupDatePage(props: {
         {!embedMode ? (
           <p className="mb-6 max-w-xl text-sm text-white/60">
             <span className="text-white/80">Open</span> slots: artists tap{" "}
-            <span className="font-medium text-white/85">Perform</span> to sign in and claim a set.
+            <span className="font-medium text-white/85">Sign up</span> to sign in and claim a set.
           </p>
         ) : null}
 

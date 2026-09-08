@@ -153,6 +153,7 @@ export async function sendApprovedGrowthLeadDraft(
     discoveryMarketSlug: draft.discoveryMarketSlug ?? draft.lead.discoveryMarketSlug,
     clickDestinationUrl,
     domainDailyCapOverride: outreachRuntime.effectiveDomainDailyMax,
+    categoryDailyCapOverride: outreachRuntime.effectiveMarketingOutreachDailyCap,
   });
 
   if (result.ok) {

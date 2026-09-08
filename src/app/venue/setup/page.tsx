@@ -27,6 +27,10 @@ export default async function VenueSetupPage(props: {
 }) {
   const { error, growthLead, claimListing } = await props.searchParams;
   const session = await getSession();
+  // Managers are signed in but own nothing to set up — /register/venue would bounce them straight back here.
+  if (session?.kind === "venue" && !session.venueOwnerId) {
+    redirect("/venue?venueError=managerNoSetup");
+  }
   if (!session || session.kind !== "venue" || !session.venueOwnerId) {
     const qs = new URLSearchParams();
     if (typeof claimListing === "string" && SLUG_RE.test(claimListing.trim())) {

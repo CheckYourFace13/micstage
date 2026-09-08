@@ -11,7 +11,11 @@ import { lineupNavLabelFromYmd } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { HostAddNightForm } from "@/components/host/HostAddNightForm";
+import { FindOpenMicPanel } from "@/components/promoter/FindOpenMicPanel";
+import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { SharePageButtons } from "@/components/onboarding/SharePageButtons";
+import { promoterSetupChecklist } from "@/lib/onboarding/setupProgress";
+import { listRemovableOpenMicsForPromoter } from "@/lib/publicListings/openMicSelfRemoval";
 import {
   addPromoterNightAction,
   addPromoterRecurringNightsAction,
@@ -51,6 +55,13 @@ export default async function HostDashboardPage(props: {
       select: { displayName: true, hostSlug: true, application: { select: { contactName: true, brandName: true } } },
     }),
   ]);
+
+  let removableOpenMics: Awaited<ReturnType<typeof listRemovableOpenMicsForPromoter>> = [];
+  try {
+    removableOpenMics = await listRemovableOpenMicsForPromoter(prisma, session.promoterId);
+  } catch (e) {
+    console.error("[host dashboard] listRemovableOpenMicsForPromoter", e);
+  }
 
   const cookieStore = await cookies();
   const welcomeSeen = cookieStore.get("om_promoter_welcome_seen")?.value === "1";
@@ -100,6 +111,8 @@ export default async function HostDashboardPage(props: {
         return "Night saved.";
       case "venue_changed":
         return "Venue updated.";
+      case "connected":
+        return "Open mic connected. Add or confirm a night below.";
       case "night_duplicate":
         return "That venue and date are already on your list.";
       case "night_bad_date":
@@ -264,6 +277,56 @@ export default async function HostDashboardPage(props: {
                 }))}
             />
           ))}
+        </div>
+
+        <section id="find" className="mt-10 scroll-mt-24">
+          <h2 className="text-lg font-semibold text-white">Already listed on MicStage?</h2>
+          <p className="mt-1 text-sm text-white/60">
+            Search for the open mic you run and connect it to your account — you don&apos;t need to own the venue.
+          </p>
+          <div className="mt-4">
+            <FindOpenMicPanel />
+          </div>
+        </section>
+
+        {removableOpenMics.length > 0 ? (
+          <section className="mt-10">
+            <h2 className="text-lg font-semibold text-white">Your open mics on MicStage</h2>
+            <p className="mt-1 text-sm text-white/60">
+              These public listings are linked to you. Removing one takes it off MicStage search and maps.
+            </p>
+            <ul className="mt-4 grid gap-2 text-sm">
+              {removableOpenMics.map((m) => (
+                <li
+                  key={m.listingId}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/25 px-3 py-2"
+                >
+                  <span>
+                    <span className="font-medium text-white">{m.listingName}</span>
+                    {m.placeLine ? <span className="text-white/55"> · {m.placeLine}</span> : null}
+                  </span>
+                  <Link
+                    href={`/promoter/open-mics/${m.listingSlug}/remove`}
+                    className="text-xs font-semibold text-red-300 underline"
+                  >
+                    Remove this open mic
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <div className="mt-10">
+          <SetupChecklist
+            heading="Finish setting up"
+            subheading="Optional — your open mic is already live for performers once a night is scheduled."
+            items={promoterSetupChecklist({
+              hasOpenMicConnected: removableOpenMics.length > 0 || recentVenues.length > 0,
+              hasSeries: seriesList.length > 0,
+              hasNight: allNights.length > 0,
+            })}
+          />
         </div>
 
         {seriesList.length > 0 ? (

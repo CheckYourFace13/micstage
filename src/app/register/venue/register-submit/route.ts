@@ -81,8 +81,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const existing = await prisma.venueOwner.findUnique({ where: { email } });
-    if (existing) {
+    // Managers sign in through the same venue login, so a duplicate here would shadow their account.
+    const [existing, existingManager] = await Promise.all([
+      prisma.venueOwner.findUnique({ where: { email }, select: { id: true } }),
+      prisma.venueManager.findUnique({ where: { email }, select: { id: true } }),
+    ]);
+    if (existing || existingManager) {
       return redirectTo(registerErrorPath("exists", email, claimListing, growthTraceLeadId));
     }
 

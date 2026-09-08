@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { unstable_rethrow } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
@@ -9,9 +9,11 @@ import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 
 export const runtime = "nodejs";
 
-function venueLoginQuery(code: string, nextField: string): string {
+function venueLoginQuery(code: string, nextField: string, email?: string): string {
   const q = new URLSearchParams({ error: code });
   if (nextField) q.set("next", nextField);
+  // Keep the typed address so a failed attempt doesn't mean retyping it on a phone.
+  if (email) q.set("email", email);
   return `/login/venue?${q.toString()}`;
 }
 
@@ -49,12 +51,12 @@ export async function POST(request: Request) {
     limit: 10,
     windowSec: 60 * 15,
   });
-  if (!rl.allowed) return redirectTo(venueLoginQuery("rate", nextField));
+  if (!rl.allowed) return redirectTo(venueLoginQuery("rate", nextField, email));
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[loginVenue] database not configured");
-    return redirectTo(venueLoginQuery("unavailable", nextField));
+    return redirectTo(venueLoginQuery("unavailable", nextField, email));
   }
 
   let owner;
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginVenue] venueOwner findUnique", e);
-    return redirectTo(venueLoginQuery("unavailable", nextField));
+    return redirectTo(venueLoginQuery("unavailable", nextField, email));
   }
 
   if (owner) {
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
     } catch (e) {
       unstable_rethrow(e);
       console.error("[loginVenue] bcrypt owner", e);
-      return redirectTo(venueLoginQuery("unavailable", nextField));
+      return redirectTo(venueLoginQuery("unavailable", nextField, email));
     }
     if (ownerOk) {
       try {
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
       } catch (e) {
         unstable_rethrow(e);
         console.error("[loginVenue] setSession owner", e);
-        return redirectTo(venueLoginQuery("unavailable", nextField));
+        return redirectTo(venueLoginQuery("unavailable", nextField, email));
       }
       return redirectTo(safeAfterAuthPath(nextField, "/venue"));
     }
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginVenue] venueManager findUnique", e);
-    return redirectTo(venueLoginQuery("unavailable", nextField));
+    return redirectTo(venueLoginQuery("unavailable", nextField, email));
   }
 
   if (manager) {
@@ -109,7 +111,7 @@ export async function POST(request: Request) {
     } catch (e) {
       unstable_rethrow(e);
       console.error("[loginVenue] bcrypt manager", e);
-      return redirectTo(venueLoginQuery("unavailable", nextField));
+      return redirectTo(venueLoginQuery("unavailable", nextField, email));
     }
     if (managerOk) {
       try {
@@ -117,12 +119,13 @@ export async function POST(request: Request) {
       } catch (e) {
         unstable_rethrow(e);
         console.error("[loginVenue] setSession manager", e);
-        return redirectTo(venueLoginQuery("unavailable", nextField));
+        return redirectTo(venueLoginQuery("unavailable", nextField, email));
       }
       return redirectTo(safeAfterAuthPath(nextField, "/venue"));
     }
   }
 
-  return redirectTo(venueLoginQuery("invalid", nextField));
+  return redirectTo(venueLoginQuery("invalid", nextField, email));
 }
+
 

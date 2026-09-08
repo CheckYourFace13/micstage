@@ -22,6 +22,7 @@ export const OUTREACH_RUNTIME_KEYS = [
   "GROWTH_OUTREACH_DAILY_MAX",
   "GROWTH_OUTREACH_SENDS_PER_CRON_RUN",
   "GROWTH_OUTREACH_DOMAIN_DAILY_MAX",
+  "MARKETING_CAP_DAILY_OUTREACH",
 ] as const;
 
 export type OutreachRuntimeKey = (typeof OUTREACH_RUNTIME_KEYS)[number];
@@ -49,20 +50,27 @@ export type OutreachRuntimeSnapshot = {
   dailyMax: ResolvedIntSetting;
   sendsPerCron: ResolvedIntSetting;
   domainDailyMax: ResolvedIntSetting;
+  marketingOutreachDailyCap: ResolvedIntSetting;
   /** Final gate: !kill && enabled */
   outreachMasterEnabled: boolean;
   effectiveSendsPerCron: number;
   effectiveDailyMax: number;
   effectiveDomainDailyMax: number;
+  /** Category-wide OUTREACH ceiling for the UTC day, DB-overridable so it can move without a redeploy. */
+  effectiveMarketingOutreachDailyCap: number;
 };
 
-const INT_DEFAULTS: Record<
-  "GROWTH_OUTREACH_DAILY_MAX" | "GROWTH_OUTREACH_SENDS_PER_CRON_RUN" | "GROWTH_OUTREACH_DOMAIN_DAILY_MAX",
-  number
-> = {
+type IntSettingKey =
+  | "GROWTH_OUTREACH_DAILY_MAX"
+  | "GROWTH_OUTREACH_SENDS_PER_CRON_RUN"
+  | "GROWTH_OUTREACH_DOMAIN_DAILY_MAX"
+  | "MARKETING_CAP_DAILY_OUTREACH";
+
+const INT_DEFAULTS: Record<IntSettingKey, number> = {
   GROWTH_OUTREACH_DAILY_MAX: 25,
   GROWTH_OUTREACH_SENDS_PER_CRON_RUN: 0,
   GROWTH_OUTREACH_DOMAIN_DAILY_MAX: 1,
+  MARKETING_CAP_DAILY_OUTREACH: 50,
 };
 
 function envTruthy(v: string | undefined | null): boolean {
@@ -115,7 +123,7 @@ function resolveBool(
 }
 
 function resolveInt(
-  key: "GROWTH_OUTREACH_DAILY_MAX" | "GROWTH_OUTREACH_SENDS_PER_CRON_RUN" | "GROWTH_OUTREACH_DOMAIN_DAILY_MAX",
+  key: IntSettingKey,
   db: Map<string, string>,
   clamp: { min: number; max: number },
 ): ResolvedIntSetting {
@@ -185,6 +193,7 @@ export async function resolveOutreachRuntimeSnapshot(prisma: PrismaClient): Prom
   const dailyMax = resolveInt("GROWTH_OUTREACH_DAILY_MAX", db, { min: 0, max: 100 });
   const sendsPerCron = resolveInt("GROWTH_OUTREACH_SENDS_PER_CRON_RUN", db, { min: 0, max: 50 });
   const domainDailyMax = resolveInt("GROWTH_OUTREACH_DOMAIN_DAILY_MAX", db, { min: 0, max: 10 });
+  const marketingOutreachDailyCap = resolveInt("MARKETING_CAP_DAILY_OUTREACH", db, { min: 0, max: 100 });
 
   const outreachMasterEnabled = !killEffective && enabledBase.effective;
   const rlsGateClear = await isDatabaseRlsSecurityGateClear(prisma);
@@ -200,10 +209,12 @@ export async function resolveOutreachRuntimeSnapshot(prisma: PrismaClient): Prom
     dailyMax,
     sendsPerCron,
     domainDailyMax,
+    marketingOutreachDailyCap,
     outreachMasterEnabled,
     effectiveSendsPerCron,
     effectiveDailyMax,
     effectiveDomainDailyMax,
+    effectiveMarketingOutreachDailyCap: marketingOutreachDailyCap.effective,
   };
 }
 
@@ -232,6 +243,10 @@ export function validateOutreachRuntimeValue(
     }
     if (key === "GROWTH_OUTREACH_DOMAIN_DAILY_MAX") {
       if (value < 0 || value > 10) return { ok: false, error: "domain_daily_max_out_of_range" };
+      return { ok: true, valueType: "integer", stored: String(value) };
+    }
+    if (key === "MARKETING_CAP_DAILY_OUTREACH") {
+      if (value < 0 || value > 100) return { ok: false, error: "marketing_outreach_cap_out_of_range" };
       return { ok: true, valueType: "integer", stored: String(value) };
     }
     return { ok: false, error: "integer_not_allowed_for_key" };

@@ -43,6 +43,7 @@ export function safeAfterMusicianLoginPath(next: string | null | undefined): str
   const pathOnly = (resolved.split("?")[0] || "").trim();
   if (
     pathOnly.startsWith("/venues/") ||
+    pathOnly.startsWith("/nights/") ||
     pathOnly.startsWith("/open-mics/") ||
     pathOnly === "/find-open-mics" ||
     pathOnly.startsWith("/find-open-mics?") ||

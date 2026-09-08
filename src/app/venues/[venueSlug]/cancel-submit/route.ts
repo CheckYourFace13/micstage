@@ -35,21 +35,33 @@ export async function POST(request: Request) {
   }
 
   const venueSlug = reqString(formData, "venueSlug");
-  const returnBase = safePublicVenueReturnPath(venueSlug, optString(formData, "returnPath"));
   const bookingId = reqString(formData, "bookingId");
+
+  const prisma = requirePrisma();
+  const bookingTemplate = await prisma.booking
+    .findUnique({
+      where: { id: bookingId },
+      select: {
+        slot: {
+          select: {
+            instance: { select: { template: { select: { venueId: true, promoterNightId: true } } } },
+          },
+        },
+      },
+    })
+    .then((b) => b?.slot.instance.template ?? null);
+
+  // Host nights live at /nights/:id/lineup, so cancelling there has to return there.
+  const returnBase = safePublicVenueReturnPath(venueSlug, optString(formData, "returnPath"), {
+    nightId: bookingTemplate?.promoterNightId ?? null,
+  });
 
   const session = await getSession();
   if (!session) {
     return redirectTo(appendQueryToPath(returnBase, { bookError: "Sign in to cancel a booking." }));
   }
 
-  const prisma = requirePrisma();
-  const bookingVenueId = await prisma.booking
-    .findUnique({
-      where: { id: bookingId },
-      select: { slot: { select: { instance: { select: { template: { select: { venueId: true } } } } } } },
-    })
-    .then((b) => b?.slot.instance.template.venueId);
+  const bookingVenueId = bookingTemplate?.venueId;
 
   if (!bookingVenueId) {
     return redirectTo(appendQueryToPath(returnBase, { bookError: "Booking not found." }));

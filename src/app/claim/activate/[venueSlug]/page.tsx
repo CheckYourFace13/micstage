@@ -16,6 +16,10 @@ export default async function ClaimActivatePage(props: {
   if (!prisma) notFound();
 
   const session = await getSession();
+  // A signed-in manager can't claim; sending them to login would just bounce back here forever.
+  if (session?.kind === "venue" && !session.venueOwnerId) {
+    redirect("/venue?venueError=managerCannotClaim");
+  }
   if (!session || session.kind !== "venue" || !session.venueOwnerId) {
     redirect(`/login/venue?next=${encodeURIComponent(`/claim/activate/${venueSlug}`)}`);
   }

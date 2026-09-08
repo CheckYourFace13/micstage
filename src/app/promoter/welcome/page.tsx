@@ -64,9 +64,9 @@ export default async function HostWelcomePage(props: { searchParams: Promise<{ e
         <HostWelcomeForm setupAction={setupFirstHostNightAction} />
 
         <p className="mt-6 text-sm text-white/55">
-          Skip for now?{" "}
-          <Link href="/promoter" className="underline hover:text-white">
-            Go to dashboard
+          {/* Must go through /skip: /promoter sends hosts without a series back here until the cookie is set. */}
+          <Link href="/promoter/welcome/skip" className="underline hover:text-white">
+            Do this later — go to my dashboard
           </Link>
         </p>
       </main>

@@ -10,9 +10,9 @@ import { VENUE_LOGIN_SUBMIT_PATH } from "./serverActions";
 import { VenueLoginForm } from "./VenueLoginForm";
 
 export default async function VenueLoginPage(props: {
-  searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; reset?: string; email?: string }>;
 }) {
-  const { error, next, reset } = await props.searchParams;
+  const { error, next, reset, email } = await props.searchParams;
   const session = await getSession();
   if (session?.kind === "venue") {
     redirect(safeAfterAuthPath(next, "/venue"));
@@ -80,7 +80,8 @@ export default async function VenueLoginPage(props: {
             <input
               name="email"
               type="email"
-              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+              defaultValue={email ?? ""}
+              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white placeholder:text-white/40"
               placeholder="owner@venue.com"
               required
             />
@@ -90,7 +91,7 @@ export default async function VenueLoginPage(props: {
             <input
               name="password"
               type="password"
-              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white placeholder:text-white/40"
               placeholder="Your password"
               required
             />

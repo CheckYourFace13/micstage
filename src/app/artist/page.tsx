@@ -127,9 +127,15 @@ async function loadArtistPortalData(musicianId: string): Promise<ArtistPortalLoa
 
   let bookings: PortalBooking[] = [];
   try {
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
     bookings = await prisma.booking.findMany({
-      where: { musicianId: base.id, cancelledAt: null },
-      orderBy: { createdAt: "desc" },
+      where: {
+        musicianId: base.id,
+        cancelledAt: null,
+        slot: { instance: { date: { gte: todayUtc } } },
+      },
+      orderBy: { slot: { instance: { date: "asc" } } },
       take: 25,
       include: bookingPortalInclude,
     });
@@ -456,6 +462,16 @@ export default async function ArtistPortalPage({
                             <p className="mt-2 max-w-xl text-xs leading-relaxed text-white/55">{tpl.description}</p>
                           ) : null}
                           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/60">
+                            <Link
+                              className="underline"
+                              href={
+                                tpl.promoterNightId
+                                  ? `/nights/${tpl.promoterNightId}/lineup`
+                                  : `/venues/${v.slug}/lineup/${date}`
+                              }
+                            >
+                              View lineup or cancel
+                            </Link>
                             <Link className="underline" href={`/venues/${v.slug}`}>
                               View venue page
                             </Link>

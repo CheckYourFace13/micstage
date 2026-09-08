@@ -42,6 +42,12 @@ import type { OutreachOpenMicEvidenceResult } from "@/lib/growth/outreachOpenMic
 
 export const OUTREACH_ENRICH_STATS_KEY = "GROWTH_OUTREACH_ENRICH_DAY_STATS";
 
+/** Rotating scan position so every candidate lead gets examined, not just the oldest page. */
+export const OUTREACH_ENRICH_SCAN_CURSOR_KEY = "GROWTH_OUTREACH_ENRICH_SCAN_CURSOR";
+
+const ENRICH_SCAN_PAGE = 400;
+const ENRICH_SCAN_MAX_PAGES = 6;
+
 const ROLE_LOCAL =
   /^(info|hello|contact|events?|bookings?|music|entertainment|manager|management|office|venue|host)$/i;
 
@@ -115,6 +121,35 @@ export async function readOutreachEnrichDayStats(
   } catch {
     return emptyStats(day);
   }
+}
+
+async function readEnrichScanCursor(prisma: PrismaClient): Promise<string | null> {
+  const row = await prisma.operationalRuntimeSetting.findUnique({
+    where: { key: OUTREACH_ENRICH_SCAN_CURSOR_KEY },
+    select: { value: true },
+  });
+  const id = row?.value?.trim();
+  return id ? id : null;
+}
+
+async function writeEnrichScanCursor(prisma: PrismaClient, leadId: string | null): Promise<void> {
+  const value = leadId ?? "";
+  await prisma.operationalRuntimeSetting.upsert({
+    where: { key: OUTREACH_ENRICH_SCAN_CURSOR_KEY },
+    create: {
+      key: OUTREACH_ENRICH_SCAN_CURSOR_KEY,
+      valueType: "string",
+      value,
+      updatedBy: "outreach-evidence-enrichment",
+      reason: "rotating_scan_position",
+    },
+    update: {
+      valueType: "string",
+      value,
+      updatedBy: "outreach-evidence-enrichment",
+      reason: "rotating_scan_position",
+    },
+  });
 }
 
 async function addOutreachEnrichDayStats(
@@ -419,12 +454,57 @@ export async function enrichGrowthLeadOfficialEvidence(
 
   await ensureGrowthOpsMigration(prisma);
 
+  const candidateWhere: Prisma.GrowthLeadWhereInput = {
+    leadType: { in: ["VENUE", "PROMOTER_ACCOUNT"] },
+    status: { in: ["DISCOVERED", "REVIEWED", "APPROVED"] },
+    websiteUrl: { not: null },
+  };
+
+  /**
+   * Recheck-due lives in `discoveryHints` JSON, so it can't be filtered in SQL. Scanning a fixed
+   * oldest-first page starves the queue: leads that aren't due never get their `updatedAt` bumped,
+   * so they hold the head of the queue forever. Sweep from a persisted cursor instead, wrapping at
+   * the end, so every candidate is examined within a few ticks.
+   */
+  const scanStartId = await readEnrichScanCursor(prisma);
+  const scanNow = new Date();
+  const dueIds: string[] = [];
+  let cursorId = scanStartId;
+  let wrapped = false;
+  let scanned = 0;
+  const wanted = Math.max(limit * 4, limit + 8);
+
+  for (let page = 0; page < ENRICH_SCAN_MAX_PAGES && dueIds.length < wanted; page++) {
+    const scan = await prisma.growthLead.findMany({
+      where: candidateWhere,
+      select: { id: true, discoveryHints: true },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: ENRICH_SCAN_PAGE,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+    });
+    if (scan.length === 0) {
+      if (wrapped || !cursorId) break;
+      cursorId = null;
+      wrapped = true;
+      continue;
+    }
+    scanned += scan.length;
+    cursorId = scan[scan.length - 1]!.id;
+    for (const row of scan) {
+      const state = parseOutreachEvidenceState(row.discoveryHints);
+      if (state?.skipPermanent) continue;
+      if (!isOutreachEvidenceRecheckDue(state, scanNow)) continue;
+      dueIds.push(row.id);
+    }
+    if (wrapped && scanStartId && cursorId === scanStartId) break;
+  }
+  await writeEnrichScanCursor(prisma, cursorId);
+  out.skippedDue += Math.max(0, scanned - dueIds.length);
+
+  if (dueIds.length === 0) return out;
+
   const rows = (await prisma.growthLead.findMany({
-    where: {
-      leadType: { in: ["VENUE", "PROMOTER_ACCOUNT"] },
-      status: { in: ["DISCOVERED", "REVIEWED", "APPROVED"] },
-      websiteUrl: { not: null },
-    },
+    where: { id: { in: dueIds } },
     select: {
       id: true,
       name: true,
@@ -460,8 +540,6 @@ export async function enrichGrowthLeadOfficialEvidence(
         take: 2,
       },
     },
-    orderBy: { updatedAt: "asc" },
-    take: Math.max(150, limit * 20),
   })) as EnrichLeadRow[];
 
   const now = new Date();
@@ -491,7 +569,6 @@ export async function enrichGrowthLeadOfficialEvidence(
     })
     .filter((x) => x.due && x.score >= 0)
     .sort((a, b) => b.score - a.score);
-  out.skippedDue += Math.max(0, rows.length - scored.length);
   const due = scored.slice(0, limit).map((x) => x.row);
 
   const robotsCache = new Map<string, ReturnType<typeof parseRobotsTxtForCrawler> | null>();

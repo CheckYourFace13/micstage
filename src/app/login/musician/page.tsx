@@ -1,4 +1,4 @@
-export const metadata = {
+﻿export const metadata = {
   title: "Artist login | MicStage",
 };
 
@@ -10,9 +10,9 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { MUSICIAN_LOGIN_SUBMIT_PATH } from "./serverActions";
 
 export default async function MusicianLoginPage(props: {
-  searchParams: Promise<{ error?: string; next?: string; reset?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; reset?: string; email?: string }>;
 }) {
-  const { error, next, reset } = await props.searchParams;
+  const { error, next, reset, email } = await props.searchParams;
   const session = await getSession();
   if (session?.kind === "musician") {
     redirect(safeAfterMusicianLoginPath(next));
@@ -75,7 +75,8 @@ export default async function MusicianLoginPage(props: {
             <input
               name="email"
               type="email"
-              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+              defaultValue={email ?? ""}
+              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white placeholder:text-white/40"
               placeholder="you@example.com"
               required
             />
@@ -85,7 +86,7 @@ export default async function MusicianLoginPage(props: {
             <input
               name="password"
               type="password"
-              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white placeholder:text-white/40"
               placeholder="Your password"
               required
             />
@@ -117,4 +118,5 @@ export default async function MusicianLoginPage(props: {
     </div>
   );
 }
+
 

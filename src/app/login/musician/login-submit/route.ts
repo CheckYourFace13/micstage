@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { unstable_rethrow } from "next/navigation";
 import { getPrismaOrNull } from "@/lib/prisma";
@@ -9,9 +9,11 @@ import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 
 export const runtime = "nodejs";
 
-function musicianLoginQuery(code: string, nextField: string): string {
+function musicianLoginQuery(code: string, nextField: string, email?: string): string {
   const q = new URLSearchParams({ error: code });
   if (nextField) q.set("next", nextField);
+  // Keep the typed address so a failed attempt doesn't mean retyping it on a phone.
+  if (email) q.set("email", email);
   return `/login/musician?${q.toString()}`;
 }
 
@@ -49,12 +51,12 @@ export async function POST(request: Request) {
     limit: 10,
     windowSec: 60 * 15,
   });
-  if (!rl.allowed) return redirectTo(musicianLoginQuery("rate", nextField));
+  if (!rl.allowed) return redirectTo(musicianLoginQuery("rate", nextField, email));
 
   const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[loginMusician] database not configured");
-    return redirectTo(musicianLoginQuery("unavailable", nextField));
+    return redirectTo(musicianLoginQuery("unavailable", nextField, email));
   }
 
   let user;
@@ -66,9 +68,9 @@ export async function POST(request: Request) {
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginMusician] findUnique", e);
-    return redirectTo(musicianLoginQuery("unavailable", nextField));
+    return redirectTo(musicianLoginQuery("unavailable", nextField, email));
   }
-  if (!user) return redirectTo(musicianLoginQuery("invalid", nextField));
+  if (!user) return redirectTo(musicianLoginQuery("invalid", nextField, email));
 
   let passwordOk: boolean;
   try {
@@ -76,18 +78,19 @@ export async function POST(request: Request) {
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginMusician] bcrypt", e);
-    return redirectTo(musicianLoginQuery("unavailable", nextField));
+    return redirectTo(musicianLoginQuery("unavailable", nextField, email));
   }
-  if (!passwordOk) return redirectTo(musicianLoginQuery("invalid", nextField));
+  if (!passwordOk) return redirectTo(musicianLoginQuery("invalid", nextField, email));
 
   try {
     await setSession({ kind: "musician", musicianId: user.id, email: user.email });
   } catch (e) {
     unstable_rethrow(e);
     console.error("[loginMusician] setSession", e);
-    return redirectTo(musicianLoginQuery("unavailable", nextField));
+    return redirectTo(musicianLoginQuery("unavailable", nextField, email));
   }
 
   return redirectTo(safeAfterMusicianLoginPath(nextField));
 }
+
 

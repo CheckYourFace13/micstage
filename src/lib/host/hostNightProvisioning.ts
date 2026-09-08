@@ -65,6 +65,8 @@ export async function provisionHostNightLineup(
     await prisma.eventTemplate.update({
       where: { id: templateId },
       data: {
+        // The template follows the night, so a venue move carries the lineup with it.
+        venueId: night.venueId,
         title,
         weekday,
         startTimeMin,

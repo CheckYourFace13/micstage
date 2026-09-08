@@ -17,7 +17,7 @@ function read(rel) {
   const page = read("src/app/register/promoter/page.tsx");
   assert.ok(!/name="slug"/.test(page), "promoter register must not ask for slug");
   assert.ok(!/venueSlug/.test(page), "promoter register must not mention venueSlug");
-  assert.ok(/Create your account/.test(page) || /Create account/.test(page), "friendly register copy");
+  assert.ok(/Create (your )?(free )?(host )?account/i.test(page), "friendly register copy");
 }
 
 // Promoter register submit lands on welcome
@@ -35,10 +35,12 @@ function read(rel) {
   assert.ok(dash.includes("FindOpenMicPanel"), "dashboard uses name search");
   assert.ok(dash.includes("SetupChecklist"), "dashboard has optional checklist");
   assert.ok(dash.includes("SharePageButtons"), "dashboard surfaces share");
-  assert.ok(/Manage my open mic/i.test(dash), "linked CTA");
-  assert.ok(dash.includes("You haven&apos;t connected an open mic yet."), "unlinked empty state");
-  assert.ok(/Find my open mic/i.test(dash), "unlinked find CTA");
-  assert.ok(dash.includes("Your open mic is connected."), "post-connect success");
+  // The dashboard now runs many open mics per host (series + nights), so the first-session paths
+  // are "manage a night", "list your open mics", and "connect one that's already listed".
+  assert.ok(/Manage lineup/i.test(dash), "linked CTA");
+  assert.ok(/Name your first open mic series/i.test(dash), "empty state");
+  assert.ok(/Already listed on MicStage/i.test(dash), "connect an existing listing");
+  assert.ok(/Your open mics/i.test(dash), "connected open mics list");
   assert.ok(!/Enter the venue slug/.test(dash), "no slug instructions");
 }
 
@@ -48,8 +50,9 @@ function read(rel) {
   assert.ok(fs.existsSync(path.join(root, "src/app/promoter/welcome/skip/route.ts")));
   const welcome = read("src/app/promoter/welcome/page.tsx");
   assert.ok(/Do this later/i.test(welcome));
-  assert.ok(/Find my open mic/i.test(welcome));
-  assert.ok(/Create a new open mic/i.test(welcome));
+  // Skipping has to go through the route that sets om_promoter_welcome_seen, or /promoter loops back here.
+  assert.ok(welcome.includes("/promoter/welcome/skip"), "skip link marks welcome as seen");
+  assert.ok(/HostWelcomeForm/.test(welcome), "welcome sets up the first night inline");
 }
 
 // Approval email prefills email, plain language
@@ -62,7 +65,7 @@ function read(rel) {
 // Musician: display name, no bio required at signup; first-session CTAs
 {
   const mus = read("src/app/register/musician/page.tsx");
-  assert.ok(/Display name/.test(mus));
+  assert.ok(/Stage name|Display name/.test(mus));
   assert.ok(!/name="bio"/.test(mus));
   assert.ok(!/name="genres"/.test(mus));
   assert.ok(!LineupHelp(mus), "no lineup help clutter on signup");

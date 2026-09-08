@@ -57,6 +57,7 @@ export default function Home() {
                 Start hosting free
               </Link>
             </div>
+            <p className="mt-3 text-xs text-white/50">No credit card required.</p>
 
             <HomeDiscoveryPanel />
           </div>
@@ -74,7 +75,9 @@ export default function Home() {
                 </li>
                 <li className="rounded-xl border border-white/10 bg-black/30 p-4">
                   <p className="font-semibold text-white">Hosts</p>
-                  <p className="mt-1 text-xs text-white/55">Run all your open mics — even across multiple venues.</p>
+                  <p className="mt-1 text-xs text-white/55">
+                    Run your open mic free — even across multiple venues.
+                  </p>
                   <Link href="/host" className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-[rgb(var(--om-neon))] underline">
                     Start hosting free
                   </Link>

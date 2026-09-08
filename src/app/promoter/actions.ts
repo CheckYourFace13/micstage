@@ -26,6 +26,7 @@ function hostMilestoneQuery(milestones: string[]): string {
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
 
+/** Slugs are always generated server-side — hosts never type or see one. */
 function slugifyName(name: string): string {
   return (
     name
@@ -436,41 +437,57 @@ export async function addPromoterRecurringNightsAction(formData: FormData) {
 export async function changePromoterNightVenueAction(formData: FormData) {
   const session = await requirePromoterSession();
   const nightId = formData.get("nightId")?.toString().trim();
-  const newVenueId = formData.get("newVenueId")?.toString().trim();
   const scope = formData.get("scope")?.toString().trim() || "this";
-  if (!nightId || !newVenueId) redirect("/promoter?promoter=night_invalid");
+  const stayOnNight = formData.get("returnTo")?.toString().trim() === "night";
+  const failureUrl = stayOnNight ? `/promoter/nights/${nightId}?error=` : "/promoter?promoter=";
+  if (!nightId) redirect("/promoter?promoter=night_invalid");
 
   const prisma = requirePrisma();
+  const newVenueId = await resolveVenueIdFromForm(formData, prisma);
+  if (!newVenueId) redirect(`${failureUrl}${stayOnNight ? "venue_missing" : "night_invalid"}`);
+
   const night = await prisma.promoterNight.findFirst({
     where: { id: nightId, series: { promoterId: session.promoterId } },
     select: { id: true, seriesId: true, venueId: true, date: true },
   });
   if (!night) redirect("/promoter?promoter=forbidden");
-  if (!(await assertVenueExistsForHostNight(prisma, newVenueId))) redirect("/promoter?promoter=venue_missing");
+  if (!(await assertVenueExistsForHostNight(prisma, newVenueId))) redirect(`${failureUrl}venue_missing`);
 
+  const movedNightIds: string[] = [];
   if (scope === "future") {
+    const future = await prisma.promoterNight.findMany({
+      where: { seriesId: night.seriesId, venueId: night.venueId, date: { gte: night.date } },
+      select: { id: true },
+      orderBy: { date: "asc" },
+      take: 60,
+    });
+    movedNightIds.push(...future.map((n) => n.id));
+  } else {
+    movedNightIds.push(night.id);
+  }
+
+  try {
     await prisma.promoterNight.updateMany({
-      where: {
-        seriesId: night.seriesId,
-        venueId: night.venueId,
-        date: { gte: night.date },
-      },
+      where: { id: { in: movedNightIds } },
       data: { venueId: newVenueId },
     });
-  } else {
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      redirect(`${failureUrl}${stayOnNight ? "duplicate_date" : "night_duplicate"}`);
+    }
+    redirect(`${failureUrl}${stayOnNight ? "venue_missing" : "night_error"}`);
+  }
+
+  // Lineup, public listing and signup page all hang off the template, so move them too.
+  for (const id of movedNightIds) {
     try {
-      await prisma.promoterNight.update({
-        where: { id: night.id },
-        data: { venueId: newVenueId },
-      });
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        redirect("/promoter?promoter=night_duplicate");
-      }
-      redirect("/promoter?promoter=night_error");
+      await provisionHostNightLineup(prisma, id);
+    } catch {
+      // Leave the night in place; the next lineup load re-provisions it.
     }
   }
 
   revalidatePath("/promoter");
-  redirect("/promoter?promoter=venue_changed");
+  revalidatePath(`/promoter/nights/${nightId}`);
+  redirect(stayOnNight ? `/promoter/nights/${nightId}?saved=venue` : "/promoter?promoter=venue_changed");
 }

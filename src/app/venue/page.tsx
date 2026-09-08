@@ -512,6 +512,13 @@ export default async function VenuePortalPage({
             You don&apos;t have access to that action for this venue. Refresh if your login changed.
           </div>
         ) : null}
+        {q.venueError === "managerNoSetup" || q.venueError === "managerCannotClaim" ? (
+          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            {q.venueError === "managerNoSetup"
+              ? "You're signed in as a venue manager, so there's nothing to set up here — manage the venues you were invited to below."
+              : "Claiming a listing needs the venue owner account. Ask the owner to claim it, or sign in with the owner login."}
+          </div>
+        ) : null}
         {q.venueError === "venueMissing" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             Venue data could not be loaded. Refresh and try again.
@@ -1066,6 +1073,7 @@ export default async function VenuePortalPage({
                       defaultEndTime={
                         v.eventTemplates[0] ? minutesToTimeInputValue(v.eventTemplates[0].endTimeMin) : undefined
                       }
+                      defaultWeekdays={[...new Set(v.eventTemplates.map((t) => t.weekday))]}
                       defaultPerformanceFormat={v.eventTemplates[0]?.performanceFormat ?? v.performanceFormat}
                       bookingRestrictionMode={v.bookingRestrictionMode}
                       restrictionHoursBefore={v.restrictionHoursBefore ?? 6}

@@ -38,13 +38,19 @@ export default async function HostNightLineupPage(props: {
   const embedMode = embed === "1";
 
   let ctx = await loadHostNightLineupContext(nightId);
-  if (!ctx) {
+  // A night with a missing template or dated instance loads fine but has nothing to show, so
+  // re-provision instead of 404ing — otherwise the host's public link is a permanent dead end.
+  if (!ctx || !ctx.template || !ctx.instance) {
     const prisma = getPrismaOrNull();
     if (prisma) {
       const exists = await prisma.promoterNight.findUnique({ where: { id: nightId }, select: { id: true } });
       if (exists) {
-        await provisionHostNightLineup(prisma, nightId);
-        ctx = await loadHostNightLineupContext(nightId);
+        try {
+          await provisionHostNightLineup(prisma, nightId);
+          ctx = await loadHostNightLineupContext(nightId);
+        } catch {
+          // Fall through to notFound below.
+        }
       }
     }
   }

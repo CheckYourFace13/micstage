@@ -4,8 +4,9 @@
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { BookingRestrictionMode, Weekday } from "@/generated/prisma/client";
+import { isValidScheduleWindow, resolveScheduleEndMin } from "@/lib/scheduleWindow";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
-import { syncSlotsForInstance } from "@/lib/slotSync";
+import { slotMayBeDeleted, syncSlotsForInstance } from "@/lib/slotSync";
 
 const WEEKDAYS: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as unknown as Weekday[];
 
@@ -37,7 +38,10 @@ export async function provisionHostNightLineup(
 
   const signupEnabled = overrides?.signupEnabled ?? night.signupEnabled;
   const startTimeMin = overrides?.startTimeMin ?? night.startTimeMin;
-  const endTimeMin = overrides?.endTimeMin ?? night.endTimeMin;
+  // End at or before start means the night runs past midnight (9:00 PM → 1:00 AM).
+  const requestedEndTimeMin = overrides?.endTimeMin ?? night.endTimeMin;
+  const endTimeMin = resolveScheduleEndMin(startTimeMin, requestedEndTimeMin);
+  if (!isValidScheduleWindow(startTimeMin, endTimeMin)) throw new Error("invalid_schedule_window");
   const slotMinutes = overrides?.slotMinutes ?? night.slotMinutes;
   const breakMinutes = overrides?.breakMinutes ?? night.breakMinutes;
 
@@ -105,6 +109,17 @@ export async function provisionHostNightLineup(
 
   const desired = generateSlotsForWindow({ startTimeMin, endTimeMin, slotMinutes, breakMinutes });
   await syncSlotsForInstance(prisma, instance.id, desired);
+
+  // A host night owns exactly one dated instance; drop untouched leftovers after a date change.
+  const stale = await prisma.eventInstance.findMany({
+    where: { templateId, date: { not: night.date } },
+    include: { slots: { include: { booking: true } } },
+  });
+  for (const inst of stale) {
+    if (inst.slots.every((s) => slotMayBeDeleted(s))) {
+      await prisma.eventInstance.delete({ where: { id: inst.id } });
+    }
+  }
 
   return { templateId, instanceId: instance.id };
 }

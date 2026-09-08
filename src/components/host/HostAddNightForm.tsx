@@ -140,6 +140,29 @@ export function HostAddNightForm(props: {
           </label>
         )}
 
+        <label className="grid gap-1 text-sm">
+          <span className="text-white/75">Start time</span>
+          <input
+            name="startTime"
+            type="time"
+            defaultValue="20:00"
+            className="h-12 rounded-md border border-white/10 bg-black/40 px-3 font-mono text-base text-white"
+          />
+        </label>
+        <label className="grid gap-1 text-sm">
+          <span className="text-white/75">End time</span>
+          <input
+            name="endTime"
+            type="time"
+            defaultValue="23:00"
+            className="h-12 rounded-md border border-white/10 bg-black/40 px-3 font-mono text-base text-white"
+          />
+        </label>
+        <p className="text-xs text-white/55 sm:col-span-2">
+          Running past midnight is supported — set 9:00 PM to 1:00 AM and the night ends the next morning. You can change
+          the day and times later from Manage.
+        </p>
+
         <FormSubmitButton label="Add night" className="h-12 rounded-md bg-[rgb(var(--om-neon))] text-sm font-semibold text-black sm:col-span-2" />
       </form>
 

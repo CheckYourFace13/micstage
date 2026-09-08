@@ -14,6 +14,7 @@ import {
   PRODUCT_ANALYTICS_QS,
 } from "@/lib/productAnalytics";
 import { requirePrisma } from "@/lib/prisma";
+import { scheduleWindowFromTimeInputs } from "@/lib/scheduleWindow";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -43,6 +44,16 @@ function parseYmdUtc(ymd: string): Date | null {
   const dt = new Date(Date.UTC(y, m - 1, d));
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
   return dt;
+}
+
+/** Optional start/end on host night forms; absent fields keep the schema defaults. */
+function nightWindowFromForm(formData: FormData): { startTimeMin: number; endTimeMin: number } | undefined {
+  return (
+    scheduleWindowFromTimeInputs(
+      formData.get("startTime")?.toString(),
+      formData.get("endTime")?.toString(),
+    ) ?? undefined
+  );
 }
 
 function parseWeekday(raw: string): number | null {
@@ -101,7 +112,7 @@ export async function setupFirstHostNightAction(formData: FormData) {
     const night = await prisma.promoterNight.create({
       data: { seriesId: series.id, venueId, date, signupEnabled },
     });
-    await provisionHostNightLineup(prisma, night.id, { signupEnabled });
+    await provisionHostNightLineup(prisma, night.id, { signupEnabled, ...nightWindowFromForm(formData) });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       redirect("/promoter/welcome?error=duplicate");
@@ -323,7 +334,7 @@ export async function addPromoterNightAction(formData: FormData) {
       },
     });
     nightId = night.id;
-    await provisionHostNightLineup(prisma, nightId, { signupEnabled });
+    await provisionHostNightLineup(prisma, nightId, { signupEnabled, ...nightWindowFromForm(formData) });
     secondVenueActivated = await maybeRecordHostSecondVenueActivation(
       prisma,
       session.promoterId,
@@ -390,7 +401,7 @@ export async function addPromoterRecurringNightsAction(formData: FormData) {
       const night = await prisma.promoterNight.create({
         data: { seriesId: series.id, venueId: resolvedVenueId, date: cursor, signupEnabled },
       });
-      await provisionHostNightLineup(prisma, night.id, { signupEnabled });
+      await provisionHostNightLineup(prisma, night.id, { signupEnabled, ...nightWindowFromForm(formData) });
       if (
         await maybeRecordHostSecondVenueActivation(
           prisma,

@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 import type { Weekday } from "@/generated/prisma/client";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
+import { isValidScheduleWindow, resolveScheduleEndMin } from "@/lib/scheduleWindow";
 
 const LUXON_TO_WEEKDAY: Record<number, Weekday> = {
   1: "MON",
@@ -72,7 +73,9 @@ export function computeWeeklySchedulePreview(input: WeeklySchedulePreviewInput):
   const { seriesStart, seriesEnd, weekdays, timeZone, startTimeMin, endTimeMin, slotMinutes, breakMinutes } = input;
   if (weekdays.length === 0) return null;
   if (seriesEnd.getTime() < seriesStart.getTime()) return null;
-  if (endTimeMin <= startTimeMin) return null;
+  // End at or before start = runs past midnight; normalize instead of rejecting.
+  const resolvedEndTimeMin = resolveScheduleEndMin(startTimeMin, endTimeMin);
+  if (!isValidScheduleWindow(startTimeMin, resolvedEndTimeMin)) return null;
   if (slotMinutes <= 0 || breakMinutes < 0) return null;
 
   const tz = timeZone?.trim() || "America/Chicago";
@@ -109,7 +112,7 @@ export function computeWeeklySchedulePreview(input: WeeklySchedulePreviewInput):
 
   const slotsPerShow = generateSlotsForWindow({
     startTimeMin,
-    endTimeMin,
+    endTimeMin: resolvedEndTimeMin,
     slotMinutes,
     breakMinutes,
   }).length;

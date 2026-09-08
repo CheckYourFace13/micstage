@@ -7,7 +7,8 @@ import { VENUE_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { VenueInviteManagerForm } from "./VenueInviteManagerForm";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { absoluteUrl } from "@/lib/publicSeo";
-import { lineupNavLabelFromYmd, minutesToTimeLabel, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
+import { lineupNavLabelFromYmd, minutesToTimeInputValue, toIsoDateOnly, weekdayToLabel } from "@/lib/time";
+import { scheduleWindowLabel } from "@/lib/scheduleWindow";
 import { isValidLineupYmd, pickPrimaryLineup, storageYmdUtc } from "@/lib/venuePublicLineup";
 import type { LineupTemplate } from "@/lib/venuePublicLineupData";
 import { loadLineupTemplatesByVenueIds, venueIsOperational } from "@/lib/venueDashboardOperational";
@@ -22,6 +23,7 @@ import { VenueTestLineupCleanupPanel } from "@/components/venue/VenueTestLineupC
 import { VenueDeleteOpenMicDayPanel } from "@/components/venue/VenueDeleteOpenMicDayPanel";
 import { VenuePerformerHistoryPanel } from "@/components/venue/VenuePerformerHistoryPanel";
 import { VenueSlotManagementRow } from "@/components/venue/VenueSlotManagementRow";
+import { VenueScheduleTimesEditor } from "@/components/venue/VenueScheduleTimesEditor";
 import { VenueAddRecurringNightFormFields } from "./VenueAddRecurringNightForm";
 import { VenueProfileForm } from "./VenueProfileForm";
 import { WeeklyScheduleForm } from "./WeeklyScheduleForm";
@@ -426,7 +428,8 @@ export default async function VenuePortalPage({
         ) : null}
         {q.scheduleError === "invalidTime" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
-            Use valid start/end times (HH:MM, 24h) with end after start.
+            Use valid start and end times. A night that runs past midnight is fine (9:00 PM to 1:00 AM ends the next day),
+            but the whole night has to be under 24 hours.
           </div>
         ) : null}
         {q.scheduleError === "templateMissing" ? (
@@ -449,6 +452,12 @@ export default async function VenuePortalPage({
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
             <span className="font-semibold text-emerald-100/95">Schedule saved.</span> Future open slots are updated;
             existing bookings were left as-is. Artists can now see live times on your public page.
+          </div>
+        ) : null}
+        {q.scheduleSuccess === "times" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            <span className="font-semibold text-emerald-100/95">Times updated.</span> Your public listing shows the new day
+            and hours now. Booked slots were left where they are.
           </div>
         ) : null}
         {q.scheduleSuccess === "template" ? (
@@ -926,8 +935,7 @@ export default async function VenuePortalPage({
                                   ) : null}
                                 </div>
                                 <div className="text-xs text-white/55">
-                                  {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–
-                                  {minutesToTimeLabel(t.endTimeMin)}
+                                  {weekdayToLabel(t.weekday)} · {scheduleWindowLabel(t.startTimeMin, t.endTimeMin)}
                                 </div>
                               </div>
                               <div className="mt-3 grid gap-5">
@@ -1010,6 +1018,29 @@ export default async function VenuePortalPage({
                     )}
                   </p>
 
+                  {v.eventTemplates.length > 0 ? (
+                    <div className="mt-6 border-t border-white/10 pt-6">
+                      <h4 className="text-base font-semibold text-white">Day & times</h4>
+                      <p className="mt-1 max-w-2xl text-sm text-white/55">
+                        Change the day or the start/end time of a night you already saved, then hit save — your public
+                        listing updates right away. Nights that run past midnight are fine: set 9:00 PM to 1:00 AM and
+                        MicStage ends it the next morning.
+                      </p>
+                      <div className="mt-4">
+                        <VenueScheduleTimesEditor
+                          venueId={v.id}
+                          rows={v.eventTemplates.map((t) => ({
+                            id: t.id,
+                            title: t.title,
+                            weekday: t.weekday,
+                            startTimeMin: t.startTimeMin,
+                            endTimeMin: t.endTimeMin,
+                          }))}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div
                     id={isPrimaryVenue ? "booking" : undefined}
                     className="mt-6 scroll-mt-24 border-t border-white/10 pt-6"
@@ -1029,6 +1060,12 @@ export default async function VenuePortalPage({
                       }
                       defaultTitle={v.eventTemplates[0]?.title ?? "Open mic"}
                       defaultDescription={v.eventTemplates[0]?.description ?? ""}
+                      defaultStartTime={
+                        v.eventTemplates[0] ? minutesToTimeInputValue(v.eventTemplates[0].startTimeMin) : undefined
+                      }
+                      defaultEndTime={
+                        v.eventTemplates[0] ? minutesToTimeInputValue(v.eventTemplates[0].endTimeMin) : undefined
+                      }
                       defaultPerformanceFormat={v.eventTemplates[0]?.performanceFormat ?? v.performanceFormat}
                       bookingRestrictionMode={v.bookingRestrictionMode}
                       restrictionHoursBefore={v.restrictionHoursBefore ?? 6}

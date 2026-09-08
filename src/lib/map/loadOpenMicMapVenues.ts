@@ -2,7 +2,8 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import type { LineupTemplate } from "@/lib/venuePublicLineupData";
 import { isDateInSeriesRange, isWithinBookingWindow } from "@/lib/venueBookingRules";
 import { pickPrimaryLineup, storageYmdUtc } from "@/lib/venuePublicLineup";
-import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
+import { scheduleWindowLabel } from "@/lib/scheduleWindow";
+import { weekdayToLabel } from "@/lib/time";
 import type { OpenMicMapVenueDto } from "@/lib/map/openMicMapTypes";
 import { discoveryBadgeLabel } from "@/lib/publicListings/types";
 
@@ -146,7 +147,7 @@ export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMi
         ymd: storageYmdUtc(primary.instance.date),
         templateTitle: t.title.trim() || "Open mic",
         weekday: t.weekday,
-        timeLabel: `${weekdayToLabel(t.weekday)} · ${minutesToTimeLabel(t.startTimeMin)}–${minutesToTimeLabel(t.endTimeMin)}`,
+        timeLabel: `${weekdayToLabel(t.weekday)} · ${scheduleWindowLabel(t.startTimeMin, t.endTimeMin)}`,
         badge: primary.badge,
       };
     }

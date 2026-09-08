@@ -7,7 +7,8 @@ import { loadHostNightLineupContext } from "@/lib/host/hostNightLineupData";
 import { publicLineupPathForNightId } from "@/lib/host/hostNightProvisioning";
 import { requirePrisma } from "@/lib/prisma";
 import { buildPublicMetadata, absoluteUrl } from "@/lib/publicSeo";
-import { lineupNavLabelFromYmd } from "@/lib/time";
+import { scheduleWindowLabel } from "@/lib/scheduleWindow";
+import { lineupNavLabelFromYmd, minutesToTimeInputValue, minutesToTimeLabel } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { SharePageButtons } from "@/components/onboarding/SharePageButtons";
@@ -29,7 +30,7 @@ export default async function HostNightManagePage(props: {
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
   const { nightId } = await props.params;
-  const { saved } = await props.searchParams;
+  const { saved, error } = await props.searchParams;
   const session = await getPromoterSessionOrNull();
   if (!session || session.kind !== "promoter") {
     throw new Error("Expected promoter auth guard middleware.");
@@ -62,7 +63,20 @@ export default async function HostNightManagePage(props: {
         </p>
 
         {saved ? (
-          <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm">Saved.</div>
+          <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm">
+            Saved. Your public lineup shows the new day and times now.
+          </div>
+        ) : null}
+        {error ? (
+          <div className="mt-4 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm">
+            {error === "invalid_time"
+              ? "Enter a valid start and end time. Past midnight is allowed (9:00 PM to 1:00 AM), but the night has to be under 24 hours."
+              : error === "invalid_date"
+                ? "Enter a valid date for this night."
+                : error === "duplicate_date"
+                  ? "You already have a night at this venue on that date."
+                  : "That slot was already taken."}
+          </div>
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
@@ -75,8 +89,48 @@ export default async function HostNightManagePage(props: {
           <SharePageButtons url={lineupUrl} label="Share signup link" />
         </div>
 
-        <form action={updateHostNightSignupAction} className="mt-8 grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <form action={updateHostNightSignupAction} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
           <input type="hidden" name="nightId" value={nightId} />
+          <div>
+            <h2 className="text-lg font-semibold">Day & times</h2>
+            <p className="mt-1 text-sm text-white/60">
+              Currently {lineupNavLabelFromYmd(ymd)} · {scheduleWindowLabel(ctx.night.startTimeMin, ctx.night.endTimeMin)}.
+              A night that runs past midnight is fine — set 9:00 PM to 1:00 AM and it ends the next morning.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/75">Date</span>
+              <input
+                name="date"
+                type="date"
+                defaultValue={ymd}
+                className="h-12 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/75">Start time</span>
+              <input
+                name="startTime"
+                type="time"
+                required
+                defaultValue={minutesToTimeInputValue(ctx.night.startTimeMin)}
+                className="h-12 rounded-md border border-white/10 bg-black/40 px-3 font-mono text-base text-white"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/75">End time</span>
+              <input
+                name="endTime"
+                type="time"
+                required
+                defaultValue={minutesToTimeInputValue(ctx.night.endTimeMin)}
+                className="h-12 rounded-md border border-white/10 bg-black/40 px-3 font-mono text-base text-white"
+              />
+            </label>
+          </div>
+
           <h2 className="text-lg font-semibold">Signup settings</h2>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="signupEnabled" defaultChecked={ctx.night.signupEnabled} />
@@ -90,10 +144,10 @@ export default async function HostNightManagePage(props: {
               min={3}
               max={30}
               defaultValue={ctx.night.slotMinutes}
-              className="h-11 w-24 rounded-md border border-white/10 bg-black/40 px-3 text-white"
+              className="h-12 w-24 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white"
             />
           </label>
-          <FormSubmitButton label="Save signup settings" className="h-11 w-fit rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold" />
+          <FormSubmitButton label="Save night" className="h-12 w-full rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold sm:w-fit" />
         </form>
 
         <section className="mt-8">
@@ -108,9 +162,7 @@ export default async function HostNightManagePage(props: {
                 <li key={slot.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm">
                   <span>
                     {label}{" "}
-                    <span className="text-white/45">
-                      {Math.floor(slot.startMin / 60)}:{String(slot.startMin % 60).padStart(2, "0")}
-                    </span>
+                    <span className="text-white/45">{minutesToTimeLabel(slot.startMin)}</span>
                   </span>
                   {slot.booking && !slot.booking.cancelledAt ? (
                     <form action={hostRemoveBookingAction}>

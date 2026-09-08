@@ -130,6 +130,9 @@ export function VenueAddRecurringNightFormFields({
           />
         </label>
       </div>
+      <p className="-mt-1 text-xs text-white/55">
+        Running past midnight is supported — an end time earlier than the start (9:00 PM to 1:00 AM) ends the next day.
+      </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">

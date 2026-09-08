@@ -11,8 +11,10 @@ import { revalidatePath } from "next/cache";
 import { requirePrisma } from "@/lib/prisma";
 import { requireVenueSession, venueIdsForSession, venueIdsForVenueSession } from "@/lib/authz";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
-import { syncSlotsForInstance } from "@/lib/slotSync";
+import { slotMayBeDeleted, syncSlotsForInstance } from "@/lib/slotSync";
+import { isValidScheduleWindow, resolveScheduleEndMin } from "@/lib/scheduleWindow";
 import {
+  ALL_WEEKDAYS,
   iterStorageDatesInVenueSeries,
   parseWeekdaysFromForm,
   weekdayFromIsoDateInTimeZone,
@@ -435,6 +437,19 @@ function scheduleTimeMinutesFromForm(formData: FormData, field: string): number 
   return hh * 60 + mm;
 }
 
+/**
+ * Start/end pair for a schedule form. An end time at or before the start is a cross-midnight
+ * night (9:00 PM → 1:00 AM) and is stored as start-day minutes + 24h, not rejected.
+ */
+function scheduleWindowFromForm(formData: FormData): { startTimeMin: number; endTimeMin: number } {
+  const startTimeMin = scheduleTimeMinutesFromForm(formData, "startTime");
+  const endTimeMin = resolveScheduleEndMin(startTimeMin, scheduleTimeMinutesFromForm(formData, "endTime"));
+  if (!isValidScheduleWindow(startTimeMin, endTimeMin)) {
+    throw new VenuePortalRedirectSignal(portalRedirect("/venue?scheduleError=invalidTime"));
+  }
+  return { startTimeMin, endTimeMin };
+}
+
 export async function createEventTemplate(formData: FormData): Promise<VenuePortalActionResult> {
   const session = await requireVenueSession();
   try {
@@ -445,9 +460,7 @@ export async function createEventTemplate(formData: FormData): Promise<VenuePort
 
   const title = reqString(formData, "title");
   const weekday = reqString(formData, "weekday") as Weekday;
-  const startTimeMin = scheduleTimeMinutesFromForm(formData, "startTime");
-  const endTimeMin = scheduleTimeMinutesFromForm(formData, "endTime");
-  if (endTimeMin <= startTimeMin) return portalRedirect("/venue?scheduleError=invalidTime");
+  const { startTimeMin, endTimeMin } = scheduleWindowFromForm(formData);
 
   const slotMinutes = reqInt(formData, "slotMinutes");
   const breakMinutes = reqInt(formData, "breakMinutes");
@@ -573,9 +586,7 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
   const isOneEvent = scheduleMode === "one_event";
 
   const title = reqString(formData, "title");
-  const startTimeMin = scheduleTimeMinutesFromForm(formData, "startTime");
-  const endTimeMin = scheduleTimeMinutesFromForm(formData, "endTime");
-  if (endTimeMin <= startTimeMin) return portalRedirect("/venue?scheduleError=invalidTime");
+  const { startTimeMin, endTimeMin } = scheduleWindowFromForm(formData);
 
   const slotMinutes = reqInt(formData, "slotMinutes");
   const breakMinutes = reqInt(formData, "breakMinutes");
@@ -978,6 +989,114 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
   }
 }
 
+
+/**
+ * Direct edit of one saved schedule's day and start/end times, without re-running the full
+ * weekly setup form. Cross-midnight windows are kept (9:00 PM → 1:00 AM); future nights are
+ * re-synced so the public listing matches immediately. Booked slots are never reshaped.
+ */
+export async function updateEventTemplateTimes(formData: FormData): Promise<VenuePortalActionResult> {
+  try {
+    const session = await requireVenueSession();
+    const venueId = reqString(formData, "venueId");
+    const templateId = reqString(formData, "templateId");
+
+    const allowed = await venueIdsForSession(session);
+    if (!allowed.includes(venueId)) return portalRedirect("/venue?venueError=forbidden");
+
+    const { startTimeMin, endTimeMin } = scheduleWindowFromForm(formData);
+
+    const prisma = requirePrisma();
+    const template = await prisma.eventTemplate.findUnique({ where: { id: templateId } });
+    if (!template || template.venueId !== venueId) return portalRedirect("/venue?venueError=forbidden");
+
+    const weekdayRaw = optString(formData, "weekday");
+    const weekday =
+      weekdayRaw && ALL_WEEKDAYS.includes(weekdayRaw as Weekday) ? (weekdayRaw as Weekday) : template.weekday;
+    const weekdayChanged = weekday !== template.weekday;
+
+    const venue = await prisma.venue.findUnique({
+      where: { id: venueId },
+      select: {
+        slug: true,
+        timeZone: true,
+        seriesStartDate: true,
+        seriesEndDate: true,
+        bookingOpensDaysAhead: true,
+      },
+    });
+    if (!venue) return portalRedirect("/venue?venueError=venueMissing");
+    const timeZone = venue.timeZone ?? "America/Chicago";
+
+    await prisma.eventTemplate.update({
+      where: { id: templateId },
+      data: { weekday, startTimeMin, endTimeMin },
+    });
+
+    const specs = generateSlotsForWindow({
+      startTimeMin,
+      endTimeMin,
+      slotMinutes: template.slotMinutes,
+      breakMinutes: template.breakMinutes,
+    });
+
+    const now = new Date();
+    const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const upcoming = await prisma.eventInstance.findMany({
+      where: { templateId, date: { gte: todayUtc } },
+      include: { slots: { include: { booking: true } } },
+    });
+
+    for (const inst of upcoming) {
+      if (inst.isCancelled) continue;
+      const instWeekday = weekdayFromIsoDateInTimeZone(storageYmdUtc(inst.date), timeZone);
+      if (instWeekday !== weekday) {
+        // Day moved: drop untouched nights on the old weekday, keep anything with a booking.
+        if (inst.slots.every((s) => slotMayBeDeleted(s))) {
+          await prisma.eventInstance.delete({ where: { id: inst.id } });
+        }
+        continue;
+      }
+      await prisma.$transaction(async (tx) => {
+        await syncSlotsForInstance(tx, inst.id, specs);
+      });
+    }
+
+    if (weekdayChanged && venue.seriesStartDate && venue.seriesEndDate) {
+      const venueForRules = {
+        seriesStartDate: venue.seriesStartDate,
+        seriesEndDate: venue.seriesEndDate,
+        bookingOpensDaysAhead: venue.bookingOpensDaysAhead,
+        timeZone,
+      };
+      for (const { storageDate, weekday: dayOfDate } of iterStorageDatesInVenueSeries(
+        venue.seriesStartDate,
+        venue.seriesEndDate,
+        timeZone,
+      )) {
+        if (dayOfDate !== weekday) continue;
+        if (!isDateInSeriesRange(venueForRules, storageDate)) continue;
+        if (!isWithinBookingWindow(venueForRules, storageDate)) continue;
+        await prisma.$transaction(async (tx) => {
+          const inst =
+            (await tx.eventInstance.findUnique({
+              where: { templateId_date: { templateId, date: storageDate } },
+            })) ?? (await tx.eventInstance.create({ data: { templateId, date: storageDate } }));
+          if (inst.isCancelled) return;
+          await syncSlotsForInstance(tx, inst.id, specs);
+        });
+      }
+    }
+
+    revalidatePath("/venue");
+    if (venue.slug) revalidatePath(`/venues/${venue.slug}`);
+    return portalRedirect("/venue?scheduleSuccess=times#schedule");
+  } catch (e) {
+    if (e instanceof VenuePortalRedirectSignal) return e.result;
+    console.error("[venue schedule times] update failed", e);
+    return portalRedirect("/venue?scheduleError=submitFailed");
+  }
+}
 
 export async function updateVenueProfile(formData: FormData): Promise<VenuePortalActionResult> {
   try {

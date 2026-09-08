@@ -2,7 +2,8 @@ import Link from "next/link";
 import { lineupPrimaryActionClass, lineupSecondaryActionClass } from "@/components/venue/lineupActionStyles";
 import type { PublicVenueForLineup } from "@/lib/venuePublicLineupData";
 import type { LineupForDateRow } from "@/lib/venuePublicLineup";
-import { lineupNavLabelFromYmd, minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
+import { scheduleWindowLabel } from "@/lib/scheduleWindow";
+import { lineupNavLabelFromYmd, weekdayToLabel } from "@/lib/time";
 import { safeExternalHref } from "@/lib/externalUrl";
 
 export function PublicLineupPageHeader(props: {
@@ -16,7 +17,7 @@ export function PublicLineupPageHeader(props: {
   const title = first?.template.title?.trim() || `Open mic at ${venue.name}`;
   const dateLabel = lineupNavLabelFromYmd(dateYmd);
   const timeDetail = first
-    ? `${weekdayToLabel(first.template.weekday)} · ${minutesToTimeLabel(first.template.startTimeMin)}–${minutesToTimeLabel(first.template.endTimeMin)} · ${first.template.slotMinutes} min slots`
+    ? `${weekdayToLabel(first.template.weekday)} · ${scheduleWindowLabel(first.template.startTimeMin, first.template.endTimeMin)} · ${first.template.slotMinutes} min slots`
     : null;
   const description =
     (first?.template.description?.trim() && first.template.description.trim()) ||

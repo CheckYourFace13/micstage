@@ -26,6 +26,7 @@
     "test:host-multi-venue": "npx tsx scripts/check-host-multi-venue.mjs",
     "test:host-e2e": "npx tsx scripts/host-multi-venue-e2e.mjs",
     "test:conversion-analytics": "node scripts/check-conversion-analytics.mjs",
+    "test:schedule-times": "npx tsx scripts/check-schedule-times.mjs",
     "backfill:host-identities": "npx tsx scripts/backfill-host-identities.mjs",
     "backfill:host-night-lineups": "npx tsx scripts/backfill-host-night-lineups.mjs",
     "audit:claim-invites": "node scripts/audit-historical-claim-invitations.mjs",

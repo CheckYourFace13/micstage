@@ -6,6 +6,7 @@ import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
 import type { PublicVenueForLineup } from "@/lib/venuePublicLineupData";
 import type { LineupBadge, LineupForDateRow } from "@/lib/venuePublicLineup";
+import { scheduleWindowLabel } from "@/lib/scheduleWindow";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
@@ -107,7 +108,7 @@ export function VenueLineupBoard({
                     <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">{t.description}</p>
                   ) : null}
                   <p className="mt-1 text-sm text-white/65">
-                    {weekdayToLabel(t.weekday)} · {minutesToTimeLabel(t.startTimeMin)}–{minutesToTimeLabel(t.endTimeMin)} ·{" "}
+                    {weekdayToLabel(t.weekday)} · {scheduleWindowLabel(t.startTimeMin, t.endTimeMin)} ·{" "}
                     {t.slotMinutes} min slots
                     {t.breakMinutes ? ` · ${t.breakMinutes} min breaks` : ""}
                   </p>

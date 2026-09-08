@@ -6,6 +6,7 @@ import type { VenuePerformanceFormat, Weekday } from "@/generated/prisma/client"
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { VENUE_PERFORMANCE_FORMAT_OPTIONS } from "@/lib/venuePerformanceFormat";
 import { ALL_WEEKDAYS, computeWeeklySchedulePreview, weekdayFromIsoDateInTimeZone } from "@/lib/weeklySchedule";
+import { resolveScheduleEndMin, scheduleEndsNextDay, scheduleWindowLabel } from "@/lib/scheduleWindow";
 import { weekdayToLabel } from "@/lib/time";
 import { DateSelectField } from "@/components/forms/DateSelectField";
 import { LineupSlotTypesHelp } from "@/components/LineupSlotTypesHelp";
@@ -36,6 +37,9 @@ type Props = {
   defaultSeriesEnd: string;
   defaultTitle: string;
   defaultDescription: string;
+  /** `HH:MM` 24h; prefilled from the venue's current schedule so edits start from live times. */
+  defaultStartTime?: string;
+  defaultEndTime?: string;
   bookingRestrictionMode: string;
   restrictionHoursBefore: number;
   onPremiseMaxDistanceMeters: number;
@@ -53,6 +57,8 @@ export function WeeklyScheduleForm({
   defaultSeriesEnd,
   defaultTitle,
   defaultDescription,
+  defaultStartTime = "17:00",
+  defaultEndTime = "21:00",
   bookingRestrictionMode,
   restrictionHoursBefore,
   onPremiseMaxDistanceMeters,
@@ -71,8 +77,8 @@ export function WeeklyScheduleForm({
   const [seriesStart, setSeriesStart] = useState(defaultSeriesStart);
   const [seriesEnd, setSeriesEnd] = useState(defaultSeriesEnd);
   const [oneEventDate, setOneEventDate] = useState(defaultSeriesStart);
-  const [startTime, setStartTime] = useState("17:00");
-  const [endTime, setEndTime] = useState("21:00");
+  const [startTime, setStartTime] = useState(defaultStartTime);
+  const [endTime, setEndTime] = useState(defaultEndTime);
   const [slotMinutes, setSlotMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [weekdays, setWeekdays] = useState<Set<Weekday>>(() => new Set());
@@ -96,9 +102,16 @@ export function WeeklyScheduleForm({
     return [...weekdays];
   }, [scheduleMode, oneEventDate, venueTimeZone, weekdays]);
 
-  const preview = useMemo(() => {
+  const resolvedWindow = useMemo(() => {
     const startMin = timeToMinutesHHMM(startTime);
-    const endMin = timeToMinutesHHMM(endTime);
+    const endMinRaw = timeToMinutesHHMM(endTime);
+    if (startMin == null || endMinRaw == null) return null;
+    return { startMin, endMin: resolveScheduleEndMin(startMin, endMinRaw) };
+  }, [startTime, endTime]);
+
+  const preview = useMemo(() => {
+    const startMin = resolvedWindow?.startMin ?? null;
+    const endMin = resolvedWindow?.endMin ?? null;
     if (startMin == null || endMin == null) return null;
     const s = new Date(`${previewRangeStart}T00:00:00.000Z`);
     const e = new Date(`${previewRangeEnd}T00:00:00.000Z`);
@@ -117,8 +130,7 @@ export function WeeklyScheduleForm({
     previewRangeEnd,
     effectiveWeekdays,
     venueTimeZone,
-    startTime,
-    endTime,
+    resolvedWindow,
     slotMinutes,
     breakMinutes,
   ]);
@@ -301,6 +313,19 @@ export function WeeklyScheduleForm({
           />
         </label>
       </div>
+
+      <p className="-mt-1 text-xs text-white/55">
+        {resolvedWindow ? (
+          <>
+            Saves as {scheduleWindowLabel(resolvedWindow.startMin, resolvedWindow.endMin)}.{" "}
+            {scheduleEndsNextDay(resolvedWindow.endMin)
+              ? "An end time earlier than the start means the night runs past midnight — that’s supported."
+              : ""}
+          </>
+        ) : (
+          "Nights that run past midnight are supported — e.g. 9:00 PM to 1:00 AM."
+        )}
+      </p>
 
       <fieldset className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4">
         <legend className="text-sm font-semibold text-white">Performance format</legend>

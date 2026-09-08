@@ -2,10 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { Prisma } from "@/generated/prisma/client";
 import { requirePromoterSession } from "@/lib/authz";
 import { assertHostOwnsNight, assertHostOwnsSlot } from "@/lib/host/hostNightAuth";
 import { provisionHostNightLineup } from "@/lib/host/hostNightProvisioning";
 import { requirePrisma } from "@/lib/prisma";
+import { scheduleWindowFromTimeInputs } from "@/lib/scheduleWindow";
+
+/** `YYYY-MM-DD` as UTC midnight — same storage convention as `PromoterNight.date`. */
+function parseYmdUtc(ymd: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const [y, m, d] = ymd.split("-").map((x) => Number.parseInt(x, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return dt;
+}
 
 export async function updateHostNightSignupAction(formData: FormData) {
   const session = await requirePromoterSession();
@@ -19,7 +30,33 @@ export async function updateHostNightSignupAction(formData: FormData) {
   const signupEnabled = formData.get("signupEnabled") === "on" || formData.get("signupEnabled") === "true";
   const slotMinutes = Math.min(30, Math.max(3, Number.parseInt(formData.get("slotMinutes")?.toString() ?? "5", 10) || 5));
 
-  await provisionHostNightLineup(prisma, nightId, { signupEnabled, slotMinutes });
+  // End time at or before start = runs past midnight (9:00 PM → 1:00 AM), not an error.
+  const window = scheduleWindowFromTimeInputs(
+    formData.get("startTime")?.toString(),
+    formData.get("endTime")?.toString(),
+  );
+  if (!window) redirect(`/promoter/nights/${nightId}?error=invalid_time`);
+
+  const dateRaw = formData.get("date")?.toString().trim();
+  if (dateRaw) {
+    const date = parseYmdUtc(dateRaw);
+    if (!date) redirect(`/promoter/nights/${nightId}?error=invalid_date`);
+    try {
+      await prisma.promoterNight.update({ where: { id: nightId }, data: { date } });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        redirect(`/promoter/nights/${nightId}?error=duplicate_date`);
+      }
+      throw e;
+    }
+  }
+
+  await provisionHostNightLineup(prisma, nightId, {
+    signupEnabled,
+    slotMinutes,
+    startTimeMin: window.startTimeMin,
+    endTimeMin: window.endTimeMin,
+  });
 
   revalidatePath("/promoter");
   revalidatePath(`/nights/${nightId}/lineup`);

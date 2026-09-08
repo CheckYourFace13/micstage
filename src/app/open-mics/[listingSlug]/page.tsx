@@ -25,7 +25,8 @@ import {
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { displayListingAddress } from "@/lib/publicListings/discoveryMerge";
-import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
+import { scheduleWindowLabel } from "@/lib/scheduleWindow";
+import { weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { primaryDiscoverySlugForVenue, getVenueCityDiscoveryCounts } from "@/lib/discoveryMarket";
 
@@ -262,7 +263,7 @@ export default async function PublicOpenMicListingPage(props: {
                   <li key={s.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
                     <div className="font-semibold">Weekly on {weekdayToLabel(s.weekday)}</div>
                     <div className="mt-1 text-sm text-white/75">
-                      {minutesToTimeLabel(s.startTimeMin)} – {minutesToTimeLabel(s.endTimeMin)}
+                      {scheduleWindowLabel(s.startTimeMin, s.endTimeMin)}
                       {s.title ? ` · ${s.title}` : ""}
                     </div>
                     <div className="mt-1 text-xs text-white/55">{performanceFormatLabel(s.performanceFormat)}</div>

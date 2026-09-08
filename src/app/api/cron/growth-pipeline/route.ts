@@ -121,6 +121,19 @@ async function handle(request: Request) {
   }
 
   const phase = phaseEarly;
+  // Tick runs never touched DiscoveryInvocationLog, so cron cadence was unmeasurable. Log them too.
+  const tickLog =
+    phase === "tick" ? beginDiscoveryRequestSourceLog(request, { phase, authorizationPassed: authOk }) : null;
+  const tickStartedAtMs = Date.now();
+  const finishTickLog = async (outcome: string) => {
+    if (!tickLog) return;
+    await persistDiscoveryInvocationLog(prisma, {
+      snapshot: tickLog,
+      outcome,
+      hourBucket: utcDiscoveryHourBucket(),
+      durationMs: Date.now() - tickStartedAtMs,
+    });
+  };
   const discoveryEnabled = growthLeadDiscoveryCronEnabled() && isDiscoveryPhaseRequest;
   const draftEnabled = growthAutoDraftCronEnabled() && phase !== "discovery";
   const emailMiningEnabled = phase === "tick";
@@ -344,6 +357,7 @@ async function handle(request: Request) {
     );
 
     if (outreachSkippedReason && !discovery && !drafts) {
+      await finishTickLog("skipped");
       return NextResponse.json(
         {
           ok: true,
@@ -357,6 +371,7 @@ async function handle(request: Request) {
       );
     }
 
+    await finishTickLog("completed");
     return NextResponse.json(
       {
         ok: true,
@@ -387,6 +402,7 @@ async function handle(request: Request) {
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
+    await finishTickLog("failed");
     if (discoverySourceLog) {
       endDiscoveryRequestSourceLog(discoverySourceLog, {
         discoveryRunId: null,

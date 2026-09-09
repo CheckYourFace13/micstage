@@ -3,6 +3,7 @@ import type {
   GrowthLeadEmailConfidence,
   GrowthLeadOutreachDraft,
   GrowthLeadSourceKind,
+  Prisma,
   PrismaClient,
 } from "@/generated/prisma/client";
 import {
@@ -36,18 +37,50 @@ const IMPORT_LIKE_DISCOVERED_SOURCE_KINDS: GrowthLeadSourceKind[] = [
   "SOCIAL_PROFILE",
 ];
 
-/** Skip cold outreach only when a VERIFIED public listing is awaiting claim / go-live. */
+/**
+ * Skip cold outreach only when a VERIFIED public listing is awaiting claim / go-live. Once the
+ * claim invite has gone out, the claim path has had its turn — matching `deferClaimPath` in
+ * explainGrowthLeadOutreachEligibility, which otherwise marks these leads eligible forever while
+ * draft creation blocked them.
+ */
 const LISTING_BLOCKS_OUTREACH = {
   publicListings: {
     none: {
       verificationStatus: "VERIFIED" as const,
       promotionEligibleAt: null,
+      claimInviteEmailSentAt: null,
     },
   },
 } as const;
 
 function sourceSkipsDiscoveredStrictGate(sourceKind: GrowthLeadSourceKind): boolean {
   return IMPORT_LIKE_DISCOVERED_SOURCE_KINDS.includes(sourceKind);
+}
+
+export const OUTREACH_DRAFT_SCAN_CURSOR_KEY = "GROWTH_OUTREACH_DRAFT_SCAN_CURSOR";
+
+async function readDraftScanCursor(prisma: PrismaClient): Promise<string | null> {
+  const row = await prisma.operationalRuntimeSetting.findUnique({
+    where: { key: OUTREACH_DRAFT_SCAN_CURSOR_KEY },
+    select: { value: true },
+  });
+  const id = row?.value?.trim();
+  return id ? id : null;
+}
+
+async function writeDraftScanCursor(prisma: PrismaClient, leadId: string | null): Promise<void> {
+  const value = leadId ?? "";
+  const fields = {
+    valueType: "string",
+    value,
+    updatedBy: "growth-draft-automation",
+    reason: "rotating_scan_position",
+  };
+  await prisma.operationalRuntimeSetting.upsert({
+    where: { key: OUTREACH_DRAFT_SCAN_CURSOR_KEY },
+    create: { key: OUTREACH_DRAFT_SCAN_CURSOR_KEY, ...fields },
+    update: fields,
+  });
 }
 
 function draftMarketSlug(d: { lead: { discoveryMarketSlug: string | null }; discoveryMarketSlug?: string | null }): string {
@@ -251,21 +284,54 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const activeMarketSet = new Set(activeMarkets.map((m) => m.discoveryMarketSlug.trim().toLowerCase()));
 
   // Priority: net-send-eligible leads (including AUTO_SEND_READY) before generic fit/tier heuristics.
-  const priorityScan = await prisma.growthLead.findMany({
-    where: {
-      contactEmailNormalized: { not: null },
-      contactEmailConfidence: { in: emailReadyLevels },
-      leadType: { in: ["VENUE", "PROMOTER_ACCOUNT"] },
-      status: { in: ["DISCOVERED", "REVIEWED", "APPROVED"] },
-      outreachDrafts: { none: { status: { in: ["PENDING_REVIEW", "APPROVED"] } } },
-      ...LISTING_BLOCKS_OUTREACH,
-    },
+  const priorityWhere: Prisma.GrowthLeadWhereInput = {
+    contactEmailNormalized: { not: null },
+    contactEmailConfidence: { in: emailReadyLevels },
+    leadType: { in: ["VENUE", "PROMOTER_ACCOUNT"] },
+    status: { in: ["DISCOVERED", "REVIEWED", "APPROVED"] },
+    outreachDrafts: { none: { status: { in: ["PENDING_REVIEW", "APPROVED"] } } },
+    ...LISTING_BLOCKS_OUTREACH,
+  };
+  const priorityWindow = Math.min(64, draftWorkTake * 2);
+  const hotTake = Math.max(1, Math.floor(priorityWindow / 2));
+
+  /**
+   * Top-of-pool by fit surfaces freshly enriched leads, but on its own it re-scans the same
+   * highest-fit rows every tick: eligible leads deeper in the pool never get their `updatedAt`
+   * bumped, so they are never evaluated. Half the window sweeps from a persisted cursor instead,
+   * wrapping at the end, so every candidate is reached within a few ticks.
+   */
+  const hotScan = await prisma.growthLead.findMany({
+    where: priorityWhere,
     select: { id: true },
     orderBy: [{ fitScore: "desc" }, { updatedAt: "desc" }],
-    take: Math.min(64, draftWorkTake * 2),
+    take: hotTake,
   });
+  const hotIds = new Set(hotScan.map((r) => r.id));
+
+  const scanStartId = await readDraftScanCursor(prisma);
+  let cursorId = scanStartId;
+  const rotatingRows: { id: string }[] = [];
+  for (let page = 0; page < 2 && rotatingRows.length < priorityWindow - hotTake; page++) {
+    const rows = await prisma.growthLead.findMany({
+      where: priorityWhere,
+      select: { id: true },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: priorityWindow - hotTake - rotatingRows.length,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+    });
+    if (rows.length === 0) {
+      if (!cursorId) break;
+      cursorId = null;
+      continue;
+    }
+    rotatingRows.push(...rows);
+    cursorId = rows[rows.length - 1]!.id;
+  }
+  await writeDraftScanCursor(prisma, cursorId);
+
   const priorityEligibleIds: string[] = [];
-  for (const row of priorityScan) {
+  for (const row of [...hotScan, ...rotatingRows.filter((r) => !hotIds.has(r.id))]) {
     const elig = await explainGrowthLeadOutreachEligibility(prisma, row.id);
     if (elig.eligible) priorityEligibleIds.push(row.id);
   }

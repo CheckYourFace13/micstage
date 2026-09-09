@@ -211,10 +211,18 @@ export async function ingestGrowthLeadCandidate(
    * Inventory path: venue discoveries with a website + open-mic signal may enter without email
    * so publish/verify can build public listings. Outreach/claim still require a mined mailbox.
    */
+  const strongOpenMicSignal =
+    raw.openMicSignalTier === "EXPLICIT_OPEN_MIC" || raw.openMicSignalTier === "STRONG_LIVE_EVENT";
+  /**
+   * A Google-verified place is as strong an anchor as a website host: the venue exists, is in
+   * the US, and is a hospitality/performance business. Venues named on a directory page without
+   * a link used to be dropped here, which lost real venues; they now enter as inventory and a
+   * later pass resolves their official site.
+   */
   const allowInventoryWithoutEmail =
     raw.leadType === "VENUE" &&
-    Boolean(normalizeWebsiteHost(raw.websiteUrl ?? null)) &&
-    (raw.openMicSignalTier === "EXPLICIT_OPEN_MIC" || raw.openMicSignalTier === "STRONG_LIVE_EVENT");
+    strongOpenMicSignal &&
+    (Boolean(normalizeWebsiteHost(raw.websiteUrl ?? null)) || Boolean(raw.googlePlaceId?.trim()));
   if (!hasValidEmail && !allowInventoryWithoutEmail) {
     return { status: "skipped", reason: "no_valid_email_for_main_pipeline" };
   }
@@ -279,10 +287,6 @@ export async function ingestGrowthLeadCandidate(
         discoveryHints: raw.discoveryHints ?? undefined,
         googlePlaceId: raw.googlePlaceId?.trim() || null,
         googlePlaceVerifiedAt: raw.googlePlaceId?.trim() ? new Date() : null,
-        placeCanonicalName: raw.placeCanonicalName?.trim() || null,
-        placeFormattedAddress: raw.placeFormattedAddress?.trim() || null,
-        placeLat: raw.placeLat ?? null,
-        placeLng: raw.placeLng ?? null,
       },
     });
   } catch (e) {

@@ -1,5 +1,6 @@
 import type { GrowthLeadType } from "@/generated/prisma/client";
 import { createAutonomousEventbriteVenueAdapter } from "@/lib/growth/discovery/autonomousEventbriteAdapter";
+import { createAutonomousHostSearchAdapter } from "@/lib/growth/discovery/autonomousHostSearchAdapter";
 import { createAutonomousSeedCrawlVenueAdapter } from "@/lib/growth/discovery/autonomousSeedCrawlAdapter";
 import { createAutonomousVenueWebSearchAdapter } from "@/lib/growth/discovery/autonomousWebSearchAdapters";
 import { allChicagolandStaticAdapters } from "@/lib/growth/sources/chicagolandStaticAdapters";
@@ -12,6 +13,7 @@ function allAutonomousDiscoveryAdapters(): GrowthLeadSourceAdapter[] {
   return [
     createAutonomousEventbriteVenueAdapter(),
     createAutonomousSeedCrawlVenueAdapter(),
+    createAutonomousHostSearchAdapter(),
     createAutonomousVenueWebSearchAdapter(),
   ];
 }

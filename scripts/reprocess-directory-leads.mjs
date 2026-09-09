@@ -70,6 +70,7 @@ const stats = {
   venueLeadsDuplicate: 0,
   venueLeadsSkipped: 0,
   directoryLeadsRejected: 0,
+  keptForIdentityRetry: 0,
 };
 const examples = [];
 
@@ -144,14 +145,15 @@ for (const lead of candidates) {
     stats.placeResolved++;
 
     if (!APPLY) {
-      found.push(`${resolution.canonicalName} (${resolution.formattedAddress})`);
+      found.push(`${cand.name} (place ${resolution.placeId})`);
       continue;
     }
 
     const res = await ingestGrowthLeadCandidate(prisma, {
       leadType: "VENUE",
-      name: resolution.canonicalName ?? cand.name,
-      websiteUrl: cand.websiteUrl ?? resolution.website ?? null,
+      // Identity from our own extraction: Google's business name has no retention grant.
+      name: cand.name,
+      websiteUrl: cand.websiteUrl ?? null,
       city: cand.city ?? lead.city,
       region: cand.region ?? lead.region,
       discoveryMarketSlug: lead.discoveryMarketSlug,
@@ -159,10 +161,6 @@ for (const lead of candidates) {
       sourceKind: "WEBSITE_CONTACT",
       openMicSignalTier: lead.openMicSignalTier ?? "STRONG_LIVE_EVENT",
       googlePlaceId: resolution.placeId,
-      placeCanonicalName: resolution.canonicalName,
-      placeFormattedAddress: resolution.formattedAddress,
-      placeLat: resolution.lat,
-      placeLng: resolution.lng,
       importKey: `reprocess:place:${resolution.placeId}`,
       internalNotes: `Extracted from directory/article lead ${lead.id} (${lead.websiteUrl}) via ${cand.method}; Google place match ${Math.round((resolution.matchScore ?? 0) * 100)}%.`,
       discoveryHints: {
@@ -174,7 +172,21 @@ for (const lead of candidates) {
     if (res.status === "created") stats.venueLeadsCreated++;
     else if (res.status === "duplicate") stats.venueLeadsDuplicate++;
     else stats.venueLeadsSkipped++;
-    found.push(`${resolution.canonicalName} [${res.status}]`);
+    found.push(`${cand.name} [${res.status}]`);
+  }
+
+  /**
+   * Only retire pages that are genuinely not a venue. A first-party venue site whose name we
+   * simply could not read is a real target, so it stays for a later extraction pass instead of
+   * being thrown away.
+   */
+  const isNonTargetPage = extraction.pageRole === "directory_or_article" || badHost;
+  if (!isNonTargetPage && found.length === 0) {
+    stats.keptForIdentityRetry++;
+    if (examples.length < 12) {
+      examples.push({ lead: lead.name?.slice(0, 45), url: lead.websiteUrl?.slice(0, 60), role: extraction.pageRoleReason, kept: "identity_unresolved" });
+    }
+    continue;
   }
 
   if (APPLY) {

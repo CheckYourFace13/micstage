@@ -19,6 +19,10 @@ export function discoveryIngestCapForAdapter(_adapter: GrowthLeadSourceAdapter):
   if (_adapter.id === "autonomous_seed_url_crawl_venue" || _adapter.id === "autonomous_eventbrite_chicago") {
     return Math.max(80, Math.round(base * 1.2));
   }
+  /** Host lane runs alongside the venue lanes on a deliberately small per-run share. */
+  if (_adapter.id === "autonomous_host_search_promoter") {
+    return Math.max(20, Math.round(base * 0.2));
+  }
   if (_adapter.id.startsWith("chicagoland_")) {
     return Math.max(100, Math.round(base * 1.25));
   }

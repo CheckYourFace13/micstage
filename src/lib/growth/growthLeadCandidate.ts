@@ -40,12 +40,13 @@ export type GrowthLeadCandidate = {
   performanceTags?: GrowthLeadPerformanceTag[];
   importKey?: string | null;
   internalNotes?: string | null;
-  /** Google Places identity resolved during discovery (venue lane); hosts never require this. */
+  /**
+   * Google Places identity resolved during discovery (venue lane); hosts never require this.
+   * Only the place id is accepted: Maps Platform terms permit retaining it indefinitely but
+   * grant no retention for Google's business name or address, so lead name/address/coordinates
+   * must come from our own crawl.
+   */
   googlePlaceId?: string | null;
-  placeCanonicalName?: string | null;
-  placeFormattedAddress?: string | null;
-  placeLat?: number | null;
-  placeLng?: number | null;
   /** Structured discovery enrichment (public roles, adapter metadata). Persisted on `GrowthLead.discoveryHints`. */
   discoveryHints?: Prisma.InputJsonValue | null;
 };

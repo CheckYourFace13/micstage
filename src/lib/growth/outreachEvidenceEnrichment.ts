@@ -55,6 +55,9 @@ const ROLE_LOCAL =
 
 const CONTACT_PATHS = ["/contact", "/contact-us", "/about", "/booking", "/bookings"];
 
+/** Per-page HTML retained for host organizer extraction (structured data lives near the top). */
+const HOST_EXTRACTION_HTML_LIMIT = 120_000;
+
 export type OutreachEnrichDayStats = {
   utcDay: string;
   candidatesChecked: number;
@@ -423,6 +426,8 @@ async function crawlPages(
       url,
       title: ex.nameGuess || "",
       text: ex.bodyTextSample || html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 12_000),
+      // Kept so the host lane can read JSON-LD organizers and host links off the evidence page.
+      html: html.slice(0, HOST_EXTRACTION_HTML_LIMIT),
     });
   }
   return { pages, taggedEmails, discoveredLinks };
@@ -765,8 +770,11 @@ export async function enrichGrowthLeadOfficialEvidence(
           eventName: title,
           sourceUrl: result.evidenceUrl ?? pageForSnippet?.url ?? lead.websiteUrl,
           city: lead.city,
+          region: lead.region,
           discoveryMarketSlug: lead.discoveryMarketSlug,
           contactEmail: lead.contactEmailNormalized,
+          venueWebsiteUrl: lead.websiteUrl ?? listing?.websiteUrl ?? null,
+          sourceHtml: pageForSnippet?.html ?? null,
         });
       } catch (e) {
         console.warn("[outreachEvidenceEnrichment] host_lane_ingest_skipped", lead.id, e instanceof Error ? e.message : e);

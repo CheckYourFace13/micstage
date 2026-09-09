@@ -220,6 +220,50 @@ check("a page with only an SEO title produces no venue identity", () => {
   assert.equal(seoOnly.candidates.length, 0);
 });
 
+// Real venue sites hide their name in the title tail, the logo, or the domain.
+const BRAND_IN_TITLE_TAIL = extractVenueCandidatesFromPage({
+  pageUrl: "https://sillygoosememphis.com/",
+  html: `<!doctype html><html><head><title>Open Mic Night | Silly Goose Memphis</title></head>
+<body><h1>Open Mic Night</h1></body></html>`,
+});
+check("a brand in the title tail is used as the identity", () => {
+  assert.equal(BRAND_IN_TITLE_TAIL.candidates[0]?.name, "Silly Goose Memphis");
+});
+
+const BRAND_IN_MARKETING_TITLE = extractVenueCandidatesFromPage({
+  pageUrl: "https://www.mortonamphitheater.com/",
+  html: `<!doctype html><html><head><title>Morton Amphitheater Tickets &amp; Schedule</title></head>
+<body><h1>Welcome</h1></body></html>`,
+});
+check("marketing tails are stripped to reveal the venue name", () => {
+  assert.equal(BRAND_IN_MARKETING_TITLE.candidates[0]?.name, "Morton Amphitheater");
+});
+
+const BRAND_IN_LOGO = extractVenueCandidatesFromPage({
+  pageUrl: "https://example-venue-site.com/open-mic",
+  html: `<!doctype html><html><head><title>Live Music Every Night in Downtown</title></head>
+<body><header><a class="site-logo" href="/"><img alt="The Hideout Chicago logo" src="/l.png"></a></header>
+<h1>Live Music Every Night</h1></body></html>`,
+});
+check("logo alt text supplies the identity when the title is a slogan", () => {
+  assert.equal(BRAND_IN_LOGO.candidates[0]?.name, "The Hideout Chicago");
+});
+
+check("marketing-tail stripping still rejects a pure category title", () => {
+  // "Cocktail Bar in Downtown Memphis Open Late" is a description, not a name.
+  const desc = extractVenueCandidatesFromPage({
+    pageUrl: "https://somebar.com/",
+    html: `<!doctype html><html><head><title>Cocktail Bar in Downtown Memphis Open Late</title></head>
+<body><h1>Cocktail Bar</h1></body></html>`,
+  });
+  const names = desc.candidates.map((c) => c.name.toLowerCase());
+  assert.equal(
+    names.some((n) => n.includes("cocktail bar in downtown")),
+    false,
+    `description leaked as identity: ${JSON.stringify(names)}`,
+  );
+});
+
 // ---------------------------------------------------------------------------
 // 4. Venue lane requires a Google Place match; host lane does not.
 // ---------------------------------------------------------------------------
@@ -305,11 +349,15 @@ await checkAsync("place lookups are not spent twice on the same candidate", asyn
   };
   let updates = 0;
   const prismaStub = {
+    // Hit counting must not touch `updatedAt`, which the daily budget reads as real spend.
+    $executeRaw: async () => {
+      updates += 1;
+      return 1;
+    },
     growthPlaceLookup: {
       findUnique: async () => cacheRow,
       update: async () => {
-        updates += 1;
-        return cacheRow;
+        throw new Error("cache hits must not bump updatedAt");
       },
       upsert: async () => {
         throw new Error("must not write a new lookup when the cache is warm");
@@ -418,6 +466,32 @@ await checkAsync("host lane is not subject to the venue name/place gate", async 
     sourceKind: "EVENT_LISTING",
   });
   assert.equal(res.status, "created", `host lane blocked: ${res.reason ?? ""}`);
+});
+
+await checkAsync("a place-verified venue with no website still enters as inventory", async () => {
+  // Venues named on a directory page without a link have no site to crawl yet; the verified
+  // place id is the anchor that keeps them from being dropped.
+  const res = await ingestOutcome({
+    leadType: "VENUE",
+    name: "The Mahaffey Theater",
+    city: "St. Petersburg",
+    region: "FL",
+    openMicSignalTier: "STRONG_LIVE_EVENT",
+    sourceKind: "WEBSITE_CONTACT",
+    googlePlaceId: "place-mahaffey",
+  });
+  assert.equal(res.status, "created", `place-verified venue dropped: ${res.reason ?? ""}`);
+});
+
+await checkAsync("a venue with neither website, email nor place is still dropped", async () => {
+  const res = await ingestOutcome({
+    leadType: "VENUE",
+    name: "The Mahaffey Theater",
+    openMicSignalTier: "STRONG_LIVE_EVENT",
+    sourceKind: "WEBSITE_CONTACT",
+  });
+  assert.equal(res.status, "skipped");
+  assert.equal(res.reason, "no_valid_email_for_main_pipeline");
 });
 
 await checkAsync("manual admin imports are exempt from the discovery name gate", async () => {

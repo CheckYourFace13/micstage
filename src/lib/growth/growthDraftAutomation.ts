@@ -307,7 +307,24 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     orderBy: [{ fitScore: "desc" }, { updatedAt: "desc" }],
     take: hotTake,
   });
-  const hotIds = new Set(hotScan.map((r) => r.id));
+
+  /**
+   * Ordering only: a host who runs mics at several venues can activate all of them plus their
+   * performers, so they are evaluated first. Same `priorityWhere` — eligibility is unchanged and
+   * still decided per lead by `explainGrowthLeadOutreachEligibility` below.
+   */
+  const multiVenueHostScan = await prisma.growthLead.findMany({
+    where: {
+      ...priorityWhere,
+      discoveryHints: { path: ["hostMultiVenueProspect"], equals: true },
+    },
+    select: { id: true },
+    orderBy: [{ fitScore: "desc" }, { updatedAt: "desc" }],
+    take: Math.max(2, Math.floor(hotTake / 2)),
+  });
+
+  const multiVenueHostIds = new Set(multiVenueHostScan.map((r) => r.id));
+  const hotIds = new Set([...multiVenueHostScan, ...hotScan].map((r) => r.id));
 
   const scanStartId = await readDraftScanCursor(prisma);
   let cursorId = scanStartId;
@@ -331,7 +348,12 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   await writeDraftScanCursor(prisma, cursorId);
 
   const priorityEligibleIds: string[] = [];
-  for (const row of [...hotScan, ...rotatingRows.filter((r) => !hotIds.has(r.id))]) {
+  const priorityScanOrder = [
+    ...multiVenueHostScan,
+    ...hotScan.filter((r) => !multiVenueHostIds.has(r.id)),
+    ...rotatingRows.filter((r) => !hotIds.has(r.id)),
+  ];
+  for (const row of priorityScanOrder) {
     const elig = await explainGrowthLeadOutreachEligibility(prisma, row.id);
     if (elig.eligible) priorityEligibleIds.push(row.id);
   }

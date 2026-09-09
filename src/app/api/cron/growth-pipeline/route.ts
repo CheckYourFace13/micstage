@@ -5,6 +5,7 @@ import {
 } from "@/lib/growth/expansionConfig";
 import { runAutoGrowthOutreachDrafts } from "@/lib/growth/growthDraftAutomation";
 import { runGrowthLeadDiscovery } from "@/lib/growth/growthDiscoveryRun";
+import { sweepHostMultiVenueProspects } from "@/lib/growth/hostMultiVenueSweep";
 import {
   beginDiscoveryRequestSourceLog,
   endDiscoveryRequestSourceLog,
@@ -17,6 +18,9 @@ import {
 } from "@/lib/growth/discoveryExecutionGuard";
 import { autoPublishGrowthLeadsAsListings } from "@/lib/publicListings/autoPublishGrowthLeadsAsListings";
 import { runListingBacklogProcessor } from "@/lib/publicListings/listingBacklogProcessor";
+import { sourceListingCoordinatesWithoutGoogle } from "@/lib/publicListings/listingCoordinateSourcing";
+import { runDirectoryLeadReprocessing } from "@/lib/growth/discovery/directoryLeadReprocessing";
+import { purgeExpiredGoogleMapsContent } from "@/lib/compliance/googleMapsContentRetention";
 import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
 import { runOnboardingSetupNudges } from "@/lib/onboarding/setupNudges";
 import {
@@ -146,8 +150,12 @@ async function handle(request: Request) {
     let discoveryError: string | null = null;
     let listingAutoPublish: Awaited<ReturnType<typeof autoPublishGrowthLeadsAsListings>> | null = null;
     let listingBacklog: Awaited<ReturnType<typeof runListingBacklogProcessor>> | null = null;
+    let coordinateSourcing: Awaited<ReturnType<typeof sourceListingCoordinatesWithoutGoogle>> | null = null;
+    let directoryReprocess: Awaited<ReturnType<typeof runDirectoryLeadReprocessing>> | null = null;
+    let googleContentPurge: Awaited<ReturnType<typeof purgeExpiredGoogleMapsContent>> | null = null;
     let drafts: Awaited<ReturnType<typeof runAutoGrowthOutreachDrafts>> | null = null;
     let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
+    let hostMultiVenueSweep: Awaited<ReturnType<typeof sweepHostMultiVenueProspects>> | null = null;
     let listingClaimInvites: Awaited<ReturnType<typeof runPendingListingClaimInvites>> | null = null;
     let onboardingNudges: Awaited<ReturnType<typeof runOnboardingSetupNudges>> | null = null;
     let resendBudget: Awaited<ReturnType<typeof resendDailyBudgetSnapshot>> | null = null;
@@ -162,6 +170,35 @@ async function handle(request: Request) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error("[growth pipeline] listing backlog processor failed", { error: msg, phase });
+      }
+
+      /**
+       * Map pins must not come from Places (30-day cache limit, and no Places content beside a
+       * non-Google map), so re-source coordinates from public-domain geocoders and then delete
+       * any Google Maps Content whose retention window has passed.
+       */
+      try {
+        coordinateSourcing = await sourceListingCoordinatesWithoutGoogle(prisma, { limit: 20 });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[growth pipeline] listing coordinate sourcing failed", { error: msg, phase });
+      }
+      try {
+        googleContentPurge = await purgeExpiredGoogleMapsContent(prisma);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[growth pipeline] google content retention purge failed", { error: msg, phase });
+      }
+
+      /**
+       * Host brands accumulate as venue hints during evidence enrichment, so the multi-venue sweep
+       * runs in the same tick. Rows, brands and wall-clock are all bounded per run.
+       */
+      try {
+        hostMultiVenueSweep = await sweepHostMultiVenueProspects(prisma, { budgetMs: 5_000 });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[growth pipeline] host multi-venue sweep failed", { error: msg, phase });
       }
     }
 
@@ -316,6 +353,16 @@ async function handle(request: Request) {
             console.error("[growth pipeline] listing auto-publish failed", { error: msg, phase });
             if (!discoveryError) discoveryError = `listing auto-publish: ${msg}`;
           }
+          /**
+           * Repair the pre-fix backlog with whatever Places budget the fresh discovery left,
+           * so old article/directory "venues" turn into real venues without a manual script.
+           */
+          try {
+            directoryReprocess = await runDirectoryLeadReprocessing(prisma);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error("[growth pipeline] directory lead reprocessing failed", { error: msg, phase });
+          }
         } finally {
           await guard.release({
             completedRunId: discovery?.discoveryRunId ?? null,
@@ -383,8 +430,12 @@ async function handle(request: Request) {
         discoveryError,
         listingAutoPublish,
         listingBacklog,
+        coordinateSourcing,
+        googleContentPurge,
+        directoryReprocess,
         growthRuntime: growthRuntimeSnapshotForStatus(growthRuntime),
         emailMining,
+        hostMultiVenueSweep,
         resendBudget,
         pendingClaimInvites,
         listingClaimInvites,

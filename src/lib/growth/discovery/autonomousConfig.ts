@@ -126,6 +126,36 @@ export function growthDiscoveryAutonomousWebSearchEnabled(): boolean {
   return hasSerpApi() || hasBraveSearch();
 }
 
+/**
+ * Host/promoter lane share of the search budget. Hosts are high value (one host activates several
+ * venues) but the venue lane owns inventory throughput, so the host lane gets a small fixed slice.
+ */
+const HOST_LANE_SEARCH_SHARE = 0.15;
+const HOST_LANE_FETCH_SHARE = 0.12;
+
+/** Host search lane: on wherever venue web search is on, unless explicitly disabled. */
+export function growthDiscoveryHostSearchEnabled(): boolean {
+  const raw = process.env.GROWTH_DISCOVERY_HOST_SEARCH_ENABLED;
+  if (raw != null && raw.trim() !== "") return envTruthy(raw);
+  return growthDiscoveryAutonomousWebSearchEnabled();
+}
+
+/** Search calls the host lane may spend per run (hard-capped so it cannot starve the venue lane). */
+export function growthDiscoveryHostSearchCallsPerRun(): number {
+  const configured = parseIntEnv("GROWTH_DISCOVERY_HOST_SEARCH_CALLS_PER_RUN", 0);
+  if (configured > 0) return Math.min(configured, 6);
+  const share = Math.round(growthDiscoveryAutonomousSearchCallsPerRun() * HOST_LANE_SEARCH_SHARE);
+  return Math.max(1, Math.min(3, share));
+}
+
+/** HTML page fetches the host lane may spend per run. */
+export function growthDiscoveryHostSearchPageFetchesPerRun(): number {
+  const configured = parseIntEnv("GROWTH_DISCOVERY_HOST_SEARCH_PAGE_FETCHES_PER_RUN", 0);
+  if (configured > 0) return Math.min(configured, 40);
+  const share = Math.round(growthDiscoveryAutonomousMaxPageFetchesPerRun() * HOST_LANE_FETCH_SHARE);
+  return Math.max(2, Math.min(16, share));
+}
+
 /** Comma-separated root URLs to fetch and mine for contacts (same-host links optional). */
 export function growthDiscoveryCrawlSeedUrls(): string[] {
   const raw = process.env.GROWTH_DISCOVERY_CRAWL_SEED_URLS?.trim();

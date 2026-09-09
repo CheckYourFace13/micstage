@@ -8,6 +8,8 @@ import {
   growthDiscoveryAllocationSummary,
 } from "@/lib/growth/growthDiscoveryAllocation";
 import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
+import { ingestHostLaneLeadCandidate, isHostLaneCandidate } from "@/lib/growth/hostLeadIngest";
+import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import {
   hasBraveSearch,
   hasSerpApi,
@@ -71,6 +73,17 @@ export type GrowthDiscoveryRunResult = {
 const MAX_ADAPTER_ERROR_LINES = 80;
 const MAX_ADAPTER_ERROR_CHARS = 480;
 const AUTONOMOUS_WEB_SEARCH_ADAPTER_ID = "autonomous_web_search_venue";
+
+/**
+ * Host leads are discovered before their mailbox is, and the shared ingest requires a parsed
+ * address for every non-venue lead. Host-lane candidates therefore take the host ingest path,
+ * which persists them contactless for enrichment to mine later.
+ */
+function ingestDiscoveryCandidate(prisma: PrismaClient, cand: GrowthLeadCandidate) {
+  return isHostLaneCandidate(cand)
+    ? ingestHostLaneLeadCandidate(prisma, cand)
+    : ingestGrowthLeadCandidate(prisma, cand);
+}
 
 function discoveryRunSummaryForDb(
   r: Omit<GrowthDiscoveryRunResult, "discoveryRunId">,
@@ -168,7 +181,7 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
 
         for (const cand of candidates) {
           try {
-            const r = await ingestGrowthLeadCandidate(prisma, cand);
+            const r = await ingestDiscoveryCandidate(prisma, cand);
             if (r.status === "created") {
               created++;
               byAdapter[adapter.id].created++;
@@ -224,7 +237,7 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
 
         for (const cand of candidates) {
           try {
-            const r = await ingestGrowthLeadCandidate(prisma, cand);
+            const r = await ingestDiscoveryCandidate(prisma, cand);
             if (r.status === "created") {
               created++;
               byAdapter[webSearchAdapter.id].created++;

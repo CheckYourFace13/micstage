@@ -193,13 +193,10 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
 
         out.push({
           leadType: "VENUE",
-          name: resolution.canonicalName ?? name,
+          // Identity from the Eventbrite venue record; Google only confirms it is a real place.
+          name,
           googlePlaceId: resolution.placeId,
-          placeCanonicalName: resolution.canonicalName,
-          placeFormattedAddress: resolution.formattedAddress,
-          placeLat: resolution.lat,
-          placeLng: resolution.lng,
-          websiteUrl: resolution.website ?? ev.url?.split("?")[0] ?? null,
+          websiteUrl: ev.url?.split("?")[0] ?? null,
           contactUrl: ev.url ?? null,
           city,
           region,

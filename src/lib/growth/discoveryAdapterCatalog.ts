@@ -22,11 +22,12 @@ export const CHICAGOLAND_STATIC_REAL_ADAPTER_IDS = [
   "chicagoland_promoter_social_profile",
 ] as const;
 
-/** High-volume autonomous adapter ids (venue web search + crawl + listings API; no artist/promoter web search this phase). */
+/** High-volume autonomous adapter ids (venue web search + crawl + listings API, plus the host lane). */
 export const AUTONOMOUS_DISCOVERY_ADAPTER_IDS = [
   "autonomous_web_search_venue",
   "autonomous_seed_url_crawl_venue",
   "autonomous_eventbrite_chicago",
+  "autonomous_host_search_promoter",
 ] as const;
 
 export function growthStubAdapterIdForLeadType(leadType: GrowthLeadType): string {
@@ -69,6 +70,12 @@ export function listGrowthDiscoveryAdapterRegistry(): GrowthDiscoveryAdapterInfo
       id: "autonomous_eventbrite_chicago",
       tier: "autonomous",
       description: "Eventbrite API (every US state + DC rotation, q=open mic) → open-mic event rows → venue leads + signal tier",
+    },
+    {
+      id: "autonomous_host_search_promoter",
+      tier: "autonomous",
+      description:
+        "Host-intent web search (small SerpAPI/Brave slice, venue-lane reserve respected) → crawl → JSON-LD organizer / 'hosted by' extraction → PROMOTER_ACCOUNT candidates (no Google Places)",
     },
     {
       id: "chicagoland_venue_website_contact",

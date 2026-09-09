@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
+import { googleContentExpiryFrom } from "@/lib/compliance/googleMapsContentRetention";
 import type { ExtractedVenueCandidate } from "@/lib/growth/discovery/venueCandidateExtraction";
 import { googleMapsServerApiKey, verifyListingWithGoogle } from "@/lib/publicListings/googlePlacesVerify";
 
@@ -21,12 +22,20 @@ export type PlaceResolution = {
   status: PlaceResolutionStatus;
   reason: string;
   placeId: string | null;
+  /**
+   * Google's business name, address, website and coordinates are decision inputs for the
+   * current run only. Maps Platform terms grant no retention for the name/address/website and
+   * cap coordinate caching at 30 days, so callers must not copy these onto a lead — use the
+   * identity our own crawl extracted and keep only `placeId`.
+   */
   canonicalName: string | null;
   formattedAddress: string | null;
   lat: number | null;
   lng: number | null;
   website: string | null;
   websiteHost: string | null;
+  /** Our own derived conclusion that Google had coordinates; survives content expiry. */
+  coordsVerified: boolean;
   matchScore: number | null;
   /** True when a paid Places lookup was actually spent. */
   spentLookup: boolean;
@@ -56,6 +65,64 @@ export function isUnitedStatesAddress(address: string | null | undefined): boole
   if (!a) return false;
   if (/\bUSA\b|\bUnited States\b/i.test(a)) return true;
   return US_STATE_ABBR_RE.test(a);
+}
+
+/**
+ * Places types that can plausibly host an open mic. Google marks almost every business as
+ * `establishment`/`point_of_interest`, so matching on those alone lets things like a film
+ * production company through; the venue lane requires a hospitality or performance type.
+ */
+const VENUE_LANE_PLACE_TYPES = new Set([
+  "bar",
+  "pub",
+  "wine_bar",
+  "cocktail_bar",
+  "sports_bar",
+  "karaoke",
+  "tea_house",
+  "night_club",
+  "restaurant",
+  "cafe",
+  "coffee_shop",
+  "bakery",
+  "brewery",
+  "brewpub",
+  "winery",
+  "distillery",
+  "meal_takeaway",
+  "food",
+  "book_store",
+  "art_gallery",
+  "performing_arts_theater",
+  "movie_theater",
+  "museum",
+  "community_center",
+  "cultural_center",
+  "event_venue",
+  "banquet_hall",
+  "concert_hall",
+  "amphitheatre",
+  "comedy_club",
+  "church",
+  "place_of_worship",
+  "university",
+  "library",
+  "lodging",
+  "hotel",
+  "bowling_alley",
+  "amusement_center",
+  "tourist_attraction",
+]);
+
+/**
+ * Places API (New) returns granular types ("cocktail_bar", "italian_restaurant",
+ * "performing_arts_theater"), so match the family suffix as well as the exact list.
+ */
+const VENUE_LANE_TYPE_SUFFIX_RE = /_(restaurant|bar|cafe|club|theater|theatre|hall|brewery|pub|winery)$/;
+
+export function hasVenueLanePlaceType(types: string[] | null | undefined): boolean {
+  if (!types?.length) return false;
+  return types.some((t) => VENUE_LANE_PLACE_TYPES.has(t) || VENUE_LANE_TYPE_SUFFIX_RE.test(t));
 }
 
 /** Same registrable-ish domain, tolerating subdomains on either side. */
@@ -152,6 +219,7 @@ function fromCacheRow(row: {
   lng: number | null;
   website: string | null;
   websiteHost: string | null;
+  coordsVerified: boolean;
 }): PlaceResolution {
   return {
     status: row.outcome === "resolved" ? "cached_resolved" : "cached_unresolved",
@@ -163,6 +231,7 @@ function fromCacheRow(row: {
     lng: row.lng,
     website: row.website,
     websiteHost: row.websiteHost,
+    coordsVerified: row.coordsVerified,
     matchScore: row.matchScore,
     spentLookup: false,
   };
@@ -179,6 +248,7 @@ function unresolved(status: PlaceResolutionStatus, reason: string, spentLookup =
     lng: null,
     website: null,
     websiteHost: null,
+    coordsVerified: false,
     matchScore: null,
     spentLookup,
   };
@@ -199,10 +269,12 @@ export async function resolveVenueCandidateWithPlaces(
     const fresh = cached.outcome === "resolved" || Date.now() - cached.updatedAt.getTime() < UNRESOLVED_TTL_MS;
     if (fresh) {
       budget.noteCacheHit();
-      await prisma.growthPlaceLookup.update({
-        where: { lookupKey: key },
-        data: { hitCount: { increment: 1 } },
-      });
+      /**
+       * Raw update so the hit counter does not touch `updatedAt`: that timestamp is what the
+       * daily budget reads as "a lookup was actually spent", and a Prisma update would bump it
+       * on every free cache hit and make the day look exhausted.
+       */
+      await prisma.$executeRaw`UPDATE "GrowthPlaceLookup" SET "hitCount" = "hitCount" + 1 WHERE "lookupKey" = ${key}`;
       return fromCacheRow(cached);
     }
   }
@@ -211,12 +283,21 @@ export async function resolveVenueCandidateWithPlaces(
   if (budget.remaining <= 0) return unresolved("budget_exhausted", "place_lookup_budget_exhausted");
 
   budget.noteSpend();
-  const verify = await verifyListingWithGoogle({
-    name,
-    city: candidate.city ?? null,
-    region: candidate.region ?? null,
-    formattedAddress: candidate.streetAddress ?? "",
-  });
+  /**
+   * The website field is the only Enterprise-tier field in our mask (1,000 free calls/month
+   * instead of 5,000), and it only decides something when the candidate arrived with its own
+   * domain to cross-check. Request it just in that case.
+   */
+  const candidateHostForCheck = hostOf(candidate.websiteUrl ?? null);
+  const verify = await verifyListingWithGoogle(
+    {
+      name,
+      city: candidate.city ?? null,
+      region: candidate.region ?? null,
+      formattedAddress: candidate.streetAddress ?? "",
+    },
+    { needWebsite: Boolean(candidateHostForCheck) },
+  );
 
   /**
    * A name can match a same-named business anywhere on earth. Two corroborations keep a
@@ -224,10 +305,12 @@ export async function resolveVenueCandidateWithPlaces(
    * brought its own website that domain must agree with the one Google has on file.
    */
   const inUnitedStates = isUnitedStatesAddress(verify.formattedAddress);
-  const candidateHost = hostOf(candidate.websiteUrl ?? null);
+  const candidateHost = candidateHostForCheck;
   const placeWebsiteHost = hostOf(verify.website ?? null);
   const domainConflict =
     Boolean(candidateHost) && Boolean(placeWebsiteHost) && !domainsAgree(candidateHost, placeWebsiteHost);
+
+  const venueTypeOk = hasVenueLanePlaceType(verify.types);
 
   const strongEnough =
     verify.outcome === "verified" &&
@@ -236,13 +319,16 @@ export async function resolveVenueCandidateWithPlaces(
     verify.lng != null &&
     (verify.matchScore ?? 0) >= MIN_PLACE_MATCH_SCORE &&
     inUnitedStates &&
+    venueTypeOk &&
     !domainConflict;
 
   const rejectReason = !inUnitedStates
-    ? `place_outside_us (${verify.formattedAddress ?? "unknown address"})`
+    ? "place_outside_us"
     : domainConflict
       ? `website_domain_conflict (candidate ${candidateHost} vs google ${placeWebsiteHost})`
-      : null;
+      : verify.outcome === "verified" && !venueTypeOk
+        ? `place_not_a_venue_type (${(verify.types ?? []).slice(0, 4).join(", ") || "no types"})`
+        : null;
 
   const resolution: PlaceResolution = strongEnough
     ? {
@@ -255,6 +341,7 @@ export async function resolveVenueCandidateWithPlaces(
         lng: verify.lng ?? null,
         website: verify.website ?? null,
         websiteHost: hostOf(verify.website ?? null),
+        coordsVerified: verify.lat != null && verify.lng != null,
         matchScore: verify.matchScore ?? null,
         spentLookup: true,
       }
@@ -268,17 +355,26 @@ export async function resolveVenueCandidateWithPlaces(
         placeId: verify.placeId ?? null,
       };
 
+  /**
+   * What the cache is allowed to keep: the place id (exempt from Maps Platform caching limits),
+   * our own match score and conclusion, and coordinates for up to 30 days. Google's business
+   * name, address and website are deliberately not persisted — there is no retention grant for
+   * them, and `outcome` already encodes the US/domain checks they were used for, so a cache hit
+   * still short-circuits a paid lookup without holding the content.
+   */
   const cacheData = {
     outcome: resolution.status === "resolved" ? "resolved" : resolution.status === "rejected" ? "rejected" : "unresolved",
     reason: resolution.reason.slice(0, 300),
     matchScore: resolution.matchScore,
     placeId: resolution.status === "resolved" ? resolution.placeId : null,
-    canonicalName: resolution.canonicalName,
-    formattedAddress: resolution.formattedAddress,
+    coordsVerified: resolution.coordsVerified,
     lat: resolution.lat,
     lng: resolution.lng,
-    website: resolution.website,
-    websiteHost: resolution.websiteHost,
+    googleContentExpiresAt: resolution.lat != null ? googleContentExpiryFrom() : null,
+    canonicalName: null,
+    formattedAddress: null,
+    website: null,
+    websiteHost: null,
   };
   await prisma.growthPlaceLookup.upsert({
     where: { lookupKey: key },
@@ -290,5 +386,9 @@ export async function resolveVenueCandidateWithPlaces(
 }
 
 export function placeResolutionIsUsable(r: PlaceResolution): boolean {
-  return (r.status === "resolved" || r.status === "cached_resolved") && Boolean(r.placeId) && r.lat != null && r.lng != null;
+  if (r.status !== "resolved" && r.status !== "cached_resolved") return false;
+  if (!r.placeId) return false;
+  // Live resolutions carry coordinates; cached rows may have had them purged after 30 days,
+  // so fall back to the derived flag that records Google having had them.
+  return r.coordsVerified || (r.lat != null && r.lng != null);
 }

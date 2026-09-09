@@ -67,6 +67,8 @@ export type CrawledPage = {
   url: string;
   title: string;
   text: string;
+  /** Raw HTML, kept only by callers that need structured extraction (host organizer links). */
+  html?: string;
 };
 
 function hostOf(url: string | null | undefined): string | null {

@@ -570,12 +570,13 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
               }
               placeVerifiedVenues++;
 
-              const venueSite = cand.websiteUrl ?? resolution.website ?? null;
+              // Identity comes from our own extraction; Google only confirms the venue exists.
+              const venueSite = cand.websiteUrl ?? null;
               candidates.push({
                 leadType: "VENUE",
-                name: resolution.canonicalName ?? cand.name,
+                name: cand.name,
                 websiteUrl: venueSite,
-                city: resolution.formattedAddress ? cand.city ?? geo.city : geo.city,
+                city: cand.city ?? geo.city,
                 region: cand.region ?? geo.region,
                 discoveryMarketSlug: geo.discoveryMarketSlug,
                 source: `${ADAPTER_ID}_directory_extraction`,
@@ -586,10 +587,6 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
                 openMicSignalTier: om.tier,
                 importKey: hashImport(`place:${resolution.placeId}`),
                 googlePlaceId: resolution.placeId,
-                placeCanonicalName: resolution.canonicalName,
-                placeFormattedAddress: resolution.formattedAddress,
-                placeLat: resolution.lat,
-                placeLng: resolution.lng,
                 internalNotes: `Extracted from directory/article ${pageUrl} via ${cand.method}; Google place match ${Math.round((resolution.matchScore ?? 0) * 100)}%. The source page was rejected as an entity. Query: ${qUsed.slice(0, 140)}.`,
                 discoveryHints: {
                   source: ADAPTER_ID,
@@ -604,7 +601,6 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
                   placeResolution: {
                     placeId: resolution.placeId,
                     matchScore: resolution.matchScore,
-                    formattedAddress: resolution.formattedAddress,
                   },
                 },
               });
@@ -641,7 +637,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
           candidates.push({
             leadType: "VENUE",
-            name: placeOk ? (selfResolution.canonicalName ?? self.name) : self.name,
+            name: self.name,
             contactEmailNormalized: email,
             emailExtractedFromNoisyText: !sameHostEmail,
             additionalContactEmails,
@@ -663,10 +659,6 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             contactQuality,
             importKey: hashImport(placeOk ? `place:${selfResolution.placeId}` : pageUrl),
             googlePlaceId: placeOk ? selfResolution.placeId : null,
-            placeCanonicalName: placeOk ? selfResolution.canonicalName : null,
-            placeFormattedAddress: placeOk ? selfResolution.formattedAddress : null,
-            placeLat: placeOk ? selfResolution.lat : null,
-            placeLng: placeOk ? selfResolution.lng : null,
             internalNotes: `${emailMeta}${dmNote}. Open-mic–targeted nationwide discovery. Tier ${om.tier}. Identity via ${self.method}; place ${placeOk ? `verified (${Math.round((selfResolution.matchScore ?? 0) * 100)}%)` : `unresolved (${selfResolution.reason})`}. Market ${geo.discoveryMarketSlug}. Query: ${qUsed.slice(0, 140)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
             discoveryHints: {
               source: ADAPTER_ID,

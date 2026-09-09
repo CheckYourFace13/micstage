@@ -31,6 +31,62 @@ type GooglePlaceDetailsResult = {
   address_components?: Array<{ long_name?: string; short_name?: string; types?: string[] }>;
 };
 
+/** Normalized place shape so legacy and Places API (New) responses share one evaluator. */
+type PlaceRecord = {
+  placeId?: string;
+  name?: string;
+  formattedAddress?: string;
+  lat?: number;
+  lng?: number;
+  types?: string[];
+  businessStatus?: string;
+  website?: string;
+  addressComponents?: Array<{ long_name?: string; short_name?: string; types?: string[] }>;
+};
+
+type PlacesApiMode = "new" | "legacy" | "auto";
+
+/**
+ * Places API (New) bills the single highest field-mask tier per request, while the legacy
+ * endpoints bill the base SKU plus every data SKU the response could contain. An IDs-only
+ * Text Search (New) is free and unmetered, and a details call without `websiteUri` stays in
+ * the Pro tier, so the new API is both cheaper and easier to keep inside the free allowance.
+ */
+function placesApiMode(): PlacesApiMode {
+  const raw = process.env.GOOGLE_PLACES_API_MODE?.trim().toLowerCase();
+  if (raw === "new" || raw === "legacy") return raw;
+  return "auto";
+}
+
+/** Details fields we can justify requesting. `websiteUri` is Enterprise-tier, so it is opt-in. */
+const NEW_DETAILS_FIELD_MASK_BASE = [
+  "id",
+  "displayName",
+  "formattedAddress",
+  "location",
+  "types",
+  "businessStatus",
+  "addressComponents",
+].join(",");
+
+/** Set when the new API is unavailable to this project so we stop paying the failure latency. */
+let newPlacesApiUnavailable = false;
+
+const placesRequestCounters = {
+  newTextSearch: 0,
+  newDetails: 0,
+  newDetailsWithWebsite: 0,
+  legacyTextSearch: 0,
+  legacyDetails: 0,
+  legacyDetailsWithWebsite: 0,
+  fallbacks: 0,
+};
+
+/** Per-process request tally by billable shape; used by the Places cost audit. */
+export function placesRequestStats(): Readonly<typeof placesRequestCounters> {
+  return { ...placesRequestCounters };
+}
+
 export type GooglePlaceVerifyOutcome = "verified" | "needs_review" | "outdated" | "skipped";
 
 export type GooglePlaceVerifyResult = {
@@ -45,6 +101,8 @@ export type GooglePlaceVerifyResult = {
   city?: string;
   region?: string;
   website?: string;
+  /** Google place types, used by the discovery lane to require a hospitality/venue business. */
+  types?: string[];
 };
 
 export type BatchGoogleVerifyResult = {
@@ -88,12 +146,36 @@ const VENUE_TYPES = new Set([
   "point_of_interest",
 ]);
 
+let warnedAboutPublicKeyFallback = false;
+
+/**
+ * Key for server-side Places calls. A dedicated server key is strongly preferred: the browser
+ * key is shipped to clients and can only be protected by HTTP-referrer restrictions, which do
+ * not apply to server requests — so a referrer-restricted browser key would break these calls,
+ * and an unrestricted one is abusable by anyone who reads our JavaScript. The fallback exists
+ * only so verification keeps working until `GOOGLE_MAPS_SERVER_API_KEY` is set.
+ */
 export function googleMapsServerApiKey(): string | null {
-  const key =
-    process.env.GOOGLE_MAPS_SERVER_API_KEY?.trim() ||
-    process.env.GOOGLE_PLACES_API_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
-  return key || null;
+  const serverKey =
+    process.env.GOOGLE_MAPS_SERVER_API_KEY?.trim() || process.env.GOOGLE_PLACES_API_KEY?.trim();
+  if (serverKey) return serverKey;
+
+  const publicKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
+  if (publicKey && !warnedAboutPublicKeyFallback) {
+    warnedAboutPublicKeyFallback = true;
+    console.warn(
+      "[google places] using NEXT_PUBLIC_GOOGLE_MAPS_API_KEY for server calls; set GOOGLE_MAPS_SERVER_API_KEY (IP-restricted, Places-only) instead",
+    );
+  }
+  return publicKey || null;
+}
+
+/** True when server Places calls are running on the browser key (surfaced in ops audits). */
+export function usingPublicKeyForServerPlaces(): boolean {
+  const hasServerKey = Boolean(
+    process.env.GOOGLE_MAPS_SERVER_API_KEY?.trim() || process.env.GOOGLE_PLACES_API_KEY?.trim(),
+  );
+  return !hasServerKey && Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim());
 }
 
 function normalizeName(s: string): string {
@@ -185,13 +267,34 @@ async function googleFetchJson<T>(url: string): Promise<T | null> {
   return data as T;
 }
 
-async function textSearchPlace(query: string, key: string): Promise<GoogleTextSearchResult | null> {
-  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&region=us&key=${encodeURIComponent(key)}`;
-  const data = await googleFetchJson<{ results?: GoogleTextSearchResult[] }>(url);
-  return data?.results?.[0] ?? null;
+function legacyToRecord(place: GoogleTextSearchResult | GooglePlaceDetailsResult): PlaceRecord {
+  return {
+    placeId: place.place_id,
+    name: place.name,
+    formattedAddress: place.formatted_address,
+    lat: place.geometry?.location?.lat,
+    lng: place.geometry?.location?.lng,
+    types: place.types,
+    businessStatus: place.business_status,
+    website: "website" in place ? place.website : undefined,
+    addressComponents: "address_components" in place ? place.address_components : undefined,
+  };
 }
 
-async function placeDetails(placeId: string, key: string): Promise<GooglePlaceDetailsResult | null> {
+async function legacyTextSearchPlaceId(query: string, key: string): Promise<string | null> {
+  placesRequestCounters.legacyTextSearch += 1;
+  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&region=us&key=${encodeURIComponent(key)}`;
+  const data = await googleFetchJson<{ results?: GoogleTextSearchResult[] }>(url);
+  return data?.results?.[0]?.place_id ?? null;
+}
+
+async function legacyPlaceDetails(
+  placeId: string,
+  key: string,
+  needWebsite: boolean,
+): Promise<PlaceRecord | null> {
+  if (needWebsite) placesRequestCounters.legacyDetailsWithWebsite += 1;
+  else placesRequestCounters.legacyDetails += 1;
   const fields = [
     "place_id",
     "name",
@@ -199,13 +302,127 @@ async function placeDetails(placeId: string, key: string): Promise<GooglePlaceDe
     "geometry",
     "types",
     "business_status",
-    "website",
-    "url",
     "address_components",
+    ...(needWebsite ? ["website"] : []),
   ].join(",");
   const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${encodeURIComponent(key)}`;
   const data = await googleFetchJson<{ result?: GooglePlaceDetailsResult }>(url);
-  return data?.result ?? null;
+  return data?.result ? legacyToRecord(data.result) : null;
+}
+
+type NewPlace = {
+  id?: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  location?: { latitude?: number; longitude?: number };
+  types?: string[];
+  businessStatus?: string;
+  websiteUri?: string;
+  addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
+};
+
+function newToRecord(place: NewPlace): PlaceRecord {
+  return {
+    placeId: place.id,
+    name: place.displayName?.text,
+    formattedAddress: place.formattedAddress,
+    lat: place.location?.latitude,
+    lng: place.location?.longitude,
+    types: place.types,
+    businessStatus: place.businessStatus,
+    website: place.websiteUri,
+    addressComponents: place.addressComponents?.map((c) => ({
+      long_name: c.longText,
+      short_name: c.shortText,
+      types: c.types,
+    })),
+  };
+}
+
+/** True when the failure means this project cannot use the new API at all (not a per-place miss). */
+function isNewApiUnavailableStatus(status: number, body: string): boolean {
+  if (status === 403 || status === 401) return true;
+  return status === 400 && /SERVICE_DISABLED|API_KEY_SERVICE_BLOCKED|not enabled/i.test(body);
+}
+
+async function newTextSearchPlaceId(query: string, key: string): Promise<string | null | "unavailable"> {
+  placesRequestCounters.newTextSearch += 1;
+  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+      // IDs-only mask: Text Search Essentials SKU, $0.00 with no monthly call cap.
+      "X-Goog-FieldMask": "places.id",
+    },
+    body: JSON.stringify({ textQuery: query, regionCode: "US", languageCode: "en", maxResultCount: 1 }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (isNewApiUnavailableStatus(res.status, body)) {
+      console.warn("[google places] Places API (New) unavailable, falling back to legacy", res.status, body.slice(0, 200));
+      return "unavailable";
+    }
+    console.warn("[google places] searchText failed", res.status, body.slice(0, 200));
+    return null;
+  }
+  const data = (await res.json()) as { places?: NewPlace[] };
+  return data.places?.[0]?.id ?? null;
+}
+
+async function newPlaceDetails(
+  placeId: string,
+  key: string,
+  needWebsite: boolean,
+): Promise<PlaceRecord | null | "unavailable"> {
+  if (needWebsite) placesRequestCounters.newDetailsWithWebsite += 1;
+  else placesRequestCounters.newDetails += 1;
+  const mask = needWebsite ? `${NEW_DETAILS_FIELD_MASK_BASE},websiteUri` : NEW_DETAILS_FIELD_MASK_BASE;
+  const res = await fetch(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=en`,
+    { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": mask } },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (isNewApiUnavailableStatus(res.status, body)) {
+      console.warn("[google places] Places API (New) details unavailable, falling back to legacy", res.status);
+      return "unavailable";
+    }
+    console.warn("[google places] place details failed", res.status, body.slice(0, 200));
+    return null;
+  }
+  return newToRecord((await res.json()) as NewPlace);
+}
+
+/** Resolve a free-text query to a place id, preferring the free IDs-only new-API search. */
+async function textSearchPlaceId(query: string, key: string): Promise<string | null> {
+  const mode = placesApiMode();
+  if (mode !== "legacy" && !newPlacesApiUnavailable) {
+    const id = await newTextSearchPlaceId(query, key);
+    if (id !== "unavailable") return id;
+    newPlacesApiUnavailable = true;
+    placesRequestCounters.fallbacks += 1;
+    if (mode === "new") return null;
+  }
+  if (mode === "new") return null;
+  return legacyTextSearchPlaceId(query, key);
+}
+
+async function placeDetailsRecord(
+  placeId: string,
+  key: string,
+  needWebsite: boolean,
+): Promise<PlaceRecord | null> {
+  const mode = placesApiMode();
+  if (mode !== "legacy" && !newPlacesApiUnavailable) {
+    const rec = await newPlaceDetails(placeId, key, needWebsite);
+    if (rec !== "unavailable") return rec;
+    newPlacesApiUnavailable = true;
+    placesRequestCounters.fallbacks += 1;
+    if (mode === "new") return null;
+  }
+  if (mode === "new") return null;
+  return legacyPlaceDetails(placeId, key, needWebsite);
 }
 
 function evaluatePlaceMatch(
@@ -214,19 +431,17 @@ function evaluatePlaceMatch(
     city: string | null;
     region: string | null;
   },
-  place: GoogleTextSearchResult | GooglePlaceDetailsResult,
+  place: PlaceRecord,
 ): GooglePlaceVerifyResult {
   const placeName = place.name?.trim() ?? "";
   const matchScore = nameMatchScore(listing.name, placeName);
   const typeClass = classifyPlaceTypes(place.types);
-  const addr = parseAddressComponents(
-    "address_components" in place ? place.address_components : undefined,
-  );
+  const addr = parseAddressComponents(place.addressComponents);
   const cityOk = cityMatches(listing.city, addr.city);
   const regionOk = regionMatches(listing.region, addr.region);
 
-  if (place.business_status === "CLOSED_PERMANENTLY") {
-    return { outcome: "outdated", reason: "Google Business Profile permanently closed", matchScore, placeId: place.place_id };
+  if (place.businessStatus === "CLOSED_PERMANENTLY") {
+    return { outcome: "outdated", reason: "Google Business Profile permanently closed", matchScore, placeId: place.placeId };
   }
 
   if (typeClass === "non_venue") {
@@ -234,82 +449,87 @@ function evaluatePlaceMatch(
       outcome: "outdated",
       reason: `Google result is not a business (${(place.types ?? []).slice(0, 4).join(", ")})`,
       matchScore,
-      placeId: place.place_id,
+      placeId: place.placeId,
     };
   }
 
   if (matchScore < 0.45) {
     return {
       outcome: "needs_review",
-      reason: `Weak name match (${Math.round(matchScore * 100)}%): Google has "${placeName}"`,
+      reason: `Weak name match (${Math.round(matchScore * 100)}%)`,
       matchScore,
-      placeId: place.place_id,
+      placeId: place.placeId,
     };
   }
 
   if (!cityOk || !regionOk) {
     return {
       outcome: "needs_review",
-      reason: `Location mismatch (listing ${listing.city ?? "—"}, ${listing.region ?? "—"} vs Google ${addr.city ?? "—"}, ${addr.region ?? "—"})`,
+      reason: `Location mismatch (listing ${listing.city ?? "—"}, ${listing.region ?? "—"})`,
       matchScore,
-      placeId: place.place_id,
+      placeId: place.placeId,
     };
   }
 
-  const lat = place.geometry?.location?.lat;
-  const lng = place.geometry?.location?.lng;
-  if (!place.place_id || !place.formatted_address || lat == null || lng == null) {
-    return { outcome: "needs_review", reason: "Google place missing coordinates", matchScore, placeId: place.place_id };
+  const lat = place.lat;
+  const lng = place.lng;
+  if (!place.placeId || !place.formattedAddress || lat == null || lng == null) {
+    return { outcome: "needs_review", reason: "Google place missing coordinates", matchScore, placeId: place.placeId };
   }
-
-  const website = "website" in place ? place.website?.trim() : undefined;
 
   return {
     outcome: matchScore >= 0.65 ? "verified" : "needs_review",
     reason:
       matchScore >= 0.65
-        ? `Matched Google Business "${placeName}" (${Math.round(matchScore * 100)}%)`
-        : `Possible match "${placeName}" (${Math.round(matchScore * 100)}%) — review recommended`,
+        ? `Matched Google Business Profile (${Math.round(matchScore * 100)}% name match)`
+        : `Possible match (${Math.round(matchScore * 100)}% name match) — review recommended`,
     matchScore,
-    placeId: place.place_id,
+    placeId: place.placeId,
     placeName,
-    formattedAddress: place.formatted_address,
+    formattedAddress: place.formattedAddress,
     lat,
     lng,
     city: addr.city,
     region: addr.region,
-    website,
+    website: place.website?.trim() || undefined,
+    types: place.types,
   };
 }
 
 /**
  * Look up a listing against Google Places Text Search + Details.
  */
-export async function verifyListingWithGoogle(listing: {
-  name: string;
-  city: string | null;
-  region: string | null;
-  formattedAddress: string;
-  googlePlaceId?: string | null;
-}): Promise<GooglePlaceVerifyResult> {
+export async function verifyListingWithGoogle(
+  listing: {
+    name: string;
+    city: string | null;
+    region: string | null;
+    formattedAddress: string;
+    googlePlaceId?: string | null;
+  },
+  opts?: {
+    /**
+     * Request the place's website. This is the only field in our mask that bills at the
+     * Enterprise tier (1,000 free calls/month vs 5,000), so callers must opt in and only
+     * when the website actually decides something — i.e. when the candidate brought its own
+     * domain to cross-check against.
+     */
+    needWebsite?: boolean;
+  },
+): Promise<GooglePlaceVerifyResult> {
   const key = googleMapsServerApiKey();
   if (!key) {
     return { outcome: "skipped", reason: "No Google Maps API key configured" };
   }
+  const needWebsite = opts?.needWebsite ?? false;
 
-  let place: GoogleTextSearchResult | GooglePlaceDetailsResult | null = null;
-
-  if (listing.googlePlaceId?.trim()) {
-    place = await placeDetails(listing.googlePlaceId.trim(), key);
-  } else {
-    const query = buildSearchQuery(listing);
-    place = await textSearchPlace(query, key);
-    if (place?.place_id) {
-      const detailed = await placeDetails(place.place_id, key);
-      if (detailed) place = detailed;
-    }
+  const knownPlaceId = listing.googlePlaceId?.trim();
+  const placeId = knownPlaceId || (await textSearchPlaceId(buildSearchQuery(listing), key));
+  if (!placeId) {
+    return { outcome: "needs_review", reason: "No Google Business listing found" };
   }
 
+  const place = await placeDetailsRecord(placeId, key, needWebsite);
   if (!place) {
     return { outcome: "needs_review", reason: "No Google Business listing found" };
   }
@@ -488,16 +708,16 @@ export async function verifyPublicListingsWithGoogle(
         // (name/schedule, venue/event/admin source, or the venue's own domain).
         // Otherwise save the place fields + coordinates but hold for review.
         const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
+        /**
+         * Only the place id and the verification timestamp are persisted. Maps Platform terms
+         * grant no retention for Google's business name, address, or website, and its
+         * coordinates may not be shown on our OpenStreetMap map, so the pin is geocoded from
+         * the listing's own address by `sourceListingCoordinatesWithoutGoogle`.
+         */
         const placeData = {
           googlePlaceId: result.placeId,
           googlePlaceVerifiedAt: new Date(),
           lastVerifiedAt: new Date(),
-          formattedAddress: result.formattedAddress ?? undefined,
-          lat: result.lat,
-          lng: result.lng,
-          city: result.city ?? row.city,
-          region: result.region ?? row.region,
-          websiteUrl: row.websiteUrl?.trim() ? row.websiteUrl : result.website ?? row.websiteUrl,
         };
         if (evidence.trusted) {
           await prisma.publicOpenMicListing.update({

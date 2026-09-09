@@ -87,7 +87,7 @@ const GEO_PHRASE_RE = /\b(in|near|around|across|throughout)\s+[a-z]/i;
 
 /** Publishers, associations and civic bodies are real places but never open-mic venues. */
 const NON_VENUE_ORG_RE =
-  /\b(sun-?times|tribune|herald|gazette|chronicle|dispatch|observer|times|post|magazine|journal|news(paper|room)?|media|broadcast|radio|television|podcast|press|publishing|blog)\b|\b(chamber|business\s+alliance|association|coalition|foundation|nonprofit|non-?profit|society|council|bureau|tourism|visitors?\s+center|convention|economic\s+development)\b/i;
+  /\b(sun-?times|tribune|herald|gazette|chronicle|dispatch|observer|times|post|magazine|journal|news(paper|room)?|media|broadcast|radio|television|podcast|press|publishing|blog)\b|\b(chamber|business\s+alliance|association|coalition|foundation|nonprofit|non-?profit|society|council|bureau|tourism|visitors?\s+center|convention|economic\s+development)\b|\b(productions?|entertainment\s+group|talent\s+agency|management\s+(group|company)|marketing|advertising|realty|real\s+estate|insurance|law\s+(firm|offices?)|attorneys?|dental|orthodont\w*|clinic|hospital|bank|credit\s+union|staffing|consulting|logistics|construction)\b/i;
 
 /** "ComedyList", "OpenMicFinder", "GigGuide" — aggregator brands, not venues. */
 const AGGREGATOR_BRAND_RE =
@@ -132,11 +132,96 @@ function cleanName(raw: string): string {
     .trim();
 }
 
+/** Shared with the host lane, which extracts organizer names off the same crawled pages. */
+export function cleanExtractedName(raw: string | null | undefined): string {
+  return cleanName(raw ?? "");
+}
+
+/**
+ * Editorial/aggregator/publisher phrasing that disqualifies a name as any kind of identity.
+ * Venue and host lanes share it: "The 15 Best Open Mics in Austin" is a headline either way.
+ */
+export function looksLikeEditorialOrPublisherName(name: string | null | undefined): boolean {
+  const n = cleanName(name ?? "");
+  if (!n) return false;
+  return (
+    LISTICLE_TITLE_RE.test(n) ||
+    SENTENCE_TITLE_RE.test(n) ||
+    AGGREGATOR_BRAND_RE.test(n) ||
+    NON_VENUE_ORG_RE.test(n)
+  );
+}
+
+/**
+ * Article-headline phrasing only ("15 Best ...", "How to ..."). The host lane needs this without
+ * the org-name half of the check above, because "X Productions" disqualifies a venue but is a
+ * perfectly normal organizer name.
+ */
+export function looksLikeEditorialTitleName(name: string | null | undefined): boolean {
+  const n = cleanName(name ?? "");
+  if (!n) return false;
+  return LISTICLE_TITLE_RE.test(n) || SENTENCE_TITLE_RE.test(n);
+}
+
+/** "ComedyList", "OpenMicFinder" — aggregator brands, disqualifying for venues and hosts alike. */
+export function looksLikeAggregatorBrandName(name: string | null | undefined): boolean {
+  const n = cleanName(name ?? "");
+  return n ? AGGREGATOR_BRAND_RE.test(n) : false;
+}
+
+const TITLE_SEPARATOR_RE = /\s*[|\u2013\u2014]\s*|\s+[-]\s+/;
+
 /** Splits "Venue Name | Best Bars in Austin" style titles down to the leading identity segment. */
 function leadingTitleSegment(raw: string): string {
   const t = cleanName(raw);
-  const cut = t.split(/\s*[|\u2013\u2014]\s*|\s+[-]\s+/)[0]?.trim() ?? t;
+  const cut = t.split(TITLE_SEPARATOR_RE)[0]?.trim() ?? t;
   return cut.slice(0, 120);
+}
+
+/** "Open Mic Night | Silly Goose Memphis" — many sites put the brand last instead of first. */
+function trailingTitleSegment(raw: string): string {
+  const parts = cleanName(raw).split(TITLE_SEPARATOR_RE).filter((p) => p.trim());
+  if (parts.length < 2) return "";
+  return (parts.at(-1) ?? "").trim().slice(0, 120);
+}
+
+/** Marketing tails that hide a real name: "Morton Amphitheater Tickets & Schedule". */
+const TITLE_TAIL_NOISE_RE =
+  /\s*[&,]?\s*\b(tickets?|schedule|events?|event\s+calendar|calendar|home|homepage|official\s+(site|website)|menus?|reservations?|book\s+now|about\s+us|contact\s+us|open\s+late|now\s+open)\b\s*/gi;
+
+function marketingStrippedName(raw: string): string {
+  const stripped = cleanName(raw.replace(TITLE_TAIL_NOISE_RE, " "));
+  return stripped.slice(0, 120);
+}
+
+/** Header/logo alt text is usually the bare brand, which is exactly what we want. */
+function logoBrandName($: cheerio.CheerioAPI): string {
+  const selectors = [
+    'header a[class*="logo" i] img[alt]',
+    'a[class*="logo" i] img[alt]',
+    'img[class*="logo" i][alt]',
+    'header img[alt]',
+  ];
+  for (const sel of selectors) {
+    const alt = cleanName($(sel).first().attr("alt") ?? "");
+    // Alts are often "Logo" or "Venue Name Logo"; drop the word and see what is left.
+    const withoutLogo = cleanName(alt.replace(/\blogos?\b/gi, " "));
+    if (withoutLogo) return withoutLogo.slice(0, 120);
+  }
+  return "";
+}
+
+/** "green-mill-chicago.com" carries a readable name; concatenated domains do not. */
+function hyphenatedDomainName(host: string | null): string {
+  if (!host) return "";
+  const registrable = host.replace(/^www\./i, "").split(".")[0] ?? "";
+  if (!registrable.includes("-")) return "";
+  return cleanName(
+    registrable
+      .split("-")
+      .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+      .join(" "),
+  ).slice(0, 120);
 }
 
 /**
@@ -163,7 +248,7 @@ export function isUsableVenueName(name: string | null | undefined): boolean {
   return true;
 }
 
-type JsonLdNode = Record<string, unknown>;
+export type JsonLdNode = Record<string, unknown>;
 
 function jsonLdNodes($: cheerio.CheerioAPI): JsonLdNode[] {
   const out: JsonLdNode[] = [];
@@ -190,6 +275,19 @@ function jsonLdNodes($: cheerio.CheerioAPI): JsonLdNode[] {
     }
   });
   return out;
+}
+
+/** Flattened JSON-LD graph of a page (shared with the host lane). */
+export function collectJsonLdNodes($: cheerio.CheerioAPI): JsonLdNode[] {
+  return jsonLdNodes($);
+}
+
+export function jsonLdTypesOf(node: JsonLdNode): string[] {
+  return typesOf(node);
+}
+
+export function jsonLdNodeUrl(node: JsonLdNode): string | null {
+  return nodeUrl(node);
 }
 
 function typesOf(node: JsonLdNode): string[] {
@@ -451,28 +549,33 @@ export function extractVenueCandidatesFromPage(input: {
   const selfBusiness = jsonLdBusinesses[0];
   if (selfBusiness) {
     selfCandidates.push({ ...selfBusiness, websiteUrl: selfBusiness.websiteUrl ?? pageUrl });
-  } else if (isUsableVenueName(siteName)) {
-    selfCandidates.push({
-      name: siteName,
-      websiteUrl: pageUrl,
-      city: null,
-      region: null,
-      streetAddress: null,
-      method: "site_name",
-      sourceUrl: pageUrl,
-      snippet: null,
-    });
-  } else if (isUsableVenueName(titleSegment)) {
-    selfCandidates.push({
-      name: titleSegment,
-      websiteUrl: pageUrl,
-      city: null,
-      region: null,
-      streetAddress: null,
-      method: "page_title",
-      sourceUrl: pageUrl,
-      snippet: null,
-    });
+  } else {
+    /**
+     * No structured identity, so fall back through the places a venue's name actually hides.
+     * Whichever wins is still only a candidate: Google Place verification decides whether it
+     * becomes a lead, so a wrong guess costs a lookup rather than a bad venue.
+     */
+    const fallbacks: Array<{ name: string; method: VenueCandidateMethod }> = [
+      { name: siteName, method: "site_name" },
+      { name: titleSegment, method: "page_title" },
+      { name: trailingTitleSegment(rawTitle), method: "page_title" },
+      { name: marketingStrippedName(titleSegment), method: "page_title" },
+      { name: logoBrandName($), method: "site_name" },
+      { name: hyphenatedDomainName(pageHost), method: "site_name" },
+    ];
+    const picked = fallbacks.find((f) => f.name && isUsableVenueName(f.name));
+    if (picked) {
+      selfCandidates.push({
+        name: picked.name,
+        websiteUrl: pageUrl,
+        city: null,
+        region: null,
+        streetAddress: null,
+        method: picked.method,
+        sourceUrl: pageUrl,
+        snippet: null,
+      });
+    }
   }
 
   return { pageRole, pageRoleReason, candidates: dedupeCandidates(selfCandidates).slice(0, maxCandidates) };

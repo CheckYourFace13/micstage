@@ -1203,7 +1203,16 @@ model GrowthPlaceLookup {
   reason     String?
   matchScore Float?
 
-  placeId          String?
+  /// Place IDs are exempt from Maps Platform caching limits and may be retained indefinitely.
+  placeId String?
+
+  /**
+   * Everything below is Google Maps Content. Maps Platform terms permit caching Places
+   * latitude/longitude for at most 30 consecutive days and grant no retention for names,
+   * addresses, or websites, so these columns are write-limited and purged by
+   * `purgeExpiredGoogleMapsContent`. `coordsVerified` records our own finding that Google had
+   * coordinates, so a purged row stays usable without re-spending a lookup.
+   */
   canonicalName    String?
   formattedAddress String?
   lat              Float?
@@ -1211,12 +1220,19 @@ model GrowthPlaceLookup {
   website          String?
   websiteHost      String?
 
+  /// Our own derived fact: Google returned usable coordinates for this candidate.
+  coordsVerified Boolean @default(false)
+
+  /// When cached Google Maps Content in this row must be deleted (30 days after refresh).
+  googleContentExpiresAt DateTime?
+
   /// Reuse counter: how often the cache spared a paid lookup.
   hitCount Int @default(0)
 
   @@index([placeId])
   @@index([outcome])
   @@index([updatedAt])
+  @@index([googleContentExpiresAt])
 }
 
 /// Pagination / rotation state for autonomous discovery adapters (per adapter + market).
@@ -1517,6 +1533,15 @@ model PublicOpenMicListing {
   lat              Float?
   lng              Float?
   timeZone         String  @default("America/Chicago")
+
+  /**
+   * Which geocoder produced lat/lng. The public map renders OpenStreetMap tiles, and Maps
+   * Platform terms forbid using Places content with a non-Google map (plus cap Places
+   * coordinate caching at 30 days), so map pins must come from "census"/"nominatim".
+   * "google" rows are legacy and get re-sourced then purged.
+   */
+  coordSource     String?
+  coordsUpdatedAt DateTime?
 
   websiteUrl   String?
   facebookUrl  String?

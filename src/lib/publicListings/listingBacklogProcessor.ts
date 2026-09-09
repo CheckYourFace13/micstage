@@ -73,6 +73,7 @@ export async function runListingBacklogProcessor(
     skippedDue: 0,
     newHighContacts: 0,
     newSendReady: 0,
+    placesResolvedForSend: 0,
     skippedForBudget: false,
   };
 

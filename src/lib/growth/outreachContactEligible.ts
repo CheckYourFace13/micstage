@@ -61,7 +61,14 @@ export type OutreachEligibilityReason =
   | "duplicate_recent_send"
   | "weak_identity"
   | "needs_manual_review"
-  | "auto_research_retry";
+  | "auto_research_retry"
+  | "place_unverified";
+
+/** Sources where a machine, not a person or an existing listing, decided this was a venue. */
+function isAutonomousDiscoverySource(source: string | null | undefined): boolean {
+  if (!source) return false;
+  return source.startsWith("autonomous_") || source === "directory_lead_reprocess";
+}
 
 const IMPORT_LIKE: GrowthLeadSourceKind[] = [
   "MANUAL_ADMIN",
@@ -168,6 +175,10 @@ export type GrowthLeadOutreachInput = Pick<
   suppressionBlocked?: boolean;
   formattedAddress?: string | null;
   googlePlaceId?: string | null;
+  /** The lead's own verified place, which is separate from any place a linked listing carries. */
+  leadGooglePlaceId?: string | null;
+  /** Discovery adapter that produced the lead, e.g. `autonomous_web_search_venue_crawl`. */
+  source?: string | null;
   listingLat?: number | null;
   listingLng?: number | null;
   listingWebsiteUrl?: string | null;
@@ -269,6 +280,17 @@ export function evaluateGrowthLeadOutreachEligibility(input: GrowthLeadOutreachI
       return { eligible: false, reason: "auto_research_retry", target };
     }
     return { eligible: false, reason: "needs_manual_review", target };
+  }
+
+  /**
+   * Venue lane only: a machine-discovered venue must exist as a real place before we email it.
+   * Unresolved leads keep their evidence and are retried by enrichment, so this defers rather than
+   * discards. Hosts/promoters have no storefront to match and are exempt, as are curated imports
+   * and claim-path leads, whose identity came from a human or an existing listing.
+   */
+  if (input.leadType === "VENUE" && isAutonomousDiscoverySource(input.source)) {
+    const placeId = input.leadGooglePlaceId ?? input.googlePlaceId ?? null;
+    if (!placeId) return { eligible: false, reason: "place_unverified", target };
   }
 
   const nameQ = classifyOutreachNameQuality({ name: input.name, listingName: input.listingName });
@@ -492,6 +514,8 @@ export async function explainGrowthLeadOutreachEligibility(
     city: lead.city ?? ident.listingCity,
     region: lead.region ?? ident.listingRegion,
     ...ident,
+    // `ident` carries the listing's place; the lead's own verified place must survive the spread.
+    leadGooglePlaceId: lead.googlePlaceId,
     hasPendingDraft: hasOtherInFlightOutreachDraft(lead.outreachDrafts, opts?.ignoreDraftId),
     hasRecentOutreachSend: Boolean(recentSend),
     deferClaimPath: verifiedUnclaimed,
@@ -541,6 +565,7 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
     weak_identity: 0,
     needs_manual_review: 0,
     auto_research_retry: 0,
+    place_unverified: 0,
     no_target_bound_open_mic_evidence: 0,
     stale_open_mic_evidence: 0,
     artist_bio_false_positive: 0,
@@ -572,6 +597,8 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
         websiteHostNormalized: true,
         openMicSignalTier: true,
         sourceKind: true,
+        source: true,
+        googlePlaceId: true,
         city: true,
         region: true,
         discoveryMarketSlug: true,
@@ -627,6 +654,7 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
         city: row.city ?? ident.listingCity,
         region: row.region ?? ident.listingRegion,
         ...ident,
+        leadGooglePlaceId: row.googlePlaceId,
         hasPendingDraft: row.outreachDrafts.length > 0,
         hasRecentOutreachSend: recentSet.has(email),
         deferClaimPath: verifiedUnclaimed,

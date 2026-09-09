@@ -38,6 +38,11 @@ import {
   detectWeekdayTime,
 } from "@/lib/growth/outreachEvidenceCrawl";
 import { ingestHostLeadFromVenueEvidence } from "@/lib/growth/hostOutreachIngest";
+import {
+  createPlaceLookupBudget,
+  placeResolutionIsUsable,
+  resolveVenueCandidateWithPlaces,
+} from "@/lib/growth/discovery/venuePlaceResolution";
 import type { OutreachOpenMicEvidenceResult } from "@/lib/growth/outreachOpenMicEvidence";
 
 export const OUTREACH_ENRICH_STATS_KEY = "GROWTH_OUTREACH_ENRICH_DAY_STATS";
@@ -85,6 +90,8 @@ export type OutreachEvidenceEnrichResult = {
   skippedDue: number;
   newHighContacts: number;
   newSendReady: number;
+  /** Venues that earned their evidence and then resolved to a Google Place on retry. */
+  placesResolvedForSend: number;
   skippedForBudget: boolean;
 };
 
@@ -390,6 +397,7 @@ type EnrichLeadRow = {
   region: string | null;
   discoveryMarketSlug: string | null;
   source: string | null;
+  googlePlaceId: string | null;
   discoveryConfidence: number | null;
   fitScore: number | null;
   openMicSignalTier: string | null;
@@ -455,11 +463,13 @@ export async function enrichGrowthLeadOfficialEvidence(
     skippedDue: 0,
     newHighContacts: 0,
     newSendReady: 0,
+    placesResolvedForSend: 0,
     skippedForBudget: false,
   };
   if (limit <= 0) return out;
 
   await ensureGrowthOpsMigration(prisma);
+  const placeBudget = await createPlaceLookupBudget(prisma);
 
   const candidateWhere: Prisma.GrowthLeadWhereInput = {
     leadType: { in: ["VENUE", "PROMOTER_ACCOUNT"] },
@@ -527,6 +537,7 @@ export async function enrichGrowthLeadOfficialEvidence(
       region: true,
       discoveryMarketSlug: true,
       source: true,
+      googlePlaceId: true,
       discoveryConfidence: true,
       fitScore: true,
       openMicSignalTier: true,
@@ -826,6 +837,42 @@ export async function enrichGrowthLeadOfficialEvidence(
       if (mined.high) {
         out.newHighContacts += 1;
         contactHigh = true;
+      }
+    }
+
+    /**
+     * A venue that proved its open mic but never resolved to a Google Place is blocked from
+     * sending, usually because discovery ran out of Places budget rather than because the venue
+     * is fake. Retry the lookup here, where the lead has already earned the spend.
+     */
+    if (
+      lead.leadType === "VENUE" &&
+      !lead.googlePlaceId &&
+      result.autoSend &&
+      lead.source?.startsWith("autonomous_") &&
+      placeBudget.remaining > 0
+    ) {
+      try {
+        const resolution = await resolveVenueCandidateWithPlaces(
+          prisma,
+          {
+            name: lead.name,
+            city: lead.city,
+            region: lead.region,
+            streetAddress: null,
+            websiteUrl: lead.websiteUrl,
+          },
+          placeBudget,
+        );
+        if (placeResolutionIsUsable(resolution) && resolution.placeId) {
+          await prisma.growthLead.update({
+            where: { id: lead.id },
+            data: { googlePlaceId: resolution.placeId },
+          });
+          out.placesResolvedForSend += 1;
+        }
+      } catch (e) {
+        console.warn("[outreachEvidenceEnrichment] place_retry_failed", lead.id, e instanceof Error ? e.message : e);
       }
     }
 

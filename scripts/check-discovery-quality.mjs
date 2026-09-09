@@ -545,6 +545,66 @@ await checkAsync("place dedupe ignores market and domain differences", async () 
   assert.equal(dup?.reason, "googlePlaceId");
 });
 
+// ---------------------------------------------------------------------------
+// 7. Send gate: a machine-discovered venue must resolve to a real place first.
+// ---------------------------------------------------------------------------
+const { evaluateGrowthLeadOutreachEligibility } = await import("../src/lib/growth/outreachContactEligible.ts");
+
+/** A lead that clears every other send gate, so only the place requirement is under test. */
+function sendableVenue(over) {
+  return {
+    id: "lead-1",
+    leadType: "VENUE",
+    status: "APPROVED",
+    name: "Funhouse Lounge",
+    contactEmailNormalized: "info@funhouselounge.com",
+    contactEmailConfidence: "HIGH",
+    websiteUrl: "https://funhouselounge.com/",
+    contactUrl: null,
+    websiteHostNormalized: "funhouselounge.com",
+    openMicSignalTier: "EXPLICIT_OPEN_MIC",
+    sourceKind: "WEBSITE_CONTACT",
+    source: "autonomous_web_search_venue_crawl",
+    city: "Portland",
+    region: "OR",
+    ...over,
+  };
+}
+
+check("an autonomously discovered venue cannot be emailed without a Google Place", () => {
+  const res = evaluateGrowthLeadOutreachEligibility(sendableVenue({}));
+  assert.equal(res.eligible, false);
+  assert.equal(res.reason, "place_unverified");
+});
+
+check("the same venue passes the place gate once it resolves", () => {
+  const res = evaluateGrowthLeadOutreachEligibility(sendableVenue({ leadGooglePlaceId: "place-funhouse" }));
+  assert.notEqual(res.reason, "place_unverified");
+});
+
+check("a place on the linked listing satisfies the venue place gate", () => {
+  const res = evaluateGrowthLeadOutreachEligibility(sendableVenue({ googlePlaceId: "place-from-listing" }));
+  assert.notEqual(res.reason, "place_unverified");
+});
+
+check("hosts are exempt: a promoter has no storefront to match", () => {
+  const res = evaluateGrowthLeadOutreachEligibility(
+    sendableVenue({
+      leadType: "PROMOTER_ACCOUNT",
+      name: "Open Mic Collective",
+      source: "autonomous_host_search_promoter",
+    }),
+  );
+  assert.notEqual(res.reason, "place_unverified");
+});
+
+check("curated and imported venues are exempt from the place gate", () => {
+  const res = evaluateGrowthLeadOutreachEligibility(
+    sendableVenue({ source: "chicagoland_curated_venue", sourceKind: "MANUAL_ADMIN" }),
+  );
+  assert.notEqual(res.reason, "place_unverified");
+});
+
 if (failures.length) {
   console.error(`Discovery quality self-check FAILED (${failures.length}):\n` + failures.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);

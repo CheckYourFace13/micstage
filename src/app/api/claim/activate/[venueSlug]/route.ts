@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseArtistTiming } from "@/lib/artistTiming";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { refreshListingPromotionEligible } from "@/lib/publicListings/listingClaimInviteEmail";
@@ -36,8 +37,32 @@ export async function POST(
 
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 200) : "";
   const websiteUrl = typeof body.websiteUrl === "string" ? body.websiteUrl.trim().slice(0, 500) : null;
-  const slotMinutes = Math.min(60, Math.max(5, Number(body.slotMinutes) || 10));
-  const breakMinutes = Math.min(30, Math.max(0, Number(body.breakMinutes) || 0));
+
+  let slotMinutes: number;
+  let breakMinutes: number;
+  if (body.performanceMinutes != null || body.artistStartEveryMinutes != null) {
+    const parsed = parseArtistTiming({
+      performanceMinutes: Number(body.performanceMinutes),
+      artistStartEveryMinutes: Number(body.artistStartEveryMinutes),
+    });
+    if (!parsed.ok) {
+      return NextResponse.json({ ok: false, error: "Invalid artist timing" }, { status: 400 });
+    }
+    slotMinutes = parsed.stored.slotMinutes;
+    breakMinutes = parsed.stored.breakMinutes;
+  } else {
+    const legacySlot = Math.min(60, Math.max(5, Number(body.slotMinutes) || 10));
+    const legacyBreak = Math.min(30, Math.max(0, Number(body.breakMinutes) || 0));
+    const parsed = parseArtistTiming({
+      performanceMinutes: legacySlot,
+      artistStartEveryMinutes: legacySlot + legacyBreak,
+    });
+    if (!parsed.ok) {
+      return NextResponse.json({ ok: false, error: "Invalid artist timing" }, { status: 400 });
+    }
+    slotMinutes = parsed.stored.slotMinutes;
+    breakMinutes = parsed.stored.breakMinutes;
+  }
   const bookingOpensDaysAhead = Math.min(180, Math.max(1, Number(body.bookingOpensDaysAhead) || 60));
   const bookingRestrictionMode =
     body.bookingRestrictionMode === "HOURS_BEFORE" || body.bookingRestrictionMode === "ON_PREMISE"

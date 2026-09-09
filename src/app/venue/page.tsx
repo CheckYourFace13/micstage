@@ -432,6 +432,12 @@ export default async function VenuePortalPage({
             but the whole night has to be under 24 hours.
           </div>
         ) : null}
+        {q.scheduleError === "invalid_timing" ? (
+          <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
+            Performance time must be at least 3 minutes, and “new artist starts every” must be the same or longer (no
+            overlapping sets).
+          </div>
+        ) : null}
         {q.scheduleError === "templateMissing" ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">
             That schedule template is no longer available. Refresh the page and try again.

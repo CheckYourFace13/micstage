@@ -30,6 +30,7 @@
     "test:host-e2e": "npx tsx scripts/host-multi-venue-e2e.mjs",
     "test:conversion-analytics": "node scripts/check-conversion-analytics.mjs",
     "test:schedule-times": "npx tsx scripts/check-schedule-times.mjs",
+    "test:artist-timing": "npx tsx scripts/check-artist-timing.mjs",
     "test:slot-sync": "npx tsx scripts/check-slot-sync-cancelled.mjs",
     "test:host-artist-rules": "npx tsx scripts/check-host-artist-rules.mjs",
     "backfill:host-identities": "npx tsx scripts/backfill-host-identities.mjs",

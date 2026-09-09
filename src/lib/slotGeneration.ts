@@ -6,7 +6,13 @@ export type SlotSpec = {
 export function generateSlotsForWindow(input: {
   startTimeMin: number;
   endTimeMin: number;
+  /** Performance length (minutes on stage). */
   slotMinutes: number;
+  /**
+   * Quiet minutes after a performance before the next artist STARTS.
+   * Start interval = slotMinutes + breakMinutes. Prefer the Host/Venue UI pair
+   * `performanceMinutes` + `artistStartEveryMinutes` (see `artistTiming.ts`).
+   */
   breakMinutes: number;
 }): SlotSpec[] {
   const { startTimeMin, endTimeMin, slotMinutes, breakMinutes } = input;

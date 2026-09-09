@@ -9,6 +9,11 @@ import {
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { requirePrisma } from "@/lib/prisma";
+import {
+  VENUE_DEFAULT_PERFORMANCE_MINUTES,
+  VENUE_DEFAULT_START_EVERY_MINUTES,
+  parseArtistTimingFromForm,
+} from "@/lib/artistTiming";
 import { requireVenueSession, venueIdsForSession, venueIdsForVenueSession } from "@/lib/authz";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
 import { slotMayBeDeleted, syncSlotsForInstance } from "@/lib/slotSync";
@@ -450,6 +455,15 @@ function scheduleWindowFromForm(formData: FormData): { startTimeMin: number; end
   return { startTimeMin, endTimeMin };
 }
 
+function artistTimingFromVenueForm(formData: FormData): { slotMinutes: number; breakMinutes: number } | null {
+  const parsed = parseArtistTimingFromForm(formData, {
+    performanceMinutes: VENUE_DEFAULT_PERFORMANCE_MINUTES,
+    artistStartEveryMinutes: VENUE_DEFAULT_START_EVERY_MINUTES,
+  });
+  if (!parsed.ok) return null;
+  return parsed.stored;
+}
+
 export async function createEventTemplate(formData: FormData): Promise<VenuePortalActionResult> {
   const session = await requireVenueSession();
   try {
@@ -462,8 +476,9 @@ export async function createEventTemplate(formData: FormData): Promise<VenuePort
   const weekday = reqString(formData, "weekday") as Weekday;
   const { startTimeMin, endTimeMin } = scheduleWindowFromForm(formData);
 
-  const slotMinutes = reqInt(formData, "slotMinutes");
-  const breakMinutes = reqInt(formData, "breakMinutes");
+  const timing = artistTimingFromVenueForm(formData);
+  if (!timing) return portalRedirect("/venue?scheduleError=invalid_timing");
+  const { slotMinutes, breakMinutes } = timing;
   const seriesStartDate = reqDate(formData, "seriesStartDate");
   const seriesEndDate = reqDate(formData, "seriesEndDate");
   if (seriesEndDate.getTime() < seriesStartDate.getTime()) {
@@ -588,8 +603,9 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
   const title = reqString(formData, "title");
   const { startTimeMin, endTimeMin } = scheduleWindowFromForm(formData);
 
-  const slotMinutes = reqInt(formData, "slotMinutes");
-  const breakMinutes = reqInt(formData, "breakMinutes");
+  const timing = artistTimingFromVenueForm(formData);
+  if (!timing) return portalRedirect("/venue?scheduleError=invalid_timing");
+  const { slotMinutes, breakMinutes } = timing;
   console.info("[venue weekly submit] parsed base inputs", {
     scheduleMode,
     title,

@@ -49,8 +49,10 @@ export function ClaimActivationEditor(props: {
 }) {
   const [name, setName] = useState(props.venue.name);
   const [websiteUrl, setWebsiteUrl] = useState(props.venue.websiteUrl ?? "");
-  const [slotMinutes, setSlotMinutes] = useState(props.templates[0]?.slotMinutes ?? 10);
-  const [breakMinutes, setBreakMinutes] = useState(props.templates[0]?.breakMinutes ?? 0);
+  const [performanceMinutes, setPerformanceMinutes] = useState(props.templates[0]?.slotMinutes ?? 10);
+  const [artistStartEveryMinutes, setArtistStartEveryMinutes] = useState(
+    (props.templates[0]?.slotMinutes ?? 10) + (props.templates[0]?.breakMinutes ?? 0),
+  );
   const [bookingMode, setBookingMode] = useState(
     props.venue.bookingRestrictionMode === "NONE" ? "HOURS_BEFORE" : props.venue.bookingRestrictionMode || "HOURS_BEFORE",
   );
@@ -80,8 +82,10 @@ export function ClaimActivationEditor(props: {
         body: JSON.stringify({
           name,
           websiteUrl: websiteUrl || null,
-          slotMinutes,
-          breakMinutes,
+          performanceMinutes,
+          artistStartEveryMinutes,
+          slotMinutes: performanceMinutes,
+          breakMinutes: Math.max(0, artistStartEveryMinutes - performanceMinutes),
           bookingRestrictionMode: enableBooking ? bookingMode : "NONE",
           bookingOpensDaysAhead: advanceDays,
           publishSchedule,
@@ -154,24 +158,28 @@ export function ClaimActivationEditor(props: {
         )}
         <div className="grid grid-cols-2 gap-3">
           <label className="grid gap-1 text-sm">
-            <span className="text-white/70">Slot length (min)</span>
+            <span className="text-white/70">Performance time (min)</span>
             <input
               type="number"
-              min={5}
+              min={3}
               max={60}
-              value={slotMinutes}
-              onChange={(e) => setSlotMinutes(Number(e.target.value))}
+              value={performanceMinutes}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setPerformanceMinutes(next);
+                if (artistStartEveryMinutes < next) setArtistStartEveryMinutes(next);
+              }}
               className="h-10 rounded-md border border-white/15 bg-black/40 px-3"
             />
           </label>
           <label className="grid gap-1 text-sm">
-            <span className="text-white/70">Break (min)</span>
+            <span className="text-white/70">Artists start every (min)</span>
             <input
               type="number"
-              min={0}
-              max={30}
-              value={breakMinutes}
-              onChange={(e) => setBreakMinutes(Number(e.target.value))}
+              min={3}
+              max={120}
+              value={artistStartEveryMinutes}
+              onChange={(e) => setArtistStartEveryMinutes(Number(e.target.value))}
               className="h-10 rounded-md border border-white/15 bg-black/40 px-3"
             />
           </label>

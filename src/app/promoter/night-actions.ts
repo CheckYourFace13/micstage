@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@/generated/prisma/client";
+import {
+  HOST_DEFAULT_PERFORMANCE_MINUTES,
+  HOST_DEFAULT_START_EVERY_MINUTES,
+  parseArtistTimingFromForm,
+} from "@/lib/artistTiming";
 import { requirePromoterSession } from "@/lib/authz";
 import { assertHostOwnsNight, assertHostOwnsSlot } from "@/lib/host/hostNightAuth";
 import { provisionHostNightLineup } from "@/lib/host/hostNightProvisioning";
@@ -28,7 +33,11 @@ export async function updateHostNightSignupAction(formData: FormData) {
   if (!owned.ok) redirect("/promoter?promoter=forbidden");
 
   const signupEnabled = formData.get("signupEnabled") === "on" || formData.get("signupEnabled") === "true";
-  const slotMinutes = Math.min(30, Math.max(3, Number.parseInt(formData.get("slotMinutes")?.toString() ?? "5", 10) || 5));
+  const timing = parseArtistTimingFromForm(formData, {
+    performanceMinutes: HOST_DEFAULT_PERFORMANCE_MINUTES,
+    artistStartEveryMinutes: HOST_DEFAULT_START_EVERY_MINUTES,
+  });
+  if (!timing.ok) redirect(`/promoter/nights/${nightId}?error=invalid_timing`);
 
   // End time at or before start = runs past midnight (9:00 PM → 1:00 AM), not an error.
   const window = scheduleWindowFromTimeInputs(
@@ -66,14 +75,17 @@ export async function updateHostNightSignupAction(formData: FormData) {
     }
   }
 
-  await provisionHostNightLineup(prisma, nightId, {
+  const provision = {
     signupEnabled,
-    slotMinutes,
+    slotMinutes: timing.stored.slotMinutes,
+    breakMinutes: timing.stored.breakMinutes,
     startTimeMin: window.startTimeMin,
     endTimeMin: window.endTimeMin,
-  });
+  };
 
-  // Optional: push the same day/times/signup settings onto later nights in this series.
+  await provisionHostNightLineup(prisma, nightId, provision);
+
+  // Optional: push the same day/times/signup/timing settings onto later nights in this series.
   if (formData.get("applyFutureNights") === "on") {
     const night = await prisma.promoterNight.findUnique({
       where: { id: nightId },
@@ -87,12 +99,7 @@ export async function updateHostNightSignupAction(formData: FormData) {
         take: 52,
       });
       for (const row of future) {
-        await provisionHostNightLineup(prisma, row.id, {
-          signupEnabled,
-          slotMinutes,
-          startTimeMin: window.startTimeMin,
-          endTimeMin: window.endTimeMin,
-        });
+        await provisionHostNightLineup(prisma, row.id, provision);
       }
     }
   }

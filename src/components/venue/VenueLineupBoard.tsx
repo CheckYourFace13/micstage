@@ -7,6 +7,7 @@ import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
 import type { PublicVenueForLineup } from "@/lib/venuePublicLineupData";
 import type { LineupBadge, LineupForDateRow } from "@/lib/venuePublicLineup";
 import { scheduleWindowLabel } from "@/lib/scheduleWindow";
+import { artistTimingPublicLabel } from "@/lib/artistTiming";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import OnPremiseReserveButton from "@/components/OnPremiseReserveButton";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
@@ -124,8 +125,10 @@ export function VenueLineupBoard({
                   ) : null}
                   <p className="mt-2 text-sm text-white/65">
                     {weekdayToLabel(t.weekday)} · {scheduleWindowLabel(t.startTimeMin, t.endTimeMin)} ·{" "}
-                    {t.slotMinutes} min slots
-                    {t.breakMinutes ? ` · ${t.breakMinutes} min breaks` : ""}
+                    {artistTimingPublicLabel({
+                      slotMinutes: t.slotMinutes,
+                      breakMinutes: t.breakMinutes,
+                    })}
                   </p>
                   <p className="mt-1 text-xs text-white/50">{performanceFormatLabel(t.performanceFormat)}</p>
                   {!instanceCancelled && openSpotCount > 0 && t.bookingRestrictionMode !== "HOUSE_ONLY" ? (

@@ -82,9 +82,12 @@ export function WeeklyScheduleForm({
   const [oneEventDate, setOneEventDate] = useState(defaultSeriesStart);
   const [startTime, setStartTime] = useState(defaultStartTime);
   const [endTime, setEndTime] = useState(defaultEndTime);
-  const [slotMinutes, setSlotMinutes] = useState(25);
-  const [breakMinutes, setBreakMinutes] = useState(5);
+  const [performanceMinutes, setPerformanceMinutes] = useState(25);
+  const [artistStartEveryMinutes, setArtistStartEveryMinutes] = useState(30);
   const [weekdays, setWeekdays] = useState<Set<Weekday>>(() => new Set(defaultWeekdays ?? []));
+
+  const slotMinutes = performanceMinutes;
+  const breakMinutes = Math.max(0, artistStartEveryMinutes - performanceMinutes);
 
   const toggleWeekday = (w: Weekday) => {
     setWeekdays((prev) => {
@@ -355,28 +358,38 @@ export function WeeklyScheduleForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Performance slot (minutes)</span>
+          <span className="text-white/80">Performance time (minutes)</span>
           <input
-            name="slotMinutes"
+            name="performanceMinutes"
             type="number"
-            min={1}
+            min={3}
+            max={60}
             required
-            value={slotMinutes}
-            onChange={(e) => setSlotMinutes(Number.parseInt(e.target.value, 10) || 1)}
+            value={performanceMinutes}
+            onChange={(e) => {
+              const next = Number.parseInt(e.target.value, 10) || 3;
+              setPerformanceMinutes(next);
+              if (artistStartEveryMinutes < next) setArtistStartEveryMinutes(next);
+            }}
             className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
           />
+          <span className="text-xs text-white/45">How long each artist is on stage</span>
         </label>
         <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Break between slots (minutes)</span>
+          <span className="text-white/80">New artist starts every (minutes)</span>
           <input
-            name="breakMinutes"
+            name="artistStartEveryMinutes"
             type="number"
-            min={0}
+            min={3}
+            max={120}
             required
-            value={breakMinutes}
-            onChange={(e) => setBreakMinutes(Number.parseInt(e.target.value, 10) || 0)}
+            value={artistStartEveryMinutes}
+            onChange={(e) => setArtistStartEveryMinutes(Number.parseInt(e.target.value, 10) || 3)}
             className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
           />
+          <span className="text-xs text-white/45">
+            Must be ≥ performance time. Extra minutes are changeover (not shown as a break row).
+          </span>
         </label>
       </div>
 

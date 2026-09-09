@@ -220,8 +220,10 @@ model PromoterNight {
   signupEnabled Boolean @default(false)
   startTimeMin  Int     @default(1200)
   endTimeMin    Int     @default(1380)
-  slotMinutes   Int     @default(5)
-  breakMinutes  Int     @default(0)
+  /// Performance length in minutes (how long each artist is on stage).
+  slotMinutes   Int     @default(15)
+  /// Quiet minutes after a set before the next artist STARTS. Start interval = slot + break.
+  breakMinutes  Int     @default(5)
 
   eventTemplate EventTemplate?
   disputes      HostNightVenueDispute[]

@@ -136,28 +136,33 @@ export function VenueAddRecurringNightFormFields({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Slot minutes</span>
+          <span className="text-white/80">Performance time (minutes)</span>
           <input
-            name="slotMinutes"
+            name="performanceMinutes"
             type="number"
-            min={1}
+            min={3}
+            max={60}
             defaultValue={25}
             required
             className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
           />
         </label>
         <label className="grid gap-1 text-sm">
-          <span className="text-white/80">Break minutes</span>
+          <span className="text-white/80">New artist starts every (minutes)</span>
           <input
-            name="breakMinutes"
+            name="artistStartEveryMinutes"
             type="number"
-            min={0}
-            defaultValue={5}
+            min={3}
+            max={120}
+            defaultValue={30}
             required
             className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white"
           />
         </label>
       </div>
+      <p className="-mt-1 text-xs text-white/55 sm:col-span-2">
+        Extra minutes beyond performance time are changeover — the public lineup only shows artist start times.
+      </p>
 
       <label className="grid gap-1 text-sm">
         <span className="text-white/80">Performance format (this night, public)</span>

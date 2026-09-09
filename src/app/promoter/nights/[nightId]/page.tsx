@@ -75,6 +75,8 @@ export default async function HostNightManagePage(props: {
           <div className="mt-4 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm">
             {error === "invalid_time"
               ? "Enter a valid start and end time. Past midnight is allowed (9:00 PM to 1:00 AM), but the night has to be under 24 hours."
+              : error === "invalid_timing"
+                ? "Performance time must be at least 3 minutes, and “new artist starts every” must be the same or longer (no overlapping sets)."
               : error === "invalid_date"
                 ? "Enter a valid date for this night."
                 : error === "duplicate_date"
@@ -148,8 +150,8 @@ export default async function HostNightManagePage(props: {
           <label className="flex items-start gap-2 text-sm text-white/80">
             <input type="checkbox" name="applyFutureNights" className="mt-1" />
             <span>
-              Apply these times and signup settings to <strong>future nights</strong> in this series too
-              (so every Friday matches without editing each one).
+              Apply these times, performance length, start interval, and signup settings to{" "}
+              <strong>future nights</strong> in this series too (so every Friday matches without editing each one).
             </span>
           </label>
 
@@ -158,17 +160,36 @@ export default async function HostNightManagePage(props: {
             <input type="checkbox" name="signupEnabled" defaultChecked={ctx.night.signupEnabled} />
             Enable performer signup
           </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-white/75">Minutes per slot</span>
-            <input
-              name="slotMinutes"
-              type="number"
-              min={3}
-              max={30}
-              defaultValue={ctx.night.slotMinutes}
-              className="h-12 w-24 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white"
-            />
-          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/75">Performance time (minutes)</span>
+              <input
+                name="performanceMinutes"
+                type="number"
+                min={3}
+                max={60}
+                defaultValue={ctx.night.slotMinutes}
+                required
+                className="h-12 w-full rounded-md border border-white/10 bg-black/40 px-3 text-base text-white"
+              />
+              <span className="text-xs text-white/45">How long each artist is on stage</span>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/75">New artist starts every (minutes)</span>
+              <input
+                name="artistStartEveryMinutes"
+                type="number"
+                min={3}
+                max={120}
+                defaultValue={ctx.night.slotMinutes + ctx.night.breakMinutes}
+                required
+                className="h-12 w-full rounded-md border border-white/10 bg-black/40 px-3 text-base text-white"
+              />
+              <span className="text-xs text-white/45">
+                Must be ≥ performance time. Extra minutes are changeover (not shown as a break row).
+              </span>
+            </label>
+          </div>
 
           <div className="grid gap-2">
             <h2 className="text-lg font-semibold">Artist rules / performer info</h2>
@@ -180,7 +201,7 @@ export default async function HostNightManagePage(props: {
               rows={6}
               maxLength={4000}
               defaultValue={ctx.night.series.artistRules ?? ""}
-              placeholder={"Examples:\n• 5-minute sets\n• Acoustic only — bring your own instrument\n• Arrive 15 minutes early to check in\n• Duos/trios count as one slot"}
+              placeholder={"Examples:\n• 15-minute sets — arrive early for changeover\n• Acoustic only — bring your own instrument\n• Check in 15 minutes before your start time\n• Duos/trios count as one slot"}
               className="rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35"
             />
           </div>

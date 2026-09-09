@@ -17,6 +17,7 @@ type NearbyVenue = {
   kind: "claimed" | "verified" | "unclaimed";
   bookable: boolean;
   hasSchedule?: boolean;
+  ctaLabel?: string | null;
   name: string;
   city: string | null;
   region: string | null;
@@ -279,11 +280,13 @@ export function FindOpenMicsClient(props: {
                       </div>
                       <p className="mt-2 text-xs text-white/55">{v.formattedAddress}</p>
                       <p className="mt-2 text-xs text-[rgb(var(--om-neon))] underline decoration-white/20 underline-offset-2">
-                        {v.bookable
-                          ? "View schedule and sign up →"
-                          : v.kind === "claimed"
-                            ? "View open mic →"
-                            : "View listing →"}
+                        {v.ctaLabel
+                          ? v.ctaLabel
+                          : v.bookable
+                            ? "View schedule and sign up →"
+                            : v.kind === "claimed"
+                              ? "View open mic →"
+                              : "View listing →"}
                       </p>
                     </Link>
                   </li>

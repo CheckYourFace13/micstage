@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import QRCode from "react-qr-code";
 
-/** Simple copy + native share for a public MicStage page URL. */
+/** Simple copy + native share + QR for a public MicStage page URL. */
 export function SharePageButtons(props: { url: string; label?: string; className?: string }) {
   const [notice, setNotice] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
   const label = props.label ?? "your page";
 
   const flash = useCallback((text: string) => {
@@ -52,8 +54,22 @@ export function SharePageButtons(props: { url: string; label?: string; className
         >
           Share
         </button>
+        <button
+          type="button"
+          onClick={() => setShowQr((v) => !v)}
+          className="inline-flex h-11 min-w-[120px] items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
+        >
+          {showQr ? "Hide QR" : "QR code"}
+        </button>
       </div>
-      <p className="break-all text-xs text-white/45">{label}: {props.url}</p>
+      {showQr ? (
+        <div className="mt-1 w-fit rounded-xl border border-white/15 bg-white p-3">
+          <QRCode value={props.url} size={148} />
+        </div>
+      ) : null}
+      <p className="break-all text-xs text-white/45">
+        {label}: {props.url}
+      </p>
     </div>
   );
 }

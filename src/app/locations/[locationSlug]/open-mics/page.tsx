@@ -41,7 +41,7 @@ function listingCard(v: OpenMicFinderVenue) {
         ) : null}
         {v.signupMethod ? <p className="mt-1 text-xs text-white/45">Signup: {v.signupMethod}</p> : null}
         <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">
-          {v.bookable ? "View schedule and book →" : "View listing →"}
+          {v.ctaLabel ? v.ctaLabel : v.bookable ? "View schedule and book →" : "View listing →"}
         </span>
       </Link>
     </li>

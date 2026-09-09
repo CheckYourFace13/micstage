@@ -17,9 +17,13 @@ export function slotHasActiveBooking(slot: SlotWithBooking): boolean {
   return false;
 }
 
-/** Slots with any booking row or non-AVAILABLE status are kept as-is for safety. */
+/**
+ * A slot may be removed when the schedule shrinks only if nothing active depends on it.
+ * Cancelled bookings do not protect the slot — otherwise moving 8 PM → 9 PM leaves orphan
+ * early slots on the public grid while the header shows the new window.
+ */
 export function slotMayBeDeleted(slot: SlotWithBooking): boolean {
-  if (slot.booking) return false;
+  if (slotHasActiveBooking(slot)) return false;
   if (slot.status !== "AVAILABLE") return false;
   return true;
 }
@@ -34,7 +38,8 @@ export type SlotSyncStats = { created: number; updated: number; skippedProtected
  * Aligns DB slots with `desired` without touching booked/reserved slots.
  * - Creates missing start times as AVAILABLE.
  * - Updates endMin only for unbooked AVAILABLE slots.
- * - Deletes only AVAILABLE slots with no booking row that are no longer in the grid.
+ * - Deletes AVAILABLE slots outside the new window, including those whose only
+ *   booking row is cancelled (so shrinking 8 PM → 9 PM does not leave orphan early slots).
  */
 export async function syncSlotsForInstance(
   tx: Prisma.TransactionClient,

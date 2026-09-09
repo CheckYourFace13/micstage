@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePrisma } from "@/lib/prisma";
 import { buildPublicMetadata, absoluteUrl } from "@/lib/publicSeo";
+import { scheduleWindowLabel } from "@/lib/scheduleWindow";
 import { lineupNavLabelFromYmd } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
 
@@ -40,7 +41,25 @@ export default async function PublicHostPage(props: { params: Promise<{ slug: st
             where: { date: { gte: new Date(Date.now() - 86400000) } },
             orderBy: { date: "asc" },
             take: 12,
-            include: { venue: { select: { name: true, city: true, region: true, slug: true } } },
+            include: {
+              venue: { select: { name: true, city: true, region: true, slug: true } },
+              eventTemplate: {
+                select: {
+                  startTimeMin: true,
+                  endTimeMin: true,
+                  instances: {
+                    where: { isCancelled: false },
+                    select: {
+                      date: true,
+                      slots: {
+                        where: { status: "AVAILABLE" },
+                        select: { id: true, booking: { select: { cancelledAt: true } } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -72,25 +91,49 @@ export default async function PublicHostPage(props: { params: Promise<{ slug: st
                     <p className="mt-2 text-sm text-white/55">No upcoming nights scheduled.</p>
                   ) : (
                     <ul className="mt-3 grid gap-2 text-sm">
-                      {s.nights.map((n) => (
-                        <li key={n.id} className="rounded-lg border border-white/10 bg-black/25 px-3 py-2">
-                          <div className="font-medium text-white">{lineupNavLabelFromYmd(storageYmdUtc(n.date))}</div>
-                          <div className="text-white/70">
-                            at{" "}
-                            <Link href={`/venues/${n.venue.slug}`} className="underline hover:text-white">
-                              {n.venue.name}
+                      {s.nights.map((n) => {
+                        const ymd = storageYmdUtc(n.date);
+                        const instance =
+                          n.eventTemplate?.instances.find(
+                            (i) => i.date.toISOString().slice(0, 10) === n.date.toISOString().slice(0, 10),
+                          ) ?? null;
+                        const openSpots =
+                          instance?.slots.filter((slot) => !(slot.booking && slot.booking.cancelledAt == null))
+                            .length ?? 0;
+                        const timeLabel =
+                          n.eventTemplate != null
+                            ? scheduleWindowLabel(n.eventTemplate.startTimeMin, n.eventTemplate.endTimeMin)
+                            : null;
+                        return (
+                          <li key={n.id} className="rounded-lg border border-white/10 bg-black/25 px-3 py-2">
+                            <div className="font-medium text-white">{lineupNavLabelFromYmd(ymd)}</div>
+                            {timeLabel ? <div className="text-xs text-white/55">{timeLabel}</div> : null}
+                            <div className="text-white/70">
+                              at{" "}
+                              <Link href={`/venues/${n.venue.slug}`} className="underline hover:text-white">
+                                {n.venue.name}
+                              </Link>
+                              {n.venue.city ? ` · ${n.venue.city}` : ""}
+                            </div>
+                            <div className="text-xs text-white/45">Hosted by {displayName}</div>
+                            {n.signupEnabled && openSpots > 0 ? (
+                              <div className="mt-1 inline-flex rounded-md border border-[rgba(var(--om-neon),0.4)] bg-[rgba(var(--om-neon),0.12)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--om-neon))]">
+                                {openSpots} open spot{openSpots === 1 ? "" : "s"}
+                              </div>
+                            ) : null}
+                            <Link
+                              href={`/nights/${n.id}/lineup`}
+                              className="mt-2 inline-flex text-xs font-semibold text-[rgb(var(--om-neon))] underline"
+                            >
+                              {n.signupEnabled
+                                ? openSpots > 0
+                                  ? "OPEN SPOTS · Sign up →"
+                                  : "Sign up for this night →"
+                                : "View lineup →"}
                             </Link>
-                            {n.venue.city ? ` · ${n.venue.city}` : ""}
-                          </div>
-                          <div className="text-xs text-white/45">Hosted by {displayName}</div>
-                          <Link
-                            href={`/nights/${n.id}/lineup`}
-                            className="mt-2 inline-flex text-xs font-semibold text-[rgb(var(--om-neon))] underline"
-                          >
-                            {n.signupEnabled ? "Sign up for this night →" : "View lineup →"}
-                          </Link>
-                        </li>
-                      ))}
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </li>

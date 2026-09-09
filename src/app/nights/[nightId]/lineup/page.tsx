@@ -109,6 +109,17 @@ export default async function HostNightLineupPage(props: {
           </div>
         ) : null}
 
+        {ctx.night.series.artistRules?.trim() ? (
+          <section className="mb-6 rounded-2xl border border-amber-400/35 bg-amber-500/10 px-4 py-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-100">
+              Artist rules · read before you sign up
+            </h2>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/90">
+              {ctx.night.series.artistRules.trim()}
+            </p>
+          </section>
+        ) : null}
+
         <VenueLineupBoard
           venue={venueForBoard}
           lineups={lineups}
@@ -122,6 +133,7 @@ export default async function HostNightLineupPage(props: {
           embed={embedMode}
           showShareStrip={!embedMode}
           shareCanonicalPath={`/nights/${nightId}/lineup`}
+          ignoreVenueBookingWindow
         />
 
         {!embedMode ? (

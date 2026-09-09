@@ -38,6 +38,11 @@ type Props = {
   showShareStrip?: boolean;
   /** Override share/canonical URL (host night pages). */
   shareCanonicalPath?: string;
+  /**
+   * Host-owned nights control their own signup window. Skip the venue's series range /
+   * bookingOpensDaysAhead so a Host enabling signup is not blocked by venue defaults.
+   */
+  ignoreVenueBookingWindow?: boolean;
 };
 
 function badgeLabel(b: LineupBadge): string {
@@ -65,6 +70,7 @@ export function VenueLineupBoard({
   heroBadge,
   showShareStrip,
   shareCanonicalPath,
+  ignoreVenueBookingWindow,
 }: Props) {
   const isVenueStaffHere = session?.kind === "venue" && venueStaffVenueIds.includes(venue.id);
 
@@ -95,8 +101,12 @@ export function VenueLineupBoard({
       ) : (
         <div className="space-y-8">
           {lineups.map(({ template: t, instance: inst }) => {
-            const instanceBookBlock = bookingBlockReason(venue, inst.date);
+            const instanceBookBlock = ignoreVenueBookingWindow ? null : bookingBlockReason(venue, inst.date);
             const instanceCancelled = inst.isCancelled;
+            const openSpotCount = inst.slots.filter(
+              (s) => s.status === "AVAILABLE" && !(s.booking && !s.booking.cancelledAt),
+            ).length;
+            const hostNightId = "promoterNightId" in t ? (t.promoterNightId as string | null | undefined) : null;
             return (
               <section
                 key={inst.id}
@@ -105,14 +115,32 @@ export function VenueLineupBoard({
                 <header className="border-b border-white/10 px-4 py-4 sm:px-5">
                   <h2 className="text-xl font-bold leading-tight text-white sm:text-2xl">{t.title}</h2>
                   {t.description ? (
-                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">{t.description}</p>
+                    <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-100/90">
+                        Artist rules · read before you sign up
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/90">{t.description}</p>
+                    </div>
                   ) : null}
-                  <p className="mt-1 text-sm text-white/65">
+                  <p className="mt-2 text-sm text-white/65">
                     {weekdayToLabel(t.weekday)} · {scheduleWindowLabel(t.startTimeMin, t.endTimeMin)} ·{" "}
                     {t.slotMinutes} min slots
                     {t.breakMinutes ? ` · ${t.breakMinutes} min breaks` : ""}
                   </p>
                   <p className="mt-1 text-xs text-white/50">{performanceFormatLabel(t.performanceFormat)}</p>
+                  {!instanceCancelled && openSpotCount > 0 && t.bookingRestrictionMode !== "HOUSE_ONLY" ? (
+                    <p className="mt-2 inline-flex items-center rounded-md border border-[rgba(var(--om-neon),0.4)] bg-[rgba(var(--om-neon),0.12)] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--om-neon))]">
+                      {openSpotCount} open spot{openSpotCount === 1 ? "" : "s"} · sign up below
+                    </p>
+                  ) : null}
+                  {hostNightId && !shareCanonicalPath ? (
+                    <Link
+                      href={`/nights/${hostNightId}/lineup`}
+                      className="mt-2 inline-flex text-xs font-semibold text-[rgb(var(--om-neon))] underline"
+                    >
+                      Sign up on the host night page →
+                    </Link>
+                  ) : null}
                 </header>
 
                 {instanceCancelled ? (

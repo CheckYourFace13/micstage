@@ -30,7 +30,7 @@ export async function provisionHostNightLineup(
   const night = await prisma.promoterNight.findUnique({
     where: { id: nightId },
     include: {
-      series: { select: { name: true } },
+      series: { select: { name: true, artistRules: true } },
       venue: { select: { id: true, timeZone: true } },
     },
   });
@@ -44,6 +44,7 @@ export async function provisionHostNightLineup(
   if (!isValidScheduleWindow(startTimeMin, endTimeMin)) throw new Error("invalid_schedule_window");
   const slotMinutes = overrides?.slotMinutes ?? night.slotMinutes;
   const breakMinutes = overrides?.breakMinutes ?? night.breakMinutes;
+  const artistRules = night.series.artistRules?.trim() || null;
 
   await prisma.promoterNight.update({
     where: { id: nightId },
@@ -68,6 +69,8 @@ export async function provisionHostNightLineup(
         // The template follows the night, so a venue move carries the lineup with it.
         venueId: night.venueId,
         title,
+        // Series artist rules ride on the template so every public lineup surface shows them.
+        description: artistRules,
         weekday,
         startTimeMin,
         endTimeMin,
@@ -84,6 +87,7 @@ export async function provisionHostNightLineup(
         venueId: night.venueId,
         promoterNightId: nightId,
         title,
+        description: artistRules,
         weekday,
         startTimeMin,
         endTimeMin,

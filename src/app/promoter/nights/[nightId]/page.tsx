@@ -85,14 +85,22 @@ export default async function HostNightManagePage(props: {
           </div>
         ) : null}
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="mt-6 rounded-2xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--om-neon))]">
+            Share signup link
+          </h2>
+          <p className="mt-1 text-sm text-white/65">
+            Send this to performers — they land on tonight&apos;s signup page.
+          </p>
+          <div className="mt-3">
+            <SharePageButtons url={lineupUrl} label="Signup page" />
+          </div>
           <Link
             href={publicLineupPathForNightId(nightId)}
-            className="inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black"
+            className="mt-3 inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black"
           >
             View public lineup
           </Link>
-          <SharePageButtons url={lineupUrl} label="Share signup link" />
         </div>
 
         <form action={updateHostNightSignupAction} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -137,6 +145,14 @@ export default async function HostNightManagePage(props: {
             </label>
           </div>
 
+          <label className="flex items-start gap-2 text-sm text-white/80">
+            <input type="checkbox" name="applyFutureNights" className="mt-1" />
+            <span>
+              Apply these times and signup settings to <strong>future nights</strong> in this series too
+              (so every Friday matches without editing each one).
+            </span>
+          </label>
+
           <h2 className="text-lg font-semibold">Signup settings</h2>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="signupEnabled" defaultChecked={ctx.night.signupEnabled} />
@@ -153,6 +169,22 @@ export default async function HostNightManagePage(props: {
               className="h-12 w-24 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white"
             />
           </label>
+
+          <div className="grid gap-2">
+            <h2 className="text-lg font-semibold">Artist rules / performer info</h2>
+            <p className="text-sm text-white/60">
+              Shown to performers before they sign up. Saved for the whole series — you only type it once.
+            </p>
+            <textarea
+              name="artistRules"
+              rows={6}
+              maxLength={4000}
+              defaultValue={ctx.night.series.artistRules ?? ""}
+              placeholder={"Examples:\n• 5-minute sets\n• Acoustic only — bring your own instrument\n• Arrive 15 minutes early to check in\n• Duos/trios count as one slot"}
+              className="rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35"
+            />
+          </div>
+
           <FormSubmitButton label="Save night" className="h-12 w-full rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold sm:w-fit" />
         </form>
 

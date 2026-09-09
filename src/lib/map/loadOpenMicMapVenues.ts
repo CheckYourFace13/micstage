@@ -108,6 +108,7 @@ export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMi
           performanceFormat: true,
           timeZone: true,
           bookingRestrictionMode: true,
+          promoterNightId: true,
           instances: {
             where: { isCancelled: false, date: { gte: cutoff } },
             orderBy: { date: "asc" },
@@ -167,8 +168,11 @@ export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMi
       if (t.bookingRestrictionMode === "HOUSE_ONLY") continue;
       for (const inst of t.instances) {
         if (inst.isCancelled) continue;
-        if (!isDateInSeriesRange(venueSeries, inst.date)) continue;
-        if (!isWithinBookingWindow(venueSeries, inst.date, now)) continue;
+        // Host-owned nights are not gated by the venue series window.
+        if (!t.promoterNightId) {
+          if (!isDateInSeriesRange(venueSeries, inst.date)) continue;
+          if (!isWithinBookingWindow(venueSeries, inst.date, now)) continue;
+        }
         if (inst.slots.some((s) => s.status === "AVAILABLE")) {
           acceptingSignups = true;
           break;
@@ -177,8 +181,14 @@ export async function loadOpenMicMapVenues(prisma: PrismaClient): Promise<OpenMi
       if (acceptingSignups) break;
     }
 
+    const hostNightHref =
+      primary?.template && "promoterNightId" in primary.template && primary.template.promoterNightId
+        ? `/nights/${primary.template.promoterNightId}/lineup`
+        : null;
+
     out.push({
       slug: v.slug,
+      href: hostNightHref ?? `/venues/${v.slug}`,
       name: v.name,
       city: v.city,
       region: v.region,

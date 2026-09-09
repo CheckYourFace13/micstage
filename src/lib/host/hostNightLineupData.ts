@@ -12,6 +12,7 @@ export async function loadHostNightLineupContext(nightId: string) {
       series: {
         select: {
           name: true,
+          artistRules: true,
           promoter: { select: { displayName: true, hostSlug: true } },
         },
       },
@@ -25,6 +26,10 @@ export async function loadHostNightLineupContext(nightId: string) {
           timeZone: true,
           lat: true,
           lng: true,
+          bookingOpensDaysAhead: true,
+          seriesStartDate: true,
+          seriesEndDate: true,
+          formattedAddress: true,
         },
       },
       eventTemplate: {

@@ -51,6 +51,21 @@ export async function updateHostNightSignupAction(formData: FormData) {
     }
   }
 
+  // Series-level rules so every future night inherits them without retyping.
+  if (formData.has("artistRules")) {
+    const artistRules = formData.get("artistRules")?.toString() ?? "";
+    const night = await prisma.promoterNight.findUnique({
+      where: { id: nightId },
+      select: { seriesId: true },
+    });
+    if (night) {
+      await prisma.promoterSeries.update({
+        where: { id: night.seriesId },
+        data: { artistRules: artistRules.trim().slice(0, 4000) || null },
+      });
+    }
+  }
+
   await provisionHostNightLineup(prisma, nightId, {
     signupEnabled,
     slotMinutes,
@@ -58,8 +73,33 @@ export async function updateHostNightSignupAction(formData: FormData) {
     endTimeMin: window.endTimeMin,
   });
 
+  // Optional: push the same day/times/signup settings onto later nights in this series.
+  if (formData.get("applyFutureNights") === "on") {
+    const night = await prisma.promoterNight.findUnique({
+      where: { id: nightId },
+      select: { seriesId: true, date: true },
+    });
+    if (night) {
+      const future = await prisma.promoterNight.findMany({
+        where: { seriesId: night.seriesId, date: { gt: night.date } },
+        select: { id: true },
+        orderBy: { date: "asc" },
+        take: 52,
+      });
+      for (const row of future) {
+        await provisionHostNightLineup(prisma, row.id, {
+          signupEnabled,
+          slotMinutes,
+          startTimeMin: window.startTimeMin,
+          endTimeMin: window.endTimeMin,
+        });
+      }
+    }
+  }
+
   revalidatePath("/promoter");
   revalidatePath(`/nights/${nightId}/lineup`);
+  revalidatePath(`/promoter/nights/${nightId}`);
   redirect(`/promoter/nights/${nightId}?saved=1`);
 }
 

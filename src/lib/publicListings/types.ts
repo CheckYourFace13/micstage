@@ -8,6 +8,8 @@ export type OpenMicFinderVenue = {
   bookable: boolean;
   hasSchedule?: boolean;
   badgeLabel: string;
+  /** Optional stronger CTA when open spots are known (e.g. host night signup). */
+  ctaLabel?: string | null;
   name: string;
   city: string | null;
   region: string | null;
@@ -28,6 +30,7 @@ export type NearbyDiscoveryRow = {
   bookable: boolean;
   hasSchedule?: boolean;
   badgeLabel: string;
+  ctaLabel?: string | null;
   name: string;
   city: string | null;
   region: string | null;

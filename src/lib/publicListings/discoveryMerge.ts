@@ -70,6 +70,7 @@ function toFinderRow(
     scheduleWeekdays?: string[];
     performanceFormats?: string[];
     signupMethod?: string | null;
+    ctaLabel?: string | null;
   },
   counts: ReadonlyMap<string, number>,
 ): OpenMicFinderVenue {
@@ -82,6 +83,7 @@ function toFinderRow(
     bookable: opts.bookable,
     hasSchedule: opts.hasSchedule ?? true,
     badgeLabel: discoveryBadgeLabel(opts.kind, opts.bookable, { hasSchedule: opts.hasSchedule }),
+    ctaLabel: opts.ctaLabel ?? null,
     name: base.name,
     city: base.city,
     region: base.region,
@@ -146,10 +148,11 @@ export async function loadPublicDiscoveryLocationRows(prisma: PrismaClient): Pro
 }
 
 export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<OpenMicFinderVenue[]> {
-  const [venues, listings, counts] = await Promise.all([
+  const [venues, listings, counts, hostSignupNights] = await Promise.all([
     prisma.venue.findMany({
       orderBy: [{ name: "asc" }],
       select: {
+        id: true,
         slug: true,
         name: true,
         city: true,
@@ -166,25 +169,74 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
     }),
     loadDiscoverablePublicListings(prisma),
     getDiscoveryLocationCounts(prisma),
+    // Upcoming Host nights with signup on — used to deep-link performers to the night page.
+    prisma.promoterNight.findMany({
+      where: {
+        signupEnabled: true,
+        date: { gte: new Date(Date.now() - 12 * 3600_000) },
+        eventTemplate: { isPublic: true, bookingRestrictionMode: { not: "HOUSE_ONLY" } },
+      },
+      select: {
+        id: true,
+        venueId: true,
+        date: true,
+        eventTemplate: {
+          select: {
+            instances: {
+              where: { isCancelled: false },
+              select: {
+                date: true,
+                slots: {
+                  where: { status: "AVAILABLE" },
+                  select: { id: true, booking: { select: { cancelledAt: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { date: "asc" },
+      take: 400,
+    }),
   ]);
+
+  const nextHostSignupByVenue = new Map<string, { nightId: string; openSpots: number }>();
+  for (const night of hostSignupNights) {
+    if (nextHostSignupByVenue.has(night.venueId)) continue;
+    const nightYmd = night.date.toISOString().slice(0, 10);
+    const instance =
+      night.eventTemplate?.instances.find((i) => i.date.toISOString().slice(0, 10) === nightYmd) ?? null;
+    const openSpots =
+      instance?.slots.filter((s) => !(s.booking && s.booking.cancelledAt == null)).length ?? 0;
+    nextHostSignupByVenue.set(night.venueId, { nightId: night.id, openSpots });
+  }
 
   const claimed = venues.map((v) => {
     const hasSchedule = v.eventTemplates.length > 0;
+    const hostSignup = nextHostSignupByVenue.get(v.id);
     const bookable =
-      hasSchedule &&
-      (v.bookingOpensDaysAhead ?? 0) > 0 &&
-      v.eventTemplates.some((t) => t.bookingRestrictionMode !== "HOUSE_ONLY");
+      (hasSchedule &&
+        (v.bookingOpensDaysAhead ?? 0) > 0 &&
+        v.eventTemplates.some((t) => t.bookingRestrictionMode !== "HOUSE_ONLY")) ||
+      Boolean(hostSignup);
     const scheduleWeekdays = [...new Set(v.eventTemplates.map((t) => t.weekday))];
     const performanceFormats = [...new Set(v.eventTemplates.map((t) => t.performanceFormat).filter(Boolean))];
+    const href = hostSignup ? `/nights/${hostSignup.nightId}/lineup` : venuePublicHref(v.slug);
+    const ctaLabel = hostSignup
+      ? hostSignup.openSpots > 0
+        ? `OPEN SPOTS · Sign up →`
+        : "Sign up for this night →"
+      : null;
     return toFinderRow(
       v,
       {
-        href: venuePublicHref(v.slug),
+        href,
         kind: "claimed",
         bookable,
         hasSchedule,
         scheduleWeekdays,
         performanceFormats,
+        ctaLabel,
       },
       counts,
     );
@@ -220,6 +272,10 @@ export async function loadNearbyDiscoveryRows(
   lat: number,
   lng: number,
 ): Promise<NearbyDiscoveryRow[]> {
+  // Reuse finder rows so host-night deep links and OPEN SPOTS CTAs stay consistent.
+  const finder = await loadOpenMicFinderVenues(prisma);
+  const bySlug = new Map(finder.map((v) => [v.slug, v]));
+
   const [venues, listings] = await Promise.all([
     prisma.venue.findMany({
       orderBy: { name: "asc" },
@@ -231,12 +287,6 @@ export async function loadNearbyDiscoveryRows(
         formattedAddress: true,
         lat: true,
         lng: true,
-        bookingOpensDaysAhead: true,
-        eventTemplates: {
-          where: { isPublic: true },
-          select: { id: true, bookingRestrictionMode: true },
-          take: 3,
-        },
       },
     }),
     loadDiscoverablePublicListings(prisma),
@@ -257,15 +307,12 @@ export async function loadNearbyDiscoveryRows(
     kind: DiscoveryListingKind;
     bookable: boolean;
     hasSchedule?: boolean;
+    ctaLabel?: string | null;
   };
 
   const rows: Raw[] = [
     ...venues.map((v) => {
-      const hasSchedule = v.eventTemplates.length > 0;
-      const bookable =
-        hasSchedule &&
-        (v.bookingOpensDaysAhead ?? 0) > 0 &&
-        v.eventTemplates.some((t) => t.bookingRestrictionMode !== "HOUSE_ONLY");
+      const f = bySlug.get(v.slug);
       return {
         slug: v.slug,
         name: v.name,
@@ -274,10 +321,11 @@ export async function loadNearbyDiscoveryRows(
         formattedAddress: v.formattedAddress,
         lat: v.lat,
         lng: v.lng,
-        href: venuePublicHref(v.slug),
+        href: f?.href ?? venuePublicHref(v.slug),
         kind: "claimed" as const,
-        bookable,
-        hasSchedule,
+        bookable: f?.bookable ?? false,
+        hasSchedule: f?.hasSchedule ?? true,
+        ctaLabel: f?.ctaLabel ?? null,
       };
     }),
     ...listings.map((l) => ({
@@ -292,6 +340,7 @@ export async function loadNearbyDiscoveryRows(
       kind: listingKind(l.verificationStatus),
       bookable: false,
       hasSchedule: l.schedules.length > 0,
+      ctaLabel: null,
     })),
   ];
 
@@ -305,6 +354,7 @@ export async function loadNearbyDiscoveryRows(
       badgeLabel: discoveryBadgeLabel(v.kind, v.bookable, {
         hasSchedule: "hasSchedule" in v ? Boolean(v.hasSchedule) : true,
       }),
+      ctaLabel: v.ctaLabel ?? null,
       name: v.name,
       city: v.city,
       region: v.region,

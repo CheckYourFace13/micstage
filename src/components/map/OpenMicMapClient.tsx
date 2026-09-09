@@ -437,7 +437,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
                         href={v.href ?? `/venues/${v.slug}`}
                         className="text-xs font-semibold text-[rgb(var(--om-neon))] underline decoration-[rgb(var(--om-neon))]/35 underline-offset-2 hover:brightness-110"
                       >
-                        {v.isPublicListing ? "View verified listing →" : v.acceptingSignups ? "Open venue page to book →" : "Open venue page →"}
+                        {v.isPublicListing ? "View verified listing →" : v.acceptingSignups ? (v.href?.startsWith("/nights/") ? "OPEN SPOTS · Sign up →" : "Open venue page to book →") : "Open venue page →"}
                       </Link>
                     </div>
                   </div>

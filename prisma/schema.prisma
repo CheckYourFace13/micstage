@@ -167,6 +167,10 @@ model PromoterSeries {
   slug        String
   description String?
 
+  /// Host instructions shown to performers before signup (set length, gear, arrival, etc.).
+  /// Shared across nights in this series so the Host does not retype them every week.
+  artistRules String? @db.Text
+
   /// Soft-remove from promoter dashboard when the open mic is taken off MicStage.
   archivedAt DateTime?
 

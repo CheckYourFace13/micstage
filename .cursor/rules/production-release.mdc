@@ -15,12 +15,14 @@ Do **not** create a new Hostinger site/app.
 3. Typecheck
 4. Production build (`npm run build` — bakes `deployCommit` via `scripts/write-deploy-commit.mjs`)
 5. Commit
-6. Push `main` (Hostinger Git auto-deploy)
-7. Deploy / confirm Hostinger build for micstage.com (status via Hostinger API / `scripts/hostinger-wait-deploy.mjs`)
-8. Wait for deploy to complete
+6. Push `main`
+7. **Hostinger deploy** of the existing micstage.com app via connected Hostinger MCP: `hosting_deployJsApplication` (source archive of that commit; no new site). Pre-bake `src/generated/deployCommit.ts` into the archive before upload.
+8. Wait for deploy (`hosting_listJsDeployments` / `scripts/hostinger-wait-deploy.mjs`)
 9. Verify `https://micstage.com/api/health` (`ok: true`, `deployCommit` = pushed short SHA)
 10. Smoke-test affected live functionality
 11. Report the deployed SHA
+
+Optional ops: `hosting_restartNode_jsApplicationV1` (restart only; does not rebuild).
 
 ## Do not auto-deploy when
 
@@ -31,7 +33,7 @@ Do **not** create a new Hostinger site/app.
 ## deployCommit
 
 `/api/health` reports the Git short SHA baked at build time (`src/generated/deployCommit.ts`).
-Do **not** manually update `DEPLOY_GIT_SHA` each release. Prefer removing that Hostinger env var once bake is confirmed; if present, baked SHA still wins when non-empty.
+Do **not** manually update `DEPLOY_GIT_SHA` each release. Prefer removing that Hostinger env var in hPanel when convenient; never use the replace-all env API without the full secret set. Bake must not read `DEPLOY_GIT_SHA` (stale).
 
 ## Eligio rule
 

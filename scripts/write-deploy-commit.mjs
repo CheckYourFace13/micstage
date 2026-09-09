@@ -2,12 +2,13 @@
  * Bake the current Git SHA into a small module so /api/health can report
  * deployCommit without manually setting DEPLOY_GIT_SHA on Hostinger.
  *
- * Runs at the start of `npm run build` (including Hostinger git auto-deploys).
- * Prefer git HEAD; fall back to common CI env vars. Runtime DEPLOY_GIT_SHA is
- * only a last-resort override when the baked short SHA is empty.
+ * Runs at the start of `npm run build` (including Hostinger deploys).
+ * Prefer git HEAD / CI SHA. Never bake from DEPLOY_GIT_SHA (often stale on
+ * Hostinger). If nothing resolves and the file already has a SHA (pre-baked
+ * into an archive), keep it. Runtime health may still fall back to env.
  */
 import { execSync } from "node:child_process";
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,9 +22,29 @@ function fromEnv(name) {
   return "";
 }
 
+function readExistingShort() {
+  try {
+    if (!existsSync(outFile)) return "";
+    const src = readFileSync(outFile, "utf8");
+    const m = src.match(/DEPLOY_COMMIT_SHORT\s*=\s*"([0-9a-f]{7,40})"/i);
+    return m ? m[1].toLowerCase().slice(0, 7) : "";
+  } catch {
+    return "";
+  }
+}
+
+function readExistingFull() {
+  try {
+    if (!existsSync(outFile)) return "";
+    const src = readFileSync(outFile, "utf8");
+    const m = src.match(/DEPLOY_COMMIT_FULL\s*=\s*"([0-9a-f]{7,40})"/i);
+    return m ? m[1].toLowerCase().slice(0, 40) : "";
+  } catch {
+    return "";
+  }
+}
+
 function resolveSha() {
-  // Prefer the checkout being built. Do NOT prefer DEPLOY_GIT_SHA first:
-  // Hostinger may still have a stale value from manual releases.
   try {
     return execSync("git rev-parse HEAD", { cwd: root, encoding: "utf8" })
       .trim()
@@ -45,10 +66,17 @@ function resolveSha() {
     // archive deploy without .git
   }
 
-  for (const name of ["GITHUB_SHA", "GIT_COMMIT", "COMMIT_SHA", "SOURCE_VERSION", "DEPLOY_GIT_SHA"]) {
+  // CI only — never DEPLOY_GIT_SHA (stale Hostinger env overrides bake).
+  for (const name of ["GITHUB_SHA", "GIT_COMMIT", "COMMIT_SHA", "SOURCE_VERSION"]) {
     const v = fromEnv(name);
     if (v) return v;
   }
+
+  const existingFull = readExistingFull();
+  if (existingFull) return existingFull;
+  const existingShort = readExistingShort();
+  if (existingShort) return existingShort;
+
   return "";
 }
 

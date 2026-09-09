@@ -22,15 +22,18 @@ export async function tagHostMultiVenueProspect(
   const brandKey = normalizeBrand(input.hostBrand);
   if (!brandKey || brandKey.length < 3) return { tagged: false, venueCount: 0 };
 
-  const venueMatches = await prisma.growthLead.findMany({
-    where: {
-      leadType: "VENUE",
-      id: { not: input.venueLeadId },
-      discoveryHints: { string_contains: brandKey },
-    },
-    select: { id: true },
-    take: 20,
-  });
+  /**
+   * Matched in SQL against the `hostBrand` hint, case-folded. A Prisma `string_contains` without a
+   * `path` compiles to a filter that never matches on Postgres, which silently prevented every
+   * multi-venue host from being detected.
+   */
+  const venueMatches = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM "GrowthLead"
+    WHERE "leadType" = 'VENUE'
+      AND id <> ${input.venueLeadId}
+      AND lower(trim("discoveryHints"->>'hostBrand')) = ${brandKey}
+    LIMIT 20
+  `;
 
   const distinctVenues = new Set([input.venueLeadId, ...venueMatches.map((v) => v.id)]);
   if (distinctVenues.size < 2) return { tagged: false, venueCount: distinctVenues.size };

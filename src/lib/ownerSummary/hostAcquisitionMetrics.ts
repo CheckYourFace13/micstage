@@ -3,8 +3,6 @@
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { HOST_SECOND_VENUE_EVENT } from "@/lib/host/hostSecondVenueActivation";
-import { HOST_MULTI_VENUE_PROSPECT } from "@/lib/growth/hostMultiVenueProspect";
-
 export type HostAcquisitionMetrics = {
   prospectsFound: number;
   multiVenueProspects: number;
@@ -51,7 +49,7 @@ function hostLaneWhere() {
     leadType: "PROMOTER_ACCOUNT" as const,
     OR: [
       { source: "host_evidence_extraction" },
-      { discoveryHints: { string_contains: "hostOutreachLane" } },
+      { discoveryHints: { path: ["hostOutreachLane"], equals: true } },
     ],
   };
 }
@@ -93,10 +91,8 @@ export async function loadHostAcquisitionMetrics(
     prisma.growthLead.count({ where: { leadType: "PROMOTER_ACCOUNT" } }),
     prisma.growthLead.count({
       where: {
-        OR: [
-          { discoveryHints: { string_contains: "hostMultiVenueProspect" } },
-          { discoveryHints: { string_contains: HOST_MULTI_VENUE_PROSPECT } },
-        ],
+        leadType: "PROMOTER_ACCOUNT",
+        discoveryHints: { path: ["hostMultiVenueProspect"], equals: true },
       },
     }),
     prisma.growthLead.count({

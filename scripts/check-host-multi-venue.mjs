@@ -47,4 +47,67 @@ assert.notEqual(slug, slug2);
 assert.equal(safePublicVenueReturnPath("foo-bar", "/nights/n1/lineup", { nightId: "n1" }), "/nights/n1/lineup");
 assert.equal(safePublicVenueReturnPath("foo-bar", "https://evil.com", { nightId: "n1" }), "/nights/n1/lineup");
 
+// ---------------------------------------------------------------------------
+// Multi-venue tagging: the sibling-venue lookup must actually find sibling venues.
+// ---------------------------------------------------------------------------
+const { tagHostMultiVenueProspect } = await import("../src/lib/growth/hostMultiVenueProspect.ts");
+
+const hintWrites = [];
+const multiVenuePrisma = {
+  // A brand running at one other venue: two distinct venues in total.
+  $queryRaw: async () => [{ id: "venue-2" }],
+  marketingEvent: { findFirst: async () => null, create: async () => ({ id: "evt-1" }) },
+  growthLead: {
+    findUnique: async () => ({ id: "venue-1", discoveryHints: {} }),
+    update: async (args) => {
+      hintWrites.push({ id: args.where.id, data: args.data.discoveryHints });
+      return { id: args.where.id };
+    },
+  },
+};
+
+const tagged = await tagHostMultiVenueProspect(multiVenuePrisma, {
+  hostBrand: "Marvin Comedy Productions",
+  venueLeadId: "venue-1",
+  city: "Chicago",
+});
+assert.equal(tagged.tagged, true, "a brand at two venues must be tagged as a multi-venue host");
+assert.equal(tagged.venueCount, 2);
+assert.equal(hintWrites.length, 2, "both venues must carry the multi-venue hint");
+assert.equal(hintWrites[0].data.hostMultiVenueCount, 2);
+
+const lonePrisma = { ...multiVenuePrisma, $queryRaw: async () => [] };
+const lone = await tagHostMultiVenueProspect(lonePrisma, {
+  hostBrand: "One Room Only",
+  venueLeadId: "venue-1",
+});
+assert.equal(lone.tagged, false, "a brand at a single venue is not a multi-venue host");
+
+// ---------------------------------------------------------------------------
+// `string_contains` without a `path` compiles to a filter that never matches on
+// Postgres, so it silently reports zero. Verified against production: the same
+// condition returned 0 rows where raw SQL returned 1,481.
+// ---------------------------------------------------------------------------
+const { readdirSync, readFileSync, statSync } = await import("node:fs");
+const { join } = await import("node:path");
+
+function walk(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...walk(full));
+    else if (/\.tsx?$/.test(entry)) out.push(full);
+  }
+  return out;
+}
+
+const offenders = [];
+for (const file of walk("src")) {
+  const text = readFileSync(file, "utf8");
+  for (const m of text.matchAll(/\{[^{}]*\bstring_contains\b[^{}]*\}/g)) {
+    if (!m[0].includes("path")) offenders.push(`${file}: ${m[0].replace(/\s+/g, " ").slice(0, 80)}`);
+  }
+}
+assert.deepEqual(offenders, [], `JSON string_contains without a path never matches:\n${offenders.join("\n")}`);
+
 console.log(JSON.stringify({ ok: true, checks: "host-multi-venue" }));

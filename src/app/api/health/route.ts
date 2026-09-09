@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrismaOrNull } from "@/lib/prisma";
+import { DEPLOY_COMMIT_SHORT } from "@/generated/deployCommit";
 
 /** Always run fresh; safe for uptime probes. */
 export const dynamic = "force-dynamic";
@@ -15,9 +16,16 @@ type HealthBody = {
   timestamp: string;
   /** Database probe result only — no host, URL, or errors */
   database: "up" | "down" | "unconfigured";
-  /** Optional deploy marker when DEPLOY_GIT_SHA is set on the host */
+  /** Deployed Git short SHA (baked at build; optional env fallback) */
   deployCommit?: string;
 };
+
+function resolveDeployCommit(): string | undefined {
+  const baked = DEPLOY_COMMIT_SHORT?.trim();
+  if (baked) return baked.slice(0, 7);
+  const fromEnv = process.env.DEPLOY_GIT_SHA?.trim();
+  return fromEnv ? fromEnv.slice(0, 7) : undefined;
+}
 
 function json(body: HealthBody, status: number) {
   return NextResponse.json(body, {
@@ -38,7 +46,8 @@ function json(body: HealthBody, status: number) {
  */
 export async function GET() {
   const timestamp = new Date().toISOString();
-  const deployCommit = process.env.DEPLOY_GIT_SHA?.trim() || undefined;
+  const deployCommit = resolveDeployCommit();
+
 
   const prisma = getPrismaOrNull();
   if (!prisma) {

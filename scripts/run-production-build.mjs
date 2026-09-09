@@ -41,6 +41,8 @@ function runNodeModuleBin(binRel, args) {
   }
 }
 
+runNodeScript("scripts/write-deploy-commit.mjs");
 runNodeScript("scripts/write-ads-txt.mjs");
 runNodeModuleBin(path.join("prisma", "build", "index.js"), ["generate", "--schema=prisma/schema.prisma"]);
 runNodeModuleBin(path.join("next", "dist", "bin", "next"), ["build"]);
+

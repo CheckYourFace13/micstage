@@ -1,0 +1,38 @@
+---
+description: Permanent MicStage production release flow via Hostinger (micstage.com)
+alwaysApply: true
+---
+
+# MicStage production release (Hostinger)
+
+Production app: **https://micstage.com** (existing Hostinger Node.js site `u703718100` / `micstage.com`).
+Do **not** create a new Hostinger site/app.
+
+## Permanent release flow
+
+1. Make the change
+2. Test
+3. Typecheck
+4. Production build (`npm run build` — bakes `deployCommit` via `scripts/write-deploy-commit.mjs`)
+5. Commit
+6. Push `main` (Hostinger Git auto-deploy)
+7. Deploy / confirm Hostinger build for micstage.com (status via Hostinger API / `scripts/hostinger-wait-deploy.mjs`)
+8. Wait for deploy to complete
+9. Verify `https://micstage.com/api/health` (`ok: true`, `deployCommit` = pushed short SHA)
+10. Smoke-test affected live functionality
+11. Report the deployed SHA
+
+## Do not auto-deploy when
+
+- Tests fail
+- Typecheck or production build fails
+- A migration is destructive or data-risky (stop and get explicit approval)
+
+## deployCommit
+
+`/api/health` reports the Git short SHA baked at build time (`src/generated/deployCommit.ts`).
+Do **not** manually update `DEPLOY_GIT_SHA` each release. Prefer removing that Hostinger env var once bake is confirmed; if present, baked SHA still wins when non-empty.
+
+## Eligio rule
+
+Eligio’s production Host data is **READ-ONLY** for debugging unless the user explicitly authorizes writes.

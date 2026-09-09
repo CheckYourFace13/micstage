@@ -45,6 +45,8 @@ export const OUTREACH_ENRICH_STATS_KEY = "GROWTH_OUTREACH_ENRICH_DAY_STATS";
 /** Rotating scan position so every candidate lead gets examined, not just the oldest page. */
 export const OUTREACH_ENRICH_SCAN_CURSOR_KEY = "GROWTH_OUTREACH_ENRICH_SCAN_CURSOR";
 
+/** Leads crawled in parallel per batch. Each lead still gets its own per-lead deadline. */
+const ENRICH_LEAD_CONCURRENCY = 4;
 const ENRICH_SCAN_PAGE = 400;
 const ENRICH_SCAN_MAX_PAGES = 6;
 
@@ -587,11 +589,7 @@ export async function enrichGrowthLeadOfficialEvidence(
     return rules;
   }
 
-  for (const lead of due) {
-    if (Date.now() - started > budgetMs - 1_500) {
-      out.skippedForBudget = true;
-      break;
-    }
+  async function processLead(lead: EnrichLeadRow): Promise<void> {
     out.processed += 1;
     const listing = lead.publicListings[0] ?? null;
     const skip = permanentSkipReasonForLead({
@@ -640,7 +638,7 @@ export async function enrichGrowthLeadOfficialEvidence(
       });
       await writeLeadEvidence(prisma, lead.id, lead.discoveryHints, state);
       out.rejected += 1;
-      continue;
+      return;
     }
 
     const website = lead.websiteUrl || listing?.websiteUrl;
@@ -677,7 +675,7 @@ export async function enrichGrowthLeadOfficialEvidence(
       await writeLeadEvidence(prisma, lead.id, lead.discoveryHints, state);
       out.noEvidence += 1;
       out.rechecksScheduled += 1;
-      continue;
+      return;
     }
 
     const leadDeadline = Math.min(started + budgetMs, Date.now() + OUTREACH_EVIDENCE_LEAD_BUDGET_MS);
@@ -854,6 +852,16 @@ export async function enrichGrowthLeadOfficialEvidence(
     if (listing && (result.tier === "A" || result.tier === "B")) {
       await persistListingEvidence(prisma, listing.id, result, snippet, title, now);
     }
+  }
+
+  // Crawling is network-bound and the tick already runs close to its wall-clock budget, so leads
+  // are processed in small parallel batches rather than one at a time.
+  for (let i = 0; i < due.length; i += ENRICH_LEAD_CONCURRENCY) {
+    if (Date.now() - started > budgetMs - 1_500) {
+      out.skippedForBudget = true;
+      break;
+    }
+    await Promise.all(due.slice(i, i + ENRICH_LEAD_CONCURRENCY).map((lead) => processLead(lead)));
   }
 
   await addOutreachEnrichDayStats(prisma, {

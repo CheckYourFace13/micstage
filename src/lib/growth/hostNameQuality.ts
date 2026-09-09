@@ -25,6 +25,8 @@ export type HostNameRejection =
   | "GENERIC_HOST_LABEL"
   | "SOCIAL_HANDLE"
   | "SENTENCE_LIKE"
+  | "UI_CHROME"
+  | "SCHEDULE_LEFTOVER"
   | "NO_DISTINCTIVE_TOKEN";
 
 /**
@@ -44,7 +46,15 @@ const URL_LIKE_RE = /^(https?:\/\/|www\.)|\.(com|net|org|io|co|us|info|biz)(\/|$
 
 /** Labels that appear where a host name should be, but name nobody. */
 const GENERIC_HOST_LABEL_RE =
-  /^(the\s+|your\s+|our\s+|my\s+)?(host|hosts|hosted\s+by|co-?hosts?|mc|emcee|host\s+name|name|open\s+mic|open\s+mics|open\s+mic\s+night|mic\s+night|open\s+stage|open\s+jam|jam\s+night|comedy\s+night|poetry\s+night|sign\s?up|sign\s?ups|signups?\s+sheet|list|lineup|line-?up|tba|tbd|n\/?a|none|staff|team|management|manager|admin|guest|guests|performer|performers|comedian|comedians|musician|musicians|artist|artists|everyone|anyone|all|various|various\s+artists|volunteer|volunteers|organizer|organizers|organiser|producer|producers|promoter|promoters|presenter|presenters|more\s+info|details|info|home|homepage|about|about\s+us|contact|contact\s+us|us|we|you|tickets?|events?|calendar|schedule|venue|venues|bar|club|stage|music|comedy|poetry|karaoke|entertainment|productions?|presents)$/i;
+  /^(the\s+|your\s+|our\s+|my\s+)?(host|hosts|hosted\s+by|co-?hosts?|mc|emcee|host\s+name|name|open\s+mic|open\s+mics|open\s+mic\s+night|mic\s+night|open\s+stage|open\s+jam|jam\s+night|comedy\s+night|poetry\s+night|sign\s?up|sign\s?ups|signups?\s+sheet|list|lineup|line-?up|tba|tbd|n\/?a|none|staff|team|management|manager|admin|guest|guests|performer|performers|comedian|comedians|musician|musicians|artist|artists|everyone|anyone|all|various|various\s+artists|volunteer|volunteers|organizer|organizers|organiser|producer|producers|promoter|promoters|presenter|presenters|more\s+info|details|info|home|homepage|about|about\s+us|contact|contact\s+us|us|we|you|tickets?|events?|calendar|schedule|venue|venues|bar|club|stage|music|comedy|poetry|karaoke|entertainment|productions?|presents|drummer|drummers|guitarist|guitarists|bassist|vocalist|singer|icon|icons|chat\s+rooms?|organization|organisations?|organizations?)$/i;
+
+/** UI chrome / CTA text glued onto a scraped name ("Andrew GleasonCLICK HERE TO UPDATE"). */
+const UI_CHROME_IN_NAME_RE =
+  /\b(click\s+here|click\s+to|update\s+now|learn\s+more|read\s+more|see\s+more|view\s+more|sign\s+up\s+here|buy\s+tickets|register\s+now|subscribe|follow\s+us)\b|CLICK\s*HERE|UPDATE\b/i;
+
+/** Weekday/date leftovers that mean the scraper ate a schedule line ("Jae Mannion Date Monday"). */
+const SCHEDULE_LEFTOVER_RE =
+  /\b(date\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|every\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)|mondays?|tuesdays?|wednesdays?|thursdays?|fridays?|saturdays?|sundays?)\b/i;
 
 /** Editorial/sentence phrasing: a brand never says "will be", "check out", "you can". */
 const SENTENCE_HOST_RE =
@@ -64,6 +74,8 @@ const GENERIC_HOST_TOKENS = new Set([
   "comedy", "standup", "stand", "up", "poetry", "spoken", "word", "music", "musical", "acoustic",
   "songwriter", "songwriters", "singer", "singers", "variety", "live", "free", "new", "all", "every",
   "event", "events", "calendar", "schedule", "signup", "sign", "list", "lineup", "series", "collective",
+  "drummer", "drummers", "guitarist", "guitarists", "bassist", "vocalist", "singer", "singers",
+  "icon", "icons", "chat", "rooms", "room", "porchfest",
   "company", "co", "inc", "llc", "ltd", "group", "team", "crew", "family", "presentation",
   "entertainment", "entertainments", "media", "official", "page", "home", "about", "contact", "info",
 ]);
@@ -104,6 +116,12 @@ export function classifyHostName(raw: string | null | undefined): HostNameReject
 
   if (URL_LIKE_RE.test(n)) return "NOT_A_NAME";
   if (GENERIC_HOST_LABEL_RE.test(n)) return "GENERIC_HOST_LABEL";
+  if (UI_CHROME_IN_NAME_RE.test(n)) return "UI_CHROME";
+  if (SCHEDULE_LEFTOVER_RE.test(n)) return "SCHEDULE_LEFTOVER";
+  // Directory/civic event hubs scraped as "hosts" ("Choose Chicago — events hub").
+  if (/\b(events?\s+hub|theatre\s+events|theater\s+events|events?\s+calendar)\b/i.test(n)) {
+    return "EDITORIAL_OR_PUBLISHER";
+  }
   if (looksLikeSocialHandle(n)) return "SOCIAL_HANDLE";
   if (looksLikeEditorialTitleName(n) || looksLikeAggregatorBrandName(n)) return "EDITORIAL_OR_PUBLISHER";
   if (PUBLISHER_OR_CIVIC_RE.test(n)) return "PUBLISHER_OR_CIVIC_ORG";
@@ -112,6 +130,8 @@ export function classifyHostName(raw: string | null | undefined): HostNameReject
   if (SENTENCE_HOST_RE.test(n)) return "SENTENCE_LIKE";
   // SEO titles stack clauses; organizer names rarely do.
   if (n.includes(",") && words.length >= 4) return "SENTENCE_LIKE";
+  // Single-token role/instrument words are not organizers ("Drummer", "Icon").
+  if (words.length === 1 && GENERIC_HOST_TOKENS.has(words[0]!.toLowerCase())) return "GENERIC_HOST_LABEL";
   if (!hasDistinctiveHostToken(n)) return "NO_DISTINCTIVE_TOKEN";
   return null;
 }

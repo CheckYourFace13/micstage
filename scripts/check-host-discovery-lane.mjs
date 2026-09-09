@@ -180,6 +180,14 @@ const REJECT_HOST_NAMES = [
   "Greater Austin Chamber of Commerce",
   "Open Mics Near Me",
   "Productions",
+  "Drummer",
+  "Icon",
+  "CHAT ROOMS Wednesday",
+  "Andrew GleasonCLICK HERE TO UPDATE",
+  "Jae Mannion Date Monday",
+  "Choose Chicago — events hub",
+  "Auditorium Theatre events",
+  "Organization",
 ];
 for (const name of REJECT_HOST_NAMES) {
   check(`rejects host name ${JSON.stringify(name)}`, () => {

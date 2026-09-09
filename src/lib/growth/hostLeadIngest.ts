@@ -14,7 +14,8 @@ import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import { findExistingGrowthLeadForDedupe } from "@/lib/growth/growthLeadDedupe";
 import { mergeVenueDiscoveryHints } from "@/lib/growth/growthLeadDiscoveryHintsMerge";
 import { ingestGrowthLeadCandidate, type IngestGrowthLeadResult } from "@/lib/growth/growthLeadIngest";
-import { classifyHostName, isMineableHostUrl, isUsableHostName } from "@/lib/growth/hostNameQuality";
+import { classifyHostName, isMineableHostUrl, isUsableHostName, normalizeHostBrandKey } from "@/lib/growth/hostNameQuality";
+import { tagHostMultiVenueProspect } from "@/lib/growth/hostMultiVenueProspect";
 import {
   normalizeNameCityKey,
   normalizeNameSuburbKey,
@@ -48,6 +49,52 @@ function excludedHosts(opts: HostLaneIngestOptions | undefined): Set<string> {
 
 function hostsRelated(a: string, b: string): boolean {
   return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+}
+
+/**
+ * When a host was extracted from a first-party venue page, stamp that brand onto the matching
+ * venue lead so the multi-venue sweep can group hosts that appear at several rooms.
+ */
+async function linkHostBrandOntoMatchingVenue(
+  prisma: PrismaClient,
+  candidate: GrowthLeadCandidate,
+  promoterLeadId: string,
+): Promise<void> {
+  const hints =
+    candidate.discoveryHints && typeof candidate.discoveryHints === "object" && !Array.isArray(candidate.discoveryHints)
+      ? (candidate.discoveryHints as Record<string, unknown>)
+      : null;
+  const brand = typeof hints?.hostBrand === "string" ? hints.hostBrand : candidate.name;
+  if (!isUsableHostName(brand) || !normalizeHostBrandKey(brand)) return;
+
+  const evidenceUrl =
+    (typeof hints?.hostEvidenceSourceUrl === "string" && hints.hostEvidenceSourceUrl) ||
+    candidate.websiteUrl ||
+    null;
+  const evidenceHost = normalizeWebsiteHost(evidenceUrl);
+  if (!evidenceHost) return;
+
+  const venue = await prisma.growthLead.findFirst({
+    where: {
+      leadType: "VENUE",
+      status: { in: ["DISCOVERED", "REVIEWED", "APPROVED"] },
+      websiteHostNormalized: evidenceHost,
+    },
+    select: { id: true, city: true },
+  });
+  if (!venue) return;
+
+  await mergeVenueDiscoveryHints(prisma, venue.id, {
+    hostBrand: brand,
+    hostOutreachLane: true,
+    hostEvidenceSourceUrl: evidenceUrl,
+  });
+  await tagHostMultiVenueProspect(prisma, {
+    hostBrand: brand,
+    venueLeadId: venue.id,
+    promoterLeadId,
+    city: venue.city,
+  });
 }
 
 /**
@@ -92,6 +139,19 @@ export async function ingestHostLaneLeadCandidate(
     const withEmail = await ingestGrowthLeadCandidate(prisma, candidate);
     // A rejected/unparseable address must not sink the host identity — fall through to emailless.
     if (withEmail.status !== "skipped" || !withEmail.reason.startsWith("no_valid_email")) {
+      const promoterId =
+        withEmail.status === "created"
+          ? withEmail.id
+          : withEmail.status === "duplicate"
+            ? withEmail.existingId
+            : null;
+      if (promoterId) {
+        try {
+          await linkHostBrandOntoMatchingVenue(prisma, candidate, promoterId);
+        } catch {
+          /* venue link is best-effort; never fail host ingest on it */
+        }
+      }
       return withEmail;
     }
   }
@@ -112,6 +172,11 @@ export async function ingestHostLaneLeadCandidate(
   });
   if (dup) {
     await mergeVenueDiscoveryHints(prisma, dup.id, candidate.discoveryHints ?? undefined);
+    try {
+      await linkHostBrandOntoMatchingVenue(prisma, candidate, dup.id);
+    } catch {
+      /* best-effort */
+    }
     return { status: "duplicate", existingId: dup.id, reason: dup.reason };
   }
 
@@ -143,6 +208,11 @@ export async function ingestHostLaneLeadCandidate(
       },
       select: { id: true },
     });
+    try {
+      await linkHostBrandOntoMatchingVenue(prisma, candidate, row.id);
+    } catch {
+      /* best-effort */
+    }
     return { status: "created", id: row.id };
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && importKey) {
@@ -152,6 +222,11 @@ export async function ingestHostLaneLeadCandidate(
       });
       if (existing) {
         await mergeVenueDiscoveryHints(prisma, existing.id, candidate.discoveryHints ?? undefined);
+        try {
+          await linkHostBrandOntoMatchingVenue(prisma, candidate, existing.id);
+        } catch {
+          /* best-effort */
+        }
         return { status: "duplicate", existingId: existing.id, reason: "importKey_race" };
       }
     }

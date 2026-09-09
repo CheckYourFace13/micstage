@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SharePageButtons } from "@/components/onboarding/SharePageButtons";
 import { requirePrisma } from "@/lib/prisma";
 import { buildPublicMetadata, absoluteUrl } from "@/lib/publicSeo";
 import { scheduleWindowLabel } from "@/lib/scheduleWindow";
@@ -76,7 +77,9 @@ export default async function PublicHostPage(props: { params: Promise<{ slug: st
         <p className="text-xs font-medium uppercase tracking-widest text-white/55">Open mic host</p>
         <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">{displayName}</h1>
         <p className="mt-2 text-sm text-white/70">Upcoming open mics from {displayName}</p>
-        <p className="mt-1 text-xs text-white/45">One link for every open mic you run · {shareUrl}</p>
+        <div className="mt-4">
+          <SharePageButtons url={shareUrl} label="Host page" />
+        </div>
 
         <section className="mt-10">
           <h2 className="text-lg font-semibold text-white">Open mics</h2>

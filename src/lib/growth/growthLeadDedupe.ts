@@ -4,6 +4,8 @@ import type { PrismaClient } from "@/generated/prisma/client";
 export type GrowthLeadDedupeInput = {
   leadType: GrowthLeadType;
   discoveryMarketSlug: string | null | undefined;
+  /** Strongest venue identity: the same Google place is always the same venue. */
+  googlePlaceId?: string | null;
   contactEmailNormalized?: string | null;
   /** Other mailbox strings (already lowercased valid primaries from same row). */
   additionalEmailsNormalized?: string[] | null;
@@ -30,6 +32,16 @@ export async function findExistingGrowthLeadForDedupe(
   input: GrowthLeadDedupeInput,
 ): Promise<{ id: string; reason: string } | null> {
   const market = marketMatch(input.discoveryMarketSlug ?? null);
+
+  // Google Place ID first: it identifies the venue regardless of name, market, or domain.
+  const placeId = input.googlePlaceId?.trim();
+  if (placeId) {
+    const byPlace = await prisma.growthLead.findFirst({
+      where: { googlePlaceId: placeId },
+      select: { id: true },
+    });
+    if (byPlace) return { id: byPlace.id, reason: "googlePlaceId" };
+  }
 
   const email = input.contactEmailNormalized?.trim().toLowerCase();
   if (email) {

@@ -19,6 +19,12 @@ import {
 import { nationwideWebSearchGeoScopes } from "@/lib/growth/discovery/usStateGeoScopes";
 import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
 import { pickPrimaryVenueOutreachEmail } from "@/lib/growth/discovery/venueEmailExtraction";
+import { extractVenueCandidatesFromPage } from "@/lib/growth/discovery/venueCandidateExtraction";
+import {
+  createPlaceLookupBudget,
+  placeResolutionIsUsable,
+  resolveVenueCandidateWithPlaces,
+} from "@/lib/growth/discovery/venuePlaceResolution";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
 import { deriveVenueContactQuality } from "@/lib/growth/venueContactQuality";
@@ -36,6 +42,8 @@ const CURSOR_KEY = "search_rotation";
 
 /** Cap Serp pagination depth per query/geo combo before forcing vocabulary rotation. */
 const MAX_START_PER_QUERY = 40;
+/** Venues taken from a single directory/listicle page, so one article cannot flood a run. */
+const MAX_VENUES_PER_DIRECTORY_PAGE = 6;
 /** If fewer than this fraction of hit hosts are new to GrowthLead inventory, rotate qi. */
 const MIN_UNIQUE_HOST_RATIO = 0.25;
 
@@ -386,6 +394,13 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
         let emitWithMultiEmail = 0;
         let emitPathOnlyNoEmail = 0;
         let emitWithDmMeta = 0;
+        let directoryPagesRejectedAsEntity = 0;
+        let venueCandidatesExtracted = 0;
+        let placeVerifiedVenues = 0;
+        let directoryVenuesUnresolved = 0;
+        let firstPartyUnresolvedPlace = 0;
+        let skippedNoVenueIdentity = 0;
+        const placeBudget = await createPlaceLookupBudget(prisma);
 
         for (const { hit, searchQuery: qUsed } of hits) {
           if (fetches >= maxFetches) {
@@ -478,7 +493,6 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             null;
 
           const bodySample = bodyPieces.join("\n").slice(0, 24_000);
-          const nameGuess = ex.nameGuess;
           const yt = ex.youtubeUrls[0] ?? null;
           const tt = ex.tiktokUrls[0] ?? null;
 
@@ -500,7 +514,6 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             continue;
           }
 
-          const name = nameGuess.length > 2 ? nameGuess : cleanHitTitle(hit.title);
           const contactQuality = deriveVenueContactQuality({
             email,
             contactUrl: contactPick ?? (hasSocial ? ig || fb : null),
@@ -528,6 +541,99 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           const multiNote = additionalContactEmails.length > 0 ? " multi=true" : "";
           const emailMeta = `[micstage_email_meta] count=${totalFound} primary_src=${picked.bestSource}${multiNote}`;
 
+          /**
+           * A search result is evidence, not an identity. Resolve who the page is actually about
+           * before anything becomes a venue lead.
+           */
+          const extraction = html
+            ? extractVenueCandidatesFromPage({ pageUrl, html, serpTitle: hit.title })
+            : { pageRole: "first_party_venue" as const, pageRoleReason: "no_html", candidates: [] };
+
+          if (extraction.pageRole === "directory_or_article") {
+            directoryPagesRejectedAsEntity++;
+            for (const cand of extraction.candidates.slice(0, MAX_VENUES_PER_DIRECTORY_PAGE)) {
+              venueCandidatesExtracted++;
+              const resolution = await resolveVenueCandidateWithPlaces(
+                prisma,
+                {
+                  name: cand.name,
+                  city: cand.city ?? geo.city,
+                  region: cand.region ?? geo.region,
+                  streetAddress: cand.streetAddress,
+                  websiteUrl: cand.websiteUrl,
+                },
+                placeBudget,
+              );
+              if (!placeResolutionIsUsable(resolution)) {
+                directoryVenuesUnresolved++;
+                continue;
+              }
+              placeVerifiedVenues++;
+
+              const venueSite = cand.websiteUrl ?? resolution.website ?? null;
+              candidates.push({
+                leadType: "VENUE",
+                name: resolution.canonicalName ?? cand.name,
+                websiteUrl: venueSite,
+                city: resolution.formattedAddress ? cand.city ?? geo.city : geo.city,
+                region: cand.region ?? geo.region,
+                discoveryMarketSlug: geo.discoveryMarketSlug,
+                source: `${ADAPTER_ID}_directory_extraction`,
+                sourceKind: "WEBSITE_CONTACT",
+                fitScore: om.fitScore,
+                discoveryConfidence: om.confidence,
+                performanceTags: om.performanceTags.length ? om.performanceTags : [],
+                openMicSignalTier: om.tier,
+                importKey: hashImport(`place:${resolution.placeId}`),
+                googlePlaceId: resolution.placeId,
+                placeCanonicalName: resolution.canonicalName,
+                placeFormattedAddress: resolution.formattedAddress,
+                placeLat: resolution.lat,
+                placeLng: resolution.lng,
+                internalNotes: `Extracted from directory/article ${pageUrl} via ${cand.method}; Google place match ${Math.round((resolution.matchScore ?? 0) * 100)}%. The source page was rejected as an entity. Query: ${qUsed.slice(0, 140)}.`,
+                discoveryHints: {
+                  source: ADAPTER_ID,
+                  nationwide: true,
+                  extractedFrom: {
+                    sourceUrl: pageUrl,
+                    method: cand.method,
+                    pageRole: extraction.pageRole,
+                    pageRoleReason: extraction.pageRoleReason,
+                    snippet: cand.snippet ?? undefined,
+                  },
+                  placeResolution: {
+                    placeId: resolution.placeId,
+                    matchScore: resolution.matchScore,
+                    formattedAddress: resolution.formattedAddress,
+                  },
+                },
+              });
+            }
+            continue;
+          }
+
+          const self = extraction.candidates[0];
+          if (!self) {
+            skippedNoVenueIdentity++;
+            continue;
+          }
+          venueCandidatesExtracted++;
+
+          const selfResolution = await resolveVenueCandidateWithPlaces(
+            prisma,
+            {
+              name: self.name,
+              city: self.city ?? geo.city,
+              region: self.region ?? geo.region,
+              streetAddress: self.streetAddress,
+              websiteUrl: pageUrl,
+            },
+            placeBudget,
+          );
+          const placeOk = placeResolutionIsUsable(selfResolution);
+          if (placeOk) placeVerifiedVenues++;
+          else firstPartyUnresolvedPlace++;
+
           if (email) emitWithPrimaryEmail++;
           if (additionalContactEmails.length > 0) emitWithMultiEmail++;
           if (!email && (contactPick || ig || fb)) emitPathOnlyNoEmail++;
@@ -535,7 +641,7 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
 
           candidates.push({
             leadType: "VENUE",
-            name,
+            name: placeOk ? (selfResolution.canonicalName ?? self.name) : self.name,
             contactEmailNormalized: email,
             emailExtractedFromNoisyText: !sameHostEmail,
             additionalContactEmails,
@@ -555,12 +661,24 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             performanceTags: om.performanceTags.length ? om.performanceTags : [],
             openMicSignalTier: om.tier,
             contactQuality,
-            importKey: hashImport(pageUrl),
-            internalNotes: `${emailMeta}${dmNote}. Open-mic–targeted nationwide discovery. Tier ${om.tier}. Market ${geo.discoveryMarketSlug}. Query: ${qUsed.slice(0, 140)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
+            importKey: hashImport(placeOk ? `place:${selfResolution.placeId}` : pageUrl),
+            googlePlaceId: placeOk ? selfResolution.placeId : null,
+            placeCanonicalName: placeOk ? selfResolution.canonicalName : null,
+            placeFormattedAddress: placeOk ? selfResolution.formattedAddress : null,
+            placeLat: placeOk ? selfResolution.lat : null,
+            placeLng: placeOk ? selfResolution.lng : null,
+            internalNotes: `${emailMeta}${dmNote}. Open-mic–targeted nationwide discovery. Tier ${om.tier}. Identity via ${self.method}; place ${placeOk ? `verified (${Math.round((selfResolution.matchScore ?? 0) * 100)}%)` : `unresolved (${selfResolution.reason})`}. Market ${geo.discoveryMarketSlug}. Query: ${qUsed.slice(0, 140)}. Snippet: ${(hit.snippet ?? "").slice(0, 200)}.${fetchNote}`,
             discoveryHints: {
               source: ADAPTER_ID,
               nationwide: true,
               publicRoleHints: roleHints.slice(0, 14),
+              identityMethod: self.method,
+              placeResolution: {
+                status: selfResolution.status,
+                placeId: selfResolution.placeId,
+                matchScore: selfResolution.matchScore,
+                reason: selfResolution.reason,
+              },
             },
           });
         }
@@ -586,6 +704,20 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           emitWithMultiEmail,
           emitPathOnlyNoEmail,
           emitWithDmMeta,
+        });
+        // SEARCH RESULT -> REAL ENTITY -> VERIFIED IDENTITY conversion for this run.
+        console.info("[growth discovery] autonomous_web_search_venue identity funnel", {
+          rawSearchResults: rawSearchItemsThisRun,
+          pagesCrawled: fetches,
+          directoryPagesRejectedAsEntity,
+          venueCandidatesExtracted,
+          placeLookupsSpent: placeBudget.spentCount,
+          placeCacheHits: placeBudget.cacheHitCount,
+          placeVerifiedVenues,
+          directoryVenuesUnresolved,
+          firstPartyUnresolvedPlace,
+          skippedNoVenueIdentity,
+          candidatesEmitted: candidates.length,
         });
         if (candidates.length === 0) {
           const reason =

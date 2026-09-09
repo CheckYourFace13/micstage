@@ -17,6 +17,16 @@ import {
   normalizeNameSuburbKey,
   normalizeWebsiteHost,
 } from "@/lib/growth/leadFieldNormalization";
+import { isUsableVenueName } from "@/lib/growth/discovery/venueCandidateExtraction";
+import { classifyListingName } from "@/lib/publicListings/listingQuality";
+
+/** Source kinds produced by autonomous crawlers, where names are page-derived and untrusted. */
+const AUTOMATED_DISCOVERY_SOURCE_KINDS = new Set<GrowthLeadCandidate["sourceKind"]>([
+  "WEBSITE_CONTACT",
+  "EVENT_LISTING",
+  "SOCIAL_PROFILE",
+  "SCHEDULED_JOB",
+]);
 
 export type IngestGrowthLeadOptions = {
   mergeOnDuplicate?: { importMetaNote: string };
@@ -183,6 +193,14 @@ export async function ingestGrowthLeadCandidate(
   const name = raw.name?.trim();
   if (!name) return { status: "skipped", reason: "missing name" };
 
+  /**
+   * Automated venue discovery must carry a real venue identity, never a search-result page title.
+   * Manual/CSV imports and the host lane are exempt: hosts are brands, not places.
+   */
+  if (raw.leadType === "VENUE" && AUTOMATED_DISCOVERY_SOURCE_KINDS.has(raw.sourceKind) && !isUsableVenueName(name)) {
+    return { status: "skipped", reason: `venue_name_not_identity:${classifyListingName(name) ?? "page_title"}` };
+  }
+
   const discoveryMarketSlug = raw.discoveryMarketSlug?.trim() || null;
 
   const primaryParsed = parsePrimaryEmailForIngest(raw);
@@ -210,6 +228,7 @@ export async function ingestGrowthLeadCandidate(
   const dup = await findExistingGrowthLeadForDedupe(prisma, {
     leadType: raw.leadType,
     discoveryMarketSlug,
+    googlePlaceId: raw.googlePlaceId ?? null,
     contactEmailNormalized: email,
     additionalEmailsNormalized,
     importKey: raw.importKey ?? null,
@@ -258,6 +277,12 @@ export async function ingestGrowthLeadCandidate(
         websiteHostNormalized,
         instagramHandleNormalized,
         discoveryHints: raw.discoveryHints ?? undefined,
+        googlePlaceId: raw.googlePlaceId?.trim() || null,
+        googlePlaceVerifiedAt: raw.googlePlaceId?.trim() ? new Date() : null,
+        placeCanonicalName: raw.placeCanonicalName?.trim() || null,
+        placeFormattedAddress: raw.placeFormattedAddress?.trim() || null,
+        placeLat: raw.placeLat ?? null,
+        placeLng: raw.placeLng ?? null,
       },
     });
   } catch (e) {

@@ -1159,6 +1159,14 @@ model GrowthLead {
   /// Public discovery enrichment (role hints, crawl metadata) — JSON from autonomous adapters.
   discoveryHints Json?
 
+  /// Google Places identity resolved at discovery time (venue lane only; hosts do not require it).
+  googlePlaceId         String?
+  googlePlaceVerifiedAt DateTime?
+  placeCanonicalName    String?
+  placeFormattedAddress String?
+  placeLat              Float?
+  placeLng              Float?
+
   outreachDrafts  GrowthLeadOutreachDraft[]
   responses       GrowthLeadResponse[]
   followUpSchedules GrowthLeadFollowUpSchedule[]
@@ -1178,6 +1186,37 @@ model GrowthLead {
   @@index([contactQuality])
   @@index([acquisitionStage])
   @@index([leadType, openMicSignalTier])
+  @@index([googlePlaceId])
+}
+
+/// Cached Google Places resolutions so discovery never re-spends a lookup on the same candidate.
+model GrowthPlaceLookup {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Normalized "name|city|region" candidate key.
+  lookupKey String @unique
+
+  /// resolved | unresolved | rejected
+  outcome    String
+  reason     String?
+  matchScore Float?
+
+  placeId          String?
+  canonicalName    String?
+  formattedAddress String?
+  lat              Float?
+  lng              Float?
+  website          String?
+  websiteHost      String?
+
+  /// Reuse counter: how often the cache spared a paid lookup.
+  hitCount Int @default(0)
+
+  @@index([placeId])
+  @@index([outcome])
+  @@index([updatedAt])
 }
 
 /// Pagination / rotation state for autonomous discovery adapters (per adapter + market).

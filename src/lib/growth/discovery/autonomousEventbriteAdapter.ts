@@ -8,6 +8,12 @@ import {
 } from "@/lib/growth/discovery/autonomousConfig";
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { eventbriteUsLocationAddresses } from "@/lib/growth/discovery/usStateGeoScopes";
+import { isUsableVenueName } from "@/lib/growth/discovery/venueCandidateExtraction";
+import {
+  createPlaceLookupBudget,
+  placeResolutionIsUsable,
+  resolveVenueCandidateWithPlaces,
+} from "@/lib/growth/discovery/venuePlaceResolution";
 import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
@@ -19,7 +25,7 @@ const CURSOR_KEY = "eb_page";
 const EVENTBRITE_QUERIES = ["open mic", "poetry open mic", "comedy open mic", "jam night"];
 const US_LOCATIONS = eventbriteUsLocationAddresses();
 
-type EbVenue = { name?: string; address?: { city?: string; region?: string } };
+type EbVenue = { name?: string; address?: { city?: string; region?: string; address_1?: string } };
 type EbEvent = {
   id: string;
   name?: { text?: string };
@@ -126,15 +132,24 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
       );
 
       const out: GrowthLeadCandidate[] = [];
+      const placeBudget = await createPlaceLookupBudget(prisma);
+      let skippedNoVenueIdentity = 0;
+      let unresolvedVenues = 0;
+      let placeVerifiedVenues = 0;
       for (const ev of events) {
         const blob = eventText(ev);
         if (!OPEN_MIC_EVENT_RE.test(blob)) continue;
 
         const v = ev.venue;
-        const name =
-          (v?.name && String(v.name).trim()) ||
-          (ev.name?.text ? ev.name.text.trim().slice(0, 180) : null) ||
-          "Open mic event host";
+        /**
+         * An Eventbrite page is evidence about a venue, never the venue itself. Only the
+         * event's declared venue can be an identity — an event title cannot.
+         */
+        const name = (v?.name && String(v.name).trim()) || "";
+        if (!isUsableVenueName(name)) {
+          skippedNoVenueIdentity++;
+          continue;
+        }
         const city = v?.address?.city?.trim() || null;
         const region = v?.address?.region?.trim()?.toUpperCase() || null;
         const discoveryMarketSlug =
@@ -157,10 +172,34 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
           facebookUrl: null,
         });
 
+        const resolution = prisma
+          ? await resolveVenueCandidateWithPlaces(
+              prisma,
+              {
+                name,
+                city,
+                region,
+                streetAddress: v?.address?.address_1?.trim() || null,
+                websiteUrl: null,
+              },
+              placeBudget,
+            )
+          : null;
+        if (!resolution || !placeResolutionIsUsable(resolution)) {
+          unresolvedVenues++;
+          continue;
+        }
+        placeVerifiedVenues++;
+
         out.push({
           leadType: "VENUE",
-          name,
-          websiteUrl: ev.url?.split("?")[0] ?? null,
+          name: resolution.canonicalName ?? name,
+          googlePlaceId: resolution.placeId,
+          placeCanonicalName: resolution.canonicalName,
+          placeFormattedAddress: resolution.formattedAddress,
+          placeLat: resolution.lat,
+          placeLng: resolution.lng,
+          websiteUrl: resolution.website ?? ev.url?.split("?")[0] ?? null,
           contactUrl: ev.url ?? null,
           city,
           region,
@@ -172,10 +211,28 @@ export function createAutonomousEventbriteVenueAdapter(): GrowthLeadSourceAdapte
           openMicSignalTier: om.tier,
           contactQuality,
           performanceTags: om.performanceTags.length ? om.performanceTags : [],
-          importKey: `eb_evt:${ev.id}`,
-          internalNotes: `Eventbrite search (${query} @ ${locationAddress}, radius ${u.searchParams.get("location.within")}). Verify venue before outreach.`,
+          importKey: `eb_place:${resolution.placeId}`,
+          internalNotes: `Eventbrite event ${ev.url ?? ev.id} used as evidence; venue "${name}" matched Google place ${Math.round((resolution.matchScore ?? 0) * 100)}%. Search (${query} @ ${locationAddress}, radius ${u.searchParams.get("location.within")}).`,
+          discoveryHints: {
+            source: ADAPTER_ID,
+            extractedFrom: { sourceUrl: ev.url ?? null, method: "eventbrite_venue", pageRole: "directory_or_article" },
+            placeResolution: {
+              placeId: resolution.placeId,
+              matchScore: resolution.matchScore,
+              formattedAddress: resolution.formattedAddress,
+            },
+          },
         });
       }
+      console.info("[growth discovery] eventbrite identity funnel", {
+        rawEvents: events.length,
+        skippedNoVenueIdentity,
+        placeLookupsSpent: placeBudget.spentCount,
+        placeCacheHits: placeBudget.cacheHitCount,
+        placeVerifiedVenues,
+        unresolvedVenues,
+        candidatesEmitted: out.length,
+      });
       return out;
     },
   };

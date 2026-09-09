@@ -13,6 +13,7 @@ import {
 import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
 import { extractFromHtml, pickPrimaryVenueContactUrl } from "@/lib/growth/discovery/extractFromHtml";
+import { extractVenueCandidatesFromPage } from "@/lib/growth/discovery/venueCandidateExtraction";
 import { scoreOpenMicVenueProspect } from "@/lib/growth/discovery/venueOpenMicSignals";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
 import type { GrowthLeadDiscoveryContext, GrowthLeadSourceAdapter } from "@/lib/growth/sources/growthLeadSourceAdapter";
@@ -102,6 +103,10 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
           };
         }
 
+        // Seed pages are crawled, so their titles are page titles: resolve a real identity first.
+        const identity = extractVenueCandidatesFromPage({ pageUrl: seed, html }).candidates[0] ?? null;
+        if (!identity) continue;
+
         const contactQuality = deriveVenueContactQuality({
           email,
           contactUrl: contactPick ?? ig ?? fb,
@@ -116,7 +121,7 @@ export function createAutonomousSeedCrawlVenueAdapter(): GrowthLeadSourceAdapter
 
         out.push({
           leadType: "VENUE",
-          name: ex.nameGuess.slice(0, 180),
+          name: identity.name.slice(0, 180),
           contactEmailNormalized: email,
           emailExtractedFromNoisyText: !sameHostEmail,
           additionalContactEmails,

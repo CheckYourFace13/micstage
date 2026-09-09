@@ -43,6 +43,9 @@ const IMPORT_LIKE_DISCOVERED_SOURCE_KINDS: GrowthLeadSourceKind[] = [
  * explainGrowthLeadOutreachEligibility, which otherwise marks these leads eligible forever while
  * draft creation blocked them.
  */
+/** Outreach quotes the venue's own listing, so a draft this old no longer reflects current evidence. */
+const STALE_PENDING_DRAFT_DAYS = 30;
+
 const LISTING_BLOCKS_OUTREACH = {
   publicListings: {
     none: {
@@ -196,6 +199,8 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   nonEmailVenuePathsQueued: number;
   /** APPROVED drafts rejected because lead confidence/email no longer qualifies. */
   purgedStaleApproved: number;
+  /** PENDING_REVIEW drafts rejected because they can no longer send and were blocking their lead. */
+  purgedStalePending: number;
   /** Daytime send spread applied this run (caps burst sending). */
   sendPacing: OutreachSendPacing;
   skipped: number;
@@ -215,6 +220,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const venueReviewTake = Math.min(limit, Math.max(12, Math.max(1, configuredSendCeiling) * 6));
   let outreachSendsThisRun = 0;
   let purgedStaleApproved = 0;
+  let purgedStalePending = 0;
   // Eligibility is HIGH-only. Do not let GROWTH_OUTREACH_ALLOW_MEDIUM_CONFIDENCE fill the cron window with unsendable drafts.
   const allowMediumOutreach = false;
   const emailReadyLevels: GrowthLeadEmailConfidence[] = ["HIGH"];
@@ -234,6 +240,29 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     },
   });
   purgedStaleApproved = staleApprovedPurge.count;
+
+  /**
+   * A pending draft blocks its lead from being drafted again, so one that can never send holds the
+   * lead out of the queue forever. Auto-send only scans a bounded window each run, so these
+   * accumulate out of sight. Clear the two kinds that cannot recover on their own: a lead that lost
+   * its HIGH-confidence contact, and a draft old enough that its evidence is stale — if the lead
+   * still qualifies, the next run writes a fresh draft against current evidence.
+   */
+  const stalePendingPurge = await prisma.growthLeadOutreachDraft.updateMany({
+    where: {
+      status: "PENDING_REVIEW",
+      marketingEmailSendId: null,
+      OR: [
+        { lead: { OR: [{ contactEmailConfidence: { not: "HIGH" } }, { contactEmailNormalized: null }] } },
+        { createdAt: { lt: new Date(Date.now() - STALE_PENDING_DRAFT_DAYS * 86_400_000) } },
+      ],
+    },
+    data: {
+      status: "REJECTED",
+      lastError: "auto_purge: pending draft can no longer send (contact downgraded or draft stale)",
+    },
+  });
+  purgedStalePending = stalePendingPurge.count;
 
   const candidates = await prisma.growthLead.findMany({
     where: {
@@ -658,6 +687,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     outreachSendsByFallbackWave,
     nonEmailVenuePathsQueued,
     purgedStaleApproved,
+    purgedStalePending,
     sendPacing,
     skipped,
     errors,

@@ -33,6 +33,7 @@
     "test:artist-timing": "npx tsx scripts/check-artist-timing.mjs",
     "test:slot-sync": "npx tsx scripts/check-slot-sync-cancelled.mjs",
     "test:cancelled-slot-rebook": "npx tsx scripts/check-cancelled-slot-rebook.mjs",
+    "test:booking-cancel-notify": "npx tsx scripts/check-booking-cancel-notify.mjs",
     "test:host-artist-rules": "npx tsx scripts/check-host-artist-rules.mjs",
     "backfill:host-identities": "npx tsx scripts/backfill-host-identities.mjs",
     "backfill:host-night-lineups": "npx tsx scripts/backfill-host-night-lineups.mjs",

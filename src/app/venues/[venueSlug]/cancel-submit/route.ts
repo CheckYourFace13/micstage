@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { venueIdsForVenueSession } from "@/lib/authz";
+import { softCancelSlotBooking } from "@/lib/bookingSlotAssign";
+import { notifyBookingCancelledById } from "@/lib/bookingNotify";
 import { requirePrisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
@@ -42,6 +44,8 @@ export async function POST(request: Request) {
     .findUnique({
       where: { id: bookingId },
       select: {
+        slotId: true,
+        cancelledAt: true,
         slot: {
           select: {
             instance: { select: { template: { select: { venueId: true, promoterNightId: true } } } },
@@ -49,7 +53,16 @@ export async function POST(request: Request) {
         },
       },
     })
-    .then((b) => b?.slot.instance.template ?? null);
+    .then((b) =>
+      b
+        ? {
+            slotId: b.slotId,
+            cancelledAt: b.cancelledAt,
+            venueId: b.slot.instance.template.venueId,
+            promoterNightId: b.slot.instance.template.promoterNightId,
+          }
+        : null,
+    );
 
   // Host nights live at /nights/:id/lineup, so cancelling there has to return there.
   const returnBase = safePublicVenueReturnPath(venueSlug, optString(formData, "returnPath"), {
@@ -63,12 +76,13 @@ export async function POST(request: Request) {
 
   const bookingVenueId = bookingTemplate?.venueId;
 
-  if (!bookingVenueId) {
+  if (!bookingVenueId || !bookingTemplate) {
     return redirectTo(appendQueryToPath(returnBase, { bookError: "Booking not found." }));
   }
 
   const allowedVenueIds = await venueIdsForVenueSession(session);
 
+  let initiator: "performer" | "organizer";
   if (session.kind === "musician") {
     const full = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -83,10 +97,12 @@ export async function POST(request: Request) {
     if (!full.musicianId || full.musicianId !== session.musicianId) {
       return redirectTo(appendQueryToPath(returnBase, { bookError: "You can only cancel your own bookings." }));
     }
+    initiator = "performer";
   } else if (session.kind === "venue") {
     if (!allowedVenueIds.includes(bookingVenueId)) {
       return redirectTo(appendQueryToPath(returnBase, { bookError: "Not allowed to cancel this booking." }));
     }
+    initiator = "organizer";
   } else {
     return redirectTo(appendQueryToPath(returnBase, { bookError: "Sign in to cancel a booking." }));
   }
@@ -98,28 +114,35 @@ export async function POST(request: Request) {
     })
     .then((b) => b?.slot.instance.date.toISOString().slice(0, 10));
 
-  await prisma.$transaction(async (tx) => {
-    const booking = await tx.booking.findUnique({
-      where: { id: bookingId },
-      include: { slot: { include: { instance: { include: { template: { include: { venue: true } } } } } } },
+  let didCancel = false;
+  try {
+    didCancel = await prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        include: { slot: { include: { instance: { include: { template: { include: { venue: true } } } } } } },
+      });
+      if (!booking) throw new Error("Booking not found");
+      if (booking.slot.instance.template.venue.slug !== venueSlug) throw new Error("Venue mismatch");
+      return softCancelSlotBooking(tx, booking.slotId, "CANCELLED");
     });
-    if (!booking) throw new Error("Booking not found");
-    if (booking.slot.instance.template.venue.slug !== venueSlug) throw new Error("Venue mismatch");
+  } catch {
+    return redirectTo(appendQueryToPath(returnBase, { bookError: "Could not cancel booking." }));
+  }
 
-    await tx.booking.update({
-      where: { id: booking.id },
-      data: { cancelledAt: new Date() },
-    });
-
-    await tx.slot.update({
-      where: { id: booking.slotId },
-      data: { status: "AVAILABLE" },
-    });
-  });
+  if (didCancel) {
+    try {
+      await notifyBookingCancelledById(bookingId, initiator);
+    } catch (e) {
+      console.error("[cancel-submit] notify failed", e);
+    }
+  }
 
   revalidatePath(`/venues/${venueSlug}`);
   revalidatePath(`/venues/${venueSlug}/lineup`);
   if (lineupYmd) revalidatePath(`/venues/${venueSlug}/lineup/${lineupYmd}`);
+  if (bookingTemplate.promoterNightId) {
+    revalidatePath(`/nights/${bookingTemplate.promoterNightId}/lineup`);
+  }
   revalidatePath(ARTIST_DASHBOARD_HREF);
   return redirectTo(appendQueryToPath(returnBase, { cancelled: "1" }));
 }

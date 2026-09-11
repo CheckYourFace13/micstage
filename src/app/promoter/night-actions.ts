@@ -15,7 +15,7 @@ import {
   softCancelSlotBooking,
   slotIsOpenForAssignment,
 } from "@/lib/bookingSlotAssign";
-import { notifyBookingTimeChanged } from "@/lib/bookingNotify";
+import { notifyBookingTimeChanged, notifyBookingCancelledById } from "@/lib/bookingNotify";
 import { assertHostOwnsNight, assertHostOwnsSlot } from "@/lib/host/hostNightAuth";
 import { provisionHostNightLineup, publicLineupPathForNightId } from "@/lib/host/hostNightProvisioning";
 import { requirePrisma } from "@/lib/prisma";
@@ -163,9 +163,22 @@ export async function hostRemoveBookingAction(formData: FormData) {
   const owned = await assertHostOwnsSlot(prisma, session.promoterId, slotId);
   if (!owned.ok) redirect("/promoter?promoter=forbidden");
 
-  await prisma.$transaction(async (tx) => {
-    await softCancelSlotBooking(tx, slotId);
+  const prior = await prisma.slot.findUnique({
+    where: { id: slotId },
+    select: { booking: { select: { id: true, cancelledAt: true } } },
   });
+  const bookingId =
+    prior?.booking && prior.booking.cancelledAt == null ? prior.booking.id : null;
+
+  const didCancel = await prisma.$transaction(async (tx) => softCancelSlotBooking(tx, slotId));
+
+  if (didCancel && bookingId) {
+    try {
+      await notifyBookingCancelledById(bookingId, "organizer");
+    } catch (e) {
+      console.error("[hostRemoveBooking] notify failed", e);
+    }
+  }
 
   revalidatePath(`/nights/${owned.nightId}/lineup`);
   revalidatePath(`/promoter/nights/${owned.nightId}`);

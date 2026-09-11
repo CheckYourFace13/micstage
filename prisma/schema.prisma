@@ -644,6 +644,11 @@ model Booking {
   /// Set when the ~2h-before-show email was successfully claimed/sent (idempotency).
   reminderEmail2hSentAt DateTime?
 
+  /// Cancel/removal notice to performer claimed/sent (idempotency).
+  cancelNotifyPerformerSentAt DateTime?
+  /// Cancel notice to host/venue organizer claimed/sent (idempotency).
+  cancelNotifyOrganizerSentAt DateTime?
+
   @@index([musicianId])
   @@index([cancelledAt, reminderEmail24hSentAt])
   @@index([cancelledAt, reminderEmail2hSentAt])

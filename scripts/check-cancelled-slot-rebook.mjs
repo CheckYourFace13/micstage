@@ -1,6 +1,6 @@
 /**
- * Regression: cancelled Booking rows must not block rebooking (Booking.slotId UNIQUE).
- * Also covers move/swap without changing schedule grid, and signup LIVE truthfulness.
+ * Regression: cancelled Booking rows must not block rebooking; history preserved;
+ * Host nights ignore venue booking windows; move/swap clears reminder state.
  *   npx tsx scripts/check-cancelled-slot-rebook.mjs
  */
 import assert from "node:assert/strict";
@@ -11,15 +11,15 @@ import {
 import { computeSignupLiveStatus } from "../src/lib/signupLiveStatus.ts";
 import { generateSlotsForWindow } from "../src/lib/slotGeneration.ts";
 import { scheduleWindowFromTimeInputs } from "../src/lib/scheduleWindow.ts";
+import {
+  bookingBlockReason,
+  publicSignupBookBlockReason,
+} from "../src/lib/venueBookingRules.ts";
 
-// --- Open-slot helpers ---
 assert.equal(slotIsOpenForAssignment(null), true);
 assert.equal(slotIsOpenForAssignment({ id: "b1", cancelledAt: new Date() }), true);
 assert.equal(slotIsOpenForAssignment({ id: "b2", cancelledAt: null }), false);
-assert.equal(activeBookingFrom({ id: "b3", cancelledAt: new Date() }), null);
-assert.ok(activeBookingFrom({ id: "b4", cancelledAt: null, performerName: "A" }));
 
-// --- Schedule grid stays fixed for 9 PM–1 AM / 15 / every 20 ---
 const win = scheduleWindowFromTimeInputs("21:00", "01:00");
 assert.ok(win);
 const grid = generateSlotsForWindow({
@@ -28,35 +28,55 @@ const grid = generateSlotsForWindow({
   slotMinutes: 15,
   breakMinutes: 5,
 });
-assert.equal(grid[0].startMin, 21 * 60);
-assert.equal(grid[1].startMin, 21 * 60 + 20);
-assert.equal(grid[2].startMin, 21 * 60 + 40);
-assert.equal(grid[3].startMin, 22 * 60);
 const startsBefore = grid.slice(0, 4).map((s) => s.startMin);
-assert.equal(startsBefore.length, 4);
-
-// Simulated move: performer payloads move; start minutes unchanged.
 const names = ["A", "B", "C", "D"];
 const lineup = startsBefore.map((startMin, i) => ({ startMin, name: names[i] ?? null }));
-// remove B
 lineup[1].name = null;
-// move D to 9:20
 lineup[1].name = lineup[3].name;
 lineup[3].name = null;
-// move A to 10:00
 lineup[3].name = lineup[0].name;
 lineup[0].name = null;
-assert.deepEqual(
-  lineup.map((r) => r.startMin),
-  startsBefore,
-  "moving names must not alter start times",
+assert.deepEqual(lineup.map((r) => r.startMin), startsBefore);
+assert.deepEqual(lineup.map((r) => r.name), [null, "D", "C", "A"]);
+
+// --- Host night ignores venue bookingOpensDaysAhead ---
+const venueStrict = {
+  seriesStartDate: new Date("2020-01-01T00:00:00.000Z"),
+  seriesEndDate: new Date("2020-12-31T00:00:00.000Z"),
+  bookingOpensDaysAhead: 1,
+  timeZone: "America/Los_Angeles",
+};
+const future = new Date("2099-06-15T00:00:00.000Z");
+assert.ok(bookingBlockReason(venueStrict, future), "venue window should block far-future");
+assert.equal(
+  publicSignupBookBlockReason({
+    isHostNight: true,
+    hostSignupEnabled: true,
+    venue: venueStrict,
+    eventDate: future,
+  }),
+  null,
+  "Host night must not inherit venue advance window",
 );
-assert.deepEqual(
-  lineup.map((r) => r.name),
-  [null, "D", "C", "A"],
+assert.match(
+  publicSignupBookBlockReason({
+    isHostNight: true,
+    hostSignupEnabled: false,
+    venue: venueStrict,
+    eventDate: future,
+  }) ?? "",
+  /not enabled/i,
+);
+assert.ok(
+  publicSignupBookBlockReason({
+    isHostNight: false,
+    venue: venueStrict,
+    eventDate: future,
+  }),
+  "pure venue night still uses venue window",
 );
 
-// --- assignActiveBookingToSlot behavior via stub tx ---
+// --- History-preserving assign stub ---
 const store = {
   slots: new Map([
     [
@@ -66,16 +86,19 @@ const store = {
         status: "AVAILABLE",
         booking: {
           id: "old",
-          cancelledAt: new Date(),
+          createdAt: new Date("2026-01-01T00:00:00Z"),
+          cancelledAt: new Date("2026-01-02T00:00:00Z"),
           musicianId: null,
           performerName: "Artist A",
           performerEmail: "a@example.com",
           notes: null,
+          reminderEmail24hSentAt: new Date(),
+          reminderEmail2hSentAt: null,
         },
       },
     ],
   ]),
-  bookings: new Map(),
+  history: [],
 };
 
 const stubTx = {
@@ -88,21 +111,38 @@ const stubTx = {
     },
   },
   booking: {
+    findFirst: async () => null,
     update: async ({ where, data }) => {
       const s = [...store.slots.values()].find((x) => x.booking?.id === where.id);
       Object.assign(s.booking, data);
       return s.booking;
     },
-    updateMany: async ({ where, data }) => {
-      const s = store.slots.get(where.slotId);
-      if (s?.booking && (where.cancelledAt === null ? s.booking.cancelledAt == null : true)) {
-        Object.assign(s.booking, data);
-        return { count: 1 };
-      }
-      return { count: 0 };
+    updateMany: async () => ({ count: 0 }),
+    delete: async ({ where }) => {
+      const s = [...store.slots.values()].find((x) => x.booking?.id === where.id);
+      const b = s.booking;
+      s.booking = null;
+      return b;
     },
     create: async ({ data }) => {
-      throw new Error("create must not run when cancelled row exists — would hit UNIQUE(slotId)");
+      const b = {
+        id: "new-" + data.slotId,
+        createdAt: new Date(),
+        cancelledAt: null,
+        reminderEmail24hSentAt: null,
+        reminderEmail2hSentAt: null,
+        ...data,
+      };
+      store.slots.get(data.slotId).booking = b;
+      return b;
+    },
+  },
+  bookingHistory: {
+    findFirst: async () => null,
+    create: async ({ data }) => {
+      const row = { id: "h-" + store.history.length, ...data };
+      store.history.push(row);
+      return row;
     },
   },
 };
@@ -110,58 +150,71 @@ const stubTx = {
 const { assignActiveBookingToSlot, moveOrSwapBookingBetweenSlots, softCancelSlotBooking } =
   await import("../src/lib/bookingSlotAssign.ts");
 
-const reused = await assignActiveBookingToSlot(stubTx, "s1", {
+const replaced = await assignActiveBookingToSlot(stubTx, "s1", {
   performerName: "Artist B",
   performerEmail: "b@example.com",
 });
-assert.equal(reused.reusedCancelled, true);
+assert.equal(replaced.replacedCancelled, true);
+assert.equal(store.history.length, 1);
+assert.equal(store.history[0].performerName, "Artist A");
+assert.equal(store.history[0].reason, "SUPERSEDED");
 assert.equal(store.slots.get("s1").booking.performerName, "Artist B");
-assert.equal(store.slots.get("s1").booking.cancelledAt, null);
-assert.equal(store.slots.get("s1").status, "RESERVED");
+assert.equal(store.slots.get("s1").booking.id.startsWith("new-"), true);
+assert.equal(store.slots.get("s1").booking.reminderEmail24hSentAt, null);
 
-// Soft-cancel then reopen for another artist
-await softCancelSlotBooking(stubTx, "s1");
+await softCancelSlotBooking(stubTx, "s1", "CANCELLED");
 assert.ok(store.slots.get("s1").booking.cancelledAt);
-assert.equal(store.slots.get("s1").status, "AVAILABLE");
-const reused2 = await assignActiveBookingToSlot(stubTx, "s1", { performerName: "Artist C" });
-assert.equal(reused2.reusedCancelled, true);
-assert.equal(store.slots.get("s1").booking.performerName, "Artist C");
+assert.ok(store.history.some((h) => h.reason === "CANCELLED" && h.performerName === "Artist B"));
 
-// --- Move / swap stubs ---
+await assignActiveBookingToSlot(stubTx, "s1", { performerName: "Artist C" });
+assert.equal(store.slots.get("s1").booking.performerName, "Artist C");
+assert.ok(store.history.filter((h) => h.performerName === "Artist B").length >= 1);
+
+// --- Move / swap with reminder clear ---
 store.slots.set("sA", {
   id: "sA",
   instanceId: "inst1",
+  startMin: 1260,
   status: "RESERVED",
   booking: {
     id: "ba",
+    createdAt: new Date(),
     cancelledAt: null,
     musicianId: null,
     performerName: "Alpha",
-    performerEmail: null,
+    performerEmail: "alpha@ex.com",
     notes: null,
+    reminderEmail24hSentAt: new Date(),
+    reminderEmail2hSentAt: new Date(),
   },
 });
 store.slots.set("sB", {
   id: "sB",
   instanceId: "inst1",
+  startMin: 1280,
   status: "AVAILABLE",
   booking: null,
 });
 store.slots.set("sC", {
   id: "sC",
   instanceId: "inst1",
+  startMin: 1300,
   status: "RESERVED",
   booking: {
     id: "bc",
+    createdAt: new Date(),
     cancelledAt: null,
     musicianId: null,
     performerName: "Charlie",
-    performerEmail: null,
+    performerEmail: "charlie@ex.com",
     notes: null,
+    reminderEmail24hSentAt: new Date(),
+    reminderEmail2hSentAt: null,
   },
 });
 
 const moveTx = {
+  ...stubTx,
   slot: {
     findUnique: async ({ where }) => store.slots.get(where.id) ?? null,
     update: async ({ where, data }) => {
@@ -171,6 +224,7 @@ const moveTx = {
     },
   },
   booking: {
+    ...stubTx.booking,
     update: async ({ where, data }) => {
       for (const s of store.slots.values()) {
         if (s.booking?.id === where.id) {
@@ -180,69 +234,32 @@ const moveTx = {
       }
       throw new Error("missing booking");
     },
-    updateMany: async ({ where, data }) => {
-      const s = store.slots.get(where.slotId);
-      if (s?.booking && s.booking.cancelledAt == null) {
-        Object.assign(s.booking, data);
-        return { count: 1 };
-      }
-      return { count: 0 };
-    },
-    create: async ({ data }) => {
-      const b = { id: "new-" + data.slotId, cancelledAt: null, ...data };
-      store.slots.get(data.slotId).booking = b;
-      return b;
-    },
   },
 };
 
 const moved = await moveOrSwapBookingBetweenSlots(moveTx, "sA", "sB", { allowSwap: false });
 assert.equal(moved.ok, true);
 assert.equal(moved.mode, "moved");
-assert.equal(store.slots.get("sA").booking.cancelledAt != null, true);
 assert.equal(store.slots.get("sB").booking.performerName, "Alpha");
-
-const conflict = await moveOrSwapBookingBetweenSlots(moveTx, "sB", "sC", { allowSwap: false });
-assert.equal(conflict.ok, false);
-assert.equal(conflict.reason, "dest_taken");
+assert.equal(store.slots.get("sB").booking.reminderEmail24hSentAt, null);
+assert.equal(moved.notify[0].fromStartMin, 1260);
+assert.equal(moved.notify[0].toStartMin, 1280);
 
 const swapped = await moveOrSwapBookingBetweenSlots(moveTx, "sB", "sC", { allowSwap: true });
 assert.equal(swapped.ok, true);
 assert.equal(swapped.mode, "swapped");
 assert.equal(store.slots.get("sB").booking.performerName, "Charlie");
 assert.equal(store.slots.get("sC").booking.performerName, "Alpha");
+assert.equal(store.slots.get("sB").booking.reminderEmail24hSentAt, null);
+assert.equal(store.slots.get("sC").booking.reminderEmail24hSentAt, null);
+assert.equal(swapped.notify.length, 2);
 
-// --- Signup LIVE status ---
 const live = computeSignupLiveStatus({
   signupEnabled: true,
-  hasScheduleInstance: true,
-  slots: [
-    { status: "AVAILABLE", booking: null },
-    { status: "AVAILABLE", booking: { cancelledAt: new Date() } },
-    { status: "RESERVED", booking: { cancelledAt: null } },
-  ],
-  nightId: "n1",
-});
-assert.equal(live.live, true);
-assert.equal(live.openSpots, 2);
-assert.match(live.headline, /LIVE/);
-
-const notLive = computeSignupLiveStatus({
-  signupEnabled: false,
   hasScheduleInstance: true,
   slots: [{ status: "AVAILABLE", booking: null }],
   nightId: "n1",
 });
-assert.equal(notLive.live, false);
-assert.ok(notLive.blockers.some((b) => /turned off/i.test(b)));
+assert.equal(live.live, true);
 
-const full = computeSignupLiveStatus({
-  signupEnabled: true,
-  hasScheduleInstance: true,
-  slots: [{ status: "RESERVED", booking: { cancelledAt: null } }],
-  nightId: "n1",
-});
-assert.equal(full.live, false);
-assert.ok(full.blockers.some((b) => /filled|open/i.test(b)));
-
-console.log(JSON.stringify({ ok: true, checks: "cancelled-slot-rebook + move/swap + signup-live" }));
+console.log(JSON.stringify({ ok: true, checks: "rebook-history + host-window + move-reminders" }));

@@ -21,6 +21,7 @@ import {
   assignActiveBookingToSlot,
   moveOrSwapBookingBetweenSlots,
 } from "@/lib/bookingSlotAssign";
+import { notifyBookingTimeChanged } from "@/lib/bookingNotify";
 import { isValidScheduleWindow, resolveScheduleEndMin } from "@/lib/scheduleWindow";
 import {
   ALL_WEEKDAYS,
@@ -44,7 +45,7 @@ import {
 import { BookingRestrictionMode, VenuePerformerHistoryKind, Weekday } from "@/generated/prisma/client";
 import { BOOKING_RESTRICTION_OPTIONS } from "@/lib/bookingRestrictionUi";
 import { isLineupRuleTier, prismaOverridesForLineupRuleTierSelection } from "@/lib/lineupRuleTiers";
-import { timeInputValueToMinutes } from "@/lib/time";
+import { minutesToTimeLabel, timeInputValueToMinutes } from "@/lib/time";
 import { parseVenuePerformanceFormat } from "@/lib/venuePerformanceFormat";
 import {
   touchVenuePerformerHistoryForManual,
@@ -1605,6 +1606,27 @@ export async function moveVenueBookingAction(formData: FormData): Promise<VenueP
           formData,
         ),
       );
+    }
+
+    try {
+      const venue = await requirePrisma().venue.findUnique({
+        where: { id: venueId },
+        select: { name: true, slug: true },
+      });
+      const ymd = storageYmdUtc(from.instance.date);
+      const lineupPath = venue?.slug ? `/venues/${venue.slug}/lineup/${ymd}` : "/venue";
+      for (const n of result.notify) {
+        await notifyBookingTimeChanged({
+          performerName: n.performerName,
+          performerEmail: n.performerEmail,
+          venueName: venue?.name ?? "the open mic",
+          fromLabel: minutesToTimeLabel(n.fromStartMin),
+          toLabel: minutesToTimeLabel(n.toStartMin),
+          lineupPath,
+        });
+      }
+    } catch (e) {
+      console.error("[moveVenueBooking] notify failed", e);
     }
 
     revalidatePath("/venue");

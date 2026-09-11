@@ -5,7 +5,7 @@ import { getSession } from "@/lib/session";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 import { appendQueryToPath, safePublicVenueReturnPath } from "@/lib/publicVenueReturnPath";
-import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
+import { publicSignupBookBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
 import { assignActiveBookingToSlot } from "@/lib/bookingSlotAssign";
 import { notifyBookingCreated } from "@/lib/bookingNotify";
@@ -85,13 +85,33 @@ export async function POST(request: Request) {
   if (slotPreview.instance.isCancelled) {
     return redirectTo(appendQueryToPath(returnBase, { bookError: "This date’s schedule was cancelled." }));
   }
-  const instanceBlock = bookingBlockReason(venue, slotPreview.instance.date);
+
+  const hostNightId = slotPreview.instance.template.promoterNightId;
+  let hostSignupEnabled: boolean | null = null;
+  if (hostNightId) {
+    const night = await prisma.promoterNight.findUnique({
+      where: { id: hostNightId },
+      select: { signupEnabled: true },
+    });
+    hostSignupEnabled = night?.signupEnabled ?? false;
+  }
+
+  const instanceBlock = publicSignupBookBlockReason({
+    isHostNight: Boolean(hostNightId),
+    hostSignupEnabled,
+    venue,
+    eventDate: slotPreview.instance.date,
+  });
   if (instanceBlock) {
     return redirectTo(appendQueryToPath(returnBase, { bookError: instanceBlock }));
   }
 
+  // Slot must not have started yet (Host + Venue).
   const previewTz = slotPreview.instance.template.timeZone;
   const slotStartUtc = slotStartInstant(slotPreview.instance.date, slotPreview.startMin, previewTz);
+  if (slotStartUtc.getTime() <= Date.now()) {
+    return redirectTo(appendQueryToPath(returnBase, { bookError: "That start time has already passed." }));
+  }
   const effPreview = effectiveSlotRestriction(slotPreview, slotPreview.instance.template);
   const templateRestrictionBlock = slotRestrictionBlockReason(
     {
@@ -128,7 +148,24 @@ export async function POST(request: Request) {
       const txVenue = slot.instance.template.venue;
       const txTz = slot.instance.template.timeZone;
       const txSlotStartUtc = slotStartInstant(slot.instance.date, slot.startMin, txTz);
-      const txInstanceBlock = bookingBlockReason(txVenue, slot.instance.date);
+      if (txSlotStartUtc.getTime() <= Date.now()) {
+        throw new RedirectSignal(appendQueryToPath(returnBase, { bookError: "That start time has already passed." }));
+      }
+      const txHostNightId = slot.instance.template.promoterNightId;
+      let txHostSignupEnabled: boolean | null = null;
+      if (txHostNightId) {
+        const n = await tx.promoterNight.findUnique({
+          where: { id: txHostNightId },
+          select: { signupEnabled: true },
+        });
+        txHostSignupEnabled = n?.signupEnabled ?? false;
+      }
+      const txInstanceBlock = publicSignupBookBlockReason({
+        isHostNight: Boolean(txHostNightId),
+        hostSignupEnabled: txHostSignupEnabled,
+        venue: txVenue,
+        eventDate: slot.instance.date,
+      });
       if (txInstanceBlock) throw new RedirectSignal(appendQueryToPath(returnBase, { bookError: txInstanceBlock }));
       const effTx = effectiveSlotRestriction(slot, slot.instance.template);
       const txRestrictionBlock = slotRestrictionBlockReason(

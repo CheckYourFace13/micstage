@@ -71,6 +71,37 @@ export function bookingBlockReason(venue: SeriesAndWindow, eventDate: Date, now:
   return null;
 }
 
+/**
+ * Public book-submit gate.
+ * Host-owned nights (`promoterNightId`) follow Host signup rules — not Venue
+ * seriesStart/seriesEnd/bookingOpensDaysAhead (those are venue schedule windows).
+ * Still blocks past calendar days and disabled Host signup.
+ */
+export function publicSignupBookBlockReason(input: {
+  isHostNight: boolean;
+  hostSignupEnabled?: boolean | null;
+  venue: SeriesAndWindow;
+  eventDate: Date;
+  now?: Date;
+}): string | null {
+  const now = input.now ?? new Date();
+  if (input.isHostNight) {
+    if (input.hostSignupEnabled === false) {
+      return "Performer signup is not enabled for this night.";
+    }
+    // Past event days only (same calendar-day check as venue window, without advance limit).
+    const tz = input.venue.timeZone?.trim() || "America/Chicago";
+    const eventYmd = storageYmd(input.eventDate);
+    const eventDay = DateTime.fromISO(eventYmd, { zone: tz }).startOf("day");
+    const todayDay = DateTime.fromJSDate(now, { zone: "utc" }).setZone(tz).startOf("day");
+    if (eventDay.isValid && todayDay.isValid && eventDay.diff(todayDay, "days").days < 0) {
+      return "This night has already passed.";
+    }
+    return null;
+  }
+  return bookingBlockReason(input.venue, input.eventDate, now);
+}
+
 export function slotRestrictionBlockReason(
   restriction: {
     bookingRestrictionMode: BookingRestrictionMode;

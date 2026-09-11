@@ -15,10 +15,12 @@ import {
   softCancelSlotBooking,
   slotIsOpenForAssignment,
 } from "@/lib/bookingSlotAssign";
+import { notifyBookingTimeChanged } from "@/lib/bookingNotify";
 import { assertHostOwnsNight, assertHostOwnsSlot } from "@/lib/host/hostNightAuth";
-import { provisionHostNightLineup } from "@/lib/host/hostNightProvisioning";
+import { provisionHostNightLineup, publicLineupPathForNightId } from "@/lib/host/hostNightProvisioning";
 import { requirePrisma } from "@/lib/prisma";
 import { scheduleWindowFromTimeInputs } from "@/lib/scheduleWindow";
+import { minutesToTimeLabel } from "@/lib/time";
 
 /** `YYYY-MM-DD` as UTC midnight — same storage convention as `PromoterNight.date`. */
 function parseYmdUtc(ymd: string): Date | null {
@@ -199,6 +201,28 @@ export async function hostMoveBookingAction(formData: FormData) {
           ? "move_empty"
           : "move_failed";
     redirect(`/promoter/nights/${owned.nightId}?error=${err}`);
+  }
+
+  // Best-effort: notify performers whose start time changed (reminders already cleared).
+  try {
+    const night = await prisma.promoterNight.findUnique({
+      where: { id: owned.nightId },
+      select: { venue: { select: { name: true } } },
+    });
+    const venueName = night?.venue.name ?? "the open mic";
+    const lineupPath = publicLineupPathForNightId(owned.nightId);
+    for (const n of result.notify) {
+      await notifyBookingTimeChanged({
+        performerName: n.performerName,
+        performerEmail: n.performerEmail,
+        venueName,
+        fromLabel: minutesToTimeLabel(n.fromStartMin),
+        toLabel: minutesToTimeLabel(n.toStartMin),
+        lineupPath,
+      });
+    }
+  } catch (e) {
+    console.error("[hostMoveBooking] notify failed", e);
   }
 
   revalidatePath(`/nights/${owned.nightId}/lineup`);

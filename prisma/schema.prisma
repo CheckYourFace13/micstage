@@ -616,6 +616,7 @@ model Slot {
   onPremiseMaxDistanceMetersOverride Int?
 
   booking Booking?
+  bookingHistories BookingHistory[]
 
   @@unique([instanceId, startMin])
   @@index([instanceId, status])
@@ -646,6 +647,35 @@ model Booking {
   @@index([musicianId])
   @@index([cancelledAt, reminderEmail24hSentAt])
   @@index([cancelledAt, reminderEmail2hSentAt])
+}
+
+/// Append-only snapshot of a booking occupancy (cancel / replace / move-away).
+/// Active Booking rows stay 1:1 with Slot; history lives here so rebooking never
+/// overwrites the only record of who previously held the slot.
+model BookingHistory {
+  id        String   @id @default(cuid())
+  recordedAt DateTime @default(now())
+
+  slotId    String
+  slot      Slot   @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  /// Original Booking.id when known (may later be deleted after supersede).
+  bookingId String?
+
+  musicianId     String?
+  performerName  String
+  performerEmail String?
+  notes          String?
+
+  /// Original Booking.createdAt (when they booked).
+  bookedAt    DateTime
+  cancelledAt DateTime?
+
+  /// CANCELLED | SUPERSEDED | MOVED_AWAY
+  reason String
+
+  @@index([slotId, recordedAt])
+  @@index([bookingId])
+  @@index([performerEmail, recordedAt])
 }
 
 /// One thread per venue + musician pair (direct messaging).

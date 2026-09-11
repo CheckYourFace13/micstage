@@ -39,6 +39,7 @@ function writeStored(value: StoredAttribution) {
 function detectLandingType(pathname: string): ConversionLandingType {
   if (pathname.startsWith("/open-mics/")) return "listing";
   if (pathname === "/host") return "host";
+  if (pathname === "/artists") return "other";
   if (pathname === "/register/venue") return "venue_register";
   if (pathname.startsWith("/claim/")) return "claim";
   return "other";

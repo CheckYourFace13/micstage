@@ -69,8 +69,8 @@ export default function Home() {
                 <li className="rounded-xl border border-white/10 bg-black/30 p-4">
                   <p className="font-semibold text-white">Performers</p>
                   <p className="mt-1 text-xs text-white/55">Find real open mics and sign up when available.</p>
-                  <Link href="/register/musician" className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-[rgb(var(--om-neon))] underline">
-                    Sign up free
+                  <Link href="/artists" className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-[rgb(var(--om-neon))] underline">
+                    For artists
                   </Link>
                 </li>
                 <li className="rounded-xl border border-white/10 bg-black/30 p-4">

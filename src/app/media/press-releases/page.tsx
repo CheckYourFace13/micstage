@@ -83,7 +83,7 @@ export default function MediaPressReleasesPage() {
               scheduling, steadier discovery, and marketing-friendly public URLs venues can reuse week after week.
             </p>
             <p>
-              Additional updates and milestones will ship through MicStage&apos;s normal product channels as the beta continues.
+              Additional updates and milestones ship through MicStage&apos;s normal product channels.
             </p>
           </div>
 

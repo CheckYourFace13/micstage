@@ -28,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/locations",
     "/venues",
     "/resources",
+    "/artists",
     "/register/venue",
     "/register/musician",
     "/host",
@@ -57,9 +58,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ? 1
         : path === "/find-open-mics"
           ? 0.95
-          : path.startsWith("/register/")
-            ? 0.88
-            : 0.85,
+          : path === "/artists" || path === "/host"
+            ? 0.9
+            : path.startsWith("/register/")
+              ? 0.88
+              : 0.85,
   }));
 
   const prisma = getPrismaOrNull();

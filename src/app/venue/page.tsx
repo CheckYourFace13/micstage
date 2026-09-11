@@ -960,6 +960,7 @@ export default async function VenuePortalPage({
                                           key={s.id}
                                           venueId={v.id}
                                           slot={s}
+                                          siblingSlots={inst.slots}
                                           template={t}
                                           lineupDay={selectedYmd}
                                           performerSuggestions={performerSuggestionsByVenueId[v.id] ?? []}

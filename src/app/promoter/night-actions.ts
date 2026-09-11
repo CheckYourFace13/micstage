@@ -9,6 +9,12 @@ import {
   parseArtistTimingFromForm,
 } from "@/lib/artistTiming";
 import { requirePromoterSession } from "@/lib/authz";
+import {
+  assignActiveBookingToSlot,
+  moveOrSwapBookingBetweenSlots,
+  softCancelSlotBooking,
+  slotIsOpenForAssignment,
+} from "@/lib/bookingSlotAssign";
 import { assertHostOwnsNight, assertHostOwnsSlot } from "@/lib/host/hostNightAuth";
 import { provisionHostNightLineup } from "@/lib/host/hostNightProvisioning";
 import { requirePrisma } from "@/lib/prisma";
@@ -120,22 +126,29 @@ export async function hostHouseBookSlotAction(formData: FormData) {
   const owned = await assertHostOwnsSlot(prisma, session.promoterId, slotId);
   if (!owned.ok) redirect("/promoter?promoter=forbidden");
 
-  const slot = await prisma.slot.findUnique({
-    where: { id: slotId },
-    include: { booking: true },
-  });
-  if (!slot || slot.booking) redirect(`/promoter/nights/${owned.nightId}?error=slot_taken`);
-
-  await prisma.booking.create({
-    data: {
-      slotId,
-      performerName: performerName.slice(0, 120),
-      performerEmail: formData.get("performerEmail")?.toString().trim().slice(0, 200) || null,
-    },
-  });
-  await prisma.slot.update({ where: { id: slotId }, data: { status: "RESERVED" } });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const slot = await tx.slot.findUnique({
+        where: { id: slotId },
+        include: { booking: true },
+      });
+      if (!slot || !slotIsOpenForAssignment(slot.booking)) {
+        throw new Error("SLOT_TAKEN");
+      }
+      await assignActiveBookingToSlot(tx, slotId, {
+        performerName,
+        performerEmail: formData.get("performerEmail")?.toString().trim().slice(0, 200) || null,
+      });
+    });
+  } catch (e) {
+    if (e instanceof Error && e.message === "SLOT_TAKEN") {
+      redirect(`/promoter/nights/${owned.nightId}?error=slot_taken`);
+    }
+    throw e;
+  }
 
   revalidatePath(`/nights/${owned.nightId}/lineup`);
+  revalidatePath(`/promoter/nights/${owned.nightId}`);
   redirect(`/promoter/nights/${owned.nightId}?saved=1`);
 }
 
@@ -148,12 +161,47 @@ export async function hostRemoveBookingAction(formData: FormData) {
   const owned = await assertHostOwnsSlot(prisma, session.promoterId, slotId);
   if (!owned.ok) redirect("/promoter?promoter=forbidden");
 
-  await prisma.booking.updateMany({
-    where: { slotId, cancelledAt: null },
-    data: { cancelledAt: new Date() },
+  await prisma.$transaction(async (tx) => {
+    await softCancelSlotBooking(tx, slotId);
   });
-  await prisma.slot.update({ where: { id: slotId }, data: { status: "AVAILABLE", manualLineupLabel: null } });
 
   revalidatePath(`/nights/${owned.nightId}/lineup`);
+  revalidatePath(`/promoter/nights/${owned.nightId}`);
   redirect(`/promoter/nights/${owned.nightId}?saved=1`);
+}
+
+/** Move performer to another start time on the same night. Occupied destination → swap. */
+export async function hostMoveBookingAction(formData: FormData) {
+  const session = await requirePromoterSession();
+  const fromSlotId = formData.get("fromSlotId")?.toString().trim();
+  const toSlotId = formData.get("toSlotId")?.toString().trim();
+  if (!fromSlotId || !toSlotId) redirect("/promoter?promoter=night_invalid");
+
+  const prisma = requirePrisma();
+  const owned = await assertHostOwnsSlot(prisma, session.promoterId, fromSlotId);
+  if (!owned.ok) redirect("/promoter?promoter=forbidden");
+  const destOwned = await assertHostOwnsSlot(prisma, session.promoterId, toSlotId);
+  if (!destOwned.ok || destOwned.nightId !== owned.nightId) {
+    redirect("/promoter?promoter=forbidden");
+  }
+
+  const allowSwap = formData.get("allowSwap") === "on" || formData.get("allowSwap") === "true";
+
+  const result = await prisma.$transaction(async (tx) =>
+    moveOrSwapBookingBetweenSlots(tx, fromSlotId, toSlotId, { allowSwap }),
+  );
+
+  if (!result.ok) {
+    const err =
+      result.reason === "dest_taken"
+        ? "slot_taken"
+        : result.reason === "source_empty"
+          ? "move_empty"
+          : "move_failed";
+    redirect(`/promoter/nights/${owned.nightId}?error=${err}`);
+  }
+
+  revalidatePath(`/nights/${owned.nightId}/lineup`);
+  revalidatePath(`/promoter/nights/${owned.nightId}`);
+  redirect(`/promoter/nights/${owned.nightId}?saved=${result.mode === "swapped" ? "swapped" : "moved"}`);
 }

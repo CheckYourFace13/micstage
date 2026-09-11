@@ -1,21 +1,25 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getPromoterSessionOrNull } from "@/lib/authz";
+import { slotIsOpenForAssignment } from "@/lib/bookingSlotAssign";
 import { assertHostOwnsNight } from "@/lib/host/hostNightAuth";
 import { loadHostNightLineupContext } from "@/lib/host/hostNightLineupData";
 import { publicLineupPathForNightId } from "@/lib/host/hostNightProvisioning";
 import { requirePrisma } from "@/lib/prisma";
 import { buildPublicMetadata, absoluteUrl } from "@/lib/publicSeo";
 import { scheduleWindowLabel } from "@/lib/scheduleWindow";
+import { computeSignupLiveStatus } from "@/lib/signupLiveStatus";
 import { lineupNavLabelFromYmd, minutesToTimeInputValue, minutesToTimeLabel } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { HostNightVenueEditor } from "@/components/host/HostNightVenueEditor";
+import { SignupLiveStatusPanel } from "@/components/host/SignupLiveStatusPanel";
 import { SharePageButtons } from "@/components/onboarding/SharePageButtons";
 import { changePromoterNightVenueAction } from "../../actions";
 import {
   hostHouseBookSlotAction,
+  hostMoveBookingAction,
   hostRemoveBookingAction,
   updateHostNightSignupAction,
 } from "../../night-actions";
@@ -48,6 +52,15 @@ export default async function HostNightManagePage(props: {
   const lineupUrl = absoluteUrl(publicLineupPathForNightId(nightId));
   const ymd = storageYmdUtc(ctx.night.date);
   const slots = ctx.instance?.slots ?? [];
+  const firstOpenSlotId = slots.find((s) => slotIsOpenForAssignment(s.booking))?.id ?? "";
+
+  const signupLive = computeSignupLiveStatus({
+    signupEnabled: ctx.night.signupEnabled,
+    hasScheduleInstance: Boolean(ctx.instance),
+    isCancelled: ctx.instance?.isCancelled ?? false,
+    slots,
+    nightId,
+  });
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -68,7 +81,11 @@ export default async function HostNightManagePage(props: {
           <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm">
             {saved === "venue"
               ? "Moved. Your public lineup and signup link now point at the new venue."
-              : "Saved. Your public lineup shows the new day and times now."}
+              : saved === "moved"
+                ? "Performer moved. Start times on the grid did not change."
+                : saved === "swapped"
+                  ? "Performers swapped. Schedule times stayed the same."
+                  : "Saved. Your public lineup shows the new day and times now."}
           </div>
         ) : null}
         {error ? (
@@ -83,9 +100,17 @@ export default async function HostNightManagePage(props: {
                   ? "You already have a night at this venue on that date."
                   : error === "venue_missing"
                     ? "Pick a venue from the list (or add one from Google) and try again."
-                    : "That slot was already taken."}
+                    : error === "move_empty"
+                      ? "That slot no longer has a performer to move."
+                      : error === "move_failed"
+                        ? "Could not move that performer. Try again."
+                        : "That slot was already taken — choose Swap if you want to exchange performers."}
           </div>
         ) : null}
+
+        <div className="mt-6">
+          <SignupLiveStatusPanel status={signupLive} />
+        </div>
 
         <div className="mt-6 rounded-2xl border border-[rgba(var(--om-neon),0.35)] bg-[rgba(var(--om-neon),0.08)] p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--om-neon))]">
@@ -220,25 +245,67 @@ export default async function HostNightManagePage(props: {
 
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Lineup ({slots.length} slots)</h2>
+          <p className="mt-1 text-sm text-white/55">
+            Move a performer to another start time without changing the schedule grid.
+          </p>
           <ul className="mt-3 grid gap-2">
             {slots.map((slot) => {
-              const label =
-                slot.booking && !slot.booking.cancelledAt
-                  ? slot.booking.performerName
-                  : slot.manualLineupLabel || "Open";
+              const active = slot.booking && !slot.booking.cancelledAt ? slot.booking : null;
+              const label = active ? active.performerName : slot.manualLineupLabel || "Open";
               return (
-                <li key={slot.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm">
+                <li
+                  key={slot.id}
+                  className="grid gap-2 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm sm:grid-cols-[1fr_auto] sm:items-center"
+                >
                   <span>
                     {label}{" "}
                     <span className="text-white/45">{minutesToTimeLabel(slot.startMin)}</span>
                   </span>
-                  {slot.booking && !slot.booking.cancelledAt ? (
-                    <form action={hostRemoveBookingAction}>
-                      <input type="hidden" name="slotId" value={slot.id} />
-                      <button type="submit" className="text-xs text-red-300 underline">
-                        Remove
-                      </button>
-                    </form>
+                  {active ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <form action={hostMoveBookingAction} className="flex flex-wrap items-center gap-2">
+                        <input type="hidden" name="fromSlotId" value={slot.id} />
+                        <input type="hidden" name="allowSwap" value="true" />
+                        <label className="flex items-center gap-1 text-xs text-white/70">
+                          Move to
+                          <select
+                            name="toSlotId"
+                            required
+                            defaultValue=""
+                            className="h-9 rounded-md border border-white/15 bg-black/50 px-2 text-sm text-white"
+                          >
+                            <option value="" disabled>
+                              Start time…
+                            </option>
+                            {slots
+                              .filter((s) => s.id !== slot.id)
+                              .map((s) => {
+                                const otherActive = s.booking && !s.booking.cancelledAt ? s.booking : null;
+                                const destLabel = otherActive
+                                  ? `${minutesToTimeLabel(s.startMin)} (swap with ${otherActive.performerName})`
+                                  : minutesToTimeLabel(s.startMin);
+                                return (
+                                  <option key={s.id} value={s.id}>
+                                    {destLabel}
+                                  </option>
+                                );
+                              })}
+                          </select>
+                        </label>
+                        <button
+                          type="submit"
+                          className="h-9 rounded-md border border-white/20 px-3 text-xs font-semibold text-white"
+                        >
+                          Move
+                        </button>
+                      </form>
+                      <form action={hostRemoveBookingAction}>
+                        <input type="hidden" name="slotId" value={slot.id} />
+                        <button type="submit" className="text-xs text-red-300 underline">
+                          Remove
+                        </button>
+                      </form>
+                    </div>
                   ) : null}
                 </li>
               );
@@ -246,12 +313,16 @@ export default async function HostNightManagePage(props: {
           </ul>
 
           <form action={hostHouseBookSlotAction} className="mt-4 grid gap-2 rounded-xl border border-dashed border-white/15 p-4 sm:grid-cols-2">
-            <input type="hidden" name="slotId" value={slots.find((s) => !s.booking)?.id ?? ""} />
+            <input type="hidden" name="slotId" value={firstOpenSlotId} />
             <label className="grid gap-1 text-sm sm:col-span-2">
               <span className="text-white/75">Add performer (first open slot)</span>
               <input name="performerName" required placeholder="Performer name" className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white" />
             </label>
-            <FormSubmitButton label="Add to lineup" className="h-11 rounded-md bg-white/10 px-4 text-sm font-semibold sm:col-span-2" />
+            <FormSubmitButton
+              label="Add to lineup"
+              className="h-11 rounded-md bg-white/10 px-4 text-sm font-semibold sm:col-span-2"
+              disabled={!firstOpenSlotId}
+            />
           </form>
         </section>
       </main>

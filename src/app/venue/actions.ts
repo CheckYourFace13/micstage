@@ -17,6 +17,10 @@ import {
 import { requireVenueSession, venueIdsForSession, venueIdsForVenueSession } from "@/lib/authz";
 import { generateSlotsForWindow } from "@/lib/slotGeneration";
 import { slotMayBeDeleted, syncSlotsForInstance } from "@/lib/slotSync";
+import {
+  assignActiveBookingToSlot,
+  moveOrSwapBookingBetweenSlots,
+} from "@/lib/bookingSlotAssign";
 import { isValidScheduleWindow, resolveScheduleEndMin } from "@/lib/scheduleWindow";
 import {
   ALL_WEEKDAYS,
@@ -1327,40 +1331,19 @@ export async function houseBookSlot(formData: FormData): Promise<VenuePortalActi
       if (!slot) throw new Error("HOUSE_BOOK_MISSING");
       if (slot.booking && !slot.booking.cancelledAt) throw new Error("HOUSE_BOOK_TAKEN");
 
-      if (slot.booking && slot.booking.cancelledAt) {
-        await tx.booking.update({
-          where: { id: slot.booking.id },
-          data: {
-            musicianId: null,
-            performerName,
-            performerEmail: null,
-            notes: null,
-            cancelledAt: null,
-          },
-        });
-      } else {
-        await tx.booking.create({
-          data: {
-            slotId: slot.id,
-            musicianId: null,
-            performerName,
-            performerEmail: null,
-            notes: null,
-          },
-        });
-      }
-
-      await tx.slot.update({
-        where: { id: slot.id },
-        data: { status: "RESERVED", manualLineupLabel: null },
+      await assignActiveBookingToSlot(tx, slot.id, {
+        performerName,
+        musicianId: null,
+        performerEmail: null,
+        notes: null,
       });
 
       await touchVenuePerformerHistoryForManual(tx, venueId, performerName);
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
-    if (msg === "HOUSE_BOOK_MISSING") return portalRedirect("/venue?houseBookError=missing");
-    if (msg === "HOUSE_BOOK_TAKEN") return portalRedirect("/venue?houseBookError=taken");
+    if (msg === "HOUSE_BOOK_MISSING" || msg === "SLOT_MISSING") return portalRedirect("/venue?houseBookError=missing");
+    if (msg === "HOUSE_BOOK_TAKEN" || msg === "SLOT_TAKEN") return portalRedirect("/venue?houseBookError=taken");
     throw e;
   }
 
@@ -1537,14 +1520,11 @@ export async function updateVenueSlotLine(formData: FormData): Promise<VenuePort
           },
         });
       } else if (!ab) {
-        await tx.booking.create({
-          data: {
-            slotId,
-            musicianId: linkMusician.id,
-            performerName: linkMusician.stageName.trim(),
-            performerEmail: linkMusician.email,
-            notes: null,
-          },
+        await assignActiveBookingToSlot(tx, slotId, {
+          musicianId: linkMusician.id,
+          performerName: linkMusician.stageName.trim(),
+          performerEmail: linkMusician.email,
+          notes: null,
         });
       }
       await tx.slot.update({
@@ -1585,6 +1565,54 @@ export async function updateVenueSlotLine(formData: FormData): Promise<VenuePort
   const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   if (v?.slug) revalidatePath(`/venues/${v.slug}`);
   return portalRedirect(buildVenuePortalRedirect("slotLine=saved", formData));
+  } catch (e) {
+    if (e instanceof VenuePortalRedirectSignal) return e.result;
+    throw e;
+  }
+}
+
+/** Move (or swap) a venue booking to another slot — does not change schedule start times. */
+export async function moveVenueBookingAction(formData: FormData): Promise<VenuePortalActionResult> {
+  try {
+    const session = await requireVenueSession();
+    const venueId = reqString(formData, "venueId");
+    const fromSlotId = reqString(formData, "fromSlotId");
+    const toSlotId = reqString(formData, "toSlotId");
+    const allowSwap = formData.get("allowSwap") === "on" || formData.get("allowSwap") === "true";
+
+    const allowed = await venueIdsForSession(session);
+    if (!allowed.includes(venueId)) return portalRedirect("/venue?venueError=forbidden");
+
+    const from = await requirePrisma().slot.findUnique({
+      where: { id: fromSlotId },
+      include: { instance: { include: { template: true } } },
+    });
+    const to = await requirePrisma().slot.findUnique({
+      where: { id: toSlotId },
+      include: { instance: { include: { template: true } } },
+    });
+    if (!from || !to || from.instance.template.venueId !== venueId || to.instance.template.venueId !== venueId) {
+      return portalRedirect("/venue?venueError=forbidden");
+    }
+
+    const result = await requirePrisma().$transaction(async (tx) =>
+      moveOrSwapBookingBetweenSlots(tx, fromSlotId, toSlotId, { allowSwap }),
+    );
+    if (!result.ok) {
+      return portalRedirect(
+        buildVenuePortalRedirect(
+          result.reason === "dest_taken" ? "moveError=taken" : "moveError=failed",
+          formData,
+        ),
+      );
+    }
+
+    revalidatePath("/venue");
+    const v = await requirePrisma().venue.findUnique({ where: { id: venueId }, select: { slug: true } });
+    if (v?.slug) revalidatePath(`/venues/${v.slug}`);
+    return portalRedirect(
+      buildVenuePortalRedirect(result.mode === "swapped" ? "move=swapped" : "move=ok", formData),
+    );
   } catch (e) {
     if (e instanceof VenuePortalRedirectSignal) return e.result;
     throw e;

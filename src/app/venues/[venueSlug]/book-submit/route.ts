@@ -7,6 +7,10 @@ import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 import { appendQueryToPath, safePublicVenueReturnPath } from "@/lib/publicVenueReturnPath";
 import { bookingBlockReason, slotRestrictionBlockReason, slotStartInstant } from "@/lib/venueBookingRules";
 import { effectiveSlotRestriction } from "@/lib/slotBookingEffective";
+import { assignActiveBookingToSlot } from "@/lib/bookingSlotAssign";
+import { notifyBookingCreated } from "@/lib/bookingNotify";
+import { publicLineupPathForNightId } from "@/lib/host/hostNightProvisioning";
+import { minutesToTimeLabel } from "@/lib/time";
 import {
   touchVenuePerformerHistoryForManual,
   touchVenuePerformerHistoryForMusician,
@@ -159,19 +163,12 @@ export async function POST(request: Request) {
         throw new Error("Name is required");
       }
 
-      await tx.booking.create({
-        data: {
-          slotId: slot.id,
-          musicianId,
-          performerName,
-          performerEmail,
-          notes: notes ?? null,
-        },
-      });
-
-      await tx.slot.update({
-        where: { id: slot.id },
-        data: { status: "RESERVED", manualLineupLabel: null },
+      // Reuse cancelled Booking row when present — Booking.slotId is UNIQUE.
+      await assignActiveBookingToSlot(tx, slot.id, {
+        musicianId,
+        performerName,
+        performerEmail,
+        notes: notes ?? null,
       });
 
       const vid = txVenue.id;
@@ -186,10 +183,58 @@ export async function POST(request: Request) {
     throw e;
   }
 
+  // Best-effort notices (do not block booking success).
+  try {
+    const nightId = slotPreview.instance.template.promoterNightId;
+    let hostEmail: string | null = null;
+    if (nightId) {
+      const night = await prisma.promoterNight.findUnique({
+        where: { id: nightId },
+        select: { series: { select: { promoter: { select: { email: true } } } } },
+      });
+      hostEmail = night?.series.promoter.email ?? null;
+    } else {
+      const owner = await prisma.venue.findUnique({
+        where: { id: venue.id },
+        select: { owner: { select: { email: true } } },
+      });
+      hostEmail = owner?.owner?.email ?? null;
+    }
+    const lineupYmdNotify = slotPreview.instance.date.toISOString().slice(0, 10);
+    const lineupPath = nightId
+      ? publicLineupPathForNightId(nightId)
+      : `/venues/${venueSlug}/lineup/${lineupYmdNotify}`;
+    const whenLabel = `${lineupYmdNotify} · ${minutesToTimeLabel(slotPreview.startMin)}`;
+    const performerName =
+      session?.kind === "musician"
+        ? (await prisma.musicianUser.findUnique({ where: { id: session.musicianId }, select: { stageName: true } }))
+            ?.stageName ?? "Performer"
+        : (optString(formData, "performerName") ?? "Performer");
+    const performerEmail =
+      session?.kind === "musician"
+        ? (await prisma.musicianUser.findUnique({ where: { id: session.musicianId }, select: { email: true } }))
+            ?.email ?? null
+        : (optString(formData, "performerEmail") ?? null);
+    await notifyBookingCreated({
+      performerName,
+      performerEmail,
+      hostOrVenueEmail: hostEmail,
+      hostOrVenueLabel: nightId ? "Host" : "Venue",
+      venueName: venue.name,
+      whenLabel,
+      lineupPath,
+    });
+  } catch (e) {
+    console.error("[book-submit] notify failed", e);
+  }
+
   const lineupYmd = slotPreview.instance.date.toISOString().slice(0, 10);
   revalidatePath(`/venues/${venueSlug}`);
   revalidatePath(`/venues/${venueSlug}/lineup`);
   revalidatePath(`/venues/${venueSlug}/lineup/${lineupYmd}`);
+  if (slotPreview.instance.template.promoterNightId) {
+    revalidatePath(`/nights/${slotPreview.instance.template.promoterNightId}/lineup`);
+  }
   revalidatePath(ARTIST_DASHBOARD_HREF);
   return redirectTo(appendQueryToPath(returnBase, { booked: "1" }));
 }

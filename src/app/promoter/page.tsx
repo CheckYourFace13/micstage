@@ -11,11 +11,13 @@ import { lineupNavLabelFromYmd } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { HostAddNightForm } from "@/components/host/HostAddNightForm";
+import { SignupLiveStatusPanel } from "@/components/host/SignupLiveStatusPanel";
 import { FindOpenMicPanel } from "@/components/promoter/FindOpenMicPanel";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { SharePageButtons } from "@/components/onboarding/SharePageButtons";
 import { promoterSetupChecklist } from "@/lib/onboarding/setupProgress";
 import { listRemovableOpenMicsForPromoter } from "@/lib/publicListings/openMicSelfRemoval";
+import { computeSignupLiveStatus } from "@/lib/signupLiveStatus";
 import {
   addPromoterNightAction,
   addPromoterRecurringNightsAction,
@@ -103,6 +105,37 @@ export default async function HostDashboardPage(props: {
 
   const hostPublicUrl = user?.hostSlug ? absoluteUrl(`/hosts/${user.hostSlug}`) : null;
 
+  let nextNightSignupLive: ReturnType<typeof computeSignupLiveStatus> | null = null;
+  if (nextNight) {
+    const tpl = await prisma.eventTemplate.findFirst({
+      where: { promoterNightId: nextNight.id },
+      select: {
+        instances: {
+          orderBy: { date: "asc" },
+          take: 1,
+          select: {
+            isCancelled: true,
+            slots: {
+              select: {
+                status: true,
+                bookingRestrictionModeOverride: true,
+                booking: { select: { cancelledAt: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    const inst = tpl?.instances[0];
+    nextNightSignupLive = computeSignupLiveStatus({
+      signupEnabled: nextNight.signupEnabled,
+      hasScheduleInstance: Boolean(inst),
+      isCancelled: inst?.isCancelled ?? false,
+      slots: inst?.slots ?? [],
+      nightId: nextNight.id,
+    });
+  }
+
   const promoterNotice = (() => {
     switch (promoter) {
       case "series_ok":
@@ -148,6 +181,14 @@ export default async function HostDashboardPage(props: {
             <p className="mt-2 text-sm text-white/80">
               {lineupNavLabelFromYmd(storageYmdUtc(nextNight.date))} · {nextNight.venue.name}
             </p>
+            {nextNightSignupLive ? (
+              <div className="mt-4">
+                <SignupLiveStatusPanel
+                  status={nextNightSignupLive}
+                  manageHref={`/promoter/nights/${nextNight.id}`}
+                />
+              </div>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               {nightLineupHrefs[nextNight.id] ? (
                 <>

@@ -80,9 +80,9 @@ for (const rel of [
   "src/app/register/musician/register-submit/route.ts",
 ]) {
   const src = read(rel);
-  const stampIdx = src.indexOf("stampRegistrationSubmitForLead");
-  const consentIdx = src.indexOf("registrationContentConsentChecked");
-  const rateIdx = src.indexOf("consumeRateLimit");
+  const stampIdx = src.indexOf("await stampRegistrationSubmitForLead");
+  const consentIdx = src.indexOf("if (!registrationContentConsentChecked");
+  const rateIdx = src.indexOf("await consumeRateLimit");
   assert.ok(stampIdx > 0 && stampIdx < consentIdx, `${rel}: stamp before consent`);
   assert.ok(stampIdx < rateIdx, `${rel}: stamp before rate limit`);
 }

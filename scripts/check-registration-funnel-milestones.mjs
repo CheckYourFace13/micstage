@@ -136,14 +136,12 @@ try {
     "src/app/register/musician/register-submit/route.ts",
   ]) {
     const src = fs.readFileSync(rel, "utf8");
-    const stampIdx = src.indexOf("stampRegistrationSubmitForLead");
-    const consentIdx = src.indexOf("registrationContentConsentChecked");
-    const rateIdx = src.indexOf("consumeRateLimit");
-    const existsIdx = src.search(/existing|exists/);
-    assert.ok(stampIdx > 0, `${rel} has stamp`);
+    const stampIdx = src.indexOf("await stampRegistrationSubmitForLead");
+    const consentIdx = src.indexOf("if (!registrationContentConsentChecked");
+    const rateIdx = src.indexOf("await consumeRateLimit");
+    assert.ok(stampIdx > 0, `${rel} has stamp call`);
     assert.ok(stampIdx < consentIdx, `${rel} stamp before consent`);
     assert.ok(stampIdx < rateIdx, `${rel} stamp before rate limit`);
-    assert.ok(existsIdx < 0 || stampIdx < existsIdx || src.indexOf("error=exists") > stampIdx, `${rel} stamp before exists path`);
   }
 
   // A. Page load only

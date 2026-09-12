@@ -253,6 +253,19 @@ export async function sendListingClaimInviteIfNeeded(
     where: { id: listingId },
     include: {
       schedules: { select: { title: true, description: true } },
+      openMicEvidenceRows: {
+        select: {
+          trusted: true,
+          detectedPhrase: true,
+          evidenceExcerpt: true,
+          evidenceTitle: true,
+          reasonCode: true,
+          fetchedAt: true,
+          evidenceDate: true,
+          currentnessScore: true,
+          sourceType: true,
+        },
+      },
       growthLead: {
         select: {
           contactEmailNormalized: true,
@@ -273,6 +286,7 @@ export async function sendListingClaimInviteIfNeeded(
     ...listing,
     discoveryMarketSlug: listing.growthLead?.discoveryMarketSlug,
     schedules: listing.schedules,
+    storedEvidence: listing.openMicEvidenceRows,
   });
   if (!safety.ok) return { sent: false, reason: safety.reason };
 
@@ -524,6 +538,19 @@ export async function runPendingListingClaimInvites(
       internalNotes: true,
       about: true,
       schedules: { select: { title: true, description: true } },
+      openMicEvidenceRows: {
+        select: {
+          trusted: true,
+          detectedPhrase: true,
+          evidenceExcerpt: true,
+          evidenceTitle: true,
+          reasonCode: true,
+          fetchedAt: true,
+          evidenceDate: true,
+          currentnessScore: true,
+          sourceType: true,
+        },
+      },
       growthLead: {
         select: {
           contactEmailNormalized: true,
@@ -567,6 +594,7 @@ export async function runPendingListingClaimInvites(
       ...row,
       discoveryMarketSlug: row.growthLead?.discoveryMarketSlug,
       schedules: row.schedules,
+      storedEvidence: row.openMicEvidenceRows,
     });
     if (!safety.ok) {
       skipped += 1;

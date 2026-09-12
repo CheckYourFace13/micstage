@@ -12,9 +12,51 @@ type ResendWebhookBody = {
     from?: string;
     to?: string[];
     subject?: string;
-    bounce?: { message?: string; type?: string };
+    bounce?: { message?: string; type?: string; subType?: string; diagnosticCode?: string[] };
   };
 };
+
+/** Resend marks Permanent vs Transient; only true soft Transient is excluded from suppression + health. */
+export function isResendHardBounce(
+  bounce:
+    | {
+        type?: string;
+        message?: string;
+        subType?: string;
+        diagnosticCode?: string[] | string | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  const diag = Array.isArray(bounce?.diagnosticCode)
+    ? bounce.diagnosticCode.join(" ")
+    : typeof bounce?.diagnosticCode === "string"
+      ? bounce.diagnosticCode
+      : "";
+  const msg = `${bounce?.message ?? ""} ${diag} ${bounce?.subType ?? ""}`.toLowerCase();
+
+  // Explicit mailbox-full / retryable storage soft signals.
+  if (
+    bounce?.subType === "MailboxFull" ||
+    /inbox was full|mailbox (is )?full|quota exceeded|out of storage/.test(msg)
+  ) {
+    return false;
+  }
+
+  // Permanent-looking SMTP diagnostics even if Resend typed Transient (e.g. invalid domain).
+  if (/invalid domain|no such user|user unknown|address does not exist|5\.1\.1|5\.4\.4/.test(msg)) {
+    return true;
+  }
+
+  const t = (bounce?.type ?? "").trim().toLowerCase();
+  if (!t) {
+    if (/try again later|temporary/.test(msg)) return false;
+    return true;
+  }
+  if (t === "transient" || t === "soft" || t === "temporary") return false;
+  if (t === "permanent" || t === "hard") return true;
+  return true;
+}
 
 function webhookSecret(): string | null {
   return process.env.RESEND_WEBHOOK_SECRET?.trim() || null;
@@ -124,20 +166,56 @@ export async function processVerifiedResendWebhook(
     });
   } else if (type === "email.bounced") {
     const targetEmail = toEmail || send?.toEmailNormalized;
+    const bounceInfo = event.data?.bounce;
+    const hard = isResendHardBounce(bounceInfo);
     if (send) {
-      await prisma.marketingEmailSend.update({
-        where: { id: send.id },
-        data: { bouncedAt: now },
-      });
-      await prisma.marketingEvent.create({
-        data: {
-          type: "EMAIL_BOUNCED",
-          contactId: send.contactId ?? undefined,
-          payload: { sendId: send.id, providerMessageId } as Prisma.InputJsonValue,
-        },
-      });
+      if (hard) {
+        await prisma.marketingEmailSend.update({
+          where: { id: send.id },
+          data: {
+            bouncedAt: now,
+            lastError: bounceInfo?.message
+              ? `hard_bounce: ${String(bounceInfo.message).slice(0, 400)}`
+              : "hard_bounce",
+          },
+        });
+        await prisma.marketingEvent.create({
+          data: {
+            type: "EMAIL_BOUNCED",
+            contactId: send.contactId ?? undefined,
+            payload: {
+              sendId: send.id,
+              providerMessageId,
+              bounceType: bounceInfo?.type ?? null,
+              hard: true,
+            } as Prisma.InputJsonValue,
+          },
+        });
+      } else {
+        // Soft/transient: do not set bouncedAt (health throttle) and do not permanently suppress.
+        await prisma.marketingEmailSend.update({
+          where: { id: send.id },
+          data: {
+            lastError: bounceInfo?.message
+              ? `soft_bounce: ${String(bounceInfo.message).slice(0, 400)}`
+              : `soft_bounce:${bounceInfo?.type ?? "transient"}`,
+          },
+        });
+        await prisma.marketingEvent.create({
+          data: {
+            type: "EMAIL_BOUNCED",
+            contactId: send.contactId ?? undefined,
+            payload: {
+              sendId: send.id,
+              providerMessageId,
+              bounceType: bounceInfo?.type ?? null,
+              hard: false,
+            } as Prisma.InputJsonValue,
+          },
+        });
+      }
     }
-    if (targetEmail) await suppressMarketingContact(prisma, targetEmail, "HARD_BOUNCE");
+    if (hard && targetEmail) await suppressMarketingContact(prisma, targetEmail, "HARD_BOUNCE");
   } else if (type === "email.complained") {
     const targetEmail = toEmail || send?.toEmailNormalized;
     if (send) {

@@ -11,7 +11,10 @@ import { isFreeMailDomain } from "@/lib/publicListings/claimAutoApproval";
 import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
 import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
-import { evaluateOpenMicEvidence } from "@/lib/publicListings/openMicEvidence";
+import {
+  classifyPublicOpenMicEvidence,
+  type StoredEvidenceRow,
+} from "@/lib/publicListings/publicOpenMicEvidenceGate";
 
 const CONTROL_ADAPTER = "claim_invite_control";
 const CONTROL_MARKET = "global";
@@ -339,7 +342,11 @@ export function listingPassesStagedClaimInviteSafety(listing: {
   discoveryMarketSlug?: string | null;
   websiteUrl?: string | null;
   sourceUrl?: string | null;
-  schedules?: Array<{ title: string | null; description: string | null }> | null;
+  lastVerifiedAt?: Date | null;
+  googlePlaceVerifiedAt?: Date | null;
+  schedules?: Array<{ title: string | null; description: string | null; weekday?: string | null; isActive?: boolean | null }> | null;
+  /** Trusted rows already used to mark the listing VERIFIED — required for claim invites. */
+  storedEvidence?: StoredEvidenceRow[] | null;
 }): { ok: true } | { ok: false; reason: string } {
   if (listing.verificationStatus !== "VERIFIED") return { ok: false, reason: "not_verified" };
   if (listing.claimStatus !== "UNCLAIMED") return { ok: false, reason: "not_unclaimed" };
@@ -366,15 +373,25 @@ export function listingPassesStagedClaimInviteSafety(listing: {
   if (!isPublicListingNameOk(listing.name)) {
     return { ok: false, reason: "public_display_quality" };
   }
-  // Explicit open-mic evidence required — place identity alone is not enough.
-  const evidence = evaluateOpenMicEvidence({
+  // Align with public discovery gate: name/schedule evidence OR trusted stored evidence rows.
+  const gate = classifyPublicOpenMicEvidence({
     listingName: listing.name,
-    schedules: listing.schedules,
-    sourceUrl: listing.sourceUrl,
+    about: listing.about,
+    internalNotes: listing.internalNotes,
+    region: listing.region,
+    city: listing.city,
+    formattedAddress: listing.formattedAddress,
+    discoveryMarketSlug: listing.discoveryMarketSlug,
     websiteUrl: listing.websiteUrl,
+    sourceUrl: listing.sourceUrl,
+    lastVerifiedAt: listing.lastVerifiedAt,
+    googlePlaceVerifiedAt: listing.googlePlaceVerifiedAt,
+    googlePlaceId: listing.googlePlaceId,
+    schedules: listing.schedules,
+    storedEvidence: listing.storedEvidence,
   });
-  if (!evidence.trusted) {
-    return { ok: false, reason: "open_mic_evidence_required" };
+  if (!gate.publicReady) {
+    return { ok: false, reason: gate.reason || "open_mic_evidence_required" };
   }
   return { ok: true };
 }

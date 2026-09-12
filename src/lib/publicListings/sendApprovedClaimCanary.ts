@@ -113,11 +113,26 @@ export async function sendApprovedClaimCanaryInvite(
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { slug: input.listingSlug },
     include: {
+      schedules: { select: { title: true, description: true } },
+      openMicEvidenceRows: {
+        select: {
+          trusted: true,
+          detectedPhrase: true,
+          evidenceExcerpt: true,
+          evidenceTitle: true,
+          reasonCode: true,
+          fetchedAt: true,
+          evidenceDate: true,
+          currentnessScore: true,
+          sourceType: true,
+        },
+      },
       growthLead: {
         select: {
           contactEmailNormalized: true,
           contactEmailConfidence: true,
           websiteUrl: true,
+          discoveryMarketSlug: true,
         },
       },
       claimRequests: {
@@ -134,7 +149,12 @@ export async function sendApprovedClaimCanaryInvite(
     }
   }
 
-  const safety = listingPassesStagedClaimInviteSafety(listing);
+  const safety = listingPassesStagedClaimInviteSafety({
+    ...listing,
+    discoveryMarketSlug: listing.growthLead?.discoveryMarketSlug,
+    schedules: listing.schedules,
+    storedEvidence: listing.openMicEvidenceRows,
+  });
   if (!safety.ok) return { ok: false, error: safety.reason };
 
   const leadEmail = listing.growthLead?.contactEmailNormalized

@@ -19,7 +19,10 @@ const {
 const {
   validateOutreachRuntimeValue,
 } = await import("../src/lib/growth/outreachRuntimeSettings.ts");
-const { verifyResendWebhookPayload } = await import("../src/lib/marketing/resendWebhookHandler.ts");
+const {
+  verifyResendWebhookPayload,
+  isResendHardBounce,
+} = await import("../src/lib/marketing/resendWebhookHandler.ts");
 const { marketingUnsubscribeConfirmUrl } = await import("../src/lib/marketing/unsubscribeSigning.ts");
 const { classifyOutreachTargetIdentity } = await import("../src/lib/growth/outreachTargetIdentity.ts");
 const { classifyOutreachOpenMicEvidence } = await import("../src/lib/growth/outreachOpenMicEvidence.ts");
@@ -146,6 +149,32 @@ assert.equal(
   verifyResendWebhookPayload("{}", { svixId: "1", svixTimestamp: "1", svixSignature: "x" }),
   null,
 );
+
+// Soft vs hard bounce classification (throttle + suppression must ignore true soft Transient)
+assert.equal(isResendHardBounce({ type: "Permanent", message: "550 user unknown" }), true);
+assert.equal(isResendHardBounce({ type: "Hard", message: "does not exist" }), true);
+assert.equal(
+  isResendHardBounce({
+    type: "Transient",
+    subType: "MailboxFull",
+    message: "inbox was full",
+    diagnosticCode: ["smtp; 552 Quota exceeded"],
+  }),
+  false,
+);
+assert.equal(isResendHardBounce({ type: "soft", message: "try again later" }), false);
+assert.equal(isResendHardBounce({ type: "temporary" }), false);
+assert.equal(isResendHardBounce({ type: "", message: "inbox was full" }), false);
+assert.equal(
+  isResendHardBounce({
+    type: "Transient",
+    message: "general bounce",
+    diagnosticCode: ["smtp; 550 5.4.4 Invalid domain"],
+  }),
+  true,
+);
+assert.equal(isResendHardBounce({ type: "UnknownType", message: "550 permanent failure" }), true);
+assert.equal(isResendHardBounce(null), true);
 
 // Unsubscribe confirmation must ignore Hostinger bind origin (0.0.0.0)
 {

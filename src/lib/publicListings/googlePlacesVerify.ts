@@ -458,7 +458,9 @@ function evaluatePlaceMatch(
       outcome: "needs_review",
       reason: `Weak name match (${Math.round(matchScore * 100)}%)`,
       matchScore,
-      placeId: place.placeId,
+      // Do not attach placeId — promotePlaceConfirmed treats any stamped
+      // googlePlaceId as "place confirmed" and would promote junk titles.
+      placeId: undefined,
     };
   }
 
@@ -779,7 +781,7 @@ export async function verifyPublicListingsWithGoogle(
             : result.reason,
         ),
       };
-      if (result.placeId && !duplicate) {
+      if (result.placeId && !duplicate && (result.matchScore == null || result.matchScore >= 0.65)) {
         data.googlePlaceId = result.placeId;
         data.googlePlaceVerifiedAt = new Date();
       }

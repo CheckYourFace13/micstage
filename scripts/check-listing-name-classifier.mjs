@@ -89,6 +89,17 @@ const MUST_REJECT = [
   "Chance the Rapper hosts open mic night",
   "Chattanooga's Open Mic Nights",
   "Crave live music? These nine music venues in Boston, Cambridge, and Somerville will keep you grooving.",
+  // directory / tourism / org shells (Sep 11 public-quality audit)
+  "Discover Local Spots That Feature This",
+  "Discover Open Mic Arts Events in New York, NY",
+  "Breweries in Columbia SC",
+  "7 Breweries in Western Pennsylvania",
+  "SOUTH CAROLINA BREWERS GUILD",
+  "City-Data Forum",
+  "Best of New York",
+  "Live Music in Rockford, IL",
+  "Live Music & Events in Monroe, GA",
+  "Places to Visit in Charleston",
 ];
 
 // Real venue / event names — must pass.

@@ -25,11 +25,18 @@ function tagLabel(t: OwnerDailySummaryData["topItems"][0]["priorityTag"]): strin
 }
 
 function listingStatusLine(row: OwnerDailySummaryData["recentListings"][0]): string {
+  const inviteBit = row.claimInviteSent
+    ? "claim invite sent"
+    : row.verificationStatus === "VERIFIED" && row.ownerEmail
+      ? "invite pending (verified + email)"
+      : row.ownerEmail
+        ? "email on file (not invite-ready)"
+        : "no owner email";
   const bits = [
     row.verificationStatus.replace(/_/g, " "),
     row.claimStatus.replace(/_/g, " ").toLowerCase(),
     row.scheduleCount > 0 ? `${row.scheduleCount} schedule slot(s)` : "no schedule yet",
-    row.claimInviteSent ? "claim invite sent" : row.ownerEmail ? "invite pending" : "no owner email",
+    inviteBit,
   ];
   if (row.websiteUrl) bits.push("website on file");
   return bits.join(" · ");
@@ -46,7 +53,7 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Discovery metros on map: ${inv.discoveryMarkets}`,
     `  New listings (24h): ${inv.listingsCreatedCount}`,
     `  Claim invites sent (24h): ${inv.claimInvitesSentCount}`,
-    `  Pending claim invites (has email): ${inv.pendingClaimInvites}`,
+    `  Pending claim invites (eligible to send): ${inv.pendingClaimInvites}`,
     `  Venue leads waiting to publish: ${inv.leadsAwaitingPublish}`,
     `  Google Business verified: ${inv.googleVerifiedListings}`,
     `  Hidden listing backlog (NEEDS_REVIEW): ${inv.needsReviewCount}`,
@@ -499,7 +506,7 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>Discoverable listings:</strong> ${inv.totalListings} (${inv.verifiedListings} verified, ${inv.unclaimedListings} unclaimed)</li>
     <li><strong>MicStage venues:</strong> ${inv.claimedVenues} registered · ${inv.bookableVenues} bookable with schedule</li>
     <li><strong>New listings (24h):</strong> ${inv.listingsCreatedCount} · <strong>Claim invites sent (24h):</strong> ${inv.claimInvitesSentCount}</li>
-    <li><strong>Pending claim invites:</strong> ${inv.pendingClaimInvites} · <strong>Leads waiting to publish:</strong> ${inv.leadsAwaitingPublish} · <strong>Google verified:</strong> ${inv.googleVerifiedListings}</li>
+    <li><strong>Pending claim invites (eligible to send):</strong> ${inv.pendingClaimInvites} · <strong>Leads waiting to publish:</strong> ${inv.leadsAwaitingPublish} · <strong>Google verified:</strong> ${inv.googleVerifiedListings}</li>
     <li><strong>Hidden listing backlog (NEEDS_REVIEW):</strong> ${inv.needsReviewCount}</li>
   </ul>
   <p style="margin:0 0 12px;color:#6b7280;font-size:12px">${esc(inv.listingsNote)}</p>

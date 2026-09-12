@@ -20,8 +20,12 @@ function appendNote(existing: string | null | undefined, reason: string): string
 }
 
 /**
- * Deterministically demote obvious garbage in the review queue to OUTDATED.
- * Does not touch VERIFIED rows or claimed listings.
+ * Deterministically demote obvious garbage to OUTDATED.
+ * Covers review-queue junk and unclaimed VERIFIED rows whose names fail
+ * the public display gate (legacy false positives).
+ * Does not touch claimed listings.
+ * Does NOT mass-demote VERIFIED rows solely for a historical weak Google
+ * place-name score (event titles often mismatch Place display names).
  */
 export async function autoRejectJunkListings(
   prisma: PrismaClient,
@@ -33,7 +37,7 @@ export async function autoRejectJunkListings(
   const rows = await prisma.publicOpenMicListing.findMany({
     where: {
       claimedVenueId: null,
-      verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED"] },
+      verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED", "VERIFIED"] },
     },
     orderBy: [{ updatedAt: "asc" }],
     take: limit,
@@ -43,9 +47,12 @@ export async function autoRejectJunkListings(
       region: true,
       city: true,
       formattedAddress: true,
+      websiteUrl: true,
+      sourceUrl: true,
       internalNotes: true,
       evidenceTerminalReason: true,
       evidenceEnrichAttemptCount: true,
+      verificationStatus: true,
       growthLead: { select: { discoveryMarketSlug: true } },
     },
   });
@@ -70,16 +77,19 @@ export async function autoRejectJunkListings(
       name: row.name,
       discoveryMarketSlug: row.growthLead?.discoveryMarketSlug,
     });
+    const mediaWeakPlace =
+      row.verificationStatus === "VERIFIED" && isMediaOrDirectoryWeakPlace(row);
 
     let reason: string | null = null;
     if (nameReject) reason = `JUNK_NAME_${nameReject}`;
-    else if (geoConflict) reason = "PLACE_OR_REGION_CONFLICT";
+    else if (mediaWeakPlace) reason = "WEAK_PLACE_MEDIA_OR_DIRECTORY";
+    else if (row.verificationStatus !== "VERIFIED" && geoConflict) reason = "PLACE_OR_REGION_CONFLICT";
     else if (
+      row.verificationStatus !== "VERIFIED" &&
       row.evidenceTerminalReason &&
       exhaustedTerminal.has(row.evidenceTerminalReason) &&
       (row.evidenceEnrichAttemptCount ?? 0) >= 2
     ) {
-      // Enrichment already concluded — do not park forever in NEEDS_REVIEW.
       reason = `EXHAUSTED_${row.evidenceTerminalReason}`;
     }
 
@@ -98,4 +108,31 @@ export async function autoRejectJunkListings(
   }
 
   return { scanned: rows.length, rejected, byReason };
+}
+
+/** Weak Google match only counts as FP when identity is also a media/directory shell. */
+function isMediaOrDirectoryWeakPlace(row: {
+  name: string;
+  internalNotes: string | null;
+  websiteUrl: string | null;
+  sourceUrl: string | null;
+}): boolean {
+  const notes = row.internalNotes ?? "";
+  const m = /Weak name match\s*\((\d+)%\)/i.exec(notes);
+  if (!m || Number(m[1]) >= 45) return false;
+  const url = `${row.websiteUrl ?? ""} ${row.sourceUrl ?? ""}`.toLowerCase();
+  const name = row.name ?? "";
+  const hasOpenMicIdentity =
+    /\bopen[\s-]?mics?\b|\bopen[\s-]?mikes?\b|\bopen\s+jams?\b|\bopen\s+stage\b/i.test(name) ||
+    /(\bat\s+[a-z0-9])|@|(\bpresented\s+by\b)|(\bhosted\s+by\b)/i.test(name);
+  if (
+    /list-tags\/|city-data\.com|experiencecolumbiasc\.com|\/best-of-|ohiomagazine\.com|gorockford\.com\/things-to-do|eventbrite\.com\/d\//.test(
+      url,
+    )
+  ) {
+    return true;
+  }
+  if (/wordpress\.com/.test(url) && !hasOpenMicIdentity) return true;
+  if (/blocked_aggregator_or_media_domain/i.test(notes) && !hasOpenMicIdentity) return true;
+  return false;
 }

@@ -63,6 +63,7 @@ const EXPLICIT_DENYLIST = new Set(
     "12 best comedy clubs in dallas for a night of laughs",
     "14 open mics to try standup comedy in dc",
     "24 things to do in the rockford area this weekend",
+  "capital city cola",
   ].map((s) => s.toLowerCase()),
 );
 
@@ -70,6 +71,31 @@ function classifyName(name) {
   const n = (name ?? "").trim();
   if (EXPLICIT_DENYLIST.has(n.toLowerCase())) return "GENERIC_PAGE_TITLE";
   return classifyListingName(n);
+}
+
+/** Weak Google match only with media/directory identity — not bare event-title mismatches. */
+function mediaOrDirectoryWeakPlace(row) {
+  const notes = row.internalNotes ?? "";
+  const m = /Weak name match\s*\((\d+)%\)/i.exec(notes);
+  if (!m || Number(m[1]) >= 45) return null;
+  const url = `${row.websiteUrl ?? ""} ${row.sourceUrl ?? ""}`.toLowerCase();
+  const name = row.name ?? "";
+  const hasOpenMicIdentity =
+    /\bopen[\s-]?mics?\b|\bopen[\s-]?mikes?\b|\bopen\s+jams?\b|\bopen\s+stage\b/i.test(name) ||
+    /(\bat\s+[a-z0-9])|@|(\bpresented\s+by\b)|(\bhosted\s+by\b)/i.test(name);
+  if (
+    /list-tags\/|city-data\.com|experiencecolumbiasc\.com|\/best-of-|ohiomagazine\.com|gorockford\.com\/things-to-do|eventbrite\.com\/d\//.test(
+      url,
+    )
+  ) {
+    return "WEAK_PLACE_MEDIA_OR_DIRECTORY";
+  }
+  // Media blogs on wordpress.com with no venue/open-mic identity in the title.
+  if (/wordpress\.com/.test(url) && !hasOpenMicIdentity) return "WEAK_PLACE_MEDIA_OR_DIRECTORY";
+  if (/blocked_aggregator_or_media_domain/i.test(notes) && !hasOpenMicIdentity) {
+    return "WEAK_PLACE_MEDIA_OR_DIRECTORY";
+  }
+  return null;
 }
 
 function appendNote(existing, reason) {
@@ -89,14 +115,24 @@ try {
     },
     orderBy: [{ verificationStatus: "asc" }, { updatedAt: "desc" }],
     ...(limit ? { take: limit } : {}),
-    select: { id: true, slug: true, name: true, verificationStatus: true, internalNotes: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      verificationStatus: true,
+      internalNotes: true,
+      websiteUrl: true,
+      sourceUrl: true,
+    },
   });
 
   const byReason = {};
   let quarantined = 0;
 
   for (const row of rows) {
-    const reason = classifyName(row.name);
+    const reason =
+      classifyName(row.name) ||
+      (row.verificationStatus === "VERIFIED" ? mediaOrDirectoryWeakPlace(row) : null);
     if (!reason) continue;
     byReason[reason] = (byReason[reason] ?? 0) + 1;
     quarantined += 1;
@@ -110,6 +146,7 @@ try {
       where: { id: row.id },
       data: {
         verificationStatus: "OUTDATED",
+        evidenceTerminalReason: String(reason).slice(0, 80),
         internalNotes: appendNote(row.internalNotes, reason),
       },
     });

@@ -113,6 +113,35 @@ export async function promotePlaceConfirmedListings(
       continue;
     }
 
+    const weakPlace = /Weak name match\s*\((\d+)%\)/i.exec(row.internalNotes ?? "");
+    const url = `${row.websiteUrl ?? ""} ${row.sourceUrl ?? ""}`.toLowerCase();
+    const hasOpenMicIdentity =
+      /\bopen[\s-]?mics?\b|\bopen[\s-]?mikes?\b|\bopen\s+jams?\b|\bopen\s+stage\b/i.test(row.name) ||
+      /(\bat\s+[a-z0-9])|@|(\bpresented\s+by\b)|(\bhosted\s+by\b)/i.test(row.name);
+    const mediaWeak =
+      weakPlace &&
+      Number(weakPlace[1]) < 45 &&
+      (/list-tags\/|city-data\.com|experiencecolumbiasc\.com|\/best-of-|ohiomagazine\.com|gorockford\.com\/things-to-do|eventbrite\.com\/d\//.test(
+        url,
+      ) ||
+        (/wordpress\.com/.test(url) && !hasOpenMicIdentity) ||
+        (/blocked_aggregator_or_media_domain/i.test(row.internalNotes ?? "") && !hasOpenMicIdentity));
+    if (mediaWeak) {
+      skippedNonVenueName += 1;
+      junkOutdated += 1;
+      await prisma.publicOpenMicListing.update({
+        where: { id: row.id },
+        data: {
+          verificationStatus: "OUTDATED",
+          evidenceTerminalReason: "WEAK_PLACE_MEDIA_OR_DIRECTORY",
+          googlePlaceId: null,
+          googlePlaceVerifiedAt: null,
+          internalNotes: appendNote(row.internalNotes, "auto-reject WEAK_PLACE_MEDIA_OR_DIRECTORY"),
+        },
+      });
+      continue;
+    }
+
     const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
     if (!evidence.trusted) {
       skippedNoTrustedEvidence += 1;

@@ -155,8 +155,14 @@ export async function evaluateOutreachSendHealth(prisma: PrismaClient): Promise<
     prisma.marketingEmailSend.count({
       where: { category: "OUTREACH", status: "SENT", sentAt: { gte: since } },
     }),
+    // Hard only: bouncedAt set, excluding soft_bounce lastError.
+    // IMPORTANT: `NOT startsWith soft_bounce` alone excludes NULL lastError in SQL — include nulls.
     prisma.marketingEmailSend.count({
-      where: { category: "OUTREACH", bouncedAt: { gte: since } },
+      where: {
+        category: "OUTREACH",
+        bouncedAt: { gte: since },
+        OR: [{ lastError: null }, { NOT: { lastError: { startsWith: "soft_bounce" } } }],
+      },
     }),
     prisma.marketingEmailSend.count({
       where: { category: "OUTREACH", complainedAt: { gte: since } },
@@ -164,4 +170,82 @@ export async function evaluateOutreachSendHealth(prisma: PrismaClient): Promise<
   ]);
 
   return evaluateOutreachHealthFromCounts({ sentSample, hardBounces, complaints });
+}
+
+/** DB truth for ops: sends / hard / soft / complaints in the health window. */
+export async function outreachHealthWindowBreakdown(prisma: PrismaClient): Promise<{
+  windowDays: number;
+  since: string;
+  sends: number;
+  permanentHardBounces: number;
+  softBounces: number;
+  softWithBouncedAtLeak: number;
+  complaints: number;
+  health: OutreachHealthSnapshot;
+}> {
+  const windowDays = parseIntEnv("GROWTH_OUTREACH_HEALTH_WINDOW_DAYS", 7);
+  const since = new Date(Date.now() - windowDays * 86400000);
+  const [sends, permanentHardBounces, softBounces, softWithBouncedAtLeak, complaints, health] =
+    await Promise.all([
+      prisma.marketingEmailSend.count({
+        where: { category: "OUTREACH", status: "SENT", sentAt: { gte: since } },
+      }),
+      prisma.marketingEmailSend.count({
+        where: {
+          category: "OUTREACH",
+          bouncedAt: { gte: since },
+          OR: [{ lastError: null }, { NOT: { lastError: { startsWith: "soft_bounce" } } }],
+        },
+      }),
+      prisma.marketingEmailSend.count({
+        where: {
+          category: "OUTREACH",
+          sentAt: { gte: since },
+          lastError: { startsWith: "soft_bounce" },
+        },
+      }),
+      prisma.marketingEmailSend.count({
+        where: {
+          category: "OUTREACH",
+          bouncedAt: { gte: since },
+          lastError: { startsWith: "soft_bounce" },
+        },
+      }),
+      prisma.marketingEmailSend.count({
+        where: { category: "OUTREACH", complainedAt: { gte: since } },
+      }),
+      evaluateOutreachSendHealth(prisma),
+    ]);
+  return {
+    windowDays,
+    since: since.toISOString(),
+    sends,
+    permanentHardBounces,
+    softBounces,
+    softWithBouncedAtLeak,
+    complaints,
+    health,
+  };
+}
+
+/** Pure helper for tests: hard numerator must ignore soft rows even if bouncedAt leaked. */
+export function countHardBouncesForHealth(
+  rows: Array<{ bouncedAt: Date | null; lastError: string | null; sentAt?: Date | null }>,
+  since: Date,
+): number {
+  return rows.filter((r) => {
+    if (!r.bouncedAt || r.bouncedAt < since) return false;
+    // null lastError = historical hard marker (pre-prefix); soft_bounce prefix = exclude
+    if (r.lastError?.startsWith("soft_bounce")) return false;
+    return true;
+  }).length;
+}
+
+/** Prisma where-clause fragment for OUTREACH hard bounces in a window. */
+export function outreachHardBounceWhere(since: Date) {
+  return {
+    category: "OUTREACH" as const,
+    bouncedAt: { gte: since },
+    OR: [{ lastError: null }, { NOT: { lastError: { startsWith: "soft_bounce" } } }],
+  };
 }

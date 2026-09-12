@@ -225,6 +225,40 @@ assert.equal(isResendHardBounce(null), true);
   assert.equal(half.sendMultiplier, 0.5);
   const ok = evaluateOutreachHealthFromCounts({ sentSample: 40, hardBounces: 1, complaints: 0 });
   assert.equal(ok.sendMultiplier, 1);
+
+  // Soft MailboxFull must never inflate hard numerator (even if bouncedAt leaked)
+  const { countHardBouncesForHealth } = await import("../src/lib/growth/outreachHealthThrottle.ts");
+  const since = new Date("2026-09-05T00:00:00.000Z");
+  const mixed = [
+    { bouncedAt: new Date("2026-09-09T12:00:00.000Z"), lastError: "hard_bounce: 550 no such user" },
+    { bouncedAt: new Date("2026-09-09T13:00:00.000Z"), lastError: "hard_bounce: Permanent" },
+    { bouncedAt: new Date("2026-09-09T14:00:00.000Z"), lastError: "The recipient's email provider sent a hard bounce" },
+    {
+      bouncedAt: new Date("2026-09-09T00:45:00.000Z"),
+      lastError: "soft_bounce: inbox was full (MailboxFull)",
+    },
+  ];
+  assert.equal(countHardBouncesForHealth(mixed, since), 3, "20/3hard/1soft → hard numerator 3 not 4");
+  assert.equal(
+    countHardBouncesForHealth(
+      [
+        { bouncedAt: new Date("2026-09-09T12:00:00.000Z"), lastError: null },
+        { bouncedAt: new Date("2026-09-09T13:00:00.000Z"), lastError: null },
+        { bouncedAt: new Date("2026-09-09T14:00:00.000Z"), lastError: null },
+        { bouncedAt: new Date("2026-09-09T00:45:00.000Z"), lastError: "soft_bounce: MailboxFull" },
+      ],
+      since,
+    ),
+    3,
+    "historical hard rows with null lastError still count; soft does not",
+  );
+  const afterExcludeSoft = evaluateOutreachHealthFromCounts({
+    sentSample: 20,
+    hardBounces: countHardBouncesForHealth(mixed, since),
+    complaints: 0,
+  });
+  assert.equal(afterExcludeSoft.hardBounces, 3);
+  assert.equal(afterExcludeSoft.sendMultiplier, 0);
 }
 
 // Unsubscribe confirmation must ignore Hostinger bind origin (0.0.0.0)

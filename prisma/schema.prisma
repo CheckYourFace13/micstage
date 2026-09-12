@@ -1187,6 +1187,13 @@ model GrowthLead {
   contactQuality    GrowthLeadContactQuality?
   acquisitionStage  GrowthLeadAcquisitionStage @default(DISCOVERED)
 
+  /// First time this lead reached SIGNUP_STARTED (never overwritten). Enables true signup cohorts.
+  signupStartedAt   DateTime?
+  /// First time this lead reached ACCOUNT_CREATED (never overwritten).
+  accountCreatedAt  DateTime?
+  /// First time this lead reached LISTING_LIVE (never overwritten).
+  listingLiveAt     DateTime?
+
   /// Optional stable key for import dedupe (e.g. CSV row id or domain).
   importKey String? @unique
 
@@ -1221,6 +1228,10 @@ model GrowthLead {
   @@index([status, createdAt])
   @@index([contactEmailNormalized])
   @@index([contactEmailConfidence])
+  @@index([signupStartedAt])
+  @@index([accountCreatedAt])
+  @@index([acquisitionStage, signupStartedAt])
+
   @@index([websiteHostNormalized, leadType])
   @@index([instagramHandleNormalized, leadType])
   @@index([openMicSignalTier])

@@ -1,10 +1,15 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
+import { getMarketingSoftBounceDeferral } from "@/lib/marketing/softBounceDeferral";
 
-type PrismaMarketingSubset = Pick<PrismaClient, "marketingContact" | "marketingEmailSuppression">;
+type PrismaMarketingSubset = Pick<
+  PrismaClient,
+  "marketingContact" | "marketingEmailSuppression" | "marketingEmailSend"
+>;
 
 /**
  * Enforced before outreach/marketing sends. Transactional mail uses separate checks in the send pipeline.
+ * Includes temporary soft-bounce deferral (not permanent suppression).
  */
 export async function isMarketingEmailSuppressed(
   prisma: PrismaMarketingSubset,
@@ -12,6 +17,11 @@ export async function isMarketingEmailSuppressed(
 ): Promise<{ suppressed: boolean; reason?: string }> {
   const emailNormalized = normalizeMarketingEmail(rawEmail);
   if (!emailNormalized) return { suppressed: false };
+
+  const soft = await getMarketingSoftBounceDeferral(prisma, emailNormalized);
+  if (soft.deferred) {
+    return { suppressed: true, reason: soft.reason ?? "SOFT_BOUNCE_DEFER" };
+  }
 
   const globalRow = await prisma.marketingEmailSuppression.findUnique({
     where: { emailNormalized },

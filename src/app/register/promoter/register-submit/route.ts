@@ -10,7 +10,7 @@ import {
 import { JOINED_HOST, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 import { allocateUniqueHostSlug } from "@/lib/host/hostSlug";
-import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { linkRegistrationToGrowthLead } from "@/lib/growth/linkRegistrationToGrowthLead";
 
 export const runtime = "nodejs";
 
@@ -105,18 +105,11 @@ export async function POST(request: Request) {
 
     await setSession({ kind: "promoter", promoterId: promoter.id, email: promoter.email });
 
-    if (growthTraceLeadId) {
-      const lead = await prisma.growthLead.findFirst({
-        where: { id: growthTraceLeadId, leadType: "PROMOTER_ACCOUNT" },
-        select: { id: true, contactEmailNormalized: true },
-      });
-      if (lead) {
-        await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "ACCOUNT_CREATED");
-        if (lead.contactEmailNormalized?.toLowerCase() === email) {
-          await prisma.growthLead.update({ where: { id: lead.id }, data: { status: "JOINED" } });
-        }
-      }
-    }
+    await linkRegistrationToGrowthLead(prisma, {
+      leadType: "PROMOTER_ACCOUNT",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
 
     return redirectTo(`/promoter/welcome?${PRODUCT_ANALYTICS_QS.joined}=${JOINED_HOST}`);
   } catch (e) {

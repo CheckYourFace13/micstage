@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { linkRegistrationToGrowthLead } from "@/lib/growth/linkRegistrationToGrowthLead";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
 import { JOINED_VENUE, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
@@ -104,27 +103,17 @@ export async function POST(request: Request) {
 
     await setSession({ kind: "venue", venueOwnerId: owner.id, email: owner.email });
 
-    if (growthTraceLeadId) {
-      const lead = await prisma.growthLead.findFirst({
-        where: { id: growthTraceLeadId, leadType: "VENUE" },
-        select: { id: true, contactEmailNormalized: true },
-      });
-      if (lead) {
-        await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "ACCOUNT_CREATED", { leadType: "VENUE" });
-        const regEmail = normalizeMarketingEmail(email);
-        const leadEmail = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
-        if (leadEmail && leadEmail === regEmail) {
-          await prisma.growthLead.update({
-            where: { id: lead.id },
-            data: { status: "JOINED" },
-          });
-        }
-      }
-    }
+    const linked = await linkRegistrationToGrowthLead(prisma, {
+      leadType: "VENUE",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
 
     const setupQs = new URLSearchParams();
     setupQs.set(PRODUCT_ANALYTICS_QS.joined, JOINED_VENUE);
-    if (growthTraceLeadId) setupQs.set("growthLead", growthTraceLeadId);
+    if (linked.linkedLeadId || growthTraceLeadId) {
+      setupQs.set("growthLead", linked.linkedLeadId || growthTraceLeadId!);
+    }
     if (claimListing) setupQs.set("claimListing", claimListing);
     return redirectTo(`/venue/setup?${setupQs.toString()}`);
   } catch (e) {

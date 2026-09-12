@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 type Props = {
@@ -20,16 +21,30 @@ export function FormSubmitButton({
   formAction,
 }: Props) {
   const { pending } = useFormStatus();
-  const isDisabled = disabled || pending;
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [nativePending, setNativePending] = useState(false);
+
+  // Classic HTML form POST does not drive useFormStatus — disable after submit to prevent double-tap.
+  useEffect(() => {
+    const btn = btnRef.current;
+    const form = btn?.form;
+    if (!form || typeof formAction === "function") return;
+    const onSubmit = () => setNativePending(true);
+    form.addEventListener("submit", onSubmit);
+    return () => form.removeEventListener("submit", onSubmit);
+  }, [formAction]);
+
+  const isDisabled = Boolean(disabled || pending || nativePending);
   return (
     <button
+      ref={btnRef}
       type="submit"
       formAction={formAction}
       disabled={isDisabled}
       className={className}
-      aria-busy={pending}
+      aria-busy={isDisabled}
     >
-      {pending ? pendingLabel : label}
+      {isDisabled ? pendingLabel : label}
     </button>
   );
 }

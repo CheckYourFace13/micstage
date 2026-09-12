@@ -176,6 +176,57 @@ assert.equal(
 assert.equal(isResendHardBounce({ type: "UnknownType", message: "550 permanent failure" }), true);
 assert.equal(isResendHardBounce(null), true);
 
+// Soft-bounce deferral (temporary — not permanent suppress)
+{
+  const {
+    softBounceDeferralDaysForCount,
+    isWithinSoftBounceDeferral,
+    isSoftBounceLastError,
+  } = await import("../src/lib/marketing/softBounceDeferral.ts");
+  assert.equal(isSoftBounceLastError("soft_bounce: inbox was full"), true);
+  assert.equal(isSoftBounceLastError("hard_bounce: no such user"), false);
+  assert.equal(softBounceDeferralDaysForCount(1), 14);
+  assert.equal(softBounceDeferralDaysForCount(2), 30);
+  assert.equal(softBounceDeferralDaysForCount(3), 60);
+  const now = new Date("2026-09-12T12:00:00.000Z");
+  const recent = new Date("2026-09-09T00:00:00.000Z");
+  const d1 = isWithinSoftBounceDeferral({ softCountInLookback: 1, latestSoftAt: recent, now });
+  assert.equal(d1.deferred, true);
+  assert.equal(d1.deferralDays, 14);
+  const aged = isWithinSoftBounceDeferral({
+    softCountInLookback: 1,
+    latestSoftAt: new Date("2026-08-01T00:00:00.000Z"),
+    now,
+  });
+  assert.equal(aged.deferred, false);
+}
+
+// Outreach health: must NOT reopen full send when sample ages 20→19 with hard bounces remaining
+{
+  const { evaluateOutreachHealthFromCounts } = await import("../src/lib/growth/outreachHealthThrottle.ts");
+  const stop20 = evaluateOutreachHealthFromCounts({ sentSample: 20, hardBounces: 3, complaints: 0 });
+  assert.equal(stop20.sendMultiplier, 0);
+  assert.ok(stop20.hardBounceRate >= 0.05);
+  const stop19 = evaluateOutreachHealthFromCounts({ sentSample: 19, hardBounces: 3, complaints: 0 });
+  assert.equal(stop19.sendMultiplier, 0, "19 sends / 3 hard must stay stopped (conservative denom)");
+  assert.equal(stop19.rateDenominator, 20);
+  const stop18 = evaluateOutreachHealthFromCounts({ sentSample: 18, hardBounces: 3, complaints: 0 });
+  assert.equal(stop18.sendMultiplier, 0);
+  // Clean undersample may send; adverse undersample must not jump to unrestricted
+  const clean19 = evaluateOutreachHealthFromCounts({ sentSample: 19, hardBounces: 0, complaints: 0 });
+  assert.equal(clean19.sendMultiplier, 1);
+  const singleBounceReopenTrap = evaluateOutreachHealthFromCounts({
+    sentSample: 19,
+    hardBounces: 1,
+    complaints: 0,
+  });
+  assert.equal(singleBounceReopenTrap.sendMultiplier, 0);
+  const half = evaluateOutreachHealthFromCounts({ sentSample: 50, hardBounces: 2, complaints: 0 });
+  assert.equal(half.sendMultiplier, 0.5);
+  const ok = evaluateOutreachHealthFromCounts({ sentSample: 40, hardBounces: 1, complaints: 0 });
+  assert.equal(ok.sendMultiplier, 1);
+}
+
 // Unsubscribe confirmation must ignore Hostinger bind origin (0.0.0.0)
 {
   const prevNodeEnv = process.env.NODE_ENV;

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
-import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
+import { linkRegistrationToGrowthLead } from "@/lib/growth/linkRegistrationToGrowthLead";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
@@ -113,23 +112,11 @@ export async function POST(request: Request) {
 
     await setSession({ kind: "musician", musicianId: musician.id, email: musician.email });
 
-    if (growthTraceLeadId) {
-      const lead = await prisma.growthLead.findFirst({
-        where: { id: growthTraceLeadId, leadType: "ARTIST" },
-        select: { id: true, contactEmailNormalized: true },
-      });
-      if (lead) {
-        await advanceGrowthLeadAcquisitionStage(prisma, lead.id, "ACCOUNT_CREATED", { leadType: "ARTIST" });
-        const regEmail = normalizeMarketingEmail(email);
-        const leadEmail = lead.contactEmailNormalized ? normalizeMarketingEmail(lead.contactEmailNormalized) : null;
-        if (leadEmail && leadEmail === regEmail) {
-          await prisma.growthLead.update({
-            where: { id: lead.id },
-            data: { status: "JOINED" },
-          });
-        }
-      }
-    }
+    await linkRegistrationToGrowthLead(prisma, {
+      leadType: "ARTIST",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
 
     const dest = safeAfterMusicianLoginPath(nextRaw);
     return redirectTo(withJoinedAnalytics(dest));

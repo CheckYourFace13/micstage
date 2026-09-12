@@ -19,8 +19,8 @@ export default async function HostLandingPage(props: { searchParams: Promise<{ g
   if (traceId) {
     const prisma = getPrismaOrNull();
     if (prisma) {
-      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED");
-      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "SIGNUP_STARTED");
+      // Host landing is acquisition click only — not registration form start.
+      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: "PROMOTER_ACCOUNT" });
     }
   }
 

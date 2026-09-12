@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { linkRegistrationToGrowthLead } from "@/lib/growth/linkRegistrationToGrowthLead";
+import { stampRegistrationSubmitForLead } from "@/lib/growth/stampRegistrationSubmitForLead";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
@@ -88,6 +89,13 @@ export async function POST(request: Request) {
     if (existing || existingManager) {
       return redirectTo(registerErrorPath("exists", email, claimListing, growthTraceLeadId));
     }
+
+    // Submit receipt before create so submit failures are distinguishable from create failures.
+    await stampRegistrationSubmitForLead(prisma, {
+      leadType: "VENUE",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
 
     const consentAt = new Date();
     const consentVer = REGISTRATION_CONTENT_CONSENT_VERSION;

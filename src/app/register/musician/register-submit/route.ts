@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { linkRegistrationToGrowthLead } from "@/lib/growth/linkRegistrationToGrowthLead";
+import { stampRegistrationSubmitForLead } from "@/lib/growth/stampRegistrationSubmitForLead";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
 import { consumeRateLimit } from "@/lib/rateLimit";
@@ -98,6 +99,12 @@ export async function POST(request: Request) {
     if (existing) {
       return redirectTo(registerErrorPath("exists", nextRaw, errOpts));
     }
+
+    await stampRegistrationSubmitForLead(prisma, {
+      leadType: "ARTIST",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
 
     const now = new Date();
     const musician = await prisma.musicianUser.create({

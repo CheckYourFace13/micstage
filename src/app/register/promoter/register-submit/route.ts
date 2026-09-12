@@ -11,6 +11,7 @@ import { JOINED_HOST, PRODUCT_ANALYTICS_QS } from "@/lib/productAnalytics";
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 import { allocateUniqueHostSlug } from "@/lib/host/hostSlug";
 import { linkRegistrationToGrowthLead } from "@/lib/growth/linkRegistrationToGrowthLead";
+import { stampRegistrationSubmitForLead } from "@/lib/growth/stampRegistrationSubmitForLead";
 
 export const runtime = "nodejs";
 
@@ -85,6 +86,12 @@ export async function POST(request: Request) {
   try {
     const existingUser = await prisma.promoterUser.findUnique({ where: { email } });
     if (existingUser) return redirectTo(registerErrorPath("exists", errOpts));
+
+    await stampRegistrationSubmitForLead(prisma, {
+      leadType: "PROMOTER_ACCOUNT",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
 
     const hostSlug = await allocateUniqueHostSlug(displayName, async (slug) => {
       const row = await prisma.promoterUser.findUnique({ where: { hostSlug: slug }, select: { id: true } });

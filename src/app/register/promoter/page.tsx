@@ -9,7 +9,7 @@ import { RegistrationFunnelTracker } from "@/components/register/RegistrationFun
 import { RegistrationFormPersist } from "@/components/register/RegistrationFormPersist";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { PROMOTER_REGISTER_SUBMIT_PATH } from "./actions";
-import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { stampRegistrationPageViewed } from "@/lib/growth/growthLeadAcquisitionStage";
 import { getPrismaOrNull } from "@/lib/prisma";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -33,7 +33,7 @@ export default async function PromoterRegisterPage(props: {
   if (traceId) {
     const prisma = getPrismaOrNull();
     if (prisma) {
-      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "SIGNUP_STARTED");
+      await stampRegistrationPageViewed(prisma, traceId, { leadType: "PROMOTER_ACCOUNT" });
     }
   }
 
@@ -45,7 +45,7 @@ export default async function PromoterRegisterPage(props: {
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-4 py-8 sm:px-6 sm:py-12">
-        <RegistrationFunnelTracker role="host" />
+        <RegistrationFunnelTracker role="host" growthLeadId={traceId || undefined} />
         <Link className="text-sm text-white/70 hover:text-white" href="/host">
           ← For hosts
         </Link>

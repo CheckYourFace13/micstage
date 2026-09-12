@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { stampRegistrationPageViewed } from "@/lib/growth/growthLeadAcquisitionStage";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { ARTIST_DASHBOARD_HREF } from "@/lib/safeRedirect";
 import { getSession } from "@/lib/session";
@@ -35,8 +35,7 @@ export default async function MusicianRegisterPage(props: {
   if (traceId) {
     const prisma = getPrismaOrNull();
     if (prisma) {
-      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: "ARTIST" });
-      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "SIGNUP_STARTED", { leadType: "ARTIST" });
+      await stampRegistrationPageViewed(prisma, traceId, { leadType: "ARTIST" });
     }
   }
 
@@ -50,7 +49,7 @@ export default async function MusicianRegisterPage(props: {
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-4 py-8 sm:px-6 sm:py-12">
-        <RegistrationFunnelTracker role="performer" />
+        <RegistrationFunnelTracker role="performer" growthLeadId={traceId || undefined} />
         <Link className="text-sm text-white/70 hover:text-white" href={returnNext || "/"}>
           &lt;- Back
         </Link>

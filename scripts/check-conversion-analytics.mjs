@@ -48,6 +48,39 @@ assert.match(read("src/components/MicStageProductAnalytics.tsx"), /registration_
 assert.match(read("src/components/register/RegistrationFunnelTracker.tsx"), /registration_page_view/);
 assert.match(read("src/components/register/RegistrationFunnelTracker.tsx"), /registration_form_started/);
 assert.match(read("src/components/register/RegistrationFunnelTracker.tsx"), /registration_submitted/);
+assert.match(read("src/components/register/RegistrationFunnelTracker.tsx"), /\/api\/growth\/registration-funnel/);
+assert.match(read("src/components/register/RegistrationFunnelTracker.tsx"), /growthLeadId/);
+
+const venueReg = read("src/app/register/venue/page.tsx");
+assert.match(venueReg, /stampRegistrationPageViewed/);
+assert.doesNotMatch(venueReg, /SIGNUP_STARTED/);
+assert.match(venueReg, /growthLeadId=\{traceId/);
+
+const hostReg = read("src/app/register/promoter/page.tsx");
+assert.match(hostReg, /stampRegistrationPageViewed/);
+assert.doesNotMatch(hostReg, /SIGNUP_STARTED/);
+assert.match(hostReg, /growthLeadId=\{traceId/);
+
+const performerReg = read("src/app/register/musician/page.tsx");
+assert.match(performerReg, /stampRegistrationPageViewed/);
+assert.doesNotMatch(performerReg, /SIGNUP_STARTED/);
+assert.match(performerReg, /growthLeadId=\{traceId/);
+
+const hostLanding = read("src/app/host/page.tsx");
+assert.match(hostLanding, /CLICKED/);
+assert.doesNotMatch(hostLanding, /SIGNUP_STARTED/);
+
+assert.match(read("src/app/register/venue/register-submit/route.ts"), /stampRegistrationSubmitForLead/);
+assert.match(read("src/app/register/promoter/register-submit/route.ts"), /stampRegistrationSubmitForLead/);
+assert.match(read("src/app/register/musician/register-submit/route.ts"), /stampRegistrationSubmitForLead/);
+
+assert.match(read("src/lib/growth/growthLeadAcquisitionStage.ts"), /stampRegistrationPageViewed/);
+assert.match(read("src/lib/growth/growthLeadAcquisitionStage.ts"), /stampRegistrationFormStarted/);
+assert.match(read("src/lib/growth/growthLeadAcquisitionStage.ts"), /stampRegistrationSubmitted/);
+assert.match(read("src/lib/growth/growthLeadAcquisitionStage.ts"), /registrationViewedAt/);
+assert.match(read("src/lib/growth/growthLeadAcquisitionStage.ts"), /registrationSubmittedAt/);
+assert.match(read("src/app/api/growth/registration-funnel/route.ts"), /form_started/);
+
 assert.match(read("src/app/register/venue/page.tsx"), /Create your free venue account/);
 assert.match(read("src/app/register/venue/register-submit/route.ts"), /\/venue\/setup/);
 assert.match(read("src/app/venue/setup/page.tsx"), /Find your venue/);

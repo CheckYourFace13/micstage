@@ -1187,9 +1187,13 @@ model GrowthLead {
   contactQuality    GrowthLeadContactQuality?
   acquisitionStage  GrowthLeadAcquisitionStage @default(DISCOVERED)
 
-  /// First time this lead reached SIGNUP_STARTED (never overwritten). Enables true signup cohorts.
+  /// First attributed registration-page load (never overwritten). Distinct from form start.
+  registrationViewedAt DateTime?
+  /// First genuine registration-form interaction (never overwritten). SIGNUP_STARTED stage.
   signupStartedAt   DateTime?
-  /// First time this lead reached ACCOUNT_CREATED (never overwritten).
+  /// First legitimate registration POST receipt (never overwritten). Before create result.
+  registrationSubmittedAt DateTime?
+  /// First successful account creation (never overwritten).
   accountCreatedAt  DateTime?
   /// First time this lead reached LISTING_LIVE (never overwritten).
   listingLiveAt     DateTime?
@@ -1230,6 +1234,8 @@ model GrowthLead {
   @@index([contactEmailConfidence])
   @@index([signupStartedAt])
   @@index([accountCreatedAt])
+  @@index([registrationViewedAt])
+  @@index([registrationSubmittedAt])
   @@index([acquisitionStage, signupStartedAt])
 
   @@index([websiteHostNormalized, leadType])

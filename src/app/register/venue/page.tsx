@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { stampRegistrationPageViewed } from "@/lib/growth/growthLeadAcquisitionStage";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { VENUE_REGISTER_SUBMIT_PATH } from "./actions";
@@ -52,8 +52,8 @@ export default async function VenueRegisterPage(props: {
   if (traceId) {
     const prisma = getPrismaOrNull();
     if (prisma) {
-      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: "VENUE" });
-      await advanceGrowthLeadAcquisitionStage(prisma, traceId, "SIGNUP_STARTED", { leadType: "VENUE" });
+      // Page arrival = CLICKED + registrationViewedAt. Form start is client-stamped.
+      await stampRegistrationPageViewed(prisma, traceId, { leadType: "VENUE" });
     }
   }
 
@@ -65,7 +65,7 @@ export default async function VenueRegisterPage(props: {
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-xl px-4 py-8 sm:px-6 sm:py-12">
-        <RegistrationFunnelTracker role="venue" />
+        <RegistrationFunnelTracker role="venue" growthLeadId={traceId || undefined} />
         <Link className="text-sm text-white/70 hover:text-white" href="/">
           &lt;- Back
         </Link>

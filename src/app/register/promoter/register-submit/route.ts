@@ -63,6 +63,16 @@ export async function POST(request: Request) {
 
   const errOpts = { email, displayName, growthTraceLeadId };
 
+  // Genuine form POST receipt — stamp before consent / rate-limit / duplicate / create.
+  const prisma = getPrismaOrNull();
+  if (prisma) {
+    await stampRegistrationSubmitForLead(prisma, {
+      leadType: "PROMOTER_ACCOUNT",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
+  }
+
   if (!registrationContentConsentChecked(formData)) {
     return redirectTo(registerErrorPath("consent", errOpts));
   }
@@ -77,7 +87,6 @@ export async function POST(request: Request) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[registerHost] database not configured");
     return redirectTo(registerErrorPath("unavailable", errOpts));
@@ -86,12 +95,6 @@ export async function POST(request: Request) {
   try {
     const existingUser = await prisma.promoterUser.findUnique({ where: { email } });
     if (existingUser) return redirectTo(registerErrorPath("exists", errOpts));
-
-    await stampRegistrationSubmitForLead(prisma, {
-      leadType: "PROMOTER_ACCOUNT",
-      growthTraceLeadId,
-      registrationEmail: email,
-    });
 
     const hostSlug = await allocateUniqueHostSlug(displayName, async (slug) => {
       const row = await prisma.promoterUser.findUnique({ where: { hostSlug: slug }, select: { id: true } });

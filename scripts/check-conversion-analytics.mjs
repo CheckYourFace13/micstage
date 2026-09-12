@@ -74,6 +74,19 @@ assert.match(read("src/app/register/venue/register-submit/route.ts"), /stampRegi
 assert.match(read("src/app/register/promoter/register-submit/route.ts"), /stampRegistrationSubmitForLead/);
 assert.match(read("src/app/register/musician/register-submit/route.ts"), /stampRegistrationSubmitForLead/);
 
+for (const rel of [
+  "src/app/register/venue/register-submit/route.ts",
+  "src/app/register/promoter/register-submit/route.ts",
+  "src/app/register/musician/register-submit/route.ts",
+]) {
+  const src = read(rel);
+  const stampIdx = src.indexOf("stampRegistrationSubmitForLead");
+  const consentIdx = src.indexOf("registrationContentConsentChecked");
+  const rateIdx = src.indexOf("consumeRateLimit");
+  assert.ok(stampIdx > 0 && stampIdx < consentIdx, `${rel}: stamp before consent`);
+  assert.ok(stampIdx < rateIdx, `${rel}: stamp before rate limit`);
+}
+
 assert.match(read("src/lib/growth/growthLeadAcquisitionStage.ts"), /stampRegistrationPageViewed/);
 assert.match(read("src/lib/growth/growthLeadAcquisitionStage.ts"), /stampRegistrationFormStarted/);
 assert.match(read("src/lib/growth/growthLeadAcquisitionStage.ts"), /stampRegistrationSubmitted/);

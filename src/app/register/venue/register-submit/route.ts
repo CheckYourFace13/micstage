@@ -60,6 +60,16 @@ export async function POST(request: Request) {
   const growthTraceLeadId = optString(formData, "growthTraceLeadId");
   const claimListing = optString(formData, "claimListing");
 
+  // Genuine form POST receipt — stamp before consent / rate-limit / duplicate / create.
+  const prisma = getPrismaOrNull();
+  if (prisma) {
+    await stampRegistrationSubmitForLead(prisma, {
+      leadType: "VENUE",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
+  }
+
   const rl = await consumeRateLimit({
     scope: "register:venue",
     identifier: email,
@@ -74,7 +84,6 @@ export async function POST(request: Request) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[registerVenue] database not configured");
     return redirectTo(registerErrorPath("unavailable", email, claimListing, growthTraceLeadId));
@@ -89,13 +98,6 @@ export async function POST(request: Request) {
     if (existing || existingManager) {
       return redirectTo(registerErrorPath("exists", email, claimListing, growthTraceLeadId));
     }
-
-    // Submit receipt before create so submit failures are distinguishable from create failures.
-    await stampRegistrationSubmitForLead(prisma, {
-      leadType: "VENUE",
-      growthTraceLeadId,
-      registrationEmail: email,
-    });
 
     const consentAt = new Date();
     const consentVer = REGISTRATION_CONTENT_CONSENT_VERSION;

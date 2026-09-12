@@ -10,10 +10,15 @@ function normalizeIdentifier(id: string): string {
 }
 
 async function requesterIp(): Promise<string> {
-  const h = await headers();
-  const xfwd = h.get("x-forwarded-for");
-  if (!xfwd) return "unknown";
-  return xfwd.split(",")[0]?.trim() || "unknown";
+  try {
+    const h = await headers();
+    const xfwd = h.get("x-forwarded-for");
+    if (!xfwd) return "unknown";
+    return xfwd.split(",")[0]?.trim() || "unknown";
+  } catch {
+    // Outside a Next request scope (scripts / unit runners).
+    return "unknown";
+  }
 }
 
 export async function consumeRateLimit(input: {

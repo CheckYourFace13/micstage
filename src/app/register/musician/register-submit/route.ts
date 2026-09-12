@@ -74,6 +74,16 @@ export async function POST(request: Request) {
   const growthTraceLeadId = optString(formData, "growthTraceLeadId");
   const errOpts = { email, stageName, growthTraceLeadId };
 
+  // Genuine form POST receipt — stamp before consent / rate-limit / duplicate / create.
+  const prisma = getPrismaOrNull();
+  if (prisma) {
+    await stampRegistrationSubmitForLead(prisma, {
+      leadType: "ARTIST",
+      growthTraceLeadId,
+      registrationEmail: email,
+    });
+  }
+
   if (!registrationContentConsentChecked(formData)) {
     return redirectTo(registerErrorPath("consent", nextRaw, errOpts));
   }
@@ -88,7 +98,6 @@ export async function POST(request: Request) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const prisma = getPrismaOrNull();
   if (!prisma) {
     console.error("[registerMusician] database not configured");
     return redirectTo(registerErrorPath("unavailable", nextRaw, errOpts));
@@ -99,12 +108,6 @@ export async function POST(request: Request) {
     if (existing) {
       return redirectTo(registerErrorPath("exists", nextRaw, errOpts));
     }
-
-    await stampRegistrationSubmitForLead(prisma, {
-      leadType: "ARTIST",
-      growthTraceLeadId,
-      registrationEmail: email,
-    });
 
     const now = new Date();
     const musician = await prisma.musicianUser.create({

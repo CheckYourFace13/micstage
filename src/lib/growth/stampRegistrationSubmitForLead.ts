@@ -6,8 +6,9 @@ import {
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 
 /**
- * Stamp registrationSubmittedAt for the attributed lead before account creation.
- * Prefer explicit growthTraceLeadId; fall back to contact-email match.
+ * Stamp registrationSubmittedAt for the attributed lead on genuine form POST receipt.
+ * Call after email (+ optional growthTraceLeadId) parse, BEFORE consent / rate-limit /
+ * duplicate / create outcomes. Prefer explicit growthTraceLeadId; fall back to email match.
  * Never throws — registration must proceed even if stamping fails.
  */
 export async function stampRegistrationSubmitForLead(

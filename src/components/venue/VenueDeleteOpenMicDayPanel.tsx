@@ -39,16 +39,14 @@ export function VenueDeleteOpenMicDayPanel({ venueId, dateYmd, nightLabel, child
           <input type="hidden" name="dateYmd" value={dateYmd} />
           <p className="text-[11px] leading-relaxed text-white/70">
             Remove <span className="font-semibold text-white">{nightLabel}</span> (
-            <span className="font-mono text-white/80">{dateYmd}</span>) from MicStage? This deletes all generated slots and
-            bookings for that calendar night across your schedule blocks. Your recurring templates stay — you can generate this
-            date again later.
-          </p>
-          <p className="mt-1.5 text-[11px] font-medium text-amber-200/85">
-            You cannot delete a night that still has an active MicStage artist booking — cancel those first.
+            <span className="font-mono text-white/80">{dateYmd}</span>) from MicStage? This removes your
+            venue-created open mic for that date only. Host-owned nights at this venue are not
+            affected. Empty nights are deleted; nights with bookings are cancelled and performers
+            with emails are notified.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <FormSubmitButton
-              label="Delete this open mic"
+              label="Remove this open mic"
               pendingLabel="Removing…"
               className="h-8 rounded-md border border-red-400/45 bg-red-500/15 px-2.5 text-[11px] font-semibold text-red-100 hover:bg-red-500/25 disabled:opacity-50"
             />

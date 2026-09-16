@@ -22,6 +22,7 @@ import {
   moveOrSwapBookingBetweenSlots,
 } from "@/lib/bookingSlotAssign";
 import { notifyBookingTimeChanged } from "@/lib/bookingNotify";
+import { cancelOrDeleteVenueOwnedDay } from "@/lib/venue/cancelOrDeleteVenueOwnedDay";
 import { isValidScheduleWindow, resolveScheduleEndMin } from "@/lib/scheduleWindow";
 import {
   ALL_WEEKDAYS,
@@ -1690,24 +1691,10 @@ export async function deleteVenueOpenMicDay(formData: FormData): Promise<VenuePo
   const dayStart = new Date(`${dateYmd}T00:00:00.000Z`);
   const prisma = requirePrisma();
 
-  const instances = await prisma.eventInstance.findMany({
-    where: { date: dayStart, template: { venueId } },
-    include: { slots: { include: { booking: true } } },
-  });
-  if (instances.length === 0) return portalRedirect("/venue?dayDeleteError=noInstances");
-
-  for (const inst of instances) {
-    for (const slot of inst.slots) {
-      const b = slot.booking;
-      if (b && !b.cancelledAt && b.musicianId) {
-        return portalRedirect("/venue?dayDeleteError=musicianBooked");
-      }
-    }
+  const result = await cancelOrDeleteVenueOwnedDay(prisma, venueId, dayStart);
+  if (!result.ok) {
+    return portalRedirect("/venue?dayDeleteError=noInstances");
   }
-
-  await prisma.eventInstance.deleteMany({
-    where: { id: { in: instances.map((i) => i.id) } },
-  });
 
   const venue = await prisma.venue.findUnique({ where: { id: venueId }, select: { slug: true } });
   revalidatePath("/venue");
@@ -1716,15 +1703,20 @@ export async function deleteVenueOpenMicDay(formData: FormData): Promise<VenuePo
   const now = new Date();
   const startToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const remainingRows = await prisma.eventInstance.findMany({
-    where: { template: { venueId }, date: { gte: startToday } },
+    where: {
+      template: { venueId, promoterNightId: null },
+      date: { gte: startToday },
+      isCancelled: false,
+    },
     select: { date: true },
   });
   const remainingYmds = [...new Set(remainingRows.map((r) => storageYmdUtc(r.date)))].sort();
   const nextYmd = remainingYmds[0] ?? null;
+  const flag = result.mode === "cancelled" ? "dayCancelled=1" : "dayDeleted=1";
   if (nextYmd) {
-    return portalRedirect(`/venue?dayDeleted=1&lineupDay=${encodeURIComponent(nextYmd)}`);
+    return portalRedirect(`/venue?${flag}&lineupDay=${encodeURIComponent(nextYmd)}`);
   }
-  return portalRedirect("/venue?dayDeleted=1");
+  return portalRedirect(`/venue?${flag}`);
   } catch (e) {
     if (e instanceof VenuePortalRedirectSignal) return e.result;
     throw e;

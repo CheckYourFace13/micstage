@@ -35,6 +35,7 @@ export async function provisionHostNightLineup(
     },
   });
   if (!night) throw new Error("night_not_found");
+  if (night.cancelledAt) throw new Error("night_cancelled");
 
   const signupEnabled = overrides?.signupEnabled ?? night.signupEnabled;
   const startTimeMin = overrides?.startTimeMin ?? night.startTimeMin;
@@ -140,9 +141,9 @@ export async function publicLineupHrefForNight(
 ): Promise<string | null> {
   const night = await prisma.promoterNight.findUnique({
     where: { id: nightId },
-    select: { id: true, eventTemplate: { select: { id: true } } },
+    select: { id: true, cancelledAt: true, eventTemplate: { select: { id: true } } },
   });
-  if (!night) return null;
+  if (!night || night.cancelledAt) return null;
   if (!night.eventTemplate) {
     try {
       await provisionHostNightLineup(prisma, nightId);

@@ -39,7 +39,7 @@ export default async function PublicHostPage(props: { params: Promise<{ slug: st
         orderBy: { updatedAt: "desc" },
         include: {
           nights: {
-            where: { date: { gte: new Date(Date.now() - 86400000) } },
+            where: { date: { gte: new Date(Date.now() - 86400000) }, cancelledAt: null },
             orderBy: { date: "asc" },
             take: 12,
             include: {

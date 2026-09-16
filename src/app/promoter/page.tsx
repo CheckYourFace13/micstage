@@ -24,6 +24,7 @@ import {
   changePromoterNightVenueAction,
   createPromoterSeriesAction,
 } from "./actions";
+import { cancelOrDeleteHostNightAction } from "./night-actions";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Host dashboard",
@@ -47,6 +48,7 @@ export default async function HostDashboardPage(props: {
       orderBy: { updatedAt: "desc" },
       include: {
         nights: {
+          where: { cancelledAt: null },
           orderBy: { date: "asc" },
           include: { venue: { select: { id: true, name: true, slug: true, city: true, region: true } } },
         },
@@ -97,11 +99,29 @@ export default async function HostDashboardPage(props: {
   const recentVenues = [...venueMap.values()];
 
   const nightLineupHrefs: Record<string, string | null> = {};
+  const nightHasActiveBookings: Record<string, boolean> = {};
   await Promise.all(
     upcomingNights.map(async (n) => {
       nightLineupHrefs[n.id] = await publicLineupHrefForNight(prisma, n.id);
     }),
   );
+  if (upcomingNights.length > 0) {
+    const activeRows = await prisma.booking.findMany({
+      where: {
+        cancelledAt: null,
+        slot: {
+          instance: {
+            template: { promoterNightId: { in: upcomingNights.map((n) => n.id) } },
+          },
+        },
+      },
+      select: { slot: { select: { instance: { select: { template: { select: { promoterNightId: true } } } } } } },
+    });
+    for (const row of activeRows) {
+      const nid = row.slot.instance.template.promoterNightId;
+      if (nid) nightHasActiveBookings[nid] = true;
+    }
+  }
 
   const hostPublicUrl = user?.hostSlug ? absoluteUrl(`/hosts/${user.hostSlug}`) : null;
 
@@ -152,6 +172,12 @@ export default async function HostDashboardPage(props: {
         return "Pick a valid date.";
       case "venue_missing":
         return "We couldn't find that venue.";
+      case "night_deleted":
+        return "Night deleted.";
+      case "night_cancelled":
+        return "Night cancelled. Booked performers were notified when they had an email.";
+      case "forbidden":
+        return "You don’t have access to that night.";
       default:
         return null;
     }
@@ -306,6 +332,7 @@ export default async function HostDashboardPage(props: {
               addNightAction={addPromoterNightAction}
               addRecurringAction={addPromoterRecurringNightsAction}
               changeVenueAction={changePromoterNightVenueAction}
+              deleteNightAction={cancelOrDeleteHostNightAction}
               nights={s.nights
                 .filter((n) => n.date.getTime() >= nowMs - 86400000)
                 .map((n) => ({
@@ -315,6 +342,7 @@ export default async function HostDashboardPage(props: {
                   venueName: n.venue.name,
                   title: n.title,
                   lineupHref: nightLineupHrefs[n.id] ?? null,
+                  hasActiveBookings: Boolean(nightHasActiveBookings[n.id]),
                 }))}
             />
           ))}

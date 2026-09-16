@@ -242,3 +242,25 @@ export async function hostMoveBookingAction(formData: FormData) {
   revalidatePath(`/promoter/nights/${owned.nightId}`);
   redirect(`/promoter/nights/${owned.nightId}?saved=${result.mode === "swapped" ? "swapped" : "moved"}`);
 }
+
+export async function cancelOrDeleteHostNightAction(formData: FormData) {
+  const session = await requirePromoterSession();
+  const nightId = formData.get("nightId")?.toString().trim();
+  if (!nightId) redirect("/promoter?promoter=night_invalid");
+
+  const prisma = requirePrisma();
+  const owned = await assertHostOwnsNight(prisma, session.promoterId, nightId);
+  if (!owned.ok) redirect("/promoter?promoter=forbidden");
+
+  const { cancelOrDeleteHostNight } = await import("@/lib/host/cancelOrDeleteHostNight");
+  const result = await cancelOrDeleteHostNight(prisma, nightId);
+  if (!result.ok) {
+    if (result.reason === "already_cancelled") redirect("/promoter?promoter=night_cancelled");
+    redirect("/promoter?promoter=forbidden");
+  }
+
+  revalidatePath("/promoter");
+  revalidatePath(`/nights/${nightId}/lineup`);
+  revalidatePath(`/promoter/nights/${nightId}`);
+  redirect(result.mode === "deleted" ? "/promoter?promoter=night_deleted" : "/promoter?promoter=night_cancelled");
+}

@@ -211,6 +211,7 @@ export default async function VenuePortalPage({
     slotDeleted?: string;
     lineupDay?: string;
     dayDeleted?: string;
+    dayCancelled?: string;
     dayDeleteError?: string;
     performerHistory?: string;
     lineupTestCleanup?: string;
@@ -633,12 +634,12 @@ export default async function VenuePortalPage({
         ) : null}
         {q.dayDeleted === "1" ? (
           <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
-            That open mic night was removed from MicStage (templates unchanged). Slots and walk-up holds on that date are gone.
+            That open mic night was removed from MicStage (templates unchanged).
           </div>
         ) : null}
-        {q.dayDeleteError === "musicianBooked" ? (
-          <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
-            That night still has an active MicStage artist booking — cancel it first, then you can delete the night.
+        {q.dayCancelled === "1" ? (
+          <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-white">
+            That night was cancelled. Booked performers with emails were notified. Booking history was kept.
           </div>
         ) : null}
         {q.dayDeleteError === "noInstances" ? (

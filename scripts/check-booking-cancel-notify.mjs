@@ -86,5 +86,14 @@ assert.match(nightActions, /hostRemoveBookingAction[\s\S]*notifyBookingCancelled
 const schema = readFileSync(new URL("../prisma/schema.prisma", import.meta.url), "utf8");
 assert.match(schema, /cancelNotifyPerformerSentAt/);
 assert.match(schema, /cancelNotifyOrganizerSentAt/);
+assert.match(nightActions, /cancelOrDeleteHostNightAction/);
+assert.match(
+  readFileSync(new URL("../src/lib/host/cancelOrDeleteHostNight.ts", import.meta.url), "utf8"),
+  /notifyBookingCancelledById/,
+);
+assert.match(
+  readFileSync(new URL("../src/lib/venue/cancelOrDeleteVenueOwnedDay.ts", import.meta.url), "utf8"),
+  /promoterNightId: null/,
+);
 
 console.log(JSON.stringify({ ok: true, checks: "booking-cancel-notify" }));

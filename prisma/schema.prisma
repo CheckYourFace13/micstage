@@ -225,12 +225,16 @@ model PromoterNight {
   /// Quiet minutes after a set before the next artist STARTS. Start interval = slot + break.
   breakMinutes  Int     @default(5)
 
+  /// Soft-cancel / archive: night kept for booking history; hidden from upcoming + public signup.
+  cancelledAt DateTime?
+
   eventTemplate EventTemplate?
   disputes      HostNightVenueDispute[]
 
   @@unique([seriesId, venueId, date])
   @@index([seriesId, date])
   @@index([venueId, date])
+  @@index([cancelledAt])
 }
 
 enum HostNightDisputeStatus {

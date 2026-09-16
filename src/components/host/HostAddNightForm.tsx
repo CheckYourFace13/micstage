@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { VenuePlacePicker, type PlaceData } from "@/app/register/venue/VenuePlacePicker";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { HostDeleteNightPanel } from "@/components/host/HostDeleteNightPanel";
 
 type VenueResult = {
   venueId: string;
@@ -17,6 +18,7 @@ export function HostAddNightForm(props: {
   addNightAction: (formData: FormData) => void | Promise<void>;
   addRecurringAction: (formData: FormData) => void | Promise<void>;
   changeVenueAction: (formData: FormData) => void | Promise<void>;
+  deleteNightAction?: (formData: FormData) => void | Promise<void>;
   nights: Array<{
     id: string;
     dateLabel: string;
@@ -24,6 +26,7 @@ export function HostAddNightForm(props: {
     venueName: string;
     title: string | null;
     lineupHref: string | null;
+    hasActiveBookings?: boolean;
   }>;
 }) {
   const [query, setQuery] = useState("");
@@ -199,7 +202,7 @@ export function HostAddNightForm(props: {
                 <div className="font-medium text-white">{n.dateLabel}</div>
                 <div className="text-white/60">{n.venueName}</div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <a href={`/promoter/nights/${n.id}`} className="text-xs font-semibold text-[rgb(var(--om-neon))] underline">
                   Manage
                 </a>
@@ -207,6 +210,14 @@ export function HostAddNightForm(props: {
                   <a href={n.lineupHref} className="text-xs text-white/70 underline">
                     Signup link
                   </a>
+                ) : null}
+                {props.deleteNightAction ? (
+                  <HostDeleteNightPanel
+                    nightId={n.id}
+                    hasActiveBookings={Boolean(n.hasActiveBookings)}
+                    action={props.deleteNightAction}
+                    compact
+                  />
                 ) : null}
               </div>
             </li>

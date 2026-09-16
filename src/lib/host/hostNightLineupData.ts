@@ -46,6 +46,7 @@ export async function loadHostNightLineupContext(nightId: string) {
     },
   });
   if (!night) return null;
+  if (night.cancelledAt) return null;
   if (night.disputes.some((d) => d.status === "SUPPRESSED")) return null;
 
   const hostName = night.series.promoter.displayName?.trim() || "Host";

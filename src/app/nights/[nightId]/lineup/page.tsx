@@ -40,11 +40,15 @@ export default async function HostNightLineupPage(props: {
   let ctx = await loadHostNightLineupContext(nightId);
   // A night with a missing template or dated instance loads fine but has nothing to show, so
   // re-provision instead of 404ing — otherwise the host's public link is a permanent dead end.
+  // Never re-provision cancelled nights.
   if (!ctx || !ctx.template || !ctx.instance) {
     const prisma = getPrismaOrNull();
     if (prisma) {
-      const exists = await prisma.promoterNight.findUnique({ where: { id: nightId }, select: { id: true } });
-      if (exists) {
+      const exists = await prisma.promoterNight.findUnique({
+        where: { id: nightId },
+        select: { id: true, cancelledAt: true },
+      });
+      if (exists && !exists.cancelledAt) {
         try {
           await provisionHostNightLineup(prisma, nightId);
           ctx = await loadHostNightLineupContext(nightId);

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPromoterSessionOrNull } from "@/lib/authz";
-import { slotIsOpenForAssignment } from "@/lib/bookingSlotAssign";
+import { activeBookingFrom, slotIsOpenForAssignment } from "@/lib/bookingSlotAssign";
 import { assertHostOwnsNight } from "@/lib/host/hostNightAuth";
 import { loadHostNightLineupContext } from "@/lib/host/hostNightLineupData";
 import { publicLineupPathForNightId } from "@/lib/host/hostNightProvisioning";
@@ -13,11 +13,13 @@ import { computeSignupLiveStatus } from "@/lib/signupLiveStatus";
 import { lineupNavLabelFromYmd, minutesToTimeInputValue, minutesToTimeLabel } from "@/lib/time";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
 import { FormSubmitButton } from "@/components/FormSubmitButton";
+import { HostDeleteNightPanel } from "@/components/host/HostDeleteNightPanel";
 import { HostNightVenueEditor } from "@/components/host/HostNightVenueEditor";
 import { SignupLiveStatusPanel } from "@/components/host/SignupLiveStatusPanel";
 import { SharePageButtons } from "@/components/onboarding/SharePageButtons";
 import { changePromoterNightVenueAction } from "../../actions";
 import {
+  cancelOrDeleteHostNightAction,
   hostHouseBookSlotAction,
   hostMoveBookingAction,
   hostRemoveBookingAction,
@@ -57,10 +59,12 @@ export default async function HostNightManagePage(props: {
   const signupLive = computeSignupLiveStatus({
     signupEnabled: ctx.night.signupEnabled,
     hasScheduleInstance: Boolean(ctx.instance),
-    isCancelled: ctx.instance?.isCancelled ?? false,
+    isCancelled: Boolean(ctx.night.cancelledAt) || (ctx.instance?.isCancelled ?? false),
     slots,
     nightId,
   });
+
+  const hasActiveBookings = slots.some((s) => Boolean(activeBookingFrom(s.booking)));
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -324,6 +328,18 @@ export default async function HostNightManagePage(props: {
               disabled={!firstOpenSlotId}
             />
           </form>
+        </section>
+
+        <section className="mt-10 border-t border-white/10 pt-8">
+          <h2 className="text-lg font-semibold text-white">Remove this night</h2>
+          <p className="mt-1 text-sm text-white/60">
+            Affects only this date — not your series or other nights.
+          </p>
+          <HostDeleteNightPanel
+            nightId={nightId}
+            hasActiveBookings={hasActiveBookings}
+            action={cancelOrDeleteHostNightAction}
+          />
         </section>
       </main>
     </div>

@@ -112,6 +112,7 @@ export default async function HostDashboardPage(props: {
   );
   if (upcomingNights.length > 0) {
     const nightIds = upcomingNights.map((n) => n.id);
+    const signupByNight = new Map(upcomingNights.map((n) => [n.id, n.signupEnabled]));
     const slotRows = await prisma.slot.findMany({
       where: {
         instance: {
@@ -120,19 +121,34 @@ export default async function HostDashboardPage(props: {
         },
       },
       select: {
+        status: true,
+        bookingRestrictionModeOverride: true,
         booking: { select: { cancelledAt: true } },
         instance: { select: { template: { select: { promoterNightId: true } } } },
       },
     });
-    const byNight = new Map<string, Array<{ booking: { cancelledAt: Date | null } | null }>>();
+    const byNight = new Map<
+      string,
+      Array<{
+        status: string;
+        bookingRestrictionModeOverride: string | null;
+        booking: { cancelledAt: Date | null } | null;
+      }>
+    >();
     for (const id of nightIds) byNight.set(id, []);
     for (const row of slotRows) {
       const nid = row.instance.template.promoterNightId;
       if (!nid) continue;
-      byNight.get(nid)?.push({ booking: row.booking });
+      byNight.get(nid)?.push({
+        status: row.status,
+        bookingRestrictionModeOverride: row.bookingRestrictionModeOverride,
+        booking: row.booking,
+      });
     }
     for (const [nid, slots] of byNight) {
-      const counts = hostNightBookingCountsFromSlots(slots);
+      const counts = hostNightBookingCountsFromSlots(slots, {
+        signupEnabled: signupByNight.get(nid) ?? true,
+      });
       nightBookingStatusLabel[nid] = formatHostNightBookingStatus(counts);
       nightHasActiveBookings[nid] = counts.activeBooked > 0;
     }

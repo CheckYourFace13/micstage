@@ -41,6 +41,18 @@ function isFilled(slot: SignupLiveSlotSlice): boolean {
   return Boolean(slot.booking && slot.booking.cancelledAt == null);
 }
 
+/** Shared with Host dashboard occupancy labels — keep rules identical. */
+export function slotIsPubliclyBookable(
+  slot: SignupLiveSlotSlice,
+  opts?: { excludeHouseOnly?: boolean },
+): boolean {
+  return isPublicOpen(slot, opts?.excludeHouseOnly !== false);
+}
+
+export function slotHasActiveBooking(slot: SignupLiveSlotSlice): boolean {
+  return isFilled(slot);
+}
+
 /**
  * Truthful Host/Venue "performer signup is live" status.
  * LIVE only when signup is enabled, schedule exists, and at least one publicly bookable open spot.

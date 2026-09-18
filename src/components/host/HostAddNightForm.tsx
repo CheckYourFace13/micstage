@@ -27,6 +27,7 @@ export function HostAddNightForm(props: {
     title: string | null;
     lineupHref: string | null;
     hasActiveBookings?: boolean;
+    bookingStatusLabel?: string;
   }>;
 }) {
   const [query, setQuery] = useState("");
@@ -201,6 +202,17 @@ export function HostAddNightForm(props: {
               <div>
                 <div className="font-medium text-white">{n.dateLabel}</div>
                 <div className="text-white/60">{n.venueName}</div>
+                {n.bookingStatusLabel ? (
+                  <div
+                    className={
+                      n.bookingStatusLabel.startsWith("FULL")
+                        ? "mt-0.5 text-xs font-semibold text-amber-200/90"
+                        : "mt-0.5 text-xs text-white/55"
+                    }
+                  >
+                    {n.bookingStatusLabel}
+                  </div>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <a href={`/promoter/nights/${n.id}`} className="text-xs font-semibold text-[rgb(var(--om-neon))] underline">

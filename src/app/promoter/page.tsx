@@ -25,6 +25,10 @@ import {
   createPromoterSeriesAction,
 } from "./actions";
 import { cancelOrDeleteHostNightAction } from "./night-actions";
+import {
+  formatHostNightBookingStatus,
+  hostNightBookingCountsFromSlots,
+} from "@/lib/host/hostNightBookingStatus";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Host dashboard",
@@ -100,26 +104,37 @@ export default async function HostDashboardPage(props: {
 
   const nightLineupHrefs: Record<string, string | null> = {};
   const nightHasActiveBookings: Record<string, boolean> = {};
+  const nightBookingStatusLabel: Record<string, string> = {};
   await Promise.all(
     upcomingNights.map(async (n) => {
       nightLineupHrefs[n.id] = await publicLineupHrefForNight(prisma, n.id);
     }),
   );
   if (upcomingNights.length > 0) {
-    const activeRows = await prisma.booking.findMany({
+    const nightIds = upcomingNights.map((n) => n.id);
+    const slotRows = await prisma.slot.findMany({
       where: {
-        cancelledAt: null,
-        slot: {
-          instance: {
-            template: { promoterNightId: { in: upcomingNights.map((n) => n.id) } },
-          },
+        instance: {
+          isCancelled: false,
+          template: { promoterNightId: { in: nightIds } },
         },
       },
-      select: { slot: { select: { instance: { select: { template: { select: { promoterNightId: true } } } } } } },
+      select: {
+        booking: { select: { cancelledAt: true } },
+        instance: { select: { template: { select: { promoterNightId: true } } } },
+      },
     });
-    for (const row of activeRows) {
-      const nid = row.slot.instance.template.promoterNightId;
-      if (nid) nightHasActiveBookings[nid] = true;
+    const byNight = new Map<string, Array<{ booking: { cancelledAt: Date | null } | null }>>();
+    for (const id of nightIds) byNight.set(id, []);
+    for (const row of slotRows) {
+      const nid = row.instance.template.promoterNightId;
+      if (!nid) continue;
+      byNight.get(nid)?.push({ booking: row.booking });
+    }
+    for (const [nid, slots] of byNight) {
+      const counts = hostNightBookingCountsFromSlots(slots);
+      nightBookingStatusLabel[nid] = formatHostNightBookingStatus(counts);
+      nightHasActiveBookings[nid] = counts.activeBooked > 0;
     }
   }
 
@@ -310,6 +325,15 @@ export default async function HostDashboardPage(props: {
                     <span className="text-white/80">{n.seriesName}</span>
                     {" — "}
                     <span className="text-white/70">{n.venue.name}</span>
+                    <span
+                      className={
+                        (nightBookingStatusLabel[n.id] ?? "").startsWith("FULL")
+                          ? "mt-0.5 block text-xs font-semibold text-amber-200/90"
+                          : "mt-0.5 block text-xs text-white/55"
+                      }
+                    >
+                      {nightBookingStatusLabel[n.id] ?? "No performers booked"}
+                    </span>
                   </span>
                   {nightLineupHrefs[n.id] ? (
                     <Link href={nightLineupHrefs[n.id]!} className="text-xs font-semibold text-[rgb(var(--om-neon))] underline">
@@ -343,6 +367,7 @@ export default async function HostDashboardPage(props: {
                   title: n.title,
                   lineupHref: nightLineupHrefs[n.id] ?? null,
                   hasActiveBookings: Boolean(nightHasActiveBookings[n.id]),
+                  bookingStatusLabel: nightBookingStatusLabel[n.id] ?? "No performers booked",
                 }))}
             />
           ))}

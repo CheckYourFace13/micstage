@@ -14,11 +14,12 @@ type Props = {
 
 export function HostDeleteNightPanel({ nightId, hasActiveBookings, action, compact }: Props) {
   const [open, setOpen] = useState(false);
-  const label = hasActiveBookings ? "Cancel night" : "Delete night";
+  /** Compact dashboard trigger is always "Remove night" — not booking status. */
+  const triggerLabel = compact ? "Remove night" : hasActiveBookings ? "Cancel night" : "Delete night";
   const pending = hasActiveBookings ? "Canceling…" : "Deleting…";
 
   return (
-    <div className={compact ? "w-full" : "mt-8"}>
+    <div className={compact ? "" : "mt-8"}>
       {!open ? (
         <button
           type="button"
@@ -29,7 +30,7 @@ export function HostDeleteNightPanel({ nightId, hasActiveBookings, action, compa
               : "rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-100 hover:bg-red-500/20"
           }
         >
-          {label}
+          {triggerLabel}
         </button>
       ) : (
         <form

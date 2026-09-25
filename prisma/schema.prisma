@@ -1330,6 +1330,31 @@ model PlacesUsageLedger {
   @@index([placeId])
 }
 
+/// Canonical Places query identity. Google content in tempPayload expires; the place id and derived conclusions stay.
+model PlacesQueryIdentity {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  logicalKey String @unique
+  placeId    String?
+
+  responseClass String?
+  retryAfter    DateTime?
+  permanentBlock Boolean @default(false)
+
+  derivedVenueTypeOk    Boolean?
+  derivedInUnitedStates Boolean?
+  derivedBusinessActive Boolean?
+
+  /// Temporary Google response used to finish verification after a restart. Purged at expiry.
+  tempPayload            Json?
+  googleContentExpiresAt DateTime?
+
+  @@index([retryAfter])
+  @@index([googleContentExpiresAt])
+}
+
 /// Pagination / rotation state for autonomous discovery adapters (per adapter + market).
 model GrowthDiscoveryCursor {
   id         String   @id @default(cuid())

@@ -5,6 +5,7 @@
  */
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { googleContentExpiryFrom } from "@/lib/compliance/googleMapsContentRetention";
 
 export const IDS_ONLY_FIELD_MASK = "places.id";
 /** Pro details needed to decide venue identity. No websiteUri (Enterprise). */
@@ -52,7 +53,7 @@ type LedgerRow = {
 
 export type LedgerClient = {
   placesUsageLedger: {
-    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
+    create: (args: { data: Record<string, unknown> }) => Promise<{ id?: string } | unknown>;
     update: (args: { where: { idempotencyKey: string }; data: Record<string, unknown> }) => Promise<unknown>;
     findUnique: (args: { where: { idempotencyKey: string } }) => Promise<LedgerRow | null>;
     count: (args: { where: Record<string, unknown> }) => Promise<number>;
@@ -60,8 +61,29 @@ export type LedgerClient = {
       _sum: { estimatedUsdMicros: number | null };
     }>;
   };
+  placesQueryIdentity: {
+    findUnique: (args: { where: { logicalKey: string } }) => Promise<IdentityRow | null>;
+    upsert: (args: {
+      where: { logicalKey: string };
+      create: Record<string, unknown>;
+      update: Record<string, unknown>;
+    }) => Promise<IdentityRow>;
+  };
   $transaction?: <T>(fn: (tx: LedgerClient) => Promise<T>) => Promise<T>;
   $executeRawUnsafe?: (query: string) => Promise<unknown>;
+};
+
+type IdentityRow = {
+  logicalKey: string;
+  placeId: string | null;
+  responseClass: string | null;
+  retryAfter: Date | null;
+  permanentBlock: boolean;
+  tempPayload: unknown;
+  googleContentExpiresAt: Date | null;
+  derivedVenueTypeOk: boolean | null;
+  derivedInUnitedStates: boolean | null;
+  derivedBusinessActive: boolean | null;
 };
 
 function hashKey(raw: string): string {
@@ -149,107 +171,153 @@ async function withBudgetLock<T>(prisma: LedgerClient, fn: (tx: LedgerClient) =>
   return memorySerialize(() => fn(prisma));
 }
 
-function cooldownOpen(row: LedgerRow | null): boolean {
-  if (!row?.retryAfter) return false;
-  return row.retryAfter.getTime() <= Date.now();
+export function nextUtcDay(now = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
 }
 
-function reuseRow(row: LedgerRow): boolean {
-  if (row.responseClass === "success" && row.placeId) return true;
-  if (row.responseClass === "zero_results" && !cooldownOpen(row)) return true;
-  if (row.responseClass === "transient" && !cooldownOpen(row)) return true;
-  if (row.responseClass === "reserved" && row.retryAfter && row.retryAfter.getTime() > Date.now()) return true;
-  if (!row.sent && row.blockedReason && row.responseClass !== "transient") return true;
-  return false;
+export function nextUtcMonth(now = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 }
 
-async function writeResult(
-  prisma: LedgerClient,
-  idempotencyKey: string,
-  data: { placeId?: string | null; responseClass: string; retryAfter?: Date | null; blockedReason?: string | null },
-) {
-  await prisma.placesUsageLedger.update({
-    where: { idempotencyKey },
-    data: {
-      placeId: data.placeId ?? null,
-      responseClass: data.responseClass,
-      retryAfter: data.retryAfter ?? null,
-      blockedReason: data.blockedReason ?? null,
-    },
+/** When a blocked request may be considered again. Enterprise never resumes. */
+export function retryAfterForBlock(reason: string, now = new Date()): Date | null {
+  if (reason === "enterprise_background_blocked") return null;
+  if (reason === "pro_daily_cap" || reason === "essentials_daily_cap") return nextUtcDay(now);
+  if (
+    reason === "pro_monthly_cap" ||
+    reason === "essentials_monthly_cap" ||
+    reason === "soft_target_20" ||
+    reason === "hard_ceiling_30"
+  ) {
+    return nextUtcMonth(now);
+  }
+  return nextUtcDay(now);
+}
+
+function payloadFresh(row: IdentityRow | null): boolean {
+  if (!row?.tempPayload || !row.googleContentExpiresAt) return false;
+  return row.googleContentExpiresAt.getTime() > Date.now();
+}
+
+async function saveIdentity(tx: LedgerClient, logicalKey: string, patch: Record<string, unknown>) {
+  await tx.placesQueryIdentity.upsert({
+    where: { logicalKey },
+    create: { logicalKey, permanentBlock: false, ...patch },
+    update: patch,
   });
 }
 
-type Reserve =
-  | { kind: "reuse"; row: LedgerRow }
-  | { kind: "blocked"; reason: string }
-  | { kind: "go"; incrementalUsd: number };
+type AttemptGate =
+  | { kind: "cached_id"; placeId: string | null }
+  | { kind: "cached_place"; place: ProDetails }
+  | { kind: "wait"; reason: string }
+  | { kind: "reserved"; attemptKey: string };
 
-async function reserve(
+export type ProDetails = {
+  id?: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  location?: { latitude?: number; longitude?: number };
+  types?: string[];
+  businessStatus?: string;
+  addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
+};
+
+async function gateOutbound(
   prisma: LedgerClient,
   input: {
     sku: PlacesSku;
     operation: string;
     purpose: string;
     fieldMask: string;
-    idempotencyKey: string;
-    queryKeyHash?: string;
+    logicalKey: string;
     placeId?: string | null;
   },
-): Promise<Reserve> {
+): Promise<AttemptGate> {
   return withBudgetLock(prisma, async (tx) => {
-    const existing = await tx.placesUsageLedger.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
-    if (existing && reuseRow(existing)) return { kind: "reuse", row: existing };
-    if (existing && (existing.responseClass === "transient" || existing.responseClass === "reserved" || existing.responseClass === "zero_results") && cooldownOpen(existing)) {
-      await tx.placesUsageLedger.update({
-        where: { idempotencyKey: input.idempotencyKey },
-        data: { responseClass: "reserved", retryAfter: new Date(Date.now() + 120_000), blockedReason: null },
-      });
-      return { kind: "go", incrementalUsd: 0 };
+    const existing = await tx.placesQueryIdentity.findUnique({ where: { logicalKey: input.logicalKey } });
+    if (existing?.permanentBlock) return { kind: "wait", reason: "enterprise_background_blocked" };
+    if (existing?.responseClass === "success" && payloadFresh(existing) && existing.tempPayload) {
+      return { kind: "cached_place", place: existing.tempPayload as ProDetails };
+    }
+    if (existing?.responseClass === "success" && existing.placeId && !existing.tempPayload) {
+      return { kind: "cached_id", placeId: existing.placeId };
+    }
+    if (existing?.retryAfter && existing.retryAfter.getTime() > Date.now()) {
+      return { kind: "wait", reason: existing.responseClass ?? "cooldown" };
     }
     const decision = await placesBudgetDecision(tx, input.sku);
     if (!decision.ok) {
-      if (!existing) {
-        await tx.placesUsageLedger.create({
-          data: {
-            ...utcParts(),
-            operation: input.operation,
-            purpose: input.purpose,
-            sku: input.sku,
-            queryKeyHash: input.queryKeyHash ?? null,
-            placeId: input.placeId ?? null,
-            fieldMask: input.fieldMask,
-            idempotencyKey: input.idempotencyKey,
-            sent: false,
-            dedupeHit: false,
-            responseClass: "blocked",
-            estimatedUsdMicros: 0,
-            blockedReason: decision.reason,
-            retryAfter: null,
-          },
-        });
-      }
-      return { kind: "blocked", reason: decision.reason };
-    }
-    if (!existing) {
-      await tx.placesUsageLedger.create({
-        data: {
-          ...utcParts(),
-          operation: input.operation,
-          purpose: input.purpose,
-          sku: input.sku,
-          queryKeyHash: input.queryKeyHash ?? null,
-          placeId: input.placeId ?? null,
-          fieldMask: input.fieldMask,
-          idempotencyKey: input.idempotencyKey,
-          sent: true,
-          dedupeHit: false,
-          responseClass: "reserved",
-          estimatedUsdMicros: Math.round(decision.incrementalUsd * 1_000_000),
-          retryAfter: new Date(Date.now() + 120_000),
-        },
+      const retryAfter = retryAfterForBlock(decision.reason);
+      await saveIdentity(tx, input.logicalKey, {
+        placeId: input.placeId ?? existing?.placeId ?? null,
+        responseClass: decision.reason,
+        retryAfter,
+        permanentBlock: decision.reason === "enterprise_background_blocked",
       });
+      return { kind: "wait", reason: decision.reason };
     }
-    return { kind: "go", incrementalUsd: decision.incrementalUsd };
+    const attemptKey = `${input.logicalKey}:attempt:${createHash("sha256").update(`${Date.now()}:${Math.random()}`).digest("hex").slice(0, 16)}`;
+    await tx.placesUsageLedger.create({
+      data: {
+        ...utcParts(),
+        operation: input.operation,
+        purpose: input.purpose,
+        sku: input.sku,
+        queryKeyHash: input.logicalKey,
+        placeId: input.placeId ?? null,
+        fieldMask: input.fieldMask,
+        idempotencyKey: attemptKey,
+        sent: true,
+        dedupeHit: false,
+        responseClass: "reserved",
+        estimatedUsdMicros: Math.round(decision.incrementalUsd * 1_000_000),
+        retryAfter: null,
+      },
+    });
+    await saveIdentity(tx, input.logicalKey, {
+      placeId: input.placeId ?? existing?.placeId ?? null,
+      responseClass: "reserved",
+      retryAfter: new Date(Date.now() + 120_000),
+      permanentBlock: false,
+    });
+    return { kind: "reserved", attemptKey };
+  });
+}
+
+async function finishAttempt(
+  prisma: LedgerClient,
+  input: {
+    attemptKey: string;
+    logicalKey: string;
+    responseClass: string;
+    placeId?: string | null;
+    retryAfter?: Date | null;
+    blockedReason?: string | null;
+    tempPayload?: unknown;
+    derived?: { venueTypeOk?: boolean; inUnitedStates?: boolean; businessActive?: boolean };
+    permanentBlock?: boolean;
+  },
+) {
+  await prisma.placesUsageLedger.update({
+    where: { idempotencyKey: input.attemptKey },
+    data: {
+      responseClass: input.responseClass,
+      placeId: input.placeId ?? null,
+      blockedReason: input.blockedReason ?? null,
+      retryAfter: input.retryAfter ?? null,
+    },
+  });
+  await saveIdentity(prisma, input.logicalKey, {
+    placeId: input.placeId ?? null,
+    responseClass: input.responseClass,
+    retryAfter: input.retryAfter ?? null,
+    permanentBlock: Boolean(input.permanentBlock),
+    tempPayload: input.tempPayload ?? null,
+    googleContentExpiresAt: input.tempPayload ? googleContentExpiryFrom() : null,
+    derivedVenueTypeOk: input.derived?.venueTypeOk ?? null,
+    derivedInUnitedStates: input.derived?.inUnitedStates ?? null,
+    derivedBusinessActive: input.derived?.businessActive ?? null,
   });
 }
 
@@ -267,31 +335,32 @@ export async function placesTextSearchIdsOnly(
   input: { query: string; purpose: string; fetchImpl?: PlacesFetch },
 ): Promise<IdsSearchResult> {
   const query = input.query.trim();
-  const idempotencyKey = `ids:${hashKey(query.toLowerCase())}`;
+  const logicalKey = `ids:${hashKey(query.toLowerCase())}`;
   const ledger = prisma as unknown as LedgerClient;
   const key = googleMapsServerApiKey();
 
   const run = async (): Promise<IdsSearchResult> => {
-    const slot = await reserve(ledger, {
+    const gate = await gateOutbound(ledger, {
       sku: "TEXT_SEARCH_IDS",
       operation: "TEXT_SEARCH_IDS",
       purpose: input.purpose,
       fieldMask: IDS_ONLY_FIELD_MASK,
-      idempotencyKey,
-      queryKeyHash: hashKey(query.toLowerCase()),
+      logicalKey,
     });
-    if (slot.kind === "reuse") {
-      return {
-        placeId: slot.row.placeId,
-        sent: false,
-        deduped: true,
-        blockedReason: slot.row.blockedReason ?? undefined,
-      };
+    if (gate.kind === "cached_id" || gate.kind === "cached_place") {
+      const placeId = gate.kind === "cached_id" ? gate.placeId : gate.place.id ?? null;
+      return { placeId, sent: false, deduped: true };
     }
-    if (slot.kind === "blocked") return { placeId: null, sent: false, deduped: false, blockedReason: slot.reason };
+    if (gate.kind === "wait") return { placeId: null, sent: false, deduped: true, blockedReason: gate.reason };
     if (!key) {
-      await writeResult(ledger, idempotencyKey, { responseClass: "transient", retryAfter: new Date(Date.now() + TRANSIENT_COOLDOWN_MS), blockedReason: "no_server_key" });
-      return { placeId: null, sent: false, deduped: false, blockedReason: "no_server_key" };
+      await finishAttempt(ledger, {
+        attemptKey: gate.attemptKey,
+        logicalKey,
+        responseClass: "transient",
+        retryAfter: new Date(Date.now() + TRANSIENT_COOLDOWN_MS),
+        blockedReason: "no_server_key",
+      });
+      return { placeId: null, sent: true, deduped: false, blockedReason: "no_server_key" };
     }
     const fetchImpl = input.fetchImpl ?? fetch;
     try {
@@ -306,9 +375,11 @@ export async function placesTextSearchIdsOnly(
       });
       if (!res.ok) {
         const transient = res.status >= 500 || res.status === 429;
-        await writeResult(ledger, idempotencyKey, {
+        await finishAttempt(ledger, {
+          attemptKey: gate.attemptKey,
+          logicalKey,
           responseClass: transient ? "transient" : `http_${res.status}`,
-          retryAfter: transient ? new Date(Date.now() + TRANSIENT_COOLDOWN_MS) : new Date(Date.now() + ZERO_RESULT_COOLDOWN_MS),
+          retryAfter: new Date(Date.now() + (transient ? TRANSIENT_COOLDOWN_MS : ZERO_RESULT_COOLDOWN_MS)),
           blockedReason: `http_${res.status}`,
         });
         return { placeId: null, sent: true, deduped: false, blockedReason: `http_${res.status}` };
@@ -316,16 +387,26 @@ export async function placesTextSearchIdsOnly(
       const data = (await res.json()) as { places?: Array<{ id?: string }> };
       const placeId = data.places?.[0]?.id ?? null;
       if (!placeId) {
-        await writeResult(ledger, idempotencyKey, {
+        await finishAttempt(ledger, {
+          attemptKey: gate.attemptKey,
+          logicalKey,
           responseClass: "zero_results",
           retryAfter: new Date(Date.now() + ZERO_RESULT_COOLDOWN_MS),
         });
         return { placeId: null, sent: true, deduped: false };
       }
-      await writeResult(ledger, idempotencyKey, { placeId, responseClass: "success", retryAfter: null });
+      await finishAttempt(ledger, {
+        attemptKey: gate.attemptKey,
+        logicalKey,
+        placeId,
+        responseClass: "success",
+        retryAfter: null,
+      });
       return { placeId, sent: true, deduped: false };
     } catch {
-      await writeResult(ledger, idempotencyKey, {
+      await finishAttempt(ledger, {
+        attemptKey: gate.attemptKey,
+        logicalKey,
         responseClass: "transient",
         retryAfter: new Date(Date.now() + TRANSIENT_COOLDOWN_MS),
         blockedReason: "network",
@@ -334,53 +415,60 @@ export async function placesTextSearchIdsOnly(
     }
   };
 
-  const pending = inflight.get(idempotencyKey) as Promise<IdsSearchResult> | undefined;
+  const pending = inflight.get(logicalKey) as Promise<IdsSearchResult> | undefined;
   if (pending) {
     const shared = await pending;
     return { ...shared, sent: false, deduped: true };
   }
-  const promise = run().finally(() => inflight.delete(idempotencyKey));
-  inflight.set(idempotencyKey, promise);
+  const promise = run().finally(() => inflight.delete(logicalKey));
+  inflight.set(logicalKey, promise);
   return promise;
 }
 
-export type ProDetails = {
-  id?: string;
-  displayName?: { text?: string };
-  formattedAddress?: string;
-  location?: { latitude?: number; longitude?: number };
-  types?: string[];
-  businessStatus?: string;
-  addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
-};
+function derivedFromPlace(place: ProDetails) {
+  const country = place.addressComponents?.find((c) => c.types?.includes("country"));
+  const inUnitedStates =
+    country?.shortText === "US" ||
+    /\b(USA|United States)\b/i.test(place.formattedAddress ?? "");
+  return {
+    venueTypeOk: Boolean(place.types?.some((t) => ["bar", "night_club", "restaurant", "cafe"].includes(t))),
+    inUnitedStates,
+    businessActive: place.businessStatus !== "CLOSED_PERMANENTLY",
+  };
+}
 
 export async function placesDetailsPro(
   prisma: PrismaClient,
   input: { placeId: string; purpose: string; fetchImpl?: PlacesFetch },
 ): Promise<{ place: ProDetails | null; sent: boolean; deduped: boolean; blockedReason?: string }> {
   const placeId = input.placeId.trim();
-  const idempotencyKey = `pro:${placeId}`;
+  const logicalKey = `pro:${placeId}`;
   const ledger = prisma as unknown as LedgerClient;
   const key = googleMapsServerApiKey();
   if (DETAILS_PRO_FIELD_MASK.includes("*") || DETAILS_PRO_FIELD_MASK.includes("websiteUri")) {
     return { place: null, sent: false, deduped: false, blockedReason: "illegal_mask" };
   }
-
-  const slot = await reserve(ledger, {
+  const gate = await gateOutbound(ledger, {
     sku: "DETAILS_PRO",
     operation: "DETAILS_PRO",
     purpose: input.purpose,
     fieldMask: DETAILS_PRO_FIELD_MASK,
-    idempotencyKey,
+    logicalKey,
     placeId,
   });
-  if (slot.kind === "reuse") {
-    return { place: null, sent: false, deduped: true, blockedReason: slot.row.responseClass === "success" ? "already_resolved" : slot.row.blockedReason ?? undefined };
-  }
-  if (slot.kind === "blocked") return { place: null, sent: false, deduped: false, blockedReason: slot.reason };
+  if (gate.kind === "cached_place") return { place: gate.place, sent: false, deduped: true };
+  if (gate.kind === "cached_id") return { place: null, sent: false, deduped: true, blockedReason: "identity_without_payload" };
+  if (gate.kind === "wait") return { place: null, sent: false, deduped: true, blockedReason: gate.reason };
   if (!key) {
-    await writeResult(ledger, idempotencyKey, { placeId, responseClass: "transient", retryAfter: new Date(Date.now() + TRANSIENT_COOLDOWN_MS), blockedReason: "no_server_key" });
-    return { place: null, sent: false, deduped: false, blockedReason: "no_server_key" };
+    await finishAttempt(ledger, {
+      attemptKey: gate.attemptKey,
+      logicalKey,
+      placeId,
+      responseClass: "transient",
+      retryAfter: new Date(Date.now() + TRANSIENT_COOLDOWN_MS),
+      blockedReason: "no_server_key",
+    });
+    return { place: null, sent: true, deduped: false, blockedReason: "no_server_key" };
   }
   const fetchImpl = input.fetchImpl ?? fetch;
   try {
@@ -390,7 +478,9 @@ export async function placesDetailsPro(
     );
     if (!res.ok) {
       const transient = res.status >= 500 || res.status === 429;
-      await writeResult(ledger, idempotencyKey, {
+      await finishAttempt(ledger, {
+        attemptKey: gate.attemptKey,
+        logicalKey,
         placeId,
         responseClass: transient ? "transient" : `http_${res.status}`,
         retryAfter: new Date(Date.now() + (transient ? TRANSIENT_COOLDOWN_MS : ZERO_RESULT_COOLDOWN_MS)),
@@ -399,10 +489,20 @@ export async function placesDetailsPro(
       return { place: null, sent: true, deduped: false, blockedReason: `http_${res.status}` };
     }
     const place = (await res.json()) as ProDetails;
-    await writeResult(ledger, idempotencyKey, { placeId: place.id ?? placeId, responseClass: "success", retryAfter: null });
+    await finishAttempt(ledger, {
+      attemptKey: gate.attemptKey,
+      logicalKey,
+      placeId: place.id ?? placeId,
+      responseClass: "success",
+      retryAfter: null,
+      tempPayload: place,
+      derived: derivedFromPlace(place),
+    });
     return { place, sent: true, deduped: false };
   } catch {
-    await writeResult(ledger, idempotencyKey, {
+    await finishAttempt(ledger, {
+      attemptKey: gate.attemptKey,
+      logicalKey,
       placeId,
       responseClass: "transient",
       retryAfter: new Date(Date.now() + TRANSIENT_COOLDOWN_MS),

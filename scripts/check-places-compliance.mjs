@@ -98,6 +98,19 @@ function memoryLedger() {
   };
 }
 
+function memoryIdentity() {
+  const rows = new Map();
+  return {
+    findUnique: async ({ where }) => rows.get(where.logicalKey) ?? null,
+    upsert: async ({ where, create, update }) => {
+      const prev = rows.get(where.logicalKey);
+      const next = { ...(prev ?? create), ...update, logicalKey: where.logicalKey };
+      rows.set(where.logicalKey, next);
+      return next;
+    },
+  };
+}
+
 function cachingPrismaStub() {
   const writes = [];
   return {
@@ -111,6 +124,7 @@ function cachingPrismaStub() {
       },
     },
     placesUsageLedger: memoryLedger(),
+    placesQueryIdentity: memoryIdentity(),
   };
 }
 

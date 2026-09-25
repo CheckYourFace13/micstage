@@ -339,18 +339,16 @@ export async function verifyListingWithGoogle(
     };
   }
   const details = await placesDetailsPro(prisma, { placeId, purpose: "listing_verify" });
-  if (details.deduped && !details.place) {
-    return { outcome: "needs_review", reason: "Place details already resolved", placeId };
+  if (details.place) {
+    if (details.sent) placesRequestCounters.newDetails += 1;
+    return evaluatePlaceMatch(listing, proToRecord(details.place));
   }
   if (details.blockedReason) {
     placesRequestCounters.budgetBlocked += 1;
     return { outcome: "skipped", reason: details.blockedReason, placeId };
   }
   if (details.sent) placesRequestCounters.newDetails += 1;
-  if (!details.place) {
-    return { outcome: "needs_review", reason: "No Google Business listing found", placeId };
-  }
-  return evaluatePlaceMatch(listing, proToRecord(details.place));
+  return { outcome: "needs_review", reason: "No Google Business listing found", placeId };
 }
 
 export function listingGoogleVerifyPerDiscoveryRun(): number {

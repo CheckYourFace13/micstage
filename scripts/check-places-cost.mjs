@@ -9,15 +9,20 @@ import {
   DETAILS_PRO_FIELD_MASK,
   IDS_ONLY_FIELD_MASK,
   LIMITS,
+  nextUtcDay,
+  nextUtcMonth,
   placesDetailsPro,
   placesTextSearchIdsOnly,
+  retryAfterForBlock,
 } from "../src/lib/places/placesGateway.ts";
-import { shouldStampPlaceVerifiedAt } from "../src/lib/publicListings/googlePlacesVerify.ts";
+import { shouldStampPlaceVerifiedAt, verifyListingWithGoogle } from "../src/lib/publicListings/googlePlacesVerify.ts";
 
 function memoryPrisma() {
   const rows = new Map();
+  const identities = new Map();
   const prisma = {
     rows,
+    identities,
     placesUsageLedger: {
       create: async ({ data }) => {
         if (rows.has(data.idempotencyKey)) throw new Error("unique");
@@ -47,6 +52,15 @@ function memoryPrisma() {
           ),
         },
       }),
+    },
+    placesQueryIdentity: {
+      findUnique: async ({ where }) => identities.get(where.logicalKey) ?? null,
+      upsert: async ({ where, create, update }) => {
+        const prev = identities.get(where.logicalKey);
+        const next = { ...(prev ?? create), ...update, logicalKey: where.logicalKey };
+        identities.set(where.logicalKey, next);
+        return next;
+      },
     },
   };
   return prisma;
@@ -190,8 +204,7 @@ assert.match(promote, /googlePlaceVerifiedAt:\s*\{\s*not:\s*null\s*\}/);
   assert.equal(first.blockedReason, "http_503");
   await placesTextSearchIdsOnly(prisma, { query: "Flaky Venue, Austin, TX", purpose: "f", fetchImpl });
   assert.equal(outbound, 1);
-  const row = [...prisma.rows.values()][0];
-  row.retryAfter = new Date(Date.now() - 1000);
+  for (const idRow of prisma.identities.values()) idRow.retryAfter = new Date(Date.now() - 1000);
   const retried = await placesTextSearchIdsOnly(prisma, { query: "Flaky Venue, Austin, TX", purpose: "f", fetchImpl });
   assert.equal(outbound, 2);
   assert.equal(retried.placeId, "after-retry");
@@ -234,6 +247,17 @@ assert.match(promote, /googlePlaceVerifiedAt:\s*\{\s*not:\s*null\s*\}/);
     outbound += 1;
     return { ok: true, status: 200, json: async () => ({ id: "should-not" }) };
   };
+  for (let i = 0; i < 10; i += 1) {
+    prisma.identities.set(`pro:ceiling-${i}`, {
+      logicalKey: `pro:ceiling-${i}`,
+      placeId: `ceiling-${i}`,
+      responseClass: "transient",
+      retryAfter: new Date(Date.now() - 1000),
+      permanentBlock: false,
+      tempPayload: null,
+      googleContentExpiresAt: null,
+    });
+  }
   await Promise.all(
     Array.from({ length: 10 }, (_, i) =>
       placesDetailsPro(prisma, { placeId: `ceiling-${i}`, purpose: "ceil", fetchImpl }),
@@ -242,6 +266,72 @@ assert.match(promote, /googlePlaceVerifiedAt:\s*\{\s*not:\s*null\s*\}/);
   assert.equal(outbound, 0);
   const spent = [...prisma.rows.values()].reduce((n, r) => n + (r.sent ? r.estimatedUsdMicros || 0 : 0), 0);
   assert.ok(spent / 1_000_000 <= 30);
+}
+
+{
+  const prisma = memoryPrisma();
+  let outbound = 0;
+  const fetchImpl = async () => {
+    outbound += 1;
+    return { ok: true, status: 200, json: async () => ({ id: "ok" }) };
+  };
+  await Promise.all(
+    Array.from({ length: 20 }, (_, i) => placesDetailsPro(prisma, { placeId: `fill-${i}`, purpose: "fill", fetchImpl })),
+  );
+  assert.equal(outbound, 20);
+  for (let i = 0; i < 10; i += 1) {
+    prisma.identities.set(`pro:retry-${i}`, {
+      logicalKey: `pro:retry-${i}`,
+      placeId: `retry-${i}`,
+      responseClass: "transient",
+      retryAfter: new Date(Date.now() - 1000),
+      permanentBlock: false,
+      tempPayload: null,
+      googleContentExpiresAt: null,
+    });
+  }
+  await Promise.all(
+    Array.from({ length: 10 }, (_, i) => placesDetailsPro(prisma, { placeId: `retry-${i}`, purpose: "retry", fetchImpl })),
+  );
+  assert.equal(outbound, 20);
+  const blocked = prisma.identities.get("pro:retry-0");
+  assert.equal(blocked.responseClass, "pro_daily_cap");
+  assert.ok(blocked.retryAfter.getTime() >= nextUtcDay().getTime() - 2000);
+}
+
+assert.equal(retryAfterForBlock("pro_daily_cap")?.toISOString().slice(0, 10), nextUtcDay().toISOString().slice(0, 10));
+assert.equal(retryAfterForBlock("pro_monthly_cap")?.toISOString().slice(0, 10), nextUtcMonth().toISOString().slice(0, 10));
+assert.equal(retryAfterForBlock("hard_ceiling_30")?.toISOString().slice(0, 10), nextUtcMonth().toISOString().slice(0, 10));
+assert.equal(retryAfterForBlock("enterprise_background_blocked"), null);
+
+{
+  const prisma = memoryPrisma();
+  let outbound = 0;
+  const place = {
+    id: "crash-place",
+    displayName: { text: "Cactus Cafe" },
+    formattedAddress: "2247 Guadalupe St, Austin, TX 78705, USA",
+    location: { latitude: 30.28, longitude: -97.74 },
+    types: ["bar"],
+    businessStatus: "OPERATIONAL",
+    addressComponents: [
+      { longText: "Austin", shortText: "Austin", types: ["locality"] },
+      { longText: "Texas", shortText: "TX", types: ["administrative_area_level_1"] },
+      { longText: "United States", shortText: "US", types: ["country"] },
+    ],
+  };
+  const fetchImpl = async () => {
+    outbound += 1;
+    return { ok: true, status: 200, json: async () => place };
+  };
+  await placesDetailsPro(prisma, { placeId: "crash-place", purpose: "first", fetchImpl });
+  const finished = await verifyListingWithGoogle(
+    { name: "Cactus Cafe", city: "Austin", region: "TX", formattedAddress: "Austin, TX", googlePlaceId: "crash-place" },
+    { prisma, allowPaidDetails: true },
+  );
+  assert.equal(outbound, 1);
+  assert.equal(finished.outcome, "verified");
+  assert.equal(shouldStampPlaceVerifiedAt(finished), true);
 }
 
 console.log(JSON.stringify({ ok: true, checks: "places-cost" }));

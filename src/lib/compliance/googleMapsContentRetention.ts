@@ -10,7 +10,7 @@
  * This job deletes cached Google Maps Content once it expires while preserving the verification
  * facts we are allowed to keep — the place id, the match score, and our own derived conclusions.
  */
-import { Prisma, type PrismaClient } from "@/generated/prisma/client";
+import type { PrismaClient } from "@/generated/prisma/client";
 
 /** Maximum permitted retention for cached Places coordinates. */
 export const GOOGLE_CONTENT_RETENTION_DAYS = 30;
@@ -103,20 +103,6 @@ export async function purgeExpiredGoogleMapsContent(
       data: { lat: null, lng: null, coordSource: null },
     })
   ).count;
-
-  const identities = prisma.placesQueryIdentity
-    ? await prisma.placesQueryIdentity.findMany({
-        where: { googleContentExpiresAt: { lte: now }, tempPayload: { not: Prisma.DbNull } },
-        select: { id: true },
-        take: limit,
-      })
-    : [];
-  if (identities.length > 0 && prisma.placesQueryIdentity) {
-    await prisma.placesQueryIdentity.updateMany({
-      where: { id: { in: identities.map((r) => r.id) } },
-      data: { tempPayload: Prisma.DbNull, googleContentExpiresAt: null },
-    });
-  }
 
   return { placeLookupRowsPurged, growthLeadRowsPurged, listingCoordinateRowsPurged };
 }

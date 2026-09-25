@@ -5,7 +5,6 @@
  */
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { googleContentExpiryFrom } from "@/lib/compliance/googleMapsContentRetention";
 
 export const IDS_ONLY_FIELD_MASK = "places.id";
 /** Pro details needed to decide venue identity. No websiteUri (Enterprise). */
@@ -79,11 +78,6 @@ type IdentityRow = {
   responseClass: string | null;
   retryAfter: Date | null;
   permanentBlock: boolean;
-  tempPayload: unknown;
-  googleContentExpiresAt: Date | null;
-  derivedVenueTypeOk: boolean | null;
-  derivedInUnitedStates: boolean | null;
-  derivedBusinessActive: boolean | null;
 };
 
 function hashKey(raw: string): string {
@@ -194,10 +188,10 @@ export function retryAfterForBlock(reason: string, now = new Date()): Date | nul
   return nextUtcDay(now);
 }
 
-function payloadFresh(row: IdentityRow | null): boolean {
-  if (!row?.tempPayload || !row.googleContentExpiresAt) return false;
-  return row.googleContentExpiresAt.getTime() > Date.now();
-}
+type AttemptGate =
+  | { kind: "cached_id"; placeId: string | null }
+  | { kind: "wait"; reason: string }
+  | { kind: "reserved"; attemptKey: string };
 
 async function saveIdentity(tx: LedgerClient, logicalKey: string, patch: Record<string, unknown>) {
   await tx.placesQueryIdentity.upsert({
@@ -206,12 +200,6 @@ async function saveIdentity(tx: LedgerClient, logicalKey: string, patch: Record<
     update: patch,
   });
 }
-
-type AttemptGate =
-  | { kind: "cached_id"; placeId: string | null }
-  | { kind: "cached_place"; place: ProDetails }
-  | { kind: "wait"; reason: string }
-  | { kind: "reserved"; attemptKey: string };
 
 export type ProDetails = {
   id?: string;
@@ -237,10 +225,7 @@ async function gateOutbound(
   return withBudgetLock(prisma, async (tx) => {
     const existing = await tx.placesQueryIdentity.findUnique({ where: { logicalKey: input.logicalKey } });
     if (existing?.permanentBlock) return { kind: "wait", reason: "enterprise_background_blocked" };
-    if (existing?.responseClass === "success" && payloadFresh(existing) && existing.tempPayload) {
-      return { kind: "cached_place", place: existing.tempPayload as ProDetails };
-    }
-    if (existing?.responseClass === "success" && existing.placeId && !existing.tempPayload) {
+    if (input.sku === "TEXT_SEARCH_IDS" && existing?.responseClass === "success" && existing.placeId) {
       return { kind: "cached_id", placeId: existing.placeId };
     }
     if (existing?.retryAfter && existing.retryAfter.getTime() > Date.now()) {
@@ -294,8 +279,6 @@ async function finishAttempt(
     placeId?: string | null;
     retryAfter?: Date | null;
     blockedReason?: string | null;
-    tempPayload?: unknown;
-    derived?: { venueTypeOk?: boolean; inUnitedStates?: boolean; businessActive?: boolean };
     permanentBlock?: boolean;
   },
 ) {
@@ -310,14 +293,9 @@ async function finishAttempt(
   });
   await saveIdentity(prisma, input.logicalKey, {
     placeId: input.placeId ?? null,
-    responseClass: input.responseClass,
+    responseClass: input.logicalKey.startsWith("pro:") && input.responseClass === "success" ? "details_complete" : input.responseClass,
     retryAfter: input.retryAfter ?? null,
     permanentBlock: Boolean(input.permanentBlock),
-    tempPayload: input.tempPayload ?? null,
-    googleContentExpiresAt: input.tempPayload ? googleContentExpiryFrom() : null,
-    derivedVenueTypeOk: input.derived?.venueTypeOk ?? null,
-    derivedInUnitedStates: input.derived?.inUnitedStates ?? null,
-    derivedBusinessActive: input.derived?.businessActive ?? null,
   });
 }
 
@@ -347,9 +325,8 @@ export async function placesTextSearchIdsOnly(
       fieldMask: IDS_ONLY_FIELD_MASK,
       logicalKey,
     });
-    if (gate.kind === "cached_id" || gate.kind === "cached_place") {
-      const placeId = gate.kind === "cached_id" ? gate.placeId : gate.place.id ?? null;
-      return { placeId, sent: false, deduped: true };
+    if (gate.kind === "cached_id") {
+      return { placeId: gate.placeId, sent: false, deduped: true };
     }
     if (gate.kind === "wait") return { placeId: null, sent: false, deduped: true, blockedReason: gate.reason };
     if (!key) {
@@ -425,18 +402,6 @@ export async function placesTextSearchIdsOnly(
   return promise;
 }
 
-function derivedFromPlace(place: ProDetails) {
-  const country = place.addressComponents?.find((c) => c.types?.includes("country"));
-  const inUnitedStates =
-    country?.shortText === "US" ||
-    /\b(USA|United States)\b/i.test(place.formattedAddress ?? "");
-  return {
-    venueTypeOk: Boolean(place.types?.some((t) => ["bar", "night_club", "restaurant", "cafe"].includes(t))),
-    inUnitedStates,
-    businessActive: place.businessStatus !== "CLOSED_PERMANENTLY",
-  };
-}
-
 export async function placesDetailsPro(
   prisma: PrismaClient,
   input: { placeId: string; purpose: string; fetchImpl?: PlacesFetch },
@@ -456,7 +421,6 @@ export async function placesDetailsPro(
     logicalKey,
     placeId,
   });
-  if (gate.kind === "cached_place") return { place: gate.place, sent: false, deduped: true };
   if (gate.kind === "cached_id") return { place: null, sent: false, deduped: true, blockedReason: "identity_without_payload" };
   if (gate.kind === "wait") return { place: null, sent: false, deduped: true, blockedReason: gate.reason };
   if (!key) {
@@ -495,8 +459,6 @@ export async function placesDetailsPro(
       placeId: place.id ?? placeId,
       responseClass: "success",
       retryAfter: null,
-      tempPayload: place,
-      derived: derivedFromPlace(place),
     });
     return { place, sent: true, deduped: false };
   } catch {

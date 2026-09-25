@@ -93,8 +93,11 @@ delete process.env.GOOGLE_PLACES_API_KEY;
   };
   await placesDetailsPro(prisma, { placeId: "pid-shared", purpose: "alias-a", fetchImpl });
   const second = await placesDetailsPro(prisma, { placeId: "pid-shared", purpose: "alias-b", fetchImpl });
-  assert.equal(second.deduped, true);
-  assert.equal(outbound, 1);
+  assert.equal(second.sent, true);
+  assert.equal(outbound, 2);
+  const saved = JSON.stringify([...prisma.identities.values()]);
+  assert.equal(saved.includes("displayName"), false);
+  assert.equal(saved.includes("formattedAddress"), false);
 }
 
 {
@@ -153,6 +156,8 @@ const verify = readFileSync("src/lib/publicListings/googlePlacesVerify.ts", "utf
 assert.match(verify, /allowPaidDetails/);
 assert.match(verify, /PLACES_ENRICH_MIN_VERIFIED_INVENTORY/);
 assert.match(verify, /24 \* 30/);
+assert.equal(readFileSync("src/lib/places/placesGateway.ts", "utf8").includes("tempPayload"), false);
+assert.equal(readFileSync("prisma/schema.prisma", "utf8").includes("derivedVenueTypeOk"), false);
 const cron = readFileSync("src/app/api/cron/growth-pipeline/route.ts", "utf8");
 assert.match(cron, /skipDownstream: true/);
 
@@ -324,14 +329,21 @@ assert.equal(retryAfterForBlock("enterprise_background_blocked"), null);
     outbound += 1;
     return { ok: true, status: 200, json: async () => place };
   };
+  globalThis.fetch = fetchImpl;
   await placesDetailsPro(prisma, { placeId: "crash-place", purpose: "first", fetchImpl });
+  const stored = JSON.stringify([...prisma.identities.values()]);
+  assert.equal(stored.includes("displayName"), false);
+  assert.equal(stored.includes("formattedAddress"), false);
+  assert.equal(stored.includes("businessStatus"), false);
   const finished = await verifyListingWithGoogle(
     { name: "Cactus Cafe", city: "Austin", region: "TX", formattedAddress: "Austin, TX", googlePlaceId: "crash-place" },
     { prisma, allowPaidDetails: true },
   );
-  assert.equal(outbound, 1);
+  assert.equal(outbound, 2);
   assert.equal(finished.outcome, "verified");
   assert.equal(shouldStampPlaceVerifiedAt(finished), true);
+  const sent = [...prisma.rows.values()].filter((r) => r.sent && r.sku === "DETAILS_PRO" && r.placeId === "crash-place");
+  assert.equal(sent.length, 2);
 }
 
 console.log(JSON.stringify({ ok: true, checks: "places-cost" }));

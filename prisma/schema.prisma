@@ -1343,16 +1343,7 @@ model PlacesQueryIdentity {
   retryAfter    DateTime?
   permanentBlock Boolean @default(false)
 
-  derivedVenueTypeOk    Boolean?
-  derivedInUnitedStates Boolean?
-  derivedBusinessActive Boolean?
-
-  /// Temporary Google response used to finish verification after a restart. Purged at expiry.
-  tempPayload            Json?
-  googleContentExpiresAt DateTime?
-
   @@index([retryAfter])
-  @@index([googleContentExpiresAt])
 }
 
 /// Pagination / rotation state for autonomous discovery adapters (per adapter + market).

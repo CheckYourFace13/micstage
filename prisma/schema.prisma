@@ -1666,6 +1666,8 @@ model PublicOpenMicListing {
   /// Matched Google Business / Places establishment (verification + map pin).
   googlePlaceId         String?   @unique
   googlePlaceVerifiedAt DateTime?
+  /// MicStage audit: we already paid for Place Details for this listing. Not Google content.
+  googlePlaceDetailsCheckedAt DateTime?
 
   lastVerifiedAt     DateTime?
   verificationStatus PublicListingVerificationStatus @default(UNVERIFIED)

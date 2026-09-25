@@ -23,6 +23,18 @@ function memoryPrisma() {
   const prisma = {
     rows,
     identities,
+    listings: new Map(),
+    publicOpenMicListing: {
+      findFirst: async ({ where }) => {
+        for (const row of prisma.listings.values()) {
+          if (where.googlePlaceId && row.googlePlaceId !== where.googlePlaceId) continue;
+          if (where.NOT?.id && row.id === where.NOT.id) continue;
+          if (where.googlePlaceDetailsCheckedAt?.not === null && !row.googlePlaceDetailsCheckedAt) continue;
+          return row;
+        }
+        return null;
+      },
+    },
     placesUsageLedger: {
       create: async ({ data }) => {
         if (rows.has(data.idempotencyKey)) throw new Error("unique");
@@ -87,17 +99,46 @@ delete process.env.GOOGLE_PLACES_API_KEY;
 {
   const prisma = memoryPrisma();
   let outbound = 0;
+  const place = {
+    id: "pid-shared",
+    displayName: { text: "Shared Room" },
+    formattedAddress: "1 Main St, Austin, TX 78701, USA",
+    location: { latitude: 30.2, longitude: -97.7 },
+    types: ["bar"],
+    businessStatus: "OPERATIONAL",
+    addressComponents: [
+      { longText: "Austin", shortText: "Austin", types: ["locality"] },
+      { longText: "Texas", shortText: "TX", types: ["administrative_area_level_1"] },
+      { longText: "United States", shortText: "US", types: ["country"] },
+    ],
+  };
   const fetchImpl = async () => {
     outbound += 1;
-    return { ok: true, json: async () => ({ id: "pid-shared" }) };
+    return { ok: true, status: 200, json: async () => place };
   };
-  await placesDetailsPro(prisma, { placeId: "pid-shared", purpose: "alias-a", fetchImpl });
-  const second = await placesDetailsPro(prisma, { placeId: "pid-shared", purpose: "alias-b", fetchImpl });
-  assert.equal(second.sent, true);
-  assert.equal(outbound, 2);
-  const saved = JSON.stringify([...prisma.identities.values()]);
-  assert.equal(saved.includes("displayName"), false);
-  assert.equal(saved.includes("formattedAddress"), false);
+  globalThis.fetch = fetchImpl;
+  const first = await verifyListingWithGoogle(
+    { name: "Shared Room", city: "Austin", region: "TX", formattedAddress: "Austin, TX", googlePlaceId: "pid-shared" },
+    { prisma, allowPaidDetails: true, listingId: "listing-a" },
+  );
+  prisma.listings.set("listing-a", {
+    id: "listing-a",
+    googlePlaceId: "pid-shared",
+    googlePlaceDetailsCheckedAt: new Date(),
+  });
+  const second = await verifyListingWithGoogle(
+    { name: "Shared Room Alias", city: "Austin", region: "TX", formattedAddress: "Austin, TX", googlePlaceId: "pid-shared" },
+    { prisma, allowPaidDetails: true, listingId: "listing-b" },
+  );
+  assert.equal(first.detailsFetched, true);
+  assert.equal(second.duplicateWithoutDetails, true);
+  assert.equal(outbound, 1);
+  const again = await verifyListingWithGoogle(
+    { name: "Shared Room", city: "Austin", region: "TX", formattedAddress: "Austin, TX", googlePlaceId: "pid-shared" },
+    { prisma, allowPaidDetails: true, listingId: "listing-a", detailsCheckedAt: new Date() },
+  );
+  assert.equal(again.detailsFetched, undefined);
+  assert.equal(outbound, 1);
 }
 
 {

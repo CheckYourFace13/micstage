@@ -310,8 +310,13 @@ export async function verifyListingWithGoogle(
     formattedAddress: string;
     googlePlaceId?: string | null;
   },
-  opts?: { prisma?: PrismaClient; allowPaidDetails?: boolean },
-): Promise<GooglePlaceVerifyResult> {
+  opts?: {
+    prisma?: PrismaClient;
+    allowPaidDetails?: boolean;
+    listingId?: string;
+    detailsCheckedAt?: Date | null;
+  },
+): Promise<GooglePlaceVerifyResult & { detailsFetched?: boolean; duplicateWithoutDetails?: boolean }> {
   if (!googleMapsServerApiKey() || !opts?.prisma) {
     return { outcome: "skipped", reason: "No Google Maps API key configured" };
   }
@@ -331,17 +336,39 @@ export async function verifyListingWithGoogle(
   if (!placeId) {
     return { outcome: "needs_review", reason: "No Google Business listing found" };
   }
-  if (!opts.allowPaidDetails) {
+  if (!opts.allowPaidDetails || detailsCheckedRecently(opts.detailsCheckedAt)) {
     return {
       outcome: "needs_review",
-      reason: "Place ID stored; paid details deferred until trusted evidence",
+      reason: opts.detailsCheckedAt
+        ? "Details already checked for this listing"
+        : "Place ID stored; paid details deferred until trusted evidence",
       placeId,
     };
+  }
+  const listings = (prisma as { publicOpenMicListing?: { findFirst: (args: unknown) => Promise<{ id: string } | null> } })
+    .publicOpenMicListing;
+  if (opts.listingId && listings) {
+    const other = await listings.findFirst({
+      where: {
+        googlePlaceId: placeId,
+        googlePlaceDetailsCheckedAt: { not: null },
+        NOT: { id: opts.listingId },
+      },
+      select: { id: true },
+    });
+    if (other) {
+      return {
+        outcome: "needs_review",
+        reason: "Duplicate Google place (already checked)",
+        placeId,
+        duplicateWithoutDetails: true,
+      };
+    }
   }
   const details = await placesDetailsPro(prisma, { placeId, purpose: "listing_verify" });
   if (details.place) {
     if (details.sent) placesRequestCounters.newDetails += 1;
-    return evaluatePlaceMatch(listing, proToRecord(details.place));
+    return { ...evaluatePlaceMatch(listing, proToRecord(details.place)), detailsFetched: true };
   }
   if (details.blockedReason) {
     placesRequestCounters.budgetBlocked += 1;
@@ -384,6 +411,14 @@ function buildEvidenceInput(row: VerifyRowEvidence): OpenMicEvidenceInput {
 /** IDs-only may store the Place ID. Verified-at means Details identity validation succeeded. */
 export function shouldStampPlaceVerifiedAt(result: { outcome: string }): boolean {
   return result.outcome === "verified";
+}
+
+/** Paid Details is not repeated just because verification did not stamp googlePlaceVerifiedAt. */
+export const PLACE_DETAILS_RECHECK_MS = 30 * 24 * 3600 * 1000;
+
+export function detailsCheckedRecently(checkedAt: Date | null | undefined, now = Date.now()): boolean {
+  if (!checkedAt) return false;
+  return now - checkedAt.getTime() < PLACE_DETAILS_RECHECK_MS;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -442,6 +477,7 @@ export async function verifyPublicListingsWithGoogle(
       sourceName: true,
       googlePlaceId: true,
       googlePlaceVerifiedAt: true,
+      googlePlaceDetailsCheckedAt: true,
       verificationStatus: true,
       internalNotes: true,
       about: true,
@@ -472,17 +508,22 @@ export async function verifyPublicListingsWithGoogle(
     const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
     const result = await verifyListingWithGoogle(row, {
       prisma,
-      allowPaidDetails: evidence.trusted && !row.googlePlaceVerifiedAt,
+      listingId: row.id,
+      detailsCheckedAt: row.googlePlaceDetailsCheckedAt,
+      allowPaidDetails:
+        evidence.trusted && !row.googlePlaceVerifiedAt && !detailsCheckedRecently(row.googlePlaceDetailsCheckedAt),
     });
+    const paidFinished = Boolean(result.detailsFetched || result.duplicateWithoutDetails);
     const noMatch = result.reason.includes("No Google Business listing");
     const weak = result.reason.startsWith("Weak name match");
-    const cooldownHours = noMatch || weak ? 24 * 30 : Math.min(48, Math.max(1, attemptCount));
+    const cooldownHours = paidFinished || noMatch || weak ? 24 * 30 : Math.min(48, Math.max(1, attemptCount));
     await prisma.publicOpenMicListing.update({
       where: { id: row.id },
       data: {
         placeVerifyAttemptCount: attemptCount,
         placeVerifyLastAttemptAt: new Date(),
         placeVerifyNextAttemptAt: new Date(Date.now() + cooldownHours * 3600 * 1000),
+        ...(paidFinished ? { googlePlaceDetailsCheckedAt: new Date() } : {}),
       },
     });
 

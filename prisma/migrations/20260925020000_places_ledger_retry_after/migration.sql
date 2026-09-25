@@ -1,0 +1,1 @@
+ALTER TABLE "PlacesUsageLedger" ADD COLUMN IF NOT EXISTS "retryAfter" TIMESTAMP(3);

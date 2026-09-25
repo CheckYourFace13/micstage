@@ -1319,6 +1319,8 @@ model PlacesUsageLedger {
   sent         Boolean @default(false)
   dedupeHit    Boolean @default(false)
   responseClass String?
+  /// When a zero-result or transient failure may be attempted again.
+  retryAfter DateTime?
   /// Modeled incremental USD after free-tier, in micro-dollars.
   estimatedUsdMicros Int @default(0)
   blockedReason String?

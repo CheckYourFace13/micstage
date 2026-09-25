@@ -336,7 +336,6 @@ export async function verifyListingWithGoogle(
       outcome: "needs_review",
       reason: "Place ID stored; paid details deferred until trusted evidence",
       placeId,
-      matchScore: knownPlaceId ? 1 : undefined,
     };
   }
   const details = await placesDetailsPro(prisma, { placeId, purpose: "listing_verify" });
@@ -382,6 +381,11 @@ function buildEvidenceInput(row: VerifyRowEvidence): OpenMicEvidenceInput {
     discoveryHints: row.growthLead?.discoveryHints,
     sourceKind: row.growthLead?.sourceKind ?? null,
   };
+}
+
+/** IDs-only may store the Place ID. Verified-at means Details identity validation succeeded. */
+export function shouldStampPlaceVerifiedAt(result: { outcome: string }): boolean {
+  return result.outcome === "verified";
 }
 
 function sleep(ms: number): Promise<void> {
@@ -608,8 +612,10 @@ export async function verifyPublicListingsWithGoogle(
             : result.reason,
         ),
       };
-      if (result.placeId && !duplicate && (result.matchScore == null || result.matchScore >= 0.65)) {
+      if (result.placeId && !duplicate) {
         data.googlePlaceId = result.placeId;
+      }
+      if (shouldStampPlaceVerifiedAt(result)) {
         data.googlePlaceVerifiedAt = new Date();
       }
       await prisma.publicOpenMicListing.update({ where: { id: row.id }, data });

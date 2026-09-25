@@ -89,6 +89,12 @@ function memoryLedger() {
         estimatedUsdMicros: [...rows.values()].reduce((n, r) => n + (r.sent ? r.estimatedUsdMicros || 0 : 0), 0),
       },
     }),
+    update: async ({ where, data }) => {
+      const row = rows.get(where.idempotencyKey);
+      if (!row) throw new Error("missing");
+      Object.assign(row, data);
+      return row;
+    },
   };
 }
 

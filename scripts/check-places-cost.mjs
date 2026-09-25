@@ -12,17 +12,23 @@ import {
   placesDetailsPro,
   placesTextSearchIdsOnly,
 } from "../src/lib/places/placesGateway.ts";
+import { shouldStampPlaceVerifiedAt } from "../src/lib/publicListings/googlePlacesVerify.ts";
 
 function memoryPrisma() {
   const rows = new Map();
-  let fetches = 0;
   const prisma = {
-    fetches: () => fetches,
+    rows,
     placesUsageLedger: {
       create: async ({ data }) => {
         if (rows.has(data.idempotencyKey)) throw new Error("unique");
-        rows.set(data.idempotencyKey, { ...data, placeId: data.placeId ?? null, responseClass: null });
+        rows.set(data.idempotencyKey, { ...data, placeId: data.placeId ?? null, retryAfter: data.retryAfter ?? null });
         return data;
+      },
+      update: async ({ where, data }) => {
+        const row = rows.get(where.idempotencyKey);
+        if (!row) throw new Error("missing");
+        Object.assign(row, data);
+        return row;
       },
       findUnique: async ({ where }) => rows.get(where.idempotencyKey) ?? null,
       count: async ({ where }) =>
@@ -41,9 +47,6 @@ function memoryPrisma() {
           ),
         },
       }),
-    },
-    bumpFetches() {
-      fetches += 1;
     },
   };
   return prisma;
@@ -138,5 +141,107 @@ assert.match(verify, /PLACES_ENRICH_MIN_VERIFIED_INVENTORY/);
 assert.match(verify, /24 \* 30/);
 const cron = readFileSync("src/app/api/cron/growth-pipeline/route.ts", "utf8");
 assert.match(cron, /skipDownstream: true/);
+
+assert.equal(shouldStampPlaceVerifiedAt({ outcome: "needs_review" }), false);
+assert.equal(shouldStampPlaceVerifiedAt({ outcome: "verified" }), true);
+const promote = readFileSync("src/lib/publicListings/promotePlaceConfirmedListings.ts", "utf8");
+assert.match(promote, /googlePlaceVerifiedAt:\s*\{\s*not:\s*null\s*\}/);
+
+{
+  const prisma = memoryPrisma();
+  let outbound = 0;
+  const fetchImpl = async () => {
+    outbound += 1;
+    return { ok: true, status: 200, json: async () => ({ places: [{ id: "stored-id" }] }) };
+  };
+  await placesTextSearchIdsOnly(prisma, { query: "Restart Cafe, Austin, TX", purpose: "t", fetchImpl });
+  const again = await placesTextSearchIdsOnly(prisma, { query: "Restart Cafe, Austin, TX", purpose: "t", fetchImpl });
+  assert.equal(again.placeId, "stored-id");
+  assert.equal(again.deduped, true);
+  assert.equal(outbound, 1);
+  const row = [...prisma.rows.values()].find((r) => r.placeId === "stored-id");
+  assert.equal(row.responseClass, "success");
+}
+
+{
+  const prisma = memoryPrisma();
+  let outbound = 0;
+  const fetchImpl = async () => {
+    outbound += 1;
+    return { ok: true, status: 200, json: async () => ({ places: [] }) };
+  };
+  await placesTextSearchIdsOnly(prisma, { query: "Missing Venue, Austin, TX", purpose: "z", fetchImpl });
+  await placesTextSearchIdsOnly(prisma, { query: "Missing Venue, Austin, TX", purpose: "z", fetchImpl });
+  assert.equal(outbound, 1);
+  const row = [...prisma.rows.values()][0];
+  assert.equal(row.responseClass, "zero_results");
+  assert.ok(row.retryAfter.getTime() > Date.now() + 20 * 24 * 3600 * 1000);
+}
+
+{
+  const prisma = memoryPrisma();
+  let outbound = 0;
+  const fetchImpl = async () => {
+    outbound += 1;
+    if (outbound === 1) return { ok: false, status: 503, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ places: [{ id: "after-retry" }] }) };
+  };
+  const first = await placesTextSearchIdsOnly(prisma, { query: "Flaky Venue, Austin, TX", purpose: "f", fetchImpl });
+  assert.equal(first.blockedReason, "http_503");
+  await placesTextSearchIdsOnly(prisma, { query: "Flaky Venue, Austin, TX", purpose: "f", fetchImpl });
+  assert.equal(outbound, 1);
+  const row = [...prisma.rows.values()][0];
+  row.retryAfter = new Date(Date.now() - 1000);
+  const retried = await placesTextSearchIdsOnly(prisma, { query: "Flaky Venue, Austin, TX", purpose: "f", fetchImpl });
+  assert.equal(outbound, 2);
+  assert.equal(retried.placeId, "after-retry");
+}
+
+{
+  const prisma = memoryPrisma();
+  let outbound = 0;
+  const fetchImpl = async (url) => {
+    outbound += 1;
+    return { ok: true, status: 200, json: async () => ({ id: "details-only" }) };
+  };
+  await Promise.all(
+    Array.from({ length: 50 }, (_, i) =>
+      placesDetailsPro(prisma, { placeId: `daily-cap-${i}`, purpose: "cap", fetchImpl }),
+    ),
+  );
+  assert.equal(outbound, LIMITS.detailsProPerDay);
+}
+
+{
+  const prisma = memoryPrisma();
+  const month = new Date().toISOString().slice(0, 7);
+  for (let i = 0; i < 5000; i += 1) {
+    prisma.rows.set(`seed-${i}`, {
+      idempotencyKey: `seed-${i}`,
+      sent: true,
+      sku: "DETAILS_PRO",
+      dayUtc: "1999-01-01",
+      monthUtc: month,
+      estimatedUsdMicros: i === 0 ? 29_990_000 : 0,
+      responseClass: "success",
+      placeId: `seedp-${i}`,
+      retryAfter: null,
+      blockedReason: null,
+    });
+  }
+  let outbound = 0;
+  const fetchImpl = async () => {
+    outbound += 1;
+    return { ok: true, status: 200, json: async () => ({ id: "should-not" }) };
+  };
+  await Promise.all(
+    Array.from({ length: 10 }, (_, i) =>
+      placesDetailsPro(prisma, { placeId: `ceiling-${i}`, purpose: "ceil", fetchImpl }),
+    ),
+  );
+  assert.equal(outbound, 0);
+  const spent = [...prisma.rows.values()].reduce((n, r) => n + (r.sent ? r.estimatedUsdMicros || 0 : 0), 0);
+  assert.ok(spent / 1_000_000 <= 30);
+}
 
 console.log(JSON.stringify({ ok: true, checks: "places-cost" }));

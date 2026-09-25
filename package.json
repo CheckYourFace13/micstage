@@ -19,6 +19,7 @@
     "test:marketing-outreach": "npx tsx scripts/check-marketing-outreach.mjs",
     "test:discovery-quality": "npx tsx scripts/check-discovery-quality.mjs",
     "test:places-compliance": "npx tsx scripts/check-places-compliance.mjs",
+    "test:places-cost": "npx tsx scripts/check-places-cost.mjs",
     "test:open-mic-evidence": "node scripts/check-public-open-mic-evidence.mjs",
     "test:instant-claim": "node scripts/check-instant-claim.mjs",
     "test:onboarding": "node scripts/check-onboarding-simplification.mjs",

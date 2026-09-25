@@ -64,6 +64,34 @@ function installFetchStub(place) {
   return calls;
 }
 
+function memoryLedger() {
+  const rows = new Map();
+  return {
+    create: async ({ data }) => {
+      if (rows.has(data.idempotencyKey)) {
+        const err = new Error("unique");
+        throw err;
+      }
+      rows.set(data.idempotencyKey, { ...data });
+      return data;
+    },
+    findUnique: async ({ where }) => rows.get(where.idempotencyKey) ?? null,
+    count: async ({ where }) =>
+      [...rows.values()].filter((r) => {
+        if (where.sent != null && r.sent !== where.sent) return false;
+        if (where.sku && r.sku !== where.sku) return false;
+        if (where.dayUtc && r.dayUtc !== where.dayUtc) return false;
+        if (where.monthUtc && r.monthUtc !== where.monthUtc) return false;
+        return true;
+      }).length,
+    aggregate: async () => ({
+      _sum: {
+        estimatedUsdMicros: [...rows.values()].reduce((n, r) => n + (r.sent ? r.estimatedUsdMicros || 0 : 0), 0),
+      },
+    }),
+  };
+}
+
 function cachingPrismaStub() {
   const writes = [];
   return {
@@ -76,6 +104,7 @@ function cachingPrismaStub() {
         return {};
       },
     },
+    placesUsageLedger: memoryLedger(),
   };
 }
 
@@ -92,23 +121,18 @@ await checkAsync("text search asks for ids only and details omits website by def
     { name: "Cactus Cafe", city: "Austin", region: "TX", streetAddress: null, websiteUrl: null },
     new PlaceLookupBudget(5),
   );
-  assert.equal(r.status, "resolved", `expected resolved, got ${r.status} (${r.reason})`);
+  assert.notEqual(r.status, "resolved", "ids-only discovery must not treat a search hit as a paid identity match");
   assert.equal(r.placeId, "place-cactus");
 
   const search = calls.find((c) => c.url.includes("places:searchText"));
   assert.ok(search, "no Text Search request was made");
   assert.equal(search.mask, "places.id", "Text Search must stay on the free IDs-only SKU");
 
-  const details = calls.find((c) => c.url.includes("/v1/places/"));
-  assert.ok(details, "no Place Details request was made");
-  assert.equal(
-    details.mask.includes("websiteUri"),
-    false,
-    "website is Enterprise-tier and must not be requested when no candidate domain needs checking",
-  );
+  const details = calls.find((c) => c.url.includes("/v1/places/") && !c.url.includes("searchText"));
+  assert.equal(details, undefined, "discovery must not buy Place Details");
 });
 
-await checkAsync("details requests the website only when a candidate domain must be checked", async () => {
+await checkAsync("candidate websites do not trigger Enterprise websiteUri", async () => {
   const calls = installFetchStub(AUSTIN_PLACE);
   await resolveVenueCandidateWithPlaces(
     cachingPrismaStub(),
@@ -121,8 +145,8 @@ await checkAsync("details requests the website only when a candidate domain must
     },
     new PlaceLookupBudget(5),
   );
-  const details = calls.find((c) => c.url.includes("/v1/places/"));
-  assert.ok(details.mask.includes("websiteUri"), "domain cross-check needs the website field");
+  const details = calls.find((c) => c.url.includes("/v1/places/") && !c.url.includes("searchText"));
+  assert.equal(details, undefined, "websiteUri must not be requested in background discovery");
 });
 
 // ---------------------------------------------------------------------------
@@ -156,8 +180,8 @@ await checkAsync("a production company matching by name is rejected, not created
     { name: "Dick Clark Productions Inc", city: "Burbank", region: "CA", streetAddress: null, websiteUrl: null },
     new PlaceLookupBudget(5),
   );
-  assert.equal(r.status, "rejected", `expected rejection, got ${r.status}`);
-  assert.match(r.reason, /place_not_a_venue_type/);
+  assert.equal(r.status, "unresolved", `ids-only path stores the id without a type verdict, got ${r.status}`);
+  assert.equal(r.placeId, "place-productions");
 });
 
 // ---------------------------------------------------------------------------
@@ -178,10 +202,11 @@ await checkAsync("the place cache stores no Google business name, address or web
   assert.equal(written.website, null, "Google websites have no retention grant");
   assert.equal(written.websiteHost, null);
   assert.equal(written.placeId, "place-cactus", "place ids may be retained indefinitely");
-  assert.equal(written.coordsVerified, true, "our own conclusion survives content expiry");
+  assert.equal(written.coordsVerified, false);
+  assert.equal(written.lat, null);
 });
 
-await checkAsync("cached coordinates carry a 30-day expiry", async () => {
+await checkAsync("ids-only cache does not retain Google coordinates", async () => {
   installFetchStub(AUSTIN_PLACE);
   const prisma = cachingPrismaStub();
   await resolveVenueCandidateWithPlaces(
@@ -190,12 +215,9 @@ await checkAsync("cached coordinates carry a 30-day expiry", async () => {
     new PlaceLookupBudget(5),
   );
   const written = prisma.writes.at(-1);
-  assert.ok(written.lat != null && written.lng != null, "coordinates may be cached for 30 days");
-  const days = (written.googleContentExpiresAt.getTime() - Date.now()) / 86_400_000;
-  assert.ok(
-    days > GOOGLE_CONTENT_RETENTION_DAYS - 1 && days <= GOOGLE_CONTENT_RETENTION_DAYS,
-    `expiry should be ~${GOOGLE_CONTENT_RETENTION_DAYS} days out, got ${days.toFixed(2)}`,
-  );
+  assert.equal(written.lat, null);
+  assert.equal(written.lng, null);
+  assert.equal(written.googleContentExpiresAt, null);
 });
 
 check("the retention window is 30 days", () => {

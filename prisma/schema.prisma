@@ -1297,6 +1297,37 @@ model GrowthPlaceLookup {
   @@index([googleContentExpiresAt])
 }
 
+/// Durable Places API usage. One row per attempted or deduped request.
+/// idempotencyKey is unique so overlapping workers cannot double-spend.
+model PlacesUsageLedger {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  dayUtc   String
+  monthUtc String
+
+  /// TEXT_SEARCH_IDS | DETAILS_PRO | DETAILS_ESSENTIALS | DETAILS_ENTERPRISE
+  operation String
+  purpose   String
+  sku       String
+
+  queryKeyHash String?
+  placeId      String?
+  fieldMask    String
+  idempotencyKey String @unique
+
+  sent         Boolean @default(false)
+  dedupeHit    Boolean @default(false)
+  responseClass String?
+  /// Modeled incremental USD after free-tier, in micro-dollars.
+  estimatedUsdMicros Int @default(0)
+  blockedReason String?
+
+  @@index([monthUtc, sku, sent])
+  @@index([dayUtc, sku, sent])
+  @@index([placeId])
+}
+
 /// Pagination / rotation state for autonomous discovery adapters (per adapter + market).
 model GrowthDiscoveryCursor {
   id         String   @id @default(cuid())

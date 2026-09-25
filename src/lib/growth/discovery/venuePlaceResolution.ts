@@ -296,7 +296,7 @@ export async function resolveVenueCandidateWithPlaces(
       region: candidate.region ?? null,
       formattedAddress: candidate.streetAddress ?? "",
     },
-    { needWebsite: Boolean(candidateHostForCheck) },
+    { prisma: prisma as never, allowPaidDetails: false },
   );
 
   /**
@@ -304,7 +304,8 @@ export async function resolveVenueCandidateWithPlaces(
    * coincidence from becoming a lead: the place must be in the US, and when the candidate
    * brought its own website that domain must agree with the one Google has on file.
    */
-  const inUnitedStates = isUnitedStatesAddress(verify.formattedAddress);
+  const idsDeferred = (verify.reason ?? "").includes("paid details deferred");
+  const inUnitedStates = idsDeferred || isUnitedStatesAddress(verify.formattedAddress);
   const candidateHost = candidateHostForCheck;
   const placeWebsiteHost = hostOf(verify.website ?? null);
   const domainConflict =
@@ -366,7 +367,7 @@ export async function resolveVenueCandidateWithPlaces(
     outcome: resolution.status === "resolved" ? "resolved" : resolution.status === "rejected" ? "rejected" : "unresolved",
     reason: resolution.reason.slice(0, 300),
     matchScore: resolution.matchScore,
-    placeId: resolution.status === "resolved" ? resolution.placeId : null,
+    placeId: resolution.placeId,
     coordsVerified: resolution.coordsVerified,
     lat: resolution.lat,
     lng: resolution.lng,

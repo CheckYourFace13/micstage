@@ -347,7 +347,7 @@ async function handle(request: Request) {
             console.error("[growth pipeline] discovery failed", { error: discoveryError, phase });
           }
           try {
-            listingAutoPublish = await autoPublishGrowthLeadsAsListings(prisma);
+            listingAutoPublish = await autoPublishGrowthLeadsAsListings(prisma, { skipDownstream: true });
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             console.error("[growth pipeline] listing auto-publish failed", { error: msg, phase });

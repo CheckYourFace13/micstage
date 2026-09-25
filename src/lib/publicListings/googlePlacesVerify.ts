@@ -9,6 +9,12 @@ import {
 import { sendListingClaimInviteIfNeeded } from "@/lib/publicListings/listingClaimInviteEmail";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { submitUrlsToIndexNow } from "@/lib/seo/searchEnginePing";
+import {
+  googleMapsServerApiKey,
+  placesDetailsPro,
+  placesTextSearchIdsOnly,
+  type ProDetails,
+} from "@/lib/places/placesGateway";
 
 type GoogleTextSearchResult = {
   place_id?: string;
@@ -44,33 +50,11 @@ type PlaceRecord = {
   addressComponents?: Array<{ long_name?: string; short_name?: string; types?: string[] }>;
 };
 
-type PlacesApiMode = "new" | "legacy" | "auto";
+export { googleMapsServerApiKey };
 
-/**
- * Places API (New) bills the single highest field-mask tier per request, while the legacy
- * endpoints bill the base SKU plus every data SKU the response could contain. An IDs-only
- * Text Search (New) is free and unmetered, and a details call without `websiteUri` stays in
- * the Pro tier, so the new API is both cheaper and easier to keep inside the free allowance.
- */
-function placesApiMode(): PlacesApiMode {
-  const raw = process.env.GOOGLE_PLACES_API_MODE?.trim().toLowerCase();
-  if (raw === "new" || raw === "legacy") return raw;
-  return "auto";
+export function usingPublicKeyForServerPlaces(): boolean {
+  return false;
 }
-
-/** Details fields we can justify requesting. `websiteUri` is Enterprise-tier, so it is opt-in. */
-const NEW_DETAILS_FIELD_MASK_BASE = [
-  "id",
-  "displayName",
-  "formattedAddress",
-  "location",
-  "types",
-  "businessStatus",
-  "addressComponents",
-].join(",");
-
-/** Set when the new API is unavailable to this project so we stop paying the failure latency. */
-let newPlacesApiUnavailable = false;
 
 const placesRequestCounters = {
   newTextSearch: 0,
@@ -80,9 +64,10 @@ const placesRequestCounters = {
   legacyDetails: 0,
   legacyDetailsWithWebsite: 0,
   fallbacks: 0,
+  deduped: 0,
+  budgetBlocked: 0,
 };
 
-/** Per-process request tally by billable shape; used by the Places cost audit. */
 export function placesRequestStats(): Readonly<typeof placesRequestCounters> {
   return { ...placesRequestCounters };
 }
@@ -145,38 +130,6 @@ const VENUE_TYPES = new Set([
   "establishment",
   "point_of_interest",
 ]);
-
-let warnedAboutPublicKeyFallback = false;
-
-/**
- * Key for server-side Places calls. A dedicated server key is strongly preferred: the browser
- * key is shipped to clients and can only be protected by HTTP-referrer restrictions, which do
- * not apply to server requests — so a referrer-restricted browser key would break these calls,
- * and an unrestricted one is abusable by anyone who reads our JavaScript. The fallback exists
- * only so verification keeps working until `GOOGLE_MAPS_SERVER_API_KEY` is set.
- */
-export function googleMapsServerApiKey(): string | null {
-  const serverKey =
-    process.env.GOOGLE_MAPS_SERVER_API_KEY?.trim() || process.env.GOOGLE_PLACES_API_KEY?.trim();
-  if (serverKey) return serverKey;
-
-  const publicKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
-  if (publicKey && !warnedAboutPublicKeyFallback) {
-    warnedAboutPublicKeyFallback = true;
-    console.warn(
-      "[google places] using NEXT_PUBLIC_GOOGLE_MAPS_API_KEY for server calls; set GOOGLE_MAPS_SERVER_API_KEY (IP-restricted, Places-only) instead",
-    );
-  }
-  return publicKey || null;
-}
-
-/** True when server Places calls are running on the browser key (surfaced in ops audits). */
-export function usingPublicKeyForServerPlaces(): boolean {
-  const hasServerKey = Boolean(
-    process.env.GOOGLE_MAPS_SERVER_API_KEY?.trim() || process.env.GOOGLE_PLACES_API_KEY?.trim(),
-  );
-  return !hasServerKey && Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim());
-}
 
 function normalizeName(s: string): string {
   return s
@@ -256,72 +209,7 @@ function buildSearchQuery(listing: {
   return listing.formattedAddress.trim() || listing.name.trim();
 }
 
-async function googleFetchJson<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { status?: string; results?: unknown[]; result?: unknown };
-  if (data.status && data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-    console.warn("[google places verify] API status", data.status);
-    return null;
-  }
-  return data as T;
-}
-
-function legacyToRecord(place: GoogleTextSearchResult | GooglePlaceDetailsResult): PlaceRecord {
-  return {
-    placeId: place.place_id,
-    name: place.name,
-    formattedAddress: place.formatted_address,
-    lat: place.geometry?.location?.lat,
-    lng: place.geometry?.location?.lng,
-    types: place.types,
-    businessStatus: place.business_status,
-    website: "website" in place ? place.website : undefined,
-    addressComponents: "address_components" in place ? place.address_components : undefined,
-  };
-}
-
-async function legacyTextSearchPlaceId(query: string, key: string): Promise<string | null> {
-  placesRequestCounters.legacyTextSearch += 1;
-  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&region=us&key=${encodeURIComponent(key)}`;
-  const data = await googleFetchJson<{ results?: GoogleTextSearchResult[] }>(url);
-  return data?.results?.[0]?.place_id ?? null;
-}
-
-async function legacyPlaceDetails(
-  placeId: string,
-  key: string,
-  needWebsite: boolean,
-): Promise<PlaceRecord | null> {
-  if (needWebsite) placesRequestCounters.legacyDetailsWithWebsite += 1;
-  else placesRequestCounters.legacyDetails += 1;
-  const fields = [
-    "place_id",
-    "name",
-    "formatted_address",
-    "geometry",
-    "types",
-    "business_status",
-    "address_components",
-    ...(needWebsite ? ["website"] : []),
-  ].join(",");
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${encodeURIComponent(key)}`;
-  const data = await googleFetchJson<{ result?: GooglePlaceDetailsResult }>(url);
-  return data?.result ? legacyToRecord(data.result) : null;
-}
-
-type NewPlace = {
-  id?: string;
-  displayName?: { text?: string };
-  formattedAddress?: string;
-  location?: { latitude?: number; longitude?: number };
-  types?: string[];
-  businessStatus?: string;
-  websiteUri?: string;
-  addressComponents?: Array<{ longText?: string; shortText?: string; types?: string[] }>;
-};
-
-function newToRecord(place: NewPlace): PlaceRecord {
+function proToRecord(place: ProDetails) {
   return {
     placeId: place.id,
     name: place.displayName?.text,
@@ -330,99 +218,12 @@ function newToRecord(place: NewPlace): PlaceRecord {
     lng: place.location?.longitude,
     types: place.types,
     businessStatus: place.businessStatus,
-    website: place.websiteUri,
     addressComponents: place.addressComponents?.map((c) => ({
       long_name: c.longText,
       short_name: c.shortText,
       types: c.types,
     })),
   };
-}
-
-/** True when the failure means this project cannot use the new API at all (not a per-place miss). */
-function isNewApiUnavailableStatus(status: number, body: string): boolean {
-  if (status === 403 || status === 401) return true;
-  return status === 400 && /SERVICE_DISABLED|API_KEY_SERVICE_BLOCKED|not enabled/i.test(body);
-}
-
-async function newTextSearchPlaceId(query: string, key: string): Promise<string | null | "unavailable"> {
-  placesRequestCounters.newTextSearch += 1;
-  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": key,
-      // IDs-only mask: Text Search Essentials SKU, $0.00 with no monthly call cap.
-      "X-Goog-FieldMask": "places.id",
-    },
-    body: JSON.stringify({ textQuery: query, regionCode: "US", languageCode: "en", maxResultCount: 1 }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    if (isNewApiUnavailableStatus(res.status, body)) {
-      console.warn("[google places] Places API (New) unavailable, falling back to legacy", res.status, body.slice(0, 200));
-      return "unavailable";
-    }
-    console.warn("[google places] searchText failed", res.status, body.slice(0, 200));
-    return null;
-  }
-  const data = (await res.json()) as { places?: NewPlace[] };
-  return data.places?.[0]?.id ?? null;
-}
-
-async function newPlaceDetails(
-  placeId: string,
-  key: string,
-  needWebsite: boolean,
-): Promise<PlaceRecord | null | "unavailable"> {
-  if (needWebsite) placesRequestCounters.newDetailsWithWebsite += 1;
-  else placesRequestCounters.newDetails += 1;
-  const mask = needWebsite ? `${NEW_DETAILS_FIELD_MASK_BASE},websiteUri` : NEW_DETAILS_FIELD_MASK_BASE;
-  const res = await fetch(
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=en`,
-    { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": mask } },
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    if (isNewApiUnavailableStatus(res.status, body)) {
-      console.warn("[google places] Places API (New) details unavailable, falling back to legacy", res.status);
-      return "unavailable";
-    }
-    console.warn("[google places] place details failed", res.status, body.slice(0, 200));
-    return null;
-  }
-  return newToRecord((await res.json()) as NewPlace);
-}
-
-/** Resolve a free-text query to a place id, preferring the free IDs-only new-API search. */
-async function textSearchPlaceId(query: string, key: string): Promise<string | null> {
-  const mode = placesApiMode();
-  if (mode !== "legacy" && !newPlacesApiUnavailable) {
-    const id = await newTextSearchPlaceId(query, key);
-    if (id !== "unavailable") return id;
-    newPlacesApiUnavailable = true;
-    placesRequestCounters.fallbacks += 1;
-    if (mode === "new") return null;
-  }
-  if (mode === "new") return null;
-  return legacyTextSearchPlaceId(query, key);
-}
-
-async function placeDetailsRecord(
-  placeId: string,
-  key: string,
-  needWebsite: boolean,
-): Promise<PlaceRecord | null> {
-  const mode = placesApiMode();
-  if (mode !== "legacy" && !newPlacesApiUnavailable) {
-    const rec = await newPlaceDetails(placeId, key, needWebsite);
-    if (rec !== "unavailable") return rec;
-    newPlacesApiUnavailable = true;
-    placesRequestCounters.fallbacks += 1;
-    if (mode === "new") return null;
-  }
-  if (mode === "new") return null;
-  return legacyPlaceDetails(placeId, key, needWebsite);
 }
 
 function evaluatePlaceMatch(
@@ -509,38 +310,52 @@ export async function verifyListingWithGoogle(
     formattedAddress: string;
     googlePlaceId?: string | null;
   },
-  opts?: {
-    /**
-     * Request the place's website. This is the only field in our mask that bills at the
-     * Enterprise tier (1,000 free calls/month vs 5,000), so callers must opt in and only
-     * when the website actually decides something — i.e. when the candidate brought its own
-     * domain to cross-check against.
-     */
-    needWebsite?: boolean;
-  },
+  opts?: { prisma?: PrismaClient; allowPaidDetails?: boolean },
 ): Promise<GooglePlaceVerifyResult> {
-  const key = googleMapsServerApiKey();
-  if (!key) {
+  if (!googleMapsServerApiKey() || !opts?.prisma) {
     return { outcome: "skipped", reason: "No Google Maps API key configured" };
   }
-  const needWebsite = opts?.needWebsite ?? false;
-
-  const knownPlaceId = listing.googlePlaceId?.trim();
-  const placeId = knownPlaceId || (await textSearchPlaceId(buildSearchQuery(listing), key));
+  const prisma = opts.prisma;
+  const knownPlaceId = listing.googlePlaceId?.trim() || null;
+  let placeId = knownPlaceId;
+  if (!placeId) {
+    const search = await placesTextSearchIdsOnly(prisma, {
+      query: buildSearchQuery(listing),
+      purpose: "listing_verify",
+    });
+    if (search.blockedReason) placesRequestCounters.budgetBlocked += 1;
+    if (search.deduped) placesRequestCounters.deduped += 1;
+    if (search.sent) placesRequestCounters.newTextSearch += 1;
+    placeId = search.placeId;
+  }
   if (!placeId) {
     return { outcome: "needs_review", reason: "No Google Business listing found" };
   }
-
-  const place = await placeDetailsRecord(placeId, key, needWebsite);
-  if (!place) {
-    return { outcome: "needs_review", reason: "No Google Business listing found" };
+  if (!opts.allowPaidDetails) {
+    return {
+      outcome: "needs_review",
+      reason: "Place ID stored; paid details deferred until trusted evidence",
+      placeId,
+      matchScore: knownPlaceId ? 1 : undefined,
+    };
   }
-
-  return evaluatePlaceMatch(listing, place);
+  const details = await placesDetailsPro(prisma, { placeId, purpose: "listing_verify" });
+  if (details.deduped && !details.place) {
+    return { outcome: "needs_review", reason: "Place details already resolved", placeId };
+  }
+  if (details.blockedReason) {
+    placesRequestCounters.budgetBlocked += 1;
+    return { outcome: "skipped", reason: details.blockedReason, placeId };
+  }
+  if (details.sent) placesRequestCounters.newDetails += 1;
+  if (!details.place) {
+    return { outcome: "needs_review", reason: "No Google Business listing found", placeId };
+  }
+  return evaluatePlaceMatch(listing, proToRecord(details.place));
 }
 
 export function listingGoogleVerifyPerDiscoveryRun(): number {
-  return Math.min(50, Math.max(0, parseIntEnv("LISTING_GOOGLE_VERIFY_PER_RUN", 30)));
+  return Math.min(50, Math.max(0, parseIntEnv("LISTING_GOOGLE_VERIFY_PER_RUN", 5)));
 }
 
 function appendInternalNote(existing: string | null | undefined, reason: string): string {
@@ -587,6 +402,14 @@ export async function verifyPublicListingsWithGoogle(
 
   const limit = opts?.limit ?? listingGoogleVerifyPerDiscoveryRun();
   if (limit <= 0) {
+    return { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false };
+  }
+
+  const inventoryTarget = Math.max(0, parseIntEnv("PLACES_ENRICH_MIN_VERIFIED_INVENTORY", 150));
+  const verifiedInventory = await prisma.publicOpenMicListing.count({
+    where: { verificationStatus: "VERIFIED", removedAt: null, googlePlaceId: { not: null } },
+  });
+  if (verifiedInventory >= inventoryTarget) {
     return { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false };
   }
 
@@ -643,19 +466,23 @@ export async function verifyPublicListingsWithGoogle(
   let skipped = 0;
 
   for (const row of rows) {
-    // Track attempt timing for age-aware retries (do not erase historical stamps).
     const attemptCount = (row.placeVerifyAttemptCount ?? 0) + 1;
-    const backoffHours = Math.min(48, Math.max(1, attemptCount));
+    const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
+    const result = await verifyListingWithGoogle(row, {
+      prisma,
+      allowPaidDetails: evidence.trusted && !row.googlePlaceVerifiedAt,
+    });
+    const noMatch = result.reason.includes("No Google Business listing");
+    const weak = result.reason.startsWith("Weak name match");
+    const cooldownHours = noMatch || weak ? 24 * 30 : Math.min(48, Math.max(1, attemptCount));
     await prisma.publicOpenMicListing.update({
       where: { id: row.id },
       data: {
         placeVerifyAttemptCount: attemptCount,
         placeVerifyLastAttemptAt: new Date(),
-        placeVerifyNextAttemptAt: new Date(Date.now() + backoffHours * 3600 * 1000),
+        placeVerifyNextAttemptAt: new Date(Date.now() + cooldownHours * 3600 * 1000),
       },
     });
-
-    const result = await verifyListingWithGoogle(row);
 
     if (result.outcome === "skipped") {
       skipped += 1;

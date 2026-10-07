@@ -1,11 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AmazonAffiliateLink } from "@/components/resources/AmazonAffiliateLink";
-import {
-  AMAZON_ASSOCIATES_TRACKING_ID,
-  openMicGearByAudience,
-  type OpenMicGearItem,
-} from "@/lib/amazonAssociates";
+import { openMicGearByAudience, type OpenMicGearItem } from "@/lib/amazonAssociates";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -114,8 +110,7 @@ export default function OpenMicGearPage() {
 
         <section className="mt-12 border-t border-white/10 pt-8 text-sm text-white/60">
           <p>
-            Tracking ID used on Amazon links on this page:{" "}
-            <span className="text-white/80">{AMAZON_ASSOCIATES_TRACKING_ID}</span>. Browse more MicStage guides on{" "}
+            Browse more MicStage guides on{" "}
             <Link href="/resources" className="underline hover:text-white">
               Resources
             </Link>

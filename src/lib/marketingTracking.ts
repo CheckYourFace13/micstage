@@ -69,7 +69,8 @@ export type MarketingEventName =
   | "booking_completed"
   | "booking_cancelled"
   | "contact_click"
-  | "outbound_link_click";
+  | "outbound_link_click"
+  | "affiliate_click";
 
 declare global {
   interface Window {

@@ -28,6 +28,9 @@ export async function SiteFooter() {
             <Link className="hover:text-white" href="/resources">
               Resources and guides
             </Link>
+            <Link className="hover:text-white" href="/resources/open-mic-gear">
+              Open Mic Gear
+            </Link>
             <Link className="hover:text-white" href="/privacy">
               Privacy Policy
             </Link>

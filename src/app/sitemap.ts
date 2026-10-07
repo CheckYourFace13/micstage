@@ -28,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/locations",
     "/venues",
     "/resources",
+    "/resources/open-mic-gear",
     "/artists",
     "/register/venue",
     "/register/musician",

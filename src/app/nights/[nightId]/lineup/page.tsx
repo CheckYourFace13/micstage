@@ -23,7 +23,7 @@ export async function generateMetadata(props: { params: Promise<{ nightId: strin
   if (!ctx) return { title: "Open mic lineup" };
   const title = ctx.night.title?.trim() || ctx.night.series.name;
   return buildPublicMetadata({
-    title: `${title} — ${ctx.night.venue.name} | MicStage`,
+    title: `${title} — ${ctx.night.venue.name}`,
     description: `Performer signup and lineup for ${title} hosted by ${ctx.hostName} at ${ctx.night.venue.name}.`,
     path: `/nights/${nightId}/lineup`,
   });

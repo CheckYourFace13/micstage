@@ -83,7 +83,11 @@ export function locationSlugToFallbackTitle(slug: string): string {
   return slug
     .split("-")
     .filter(Boolean)
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .map((s) => {
+      // US/CA-style region codes in slugs (chicago-il → Chicago IL).
+      if (/^[a-z]{2}$/i.test(s)) return s.toUpperCase();
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    })
     .join(" ");
 }
 

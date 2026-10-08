@@ -12,7 +12,7 @@ import { VenueNewMessageForm } from "./VenueNewMessageForm";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "New message | MicStage",
+  title: "New message",
 };
 
 export default async function NewMessagePage(props: { searchParams: Promise<{ err?: string; venueId?: string }> }) {

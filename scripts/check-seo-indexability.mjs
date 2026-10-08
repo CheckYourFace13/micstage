@@ -22,6 +22,8 @@ import {
 } from "../src/lib/publicListings/listingAboutFromLead.ts";
 import { shouldIndexDiscoveryPage } from "../src/lib/seo/discoveryIndex.ts";
 import { buildPublicMetadata } from "../src/lib/publicSeo.ts";
+import fs from "node:fs";
+import path from "node:path";
 
 function baseListing(over = {}) {
   return {
@@ -205,5 +207,26 @@ assert.equal(publicListingSourceLabel("autonomous web search"), null);
 assert.equal(publicListingSourceLabel("The Hideout events calendar"), "The Hideout events calendar");
 assert.equal(isPublicListingSourceUrl("https://www.google.com/search?q=open+mic"), false);
 assert.equal(isPublicListingSourceUrl("https://hideoutchicago.com/open-mic"), true);
+
+// Brand title must not include "| MicStage" when layout template already appends it
+const hostPage = fs.readFileSync(path.join(process.cwd(), "src/app/host/page.tsx"), "utf8");
+assert.match(hostPage, /title:\s*"Run every open mic you host — free"/);
+assert.doesNotMatch(hostPage, /title:\s*"[^"]*\| MicStage"/);
+
+const gearPage = fs.readFileSync(path.join(process.cwd(), "src/app/resources/open-mic-gear/page.tsx"), "utf8");
+assert.doesNotMatch(gearPage, /title:\s*"[^"]*\| MicStage/);
+
+assert.ok(fs.existsSync(path.join(process.cwd(), "src/app/faq/page.tsx")));
+assert.ok(fs.existsSync(path.join(process.cwd(), "src/app/open-mics/page.tsx")));
+assert.ok(fs.existsSync(path.join(process.cwd(), "src/app/blog/page.tsx")));
+const openMicsIndex = fs.readFileSync(path.join(process.cwd(), "src/app/open-mics/page.tsx"), "utf8");
+assert.match(openMicsIndex, /permanentRedirect\("\/find-open-mics"\)/);
+const blogIndex = fs.readFileSync(path.join(process.cwd(), "src/app/blog/page.tsx"), "utf8");
+assert.match(blogIndex, /permanentRedirect\("\/resources"\)/);
+
+const mw = fs.readFileSync(path.join(process.cwd(), "src/middleware.ts"), "utf8");
+assert.match(mw, /www\.micstage\.com/);
+assert.match(mw, /micstage\.com/);
+assert.match(mw, /301/);
 
 console.log(JSON.stringify({ ok: true, checks: "seo-indexability" }));

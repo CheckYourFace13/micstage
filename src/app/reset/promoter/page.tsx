@@ -2,7 +2,7 @@ import { FormSubmitButton } from "@/components/FormSubmitButton";
 import { requestPromoterPasswordReset } from "./actions";
 
 export const metadata = {
-  title: "Reset promoter password | MicStage",
+  title: "Reset promoter password",
 };
 
 export default async function ResetPromoterPasswordPage(props: {

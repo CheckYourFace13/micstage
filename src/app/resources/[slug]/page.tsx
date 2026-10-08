@@ -22,7 +22,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
     });
   }
   const base = buildPublicMetadata({
-    title: `${article.title} | MicStage resources`,
+    title: article.title,
     description: article.description,
     path: `/resources/${article.slug}`,
   });

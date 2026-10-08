@@ -1,5 +1,5 @@
 ﻿export const metadata = {
-  title: "Artist login | MicStage",
+  title: "Artist login",
 };
 
 import Link from "next/link";

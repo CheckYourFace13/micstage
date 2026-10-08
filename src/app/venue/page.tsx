@@ -155,7 +155,7 @@ async function loadVenuePortalRows(session: NonNullable<Awaited<ReturnType<typeo
 }
 
 export const metadata = {
-  title: "Venue portal | MicStage",
+  title: "Venue portal",
 };
 
 export const dynamic = "force-dynamic";

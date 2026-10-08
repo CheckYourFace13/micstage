@@ -8,7 +8,7 @@ import { lineupSecondaryActionClass } from "@/components/venue/lineupActionStyle
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Messages | MicStage",
+  title: "Messages",
 };
 
 export default async function MessagesInboxPage() {

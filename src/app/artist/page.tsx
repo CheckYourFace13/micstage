@@ -32,7 +32,7 @@ type MusicianPortalUser = MusicianUser & {
 };
 
 export const metadata = {
-  title: "Artist portal | MicStage",
+  title: "Artist portal",
 };
 
 /** Session + bookings depend on request cookies; avoid any static/prerender mismatch after login. */

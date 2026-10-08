@@ -5,7 +5,7 @@ import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquis
 import { getPrismaOrNull } from "@/lib/prisma";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Run every open mic you host — free | MicStage",
+  title: "Run every open mic you host — free",
   description:
     "One MicStage host account manages all your open mics — multiple venues, recurring nights, performer signups, and lineups. Free open mic host app for comedy, music, and poetry.",
   path: "/host",

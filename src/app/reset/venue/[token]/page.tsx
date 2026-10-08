@@ -6,7 +6,7 @@ import { privateNoIndexMetadata } from "@/lib/privateSeo";
 
 export async function generateMetadata(_props: { params: Promise<{ token: string }> }): Promise<Metadata> {
   return {
-    title: "Set new venue password | MicStage",
+    title: "Set new venue password",
     ...privateNoIndexMetadata,
   };
 }

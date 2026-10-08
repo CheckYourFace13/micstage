@@ -5,7 +5,7 @@ import { openMicGearByAudience, type OpenMicGearItem } from "@/lib/amazonAssocia
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Open Mic Gear | MicStage resources",
+  title: "Open Mic Gear",
   description:
     "Practical gear recommendations for open mic performers and hosts: mics, stands, cables, portable PA, mixers, and stage essentials — with clear guidance on what matters in a live room.",
   path: "/resources/open-mic-gear",

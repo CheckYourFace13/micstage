@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import { Bebas_Neue, Inter } from "next/font/google";
+import { AdSenseScript } from "@/components/ads/AdSenseScript";
 import { MarketingTrackingClient } from "@/components/MarketingTrackingClient";
 import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -83,15 +84,13 @@ export default async function RootLayout({
         <meta charSet="utf-8" />
         <meta name="google-adsense-account" content="ca-pub-9572509189594279" />
         <link rel="icon" href="/favicon.png" type="image/png" />
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9572509189594279"
-          crossOrigin="anonymous"
-        />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
       </head>
       <body className="min-h-dvh overflow-x-hidden bg-black pb-[env(safe-area-inset-bottom)] font-[var(--font-body)] text-white">
+        <Suspense fallback={null}>
+          <AdSenseScript />
+        </Suspense>
         {!embed ? <SiteHeader /> : null}
         {children}
         {!embed ? <SiteFooter /> : null}

@@ -11,30 +11,39 @@ export const ADSENSE_ADS_TXT_LINE = `google.com, pub-${ADSENSE_PUBLISHER_NUMERIC
 export const ADSENSE_ENABLED =
   process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === "true";
 
-const ADS_BLOCKED_PATH_PREFIXES = [
-  "/register",
-  "/login",
-  "/dashboard",
-  "/artist",
-  "/venue",
-  "/internal",
-  "/logout",
-  "/reset",
-  "/api",
-] as const;
+/**
+ * Exact paths where AdSense may load (editorial / discovery directories).
+ * Venue/artist/map discover hubs are OK; detail/lineup/ops routes are not.
+ */
+const ADS_ALLOWED_EXACT = new Set([
+  "/resources",
+  "/find-open-mics",
+  "/venues",
+  "/artists",
+  "/performers",
+  "/map",
+  "/locations",
+  "/compare",
+]);
+
+/** Prefixes where AdSense may load (resource articles + city/market hubs). */
+const ADS_ALLOWED_PREFIXES = ["/resources/", "/locations/"] as const;
+
+function normalizePath(pathname: string): string {
+  return (pathname.split("?")[0] ?? pathname).replace(/\/$/, "") || "/";
+}
 
 /**
- * Central guard for whether display ads may render on a pathname.
- * Public SEO/discovery/resource routes return true; auth, product, and conversion routes return false.
+ * Central guard for whether AdSense may load or render on a pathname.
+ * Whitelist editorial/discovery only — never ops, booking, lineup, auth, or listing detail.
  */
 export function shouldShowAdsOnPath(pathname: string): boolean {
-  const path = (pathname.split("?")[0] ?? pathname).replace(/\/$/, "") || "/";
-  for (const prefix of ADS_BLOCKED_PATH_PREFIXES) {
-    if (path === prefix || path.startsWith(`${prefix}/`)) {
-      return false;
-    }
+  const path = normalizePath(pathname);
+  if (ADS_ALLOWED_EXACT.has(path)) return true;
+  for (const prefix of ADS_ALLOWED_PREFIXES) {
+    if (path.startsWith(prefix)) return true;
   }
-  return true;
+  return false;
 }
 
 /** Display ad unit slot IDs from AdSense (empty until configured in env). */

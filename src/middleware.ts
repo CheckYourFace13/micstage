@@ -164,6 +164,19 @@ export async function middleware(request: NextRequest) {
 
 async function runMiddleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  // Apex canonical host: www.micstage.com → micstage.com (preserve path + query).
+  // Hostinger currently serves www and apex as the same Node app without a 301.
+  const rawHost = (request.headers.get("host") ?? "").toLowerCase();
+  const hostname = rawHost.split(":")[0] ?? "";
+  if (hostname === "www.micstage.com") {
+    const dest = request.nextUrl.clone();
+    dest.hostname = "micstage.com";
+    dest.protocol = "https:";
+    dest.port = "";
+    return NextResponse.redirect(dest, 301);
+  }
+
   const appPortalGuard = await appPortalAuthGuard(request);
   if (appPortalGuard) return appPortalGuard;
 

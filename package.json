@@ -31,6 +31,7 @@
     "test:host-e2e": "npx tsx scripts/host-multi-venue-e2e.mjs",
     "test:conversion-analytics": "node scripts/check-conversion-analytics.mjs",
     "test:amazon-associates": "npx tsx scripts/check-amazon-associates.mjs",
+    "test:adsense-placement": "npx tsx scripts/check-adsense-placement.mjs",
     "test:registration-funnel": "npx tsx scripts/check-registration-funnel-milestones.mjs",
     "test:schedule-times": "npx tsx scripts/check-schedule-times.mjs",
     "test:artist-timing": "npx tsx scripts/check-artist-timing.mjs",

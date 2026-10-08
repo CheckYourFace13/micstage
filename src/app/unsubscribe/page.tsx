@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
-  title: "Unsubscribed | MicStage",
+  title: "Unsubscribed",
 };
 
 export default async function UnsubscribePage(props: {

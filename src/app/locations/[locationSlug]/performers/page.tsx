@@ -1,8 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
-import { AdSenseDisplayAd } from "@/components/ads/AdSenseDisplayAd";
-import { ADSENSE_SLOTS } from "@/lib/adsense";
 import type { Prisma } from "@/generated/prisma/client";
 import { getPrismaOrNull } from "@/lib/prisma";
 import {
@@ -308,8 +306,6 @@ export default async function LocationPerformersPage(props: { params: Promise<{ 
             </div>
           </section>
         ) : null}
-
-        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.directoryBottom} minHeight={100} />
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-xl font-semibold">FAQ</h2>

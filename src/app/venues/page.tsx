@@ -1,7 +1,5 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { AdSenseDisplayAd } from "@/components/ads/AdSenseDisplayAd";
-import { ADSENSE_SLOTS } from "@/lib/adsense";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { getVenueCityDiscoveryCounts, primaryDiscoverySlugForVenue } from "@/lib/discoveryMarket";
@@ -229,7 +227,6 @@ export default async function VenuesDirectoryPage() {
         )}
         </div>
 
-        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.directoryBottom} minHeight={100} />
       </main>
     </div>
   );

@@ -1,6 +1,6 @@
 /**
- * Regression guard: AdSense only on approved editorial/discovery surfaces.
- * Run: node scripts/check-adsense-placement.mjs
+ * Regression guard: AdSense only on editorial resources + city open-mic hubs.
+ * Run: npx tsx scripts/check-adsense-placement.mjs
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -16,21 +16,28 @@ function read(rel) {
 assert.equal(ADSENSE_PUBLISHER_ID, "ca-pub-9572509189594279");
 
 const allow = [
+  "/resources",
+  "/resources/how-to-run-a-successful-open-mic-night",
+  "/resources/what-to-expect-at-your-first-open-mic",
+  "/locations/chicago-il/open-mics",
+  "/locations/open-mics-ca/open-mics",
+];
+
+const deny = [
   "/",
   "/host",
-  "/resources",
-  "/resources/open-mic-gear",
-  "/resources/how-to-run-a-successful-open-mic-night",
-  "/locations",
-  "/locations/chicago-il/open-mics",
+  "/faq",
+  "/about",
+  "/contact",
   "/find-open-mics",
   "/venues",
   "/artists",
   "/performers",
   "/map",
   "/compare",
-];
-const deny = [
+  "/locations",
+  "/locations/chicago-il/performers",
+  "/resources/open-mic-gear",
   "/open-mics/some-listing",
   "/venues/some-venue",
   "/venues/some-venue/lineup",
@@ -55,11 +62,7 @@ const deny = [
   "/unsubscribe",
 ];
 
-assert.equal(shouldShowAdsOnPath("/"), false, "homepage is not an ad surface");
-assert.equal(shouldShowAdsOnPath("/host"), false, "host marketing/conversion is not an ad surface");
-
 for (const p of allow) {
-  if (p === "/" || p === "/host") continue;
   assert.equal(shouldShowAdsOnPath(p), true, `expected ads allowed on ${p}`);
 }
 for (const p of deny) {
@@ -83,7 +86,11 @@ assert.match(script, /pagead2\.googlesyndication\.com/);
 const display = read("src/components/ads/AdSenseDisplayAd.tsx");
 assert.match(display, /shouldShowAdsOnPath/);
 
-/** Display units must not be imported into ops / lineup / booking surfaces. */
+const adsenseLib = read("src/lib/adsense.ts");
+assert.match(adsenseLib, /open-mic-gear/);
+assert.match(adsenseLib, /\/locations\/\[market\]\/open-mics|\/locations\/\[^\/\]\+\/open-mics/);
+
+/** Display units must not be imported into ops / lineup / booking / product hubs. */
 const forbiddenImportRoots = [
   "src/app/promoter",
   "src/app/venue",
@@ -96,6 +103,15 @@ const forbiddenImportRoots = [
   "src/app/messages",
   "src/app/media",
   "src/app/open-mics",
+  "src/app/find-open-mics",
+  "src/app/compare",
+  "src/app/map",
+  "src/app/artists",
+  "src/app/performers",
+  "src/app/venues",
+  "src/app/host",
+  "src/app/faq",
+  "src/app/resources/open-mic-gear",
   "src/components/venue",
   "src/components/host",
 ];
@@ -105,6 +121,14 @@ const offenders = [];
 function walk(dir) {
   const abs = path.join(root, dir);
   if (!fs.existsSync(abs)) return;
+  const st0 = fs.statSync(abs);
+  if (st0.isFile()) {
+    const text = fs.readFileSync(abs, "utf8");
+    if (/AdSenseDisplayAd|AdSenseScript|adsbygoogle|ADSENSE_SLOTS/.test(text)) {
+      offenders.push(dir.replace(/\\/g, "/"));
+    }
+    return;
+  }
   for (const name of fs.readdirSync(abs)) {
     const full = path.join(abs, name);
     const st = fs.statSync(full);
@@ -122,4 +146,8 @@ function walk(dir) {
 for (const dir of forbiddenImportRoots) walk(dir);
 assert.equal(offenders.length, 0, `AdSense imports in forbidden surfaces:\n${offenders.join("\n")}`);
 
-console.log("ok: adsense placement guard");
+// Performers market pages must not ship display ad units (path gate also blocks).
+const performersPage = read("src/app/locations/[locationSlug]/performers/page.tsx");
+assert.doesNotMatch(performersPage, /AdSenseDisplayAd|ADSENSE_SLOTS/);
+
+console.log("ok: adsense placement guard (editorial + city open-mics only)");

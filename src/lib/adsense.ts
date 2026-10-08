@@ -11,38 +11,34 @@ export const ADSENSE_ADS_TXT_LINE = `google.com, pub-${ADSENSE_PUBLISHER_NUMERIC
 export const ADSENSE_ENABLED =
   process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === "true";
 
-/**
- * Exact paths where AdSense may load (editorial / discovery directories).
- * Venue/artist/map discover hubs are OK; detail/lineup/ops routes are not.
- */
-const ADS_ALLOWED_EXACT = new Set([
-  "/resources",
-  "/find-open-mics",
-  "/venues",
-  "/artists",
-  "/performers",
-  "/map",
-  "/locations",
-  "/compare",
-]);
-
-/** Prefixes where AdSense may load (resource articles + city/market hubs). */
-const ADS_ALLOWED_PREFIXES = ["/resources/", "/locations/"] as const;
+/** Affiliate-commerce resource pages — never stack AdSense on top of Amazon. */
+const ADS_BLOCKED_RESOURCE_SLUGS = new Set(["open-mic-gear"]);
 
 function normalizePath(pathname: string): string {
   return (pathname.split("?")[0] ?? pathname).replace(/\/$/, "") || "/";
 }
 
 /**
- * Central guard for whether AdSense may load or render on a pathname.
- * Whitelist editorial/discovery only — never ops, booking, lineup, auth, or listing detail.
+ * AdSense may load only on:
+ * - /resources (index)
+ * - editorial /resources/[slug] (not affiliate gear)
+ * - /locations/[market]/open-mics (strong city open-mic hubs)
+ *
+ * Not on discovery product hubs, performers pages, homepage, host, FAQ, ops, or listing detail.
  */
 export function shouldShowAdsOnPath(pathname: string): boolean {
   const path = normalizePath(pathname);
-  if (ADS_ALLOWED_EXACT.has(path)) return true;
-  for (const prefix of ADS_ALLOWED_PREFIXES) {
-    if (path.startsWith(prefix)) return true;
+
+  if (path === "/resources") return true;
+
+  const resourceMatch = /^\/resources\/([^/]+)$/.exec(path);
+  if (resourceMatch) {
+    return !ADS_BLOCKED_RESOURCE_SLUGS.has(resourceMatch[1]!);
   }
+
+  // City/market open-mic hubs only — not /locations index or /locations/.../performers.
+  if (/^\/locations\/[^/]+\/open-mics$/.test(path)) return true;
+
   return false;
 }
 

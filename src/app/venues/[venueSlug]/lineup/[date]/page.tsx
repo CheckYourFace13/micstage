@@ -8,10 +8,12 @@ import { VenueBookingFlash } from "@/components/VenueBookingFlash";
 import { isValidPublicSlug } from "@/lib/locationSlugValidation";
 import { getSession } from "@/lib/session";
 import { venueIdsForVenueSession } from "@/lib/authz";
-import { buildLineupPageMetadata } from "@/lib/publicSeo";
+import { buildVenueNightEventJsonLd } from "@/lib/publicListings/listingSeo";
+import { absoluteUrl, buildLineupPageMetadata } from "@/lib/publicSeo";
 import { lineupNavLabelFromYmd } from "@/lib/time";
 import { loadPublicVenueForLineup } from "@/lib/venuePublicLineupData";
 import {
+  instanceWindowForSchedule,
   isValidLineupYmd,
   lineupsForStorageYmd,
   pickPrimaryLineup,
@@ -90,8 +92,30 @@ export default async function VenueLineupDatePage(props: {
       ? `/venues/${venue.slug}/lineup/${dateParam}?reserve=${encodeURIComponent(reserve)}`
       : `/venues/${venue.slug}/lineup/${dateParam}`;
 
+  const pagePath = `/venues/${venue.slug}/lineup/${dateParam}`;
+  const eventJsonLd =
+    lineups.length > 0
+      ? buildVenueNightEventJsonLd({
+          venueName: venue.name,
+          formattedAddress: venue.formattedAddress,
+          url: absoluteUrl(pagePath),
+          nights: lineups.map(({ template, instance }) => {
+            const window = instanceWindowForSchedule(template, instance);
+            return {
+              eventName: (template.title?.trim() || venue.name).trim(),
+              start: window.start,
+              end: window.end,
+              isCancelled: instance.isCancelled,
+            };
+          }),
+        })
+      : [];
+
   return (
     <div className="min-h-dvh bg-black text-white">
+      {eventJsonLd.map((ev, i) => (
+        <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ev) }} />
+      ))}
       <main
         className={
           embedMode

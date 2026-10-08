@@ -13,6 +13,7 @@ import {
   publicListingSeoTitle,
   publicListingSeoDescription,
   buildListingEventJsonLd,
+  buildVenueNightEventJsonLd,
   venueIsSitemapEligible,
 } from "../src/lib/publicListings/listingSeo.ts";
 import {
@@ -143,6 +144,31 @@ const concreteEvents = buildListingEventJsonLd({
 assert.equal(concreteEvents.length, 1);
 assert.equal(concreteEvents[0]["@type"], "Event");
 assert.equal(concreteEvents[0].startDate, "2026-08-21T20:00:00-05:00");
+
+// Dated venue-night helper: only absolute Date instances (no invented weekday recurrence)
+const venueNightEvents = buildVenueNightEventJsonLd({
+  venueName: "Jokers Comedy House",
+  formattedAddress: "1 Main St",
+  url: "https://micstage.com/venues/jokers/lineup/2026-10-14",
+  nights: [
+    {
+      eventName: "Open mic",
+      start: new Date("2026-10-14T23:00:00.000Z"),
+      end: new Date("2026-10-15T02:00:00.000Z"),
+    },
+  ],
+});
+assert.equal(venueNightEvents.length, 1);
+assert.equal(venueNightEvents[0]["@type"], "Event");
+assert.equal(venueNightEvents[0].startDate, "2026-10-14T23:00:00.000Z");
+assert.equal(
+  buildVenueNightEventJsonLd({
+    venueName: "Jokers Comedy House",
+    url: "https://micstage.com/venues/jokers/lineup/2026-10-14",
+    nights: [],
+  }).length,
+  0,
+);
 
 // Invalid / empty startDate rejected
 assert.equal(

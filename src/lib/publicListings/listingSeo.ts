@@ -165,6 +165,56 @@ export function isValidEventStartDate(raw: string): boolean {
   return !Number.isNaN(d.getTime());
 }
 
+/**
+ * Event JSON-LD for public dated venue-night pages (`/venues/.../lineup/YYYY-MM-DD`).
+ * Requires concrete instance date + stored start/end minutes (or real slot bounds).
+ * Never synthesizes from weekday recurrence alone.
+ */
+export function buildVenueNightEventJsonLd(input: {
+  venueName: string;
+  formattedAddress?: string | null;
+  url: string;
+  nights: Array<{
+    eventName: string;
+    /** Absolute start instant already computed from stored date + time. */
+    start: Date;
+    /** Absolute end instant when known from template/slots; omitted when invalid. */
+    end?: Date | null;
+    isCancelled?: boolean;
+  }>;
+}): Record<string, unknown>[] {
+  const venueName = (input.venueName ?? "").trim();
+  if (!venueName) return [];
+  const out: Record<string, unknown>[] = [];
+  for (const night of input.nights) {
+    if (night.isCancelled) continue;
+    if (!(night.start instanceof Date) || Number.isNaN(night.start.getTime())) continue;
+    const startDate = night.start.toISOString();
+    if (!isValidEventStartDate(startDate)) continue;
+    const end =
+      night.end instanceof Date && !Number.isNaN(night.end.getTime()) && night.end.getTime() > night.start.getTime()
+        ? night.end.toISOString()
+        : null;
+    const name = (night.eventName ?? "").trim() || venueName;
+    out.push({
+      "@context": "https://schema.org",
+      "@type": "Event",
+      name,
+      startDate,
+      ...(end ? { endDate: end } : {}),
+      eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+      eventStatus: "https://schema.org/EventScheduled",
+      location: {
+        "@type": "Place",
+        name: venueName,
+        ...(input.formattedAddress?.trim() ? { address: input.formattedAddress.trim() } : {}),
+      },
+      url: input.url,
+    });
+  }
+  return out;
+}
+
 /** Minimal venue quality gate for sitemap inclusion (no redesign). */
 export function venueIsSitemapEligible(v: {
   name: string;

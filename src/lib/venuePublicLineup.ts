@@ -10,16 +10,18 @@ import type { LineupInstance, LineupTemplate } from "@/lib/venuePublicLineupData
  */
 export function instanceWindowForSchedule(
   template: Pick<LineupTemplate, "timeZone" | "startTimeMin" | "endTimeMin">,
-  instance: Pick<LineupInstance, "date" | "slots">,
+  instance: Pick<LineupInstance, "date" | "slots" | "startTimeMinOverride" | "endTimeMinOverride">,
 ): { start: Date; end: Date } {
   const slots = instance.slots ?? [];
   if (slots.length > 0) {
     const w = instanceWindow(instance, template.timeZone);
     if (w) return w;
   }
+  const startMin = instance.startTimeMinOverride ?? template.startTimeMin;
+  const endMin = instance.endTimeMinOverride ?? template.endTimeMin;
   return {
-    start: slotStartInstant(instance.date, template.startTimeMin, template.timeZone),
-    end: slotStartInstant(instance.date, template.endTimeMin, template.timeZone),
+    start: slotStartInstant(instance.date, startMin, template.timeZone),
+    end: slotStartInstant(instance.date, endMin, template.timeZone),
   };
 }
 

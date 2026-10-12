@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AmazonAffiliateLink } from "@/components/resources/AmazonAffiliateLink";
+import { MusicStandAffiliateLink } from "@/components/resources/MusicStandAffiliateLink";
 import { openMicGearByAudience, type OpenMicGearItem } from "@/lib/amazonAssociates";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 
@@ -79,7 +80,8 @@ export default function OpenMicGearPage() {
           aria-label="Affiliate disclosure"
         >
           <p>
-            Affiliate disclosure: MicStage may earn a commission from qualifying purchases.
+            Affiliate disclosure: MicStage may earn a commission from qualifying purchases
+            through Amazon Associates and Awin partner links on this page.
           </p>
           <p className="mt-2 text-amber-50/75">
             As an Amazon Associate I earn from qualifying purchases.
@@ -108,7 +110,17 @@ export default function OpenMicGearPage() {
           <GearList items={hosts} />
         </section>
 
-        <section className="mt-12 border-t border-white/10 pt-8 text-sm text-white/60">
+        <section className="mt-12 border-t border-white/10 pt-8 text-sm text-white/70">
+          <p>
+            Looking for gifts or small stage accessories beyond the categories above?{" "}
+            <MusicStandAffiliateLink className="font-medium text-[rgb(var(--om-neon))] underline underline-offset-2 hover:brightness-110">
+              Browse popular music gifts and accessories at The Music Stand
+            </MusicStandAffiliateLink>
+            .
+          </p>
+        </section>
+
+        <section className="mt-8 text-sm text-white/60">
           <p>
             Browse more MicStage guides on{" "}
             <Link href="/resources" className="underline hover:text-white">

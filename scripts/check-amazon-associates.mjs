@@ -1,5 +1,5 @@
 /**
- * Static checks for Amazon Associates (Open Mic Gear) wiring + placement guardrails.
+ * Static checks for Amazon Associates + Awin (Open Mic Gear) wiring + placement guardrails.
  * Run: npx tsx scripts/check-amazon-associates.mjs
  */
 import assert from "node:assert/strict";
@@ -10,6 +10,12 @@ import {
   OPEN_MIC_GEAR_ITEMS,
   amazonSearchUrl,
 } from "../src/lib/amazonAssociates.ts";
+import {
+  AWIN_AFFILIATE_NETWORK,
+  AWIN_MUSIC_STAND_ADVERTISER,
+  AWIN_MUSIC_STAND_BEST_SELLERS_URL,
+  AWIN_MUSIC_STAND_DESTINATION,
+} from "../src/lib/awinAffiliate.ts";
 
 const root = process.cwd();
 
@@ -31,15 +37,24 @@ const AFFILIATE_MARKERS = [
   { name: "amazonAssociates_import", re: /@\/lib\/amazonAssociates|from ["'].*amazonAssociates["']/ },
   { name: "browse_on_amazon_cta", re: /Browse on Amazon/i },
   { name: "affiliate_disclosure_cta", re: /Affiliate disclosure:\s*MicStage may earn a commission/i },
+  { name: "awin_cread_url", re: /awin1\.com\/cread\.php/i },
+  { name: "awinmid", re: /\bawinmid=90327\b/ },
+  { name: "awinaffid", re: /\bawinaffid=3112962\b/ },
+  { name: "MusicStandAffiliateLink", re: /\bMusicStandAffiliateLink\b/ },
+  { name: "awinAffiliate_import", re: /@\/lib\/awinAffiliate|from ["'].*awinAffiliate["']/ },
+  { name: "music_stand_cta", re: /Browse popular music gifts and accessories at The Music Stand/i },
+  { name: "themusicstand_domain", re: /themusicstand\.com/i },
 ];
 
 /**
- * Files/dirs where Amazon Associates code and tracking ID are allowed.
- * Discovery links to /resources/open-mic-gear are OK elsewhere; amazon URLs / micstage-20 are not.
+ * Files/dirs where Amazon Associates / Awin affiliate code is allowed.
+ * Discovery links to /resources/open-mic-gear are OK elsewhere; commerce URLs are not.
  */
 const AFFILIATE_ALLOWLIST = new Set([
   "src/lib/amazonAssociates.ts",
+  "src/lib/awinAffiliate.ts",
   "src/components/resources/AmazonAffiliateLink.tsx",
+  "src/components/resources/MusicStandAffiliateLink.tsx",
   "src/app/resources/open-mic-gear/page.tsx",
   "src/lib/marketingTracking.ts", // event name type only
   "scripts/check-amazon-associates.mjs",
@@ -89,10 +104,20 @@ for (const item of OPEN_MIC_GEAR_ITEMS) {
 }
 
 const page = read("src/app/resources/open-mic-gear/page.tsx");
-assert.match(page, /Affiliate disclosure: MicStage may earn a commission from qualifying purchases\./);
+assert.match(
+  page,
+  /Affiliate disclosure: MicStage may earn a commission from qualifying purchases\s+through Amazon Associates and Awin partner links on this page\./,
+);
 assert.match(page, /As an Amazon Associate I earn from qualifying purchases\./);
 assert.match(page, /AmazonAffiliateLink/);
-assert.doesNotMatch(page, /images-na\.ssl-images-amazon|media-amazon\.com/);
+assert.match(page, /MusicStandAffiliateLink/);
+assert.match(page, /Browse popular music gifts and accessories at The Music Stand/);
+assert.equal(
+  (page.match(/<MusicStandAffiliateLink\b/g) || []).length,
+  1,
+  "exactly one Music Stand JSX placement",
+);
+assert.doesNotMatch(page, /images-na\.ssl-images-amazon|media-amazon\.com|<img[\s\S]*awin|<img[\s\S]*music.?stand/i);
 assert.doesNotMatch(page, /Tracking ID used on Amazon/i);
 assert.doesNotMatch(page, /\bmicstage-20\b/, "tracking ID must not be visible copy on the resource page");
 assert.doesNotMatch(page, /AMAZON_ASSOCIATES_TRACKING_ID/);
@@ -105,6 +130,23 @@ assert.match(linkComponent, /destination/);
 assert.match(linkComponent, /rel="noopener noreferrer sponsored"/);
 assert.match(linkComponent, /target="_blank"/);
 
+assert.equal(AWIN_AFFILIATE_NETWORK, "awin");
+assert.equal(AWIN_MUSIC_STAND_ADVERTISER, "the_music_stand");
+assert.equal(AWIN_MUSIC_STAND_DESTINATION, "best_sellers");
+assert.match(AWIN_MUSIC_STAND_BEST_SELLERS_URL, /^https:\/\/www\.awin1\.com\/cread\.php\?/);
+assert.match(AWIN_MUSIC_STAND_BEST_SELLERS_URL, /awinmid=90327/);
+assert.match(AWIN_MUSIC_STAND_BEST_SELLERS_URL, /awinaffid=3112962/);
+assert.match(AWIN_MUSIC_STAND_BEST_SELLERS_URL, /themusicstand\.com/);
+
+const awinLink = read("src/components/resources/MusicStandAffiliateLink.tsx");
+assert.match(awinLink, /affiliate_click/);
+assert.match(awinLink, /affiliate_network:\s*AWIN_AFFILIATE_NETWORK/);
+assert.match(awinLink, /advertiser:\s*AWIN_MUSIC_STAND_ADVERTISER/);
+assert.match(awinLink, /destination:\s*AWIN_MUSIC_STAND_DESTINATION/);
+assert.match(awinLink, /rel="sponsored noopener noreferrer"/);
+assert.match(awinLink, /target="_blank"/);
+assert.doesNotMatch(awinLink, /<img/i);
+
 const marketing = read("src/lib/marketingTracking.ts");
 assert.match(marketing, /"affiliate_click"/);
 assert.doesNotMatch(marketing, /amazon\.com/i);
@@ -113,15 +155,15 @@ assert.doesNotMatch(marketing, /\bmicstage-20\b/);
 const footer = read("src/components/SiteFooter.tsx");
 assert.match(footer, /\/resources\/open-mic-gear/);
 assert.match(footer, /Open Mic Gear/);
-assert.doesNotMatch(footer, /amazon\.com|micstage-20|affiliate_click|AmazonAffiliateLink/i);
+assert.doesNotMatch(footer, /amazon\.com|micstage-20|affiliate_click|AmazonAffiliateLink|awin1\.com|MusicStandAffiliateLink|themusicstand/i);
 
 const resourcesIndex = read("src/app/resources/page.tsx");
 assert.match(resourcesIndex, /\/resources\/open-mic-gear/);
-assert.doesNotMatch(resourcesIndex, /amazon\.com|micstage-20|affiliate_click|AmazonAffiliateLink/i);
+assert.doesNotMatch(resourcesIndex, /amazon\.com|micstage-20|affiliate_click|AmazonAffiliateLink|awin1\.com|MusicStandAffiliateLink|themusicstand/i);
 
 const sitemap = read("src/app/sitemap.ts");
 assert.match(sitemap, /\/resources\/open-mic-gear/);
-assert.doesNotMatch(sitemap, /amazon\.com|micstage-20|affiliate_click/i);
+assert.doesNotMatch(sitemap, /amazon\.com|micstage-20|affiliate_click|awin1\.com|themusicstand/i);
 
 const associatesLib = read("src/lib/amazonAssociates.ts");
 assert.match(associatesLib, /AMAZON_ASSOCIATES_TRACKING_ID = "micstage-20"/);
@@ -211,5 +253,5 @@ assert.equal(
 );
 
 console.log(
-  `ok: amazon associates (${OPEN_MIC_GEAR_ITEMS.length} links, tag=${AMAZON_ASSOCIATES_TRACKING_ID}; placement guard ok)`,
+  `ok: amazon associates (${OPEN_MIC_GEAR_ITEMS.length} links, tag=${AMAZON_ASSOCIATES_TRACKING_ID}) + awin music stand; placement guard ok`,
 );

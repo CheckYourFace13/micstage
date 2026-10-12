@@ -7,6 +7,7 @@ import {
   OPEN_MIC_EVIDENCE_REASON,
   type OpenMicEvidenceInput,
 } from "@/lib/publicListings/openMicEvidence";
+import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 import { classifyListingName, isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 import { sendListingClaimInviteIfNeeded } from "@/lib/publicListings/listingClaimInviteEmail";
 import { submitUrlsToIndexNow } from "@/lib/seo/searchEnginePing";
@@ -81,11 +82,21 @@ export async function promotePlaceConfirmedListings(
       id: true,
       slug: true,
       name: true,
+      city: true,
+      region: true,
+      formattedAddress: true,
       internalNotes: true,
       sourceUrl: true,
       websiteUrl: true,
       schedules: { select: { title: true, description: true } },
-      growthLead: { select: { sourceKind: true, internalNotes: true, discoveryHints: true } },
+      growthLead: {
+        select: {
+          sourceKind: true,
+          internalNotes: true,
+          discoveryHints: true,
+          discoveryMarketSlug: true,
+        },
+      },
     },
   });
 
@@ -108,6 +119,27 @@ export async function promotePlaceConfirmedListings(
           verificationStatus: "OUTDATED",
           evidenceTerminalReason: `JUNK_NAME_${nameReject}`.slice(0, 80),
           internalNotes: appendNote(row.internalNotes, `auto-reject JUNK_NAME_${nameReject}`),
+        },
+      });
+      continue;
+    }
+
+    if (
+      listingHasGeoConflict({
+        region: row.region,
+        city: row.city,
+        formattedAddress: row.formattedAddress,
+        name: row.name,
+        discoveryMarketSlug: row.growthLead?.discoveryMarketSlug,
+      })
+    ) {
+      junkOutdated += 1;
+      await prisma.publicOpenMicListing.update({
+        where: { id: row.id },
+        data: {
+          verificationStatus: "OUTDATED",
+          evidenceTerminalReason: "PLACE_OR_REGION_CONFLICT",
+          internalNotes: appendNote(row.internalNotes, "auto-reject PLACE_OR_REGION_CONFLICT"),
         },
       });
       continue;

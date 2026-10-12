@@ -83,7 +83,7 @@ export async function autoRejectJunkListings(
     let reason: string | null = null;
     if (nameReject) reason = `JUNK_NAME_${nameReject}`;
     else if (mediaWeakPlace) reason = "WEAK_PLACE_MEDIA_OR_DIRECTORY";
-    else if (row.verificationStatus !== "VERIFIED" && geoConflict) reason = "PLACE_OR_REGION_CONFLICT";
+    else if (geoConflict) reason = "PLACE_OR_REGION_CONFLICT";
     else if (
       row.verificationStatus !== "VERIFIED" &&
       row.evidenceTerminalReason &&

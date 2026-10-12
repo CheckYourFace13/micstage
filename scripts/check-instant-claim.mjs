@@ -103,19 +103,7 @@ function evaluateFetchedEvidenceTrust(input) {
   return { trusted: false, reasonCode: "OFFICIAL_AMBIGUOUS_MENTION" };
 }
 
-function listingHasGeoConflict(input) {
-  const blob = `${input.name} ${input.formattedAddress || ""} ${input.city || ""}`.toLowerCase();
-  const region = (input.region || "").toUpperCase();
-  const market = (input.discoveryMarketSlug || "").toLowerCase();
-  const saysGA = /\broswell\b/.test(blob) && (/\bga\b/.test(blob) || /georgia/.test(blob));
-  const saysIL = region === "IL" || /chicago|illinois/.test(market);
-  if (saysGA && saysIL) return true;
-  const stateInAddr = blob.match(/,\s*([a-z]{2})(?:\s+\d{5}|$)/i)?.[1]?.toUpperCase();
-  if (region && stateInAddr && region.length === 2 && stateInAddr !== region) {
-    if (/[a-z]{4,}/.test(input.formattedAddress || "") && stateInAddr !== "US") return true;
-  }
-  return false;
-}
+const { listingHasGeoConflict } = await import("../src/lib/publicListings/evidenceTrust.ts");
 
 /** Booking stays off until owner chooses micstage_booking. */
 function activationBookingEnabled(performerMode) {

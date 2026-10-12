@@ -3,6 +3,7 @@
  * Does not loosen public-quality or open-mic evidence gates.
  */
 import type { Weekday } from "@/generated/prisma/client";
+import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 import { evaluateOpenMicEvidence } from "@/lib/publicListings/openMicEvidence";
 import {
   isPublicListingRenderable,
@@ -63,6 +64,7 @@ export function listingMeetsPublicSeoIndexGate(listing: {
   verificationStatus: string;
   formattedAddress: string;
   city: string | null;
+  region?: string | null;
   schedules: Array<{
     title?: string | null;
     description?: string | null;
@@ -75,6 +77,16 @@ export function listingMeetsPublicSeoIndexGate(listing: {
 }): boolean {
   if (!isPublicListingRenderable(listing)) return false;
   if (!listingIsPubliclyIndexable(listing)) return false;
+  if (
+    listingHasGeoConflict({
+      region: listing.region ?? null,
+      city: listing.city,
+      formattedAddress: listing.formattedAddress,
+      name: listing.name,
+    })
+  ) {
+    return false;
+  }
   return evaluateOpenMicEvidence({
     listingName: listing.name,
     schedules: listing.schedules.map((s) => ({

@@ -245,6 +245,184 @@ export function evaluateFetchedEvidenceTrust(input: EvidenceTrustInput): Evidenc
   };
 }
 
+/**
+ * Distinct US metros used to catch title↔stored-city misassignment.
+ * Suburb/member names roll up to the same metro (Chicagoland suburbs stay with Chicago).
+ */
+const US_METRO_GEO: Array<{
+  metro: string;
+  city: string;
+  region: string;
+  members: string[];
+}> = [
+  {
+    metro: "chicago",
+    city: "Chicago",
+    region: "IL",
+    members: [
+      "chicago",
+      "chicagoland",
+      "evanston",
+      "oak park",
+      "naperville",
+      "aurora",
+      "joliet",
+      "schaumburg",
+      "skokie",
+      "cicero",
+      "waukegan",
+      "arlington heights",
+      "elgin",
+      "des plaines",
+      "berwyn",
+      "oak lawn",
+      "tinley park",
+      "orland park",
+      "downers grove",
+      "bolingbrook",
+      "palatine",
+      "mount prospect",
+      "lombard",
+      "elmhurst",
+      "buffalo grove",
+      "hoffman estates",
+      "wheaton",
+    ],
+  },
+  {
+    metro: "indianapolis",
+    city: "Indianapolis",
+    region: "IN",
+    members: ["indianapolis", "carmel", "fishers", "noblesville", "greenwood", "lawrence", "avon", "plainfield"],
+  },
+  {
+    metro: "milwaukee",
+    city: "Milwaukee",
+    region: "WI",
+    members: ["milwaukee", "waukesha", "west allis", "wauwatosa", "brookfield"],
+  },
+  {
+    metro: "detroit",
+    city: "Detroit",
+    region: "MI",
+    members: ["detroit", "dearborn", "warren", "sterling heights", "ann arbor", "royal oak", "ferndale"],
+  },
+  {
+    metro: "minneapolis",
+    city: "Minneapolis",
+    region: "MN",
+    members: ["minneapolis", "st paul", "saint paul", "bloomington", "duluth"],
+  },
+  {
+    metro: "st_louis",
+    city: "St. Louis",
+    region: "MO",
+    members: ["st louis", "saint louis"],
+  },
+  {
+    metro: "columbus_oh",
+    city: "Columbus",
+    region: "OH",
+    members: ["columbus"],
+  },
+  {
+    metro: "cincinnati",
+    city: "Cincinnati",
+    region: "OH",
+    members: ["cincinnati"],
+  },
+  {
+    metro: "louisville",
+    city: "Louisville",
+    region: "KY",
+    members: ["louisville"],
+  },
+  {
+    metro: "nashville",
+    city: "Nashville",
+    region: "TN",
+    members: ["nashville", "murfreesboro", "franklin"],
+  },
+  {
+    metro: "madison",
+    city: "Madison",
+    region: "WI",
+    members: ["madison"],
+  },
+  {
+    metro: "kansas_city",
+    city: "Kansas City",
+    region: "MO",
+    members: ["kansas city"],
+  },
+  {
+    metro: "grand_rapids",
+    city: "Grand Rapids",
+    region: "MI",
+    members: ["grand rapids"],
+  },
+];
+
+function normalizeGeoToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function metroForCityRegion(
+  city: string | null | undefined,
+  region: string | null | undefined,
+): { metro: string; city: string; region: string } | null {
+  const c = normalizeGeoToken(city || "");
+  if (!c) return null;
+  const r = (region || "").trim().toUpperCase();
+  for (const m of US_METRO_GEO) {
+    if (!m.members.some((mem) => c === mem || c.startsWith(`${mem} `) || c.endsWith(` ${mem}`))) {
+      continue;
+    }
+    // Columbus is ambiguous across states — require OH when region is present.
+    if (m.metro === "columbus_oh" && r && r !== "OH") continue;
+    if (r && r.length === 2 && r !== m.region) {
+      // Allow missing/wrong short labels only when the member is unique to this metro.
+      if (m.metro === "kansas_city" && (r === "KS" || r === "MO")) {
+        return { metro: m.metro, city: m.city, region: r };
+      }
+      continue;
+    }
+    return { metro: m.metro, city: m.city, region: m.region };
+  }
+  return null;
+}
+
+/**
+ * Pull an explicit "in City" / "City, ST" cue from a listing/event title.
+ * Used to avoid stamping the discovery-market city onto an out-of-market venue.
+ */
+export function inferExplicitCityFromListingTitle(
+  name: string | null | undefined,
+): { city: string; region: string; metro: string } | null {
+  const n = (name || "").trim();
+  if (!n) return null;
+
+  const ordered = [...US_METRO_GEO].sort(
+    (a, b) => Math.max(...b.members.map((m) => m.length)) - Math.max(...a.members.map((m) => m.length)),
+  );
+
+  for (const m of ordered) {
+    for (const mem of [...m.members].sort((a, b) => b.length - a.length)) {
+      const memRe = mem.replace(/\s+/g, "\\s+");
+      const inCity = new RegExp(`\\bin\\s+${memRe}\\b`, "i");
+      const cityState = new RegExp(`\\b${memRe}\\s*,\\s*${m.region}\\b`, "i");
+      if (inCity.test(n) || cityState.test(n)) {
+        return { city: m.city, region: m.region, metro: m.metro };
+      }
+    }
+  }
+  return null;
+}
+
 export function listingHasGeoConflict(input: {
   region: string | null | undefined;
   city: string | null | undefined;
@@ -256,6 +434,7 @@ export function listingHasGeoConflict(input: {
   const region = (input.region || "").toUpperCase();
   const market = (input.discoveryMarketSlug || "").toLowerCase();
   const saysGA = /\broswell\b/.test(blob) && (/\bga\b/.test(blob) || /georgia/.test(blob));
+  // Market slug still used for the Roswell GA vs Chicagoland IL false-positive case.
   const saysIL = region === "IL" || /chicago|illinois/.test(market);
   if (saysGA && saysIL) return true;
   // Generic: address names a different US state abbreviation than region field
@@ -263,6 +442,13 @@ export function listingHasGeoConflict(input: {
   if (region && stateInAddr && region.length === 2 && stateInAddr !== region) {
     // Ignore common false positives when address lacks real structure
     if (/[a-z]{4,}/.test(input.formattedAddress || "") && stateInAddr !== "US") return true;
+  }
+
+  // Title names a different metro than the stored city (e.g. "in Indianapolis" + Chicago).
+  const titleMetro = inferExplicitCityFromListingTitle(input.name);
+  const storedMetro = metroForCityRegion(input.city, input.region);
+  if (titleMetro && storedMetro && titleMetro.metro !== storedMetro.metro) {
+    return true;
   }
   return false;
 }

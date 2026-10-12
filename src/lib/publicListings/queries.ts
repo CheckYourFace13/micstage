@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 import { evaluateOpenMicEvidence } from "@/lib/publicListings/openMicEvidence";
 
@@ -69,6 +70,16 @@ export type PublicOpenMicListingPayload = Prisma.PublicOpenMicListingGetPayload<
 
 function listingPassesPublicOpenMicGate(l: PublicOpenMicListingPayload): boolean {
   if (!isPublicListingNameOk(l.name)) return false;
+  if (
+    listingHasGeoConflict({
+      region: l.region,
+      city: l.city,
+      formattedAddress: l.formattedAddress,
+      name: l.name,
+    })
+  ) {
+    return false;
+  }
   return evaluateOpenMicEvidence({
     listingName: l.name,
     schedules: l.schedules,

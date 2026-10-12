@@ -36,6 +36,7 @@ import {
 } from "@/lib/growth/discovery/webSearch";
 import { markSerpApiRunStarted, readSerpApiProviderState, serpApiAvailabilityNow } from "@/lib/growth/discovery/providerState";
 import { normalizeWebsiteHost } from "@/lib/growth/leadFieldNormalization";
+import { inferExplicitCityFromListingTitle } from "@/lib/publicListings/evidenceTrust";
 
 const ADAPTER_ID = "autonomous_web_search_venue";
 const CURSOR_KEY = "search_rotation";
@@ -553,12 +554,15 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             directoryPagesRejectedAsEntity++;
             for (const cand of extraction.candidates.slice(0, MAX_VENUES_PER_DIRECTORY_PAGE)) {
               venueCandidatesExtracted++;
+              const titleGeo = inferExplicitCityFromListingTitle(cand.name);
+              const candCity = cand.city ?? titleGeo?.city ?? geo.city;
+              const candRegion = cand.region ?? titleGeo?.region ?? geo.region;
               const resolution = await resolveVenueCandidateWithPlaces(
                 prisma,
                 {
                   name: cand.name,
-                  city: cand.city ?? geo.city,
-                  region: cand.region ?? geo.region,
+                  city: candCity,
+                  region: candRegion,
                   streetAddress: cand.streetAddress,
                   websiteUrl: cand.websiteUrl,
                 },
@@ -576,8 +580,8 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
                 leadType: "VENUE",
                 name: cand.name,
                 websiteUrl: venueSite,
-                city: cand.city ?? geo.city,
-                region: cand.region ?? geo.region,
+                city: candCity,
+                region: candRegion,
                 discoveryMarketSlug: geo.discoveryMarketSlug,
                 source: `${ADAPTER_ID}_directory_extraction`,
                 sourceKind: "WEBSITE_CONTACT",
@@ -615,12 +619,15 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
           }
           venueCandidatesExtracted++;
 
+          const titleGeo = inferExplicitCityFromListingTitle(self.name);
+          const selfCity = self.city ?? titleGeo?.city ?? geo.city;
+          const selfRegion = self.region ?? titleGeo?.region ?? geo.region;
           const selfResolution = await resolveVenueCandidateWithPlaces(
             prisma,
             {
               name: self.name,
-              city: self.city ?? geo.city,
-              region: self.region ?? geo.region,
+              city: selfCity,
+              region: selfRegion,
               streetAddress: self.streetAddress,
               websiteUrl: pageUrl,
             },
@@ -647,8 +654,10 @@ export function createAutonomousVenueWebSearchAdapter(): GrowthLeadSourceAdapter
             youtubeUrl: yt,
             tiktokUrl: tt,
             facebookUrl: fb,
-            city: geo.city,
-            region: geo.region,
+            // Prefer page/title geography over the search-market city so nationwide
+            // hits (e.g. Indianapolis on a Chicago query) are not stamped wrong.
+            city: selfCity,
+            region: selfRegion,
             discoveryMarketSlug: geo.discoveryMarketSlug,
             source: `${ADAPTER_ID}_crawl`,
             sourceKind: "WEBSITE_CONTACT",

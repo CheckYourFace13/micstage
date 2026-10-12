@@ -605,6 +605,58 @@ check("curated and imported venues are exempt from the place gate", () => {
   assert.notEqual(res.reason, "place_unverified");
 });
 
+// ---------------------------------------------------------------------------
+// Title metro vs stored city (wrong-market stamp from discovery search geo)
+// ---------------------------------------------------------------------------
+const {
+  listingHasGeoConflict,
+  inferExplicitCityFromListingTitle,
+} = await import("../src/lib/publicListings/evidenceTrust.ts");
+
+check("infers Indianapolis from explicit in-City title", () => {
+  const g = inferExplicitCityFromListingTitle("Acoustic Open Mic in Indianapolis at Irving Theater");
+  assert.equal(g?.city, "Indianapolis");
+  assert.equal(g?.region, "IN");
+});
+
+check("title Indianapolis + stored Chicago is a geo conflict", () => {
+  assert.equal(
+    listingHasGeoConflict({
+      name: "Acoustic Open Mic in Indianapolis at Irving Theater",
+      city: "Chicago",
+      region: "IL",
+      formattedAddress: "Acoustic Open Mic in Indianapolis at Irving Theater, Chicago, IL",
+      discoveryMarketSlug: "chicagoland-il",
+    }),
+    true,
+  );
+});
+
+check("Chicagoland suburb title with Chicago city is not a conflict", () => {
+  assert.equal(
+    listingHasGeoConflict({
+      name: "Open Mic in Evanston at The Spot",
+      city: "Chicago",
+      region: "IL",
+      formattedAddress: "The Spot, Evanston, IL",
+      discoveryMarketSlug: "chicagoland-il",
+    }),
+    false,
+  );
+});
+
+check("matching title and city metros are not a conflict", () => {
+  assert.equal(
+    listingHasGeoConflict({
+      name: "Acoustic Open Mic in Indianapolis at Irving Theater",
+      city: "Indianapolis",
+      region: "IN",
+      formattedAddress: "Irving Theater, Indianapolis, IN",
+    }),
+    false,
+  );
+});
+
 if (failures.length) {
   console.error(`Discovery quality self-check FAILED (${failures.length}):\n` + failures.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);

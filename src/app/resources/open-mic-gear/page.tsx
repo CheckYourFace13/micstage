@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { AmazonAffiliateLink } from "@/components/resources/AmazonAffiliateLink";
 import { MusicStandAffiliateLink } from "@/components/resources/MusicStandAffiliateLink";
 import { openMicGearByAudience, type OpenMicGearItem } from "@/lib/amazonAssociates";
+import { micstageGearStoreLink } from "@/lib/cjAffiliate";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
@@ -37,6 +38,9 @@ function GearList({ items }: { items: OpenMicGearItem[] }) {
 export default function OpenMicGearPage() {
   const performers = openMicGearByAudience("performers");
   const hosts = openMicGearByAudience("hosts");
+  const aliExpress = micstageGearStoreLink(
+    "dynamic vocal microphone mic stand xlr portable pa audio mixer powered speaker",
+  );
 
   const breadcrumbLd = {
     "@context": "https://schema.org",
@@ -81,7 +85,7 @@ export default function OpenMicGearPage() {
         >
           <p>
             Affiliate disclosure: MicStage may earn a commission from qualifying purchases
-            through Amazon Associates and Awin partner links on this page.
+            through Amazon Associates, Awin, and one CJ Affiliate store link on this page.
           </p>
           <p className="mt-2 text-amber-50/75">
             As an Amazon Associate I earn from qualifying purchases.
@@ -118,6 +122,20 @@ export default function OpenMicGearPage() {
             </MusicStandAffiliateLink>
             .
           </p>
+          {aliExpress ? (
+            <p className="mt-4">
+              Amazon search remains the link for each category above.{" "}
+              <a
+                href={aliExpress}
+                target="_blank"
+                rel="sponsored nofollow noopener noreferrer"
+                className="font-medium text-[rgb(var(--om-neon))] underline underline-offset-2 hover:brightness-110"
+              >
+                AliExpress
+              </a>{" "}
+              is an optional general store for the same kinds of stage gear. It is not a tested microphone or a rank.
+            </p>
+          ) : null}
         </section>
 
         <section className="mt-8 text-sm text-white/60">

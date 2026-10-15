@@ -1,3 +1,4 @@
+import { applyManagedMetadata } from "@/lib/gravyblock-managed";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { HomeDiscoveryPanel } from "@/components/home/HomeDiscoveryPanel";
@@ -5,7 +6,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 
 const homeTitle = "Find open mics near you | MicStage";
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
@@ -15,6 +16,10 @@ export const metadata: Metadata = {
   title: { absolute: homeTitle },
 };
 
+
+export async function generateMetadata() {
+  return applyManagedMetadata("/", baseMetadata);
+}
 export default function Home() {
   return (
     <div className="relative min-h-dvh overflow-hidden bg-black text-white">

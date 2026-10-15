@@ -250,6 +250,10 @@ assert.match(openMicsIndex, /permanentRedirect\("\/find-open-mics"\)/);
 const blogIndex = fs.readFileSync(path.join(process.cwd(), "src/app/blog/page.tsx"), "utf8");
 assert.match(blogIndex, /permanentRedirect\("\/resources"\)/);
 
+assert.ok(fs.existsSync(path.join(process.cwd(), "src/app/chicago/page.tsx")));
+const chicagoAlias = fs.readFileSync(path.join(process.cwd(), "src/app/chicago/page.tsx"), "utf8");
+assert.match(chicagoAlias, /permanentRedirect\("\/locations\/chicago-il\/open-mics"\)/);
+
 const mw = fs.readFileSync(path.join(process.cwd(), "src/middleware.ts"), "utf8");
 assert.match(mw, /www\.micstage\.com/);
 assert.match(mw, /micstage\.com/);

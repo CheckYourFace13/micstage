@@ -43,8 +43,9 @@ const AFFILIATE_MARKERS = [
   { name: "MusicStandAffiliateLink", re: /\bMusicStandAffiliateLink\b/ },
   { name: "awinAffiliate_import", re: /@\/lib\/awinAffiliate|from ["'].*awinAffiliate["']/ },
   { name: "music_stand_cta", re: /Browse popular music gifts and accessories at The Music Stand/i },
-  { name: "cj_click_url", re: /dpbolvw\.net\/click-/i },
+  { name: "cj_click_url", re: /(?:anrdoezrs|dpbolvw|jdoqocy|tkqlhce)\.net\/click-|(?:anrdoezrs|dpbolvw|jdoqocy|tkqlhce)\.com\/click-/i },
   { name: "cjAffiliate_import", re: /@\/lib\/cjAffiliate|from ["'].*cjAffiliate["']/ },
+  { name: "aliexpress_cta", re: /\bAliExpress\b/ },
   { name: "themusicstand_domain", re: /themusicstand\.com/i },
 ];
 
@@ -109,7 +110,7 @@ for (const item of OPEN_MIC_GEAR_ITEMS) {
 const page = read("src/app/resources/open-mic-gear/page.tsx");
 assert.match(
   page,
-  /Affiliate disclosure: MicStage may earn a commission from qualifying purchases\s+through Amazon Associates, Awin, and one CJ Affiliate store link on this page\./,
+  /Affiliate disclosure: MicStage may earn a commission from qualifying purchases\s+through Amazon Associates and Awin partner links on this page\./,
 );
 assert.match(page, /As an Amazon Associate I earn from qualifying purchases\./);
 assert.match(page, /AmazonAffiliateLink/);
@@ -120,18 +121,22 @@ assert.equal(
   1,
   "exactly one Music Stand JSX placement",
 );
-assert.match(page, /micstageGearStoreLink/);
-assert.doesNotMatch(page, /click-101802777-/);
-assert.match(page, /rel="sponsored nofollow noopener noreferrer"/);
-assert.doesNotMatch(page, /legendz/i);
+assert.doesNotMatch(page, /micstageGearStoreLink|micstageMusicGearCjLink|cjAffiliate|AliExpress|click-101/i);
+assert.doesNotMatch(page, /legendz|BLUETTI|ALLPOWERS/i);
 const cjLib = read("src/lib/cjAffiliate.ts");
-assert.match(cjLib, /click-101904046-/);
+assert.match(cjLib, /MICSTAGE_CJ_PID = "101904046"/);
+assert.match(cjLib, /micstageMusicGearCjLink/);
+assert.doesNotMatch(cjLib, /click-101904046-/);
 assert.doesNotMatch(cjLib, /click-101802777-/);
-assert.doesNotMatch(cjLib, /legendz/i);
+assert.doesNotMatch(cjLib, /legendz|click-\d+-\d+/i);
+assert.match(cjLib, /return null/);
 assert.doesNotMatch(page, /images-na\.ssl-images-amazon|media-amazon\.com|<img[\s\S]*awin|<img[\s\S]*music.?stand/i);
 assert.doesNotMatch(page, /Tracking ID used on Amazon/i);
 assert.doesNotMatch(page, /\bmicstage-20\b/, "tracking ID must not be visible copy on the resource page");
 assert.doesNotMatch(page, /AMAZON_ASSOCIATES_TRACKING_ID/);
+
+const chicagoAlias = read("src/app/chicago/page.tsx");
+assert.match(chicagoAlias, /permanentRedirect\("\/locations\/chicago-il\/open-mics"\)/);
 
 const linkComponent = read("src/components/resources/AmazonAffiliateLink.tsx");
 assert.match(linkComponent, /affiliate_click/);

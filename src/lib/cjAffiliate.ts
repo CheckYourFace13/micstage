@@ -1,9 +1,20 @@
 /**
- * MicStage-only CJ link. The click path is the promotional property 101904046.
- * Do not copy a click URL from another website.
+ * MicStage CJ Affiliate helpers.
+ *
+ * Portfolio CJ account CID 7990498; MicStage promotional property PID 101904046.
+ * Click paths must carry this PID only — never copy a click URL from DrinkKnird,
+ * LeaguePour, or another sibling site (e.g. 101904023 / 101802777).
+ *
+ * Credentials (CJ personal access token) stay server-side / local config for
+ * Link Search scripts. Do not embed tokens in the app or client bundle.
+ *
+ * Strongly relevant merchants for MicStage: music gear / mics / instruments / PA.
+ * Heil Sound (7036312) is relevant but was relationship=notjoined as of the last
+ * Link Search check — no clickUrl until joined. General marketplaces are joined
+ * on this property but are not a music-specialty fit; do not promote them here.
  */
 
-const MICSTAGE_PID = "101904046";
+export const MICSTAGE_CJ_PID = "101904046";
 
 const CJ_HOSTS = new Set([
   "anrdoezrs.net",
@@ -20,20 +31,10 @@ const CJ_HOSTS = new Set([
   "awltovhc.com",
 ]);
 
-/** AliExpress homepage text link returned by CJ Link Search for this property. */
-const ALIEXPRESS_GEAR_CLICK_URL =
-  "https://www.dpbolvw.net/click-101904046-17242061-1773390959000";
+const FOREIGN_PIDS = ["101802777", "101904023", "101904040", "101904044"] as const;
 
-const GEAR_KEYWORDS = [
-  "microphone",
-  "mic stand",
-  "portable pa",
-  "powered speaker",
-  "audio mixer",
-  "xlr",
-];
-
-function validMicstageClick(raw: string): boolean {
+/** True when URL is a CJ click/links path for the MicStage PID only. */
+export function isValidMicstageCjClick(raw: string): boolean {
   let url: URL;
   try {
     url = new URL(raw);
@@ -43,14 +44,15 @@ function validMicstageClick(raw: string): boolean {
   const host = url.hostname.replace(/^www\./, "").toLowerCase();
   if (!CJ_HOSTS.has(host)) return false;
   if (!url.pathname.includes("/click-") && !url.pathname.includes("/links/")) return false;
-  if (!url.pathname.includes(MICSTAGE_PID)) return false;
-  if (url.pathname.includes("101802777")) return false;
+  if (!url.pathname.includes(MICSTAGE_CJ_PID)) return false;
+  if (FOREIGN_PIDS.some((pid) => url.pathname.includes(pid))) return false;
   return true;
 }
 
-/** One optional general-store link for a gear page. Null unless the page is about stage equipment. */
-export function micstageGearStoreLink(text: string): string | null {
-  const haystack = text.toLowerCase();
-  if (!GEAR_KEYWORDS.some((keyword) => haystack.includes(keyword))) return null;
-  return validMicstageClick(ALIEXPRESS_GEAR_CLICK_URL) ? ALIEXPRESS_GEAR_CLICK_URL : null;
+/**
+ * Reserved for a future music-specialty CJ text link (e.g. Heil Sound once joined).
+ * Returns null until a MicStage-PID click URL is explicitly approved in code.
+ */
+export function micstageMusicGearCjLink(): string | null {
+  return null;
 }

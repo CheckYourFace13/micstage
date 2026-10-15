@@ -1,3 +1,4 @@
+import { getManagedFeed } from "@/lib/gravyblock-managed";
 import type { MetadataRoute } from "next";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { computeCitySlugVenueCounts, primaryDiscoverySlugForVenue } from "@/lib/discoveryMarket";
@@ -11,7 +12,7 @@ import { loadOpenMicFinderVenues } from "@/lib/publicListings/discoveryMerge";
 
 export const dynamic = "force-dynamic";
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteOrigin();
   // Prefer a deploy-stable stamp; do not invent a fresh timestamp on every request.
   const staticLastModified = process.env.VERCEL_GIT_COMMIT_DATE
@@ -208,4 +209,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   } catch {
     return [...staticEntries, ...resourceEntries, ...marketingSitemapSupplements()];
   }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const base = await baseSitemap();
+  const origin = siteOrigin();
+  const items = (await getManagedFeed())?.items ?? [];
+  if (items.length === 0) return base;
+  return [...base, { url: `${origin}/insights`, changeFrequency: "weekly" as const, priority: 0.5 }, ...items.map((i) => ({ url: `${origin}/insights/${i.slug}`, lastModified: new Date(i.publishedAt), changeFrequency: "monthly" as const, priority: 0.5 }))];
 }

@@ -66,3 +66,10 @@ export async function applyManagedMetadata(path: string, base: Metadata): Promis
   }
   return out;
 }
+
+/** Signed JSON-LD override for a path, or null. Rendered by <ManagedJsonLd/>. */
+export async function getManagedJsonLd(path: string): Promise<Record<string, unknown> | null> {
+  const feed = await getManagedFeed();
+  const ld = feed?.overrides.find((o) => o.path === path)?.jsonLd;
+  return ld && typeof ld === "object" ? ld : null;
+}

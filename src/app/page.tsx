@@ -1,5 +1,3 @@
-import { ManagedJsonLd } from "@/lib/gravyblock-jsonld";
-import { applyManagedMetadata } from "@/lib/gravyblock-managed";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { HomeDiscoveryPanel } from "@/components/home/HomeDiscoveryPanel";
@@ -7,7 +5,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 
 const homeTitle = "Find open mics near you | MicStage";
 
-const baseMetadata: Metadata = {
+export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
@@ -17,17 +15,9 @@ const baseMetadata: Metadata = {
   title: { absolute: homeTitle },
 };
 
-
-// Re-render periodically so approved metadata overrides reach the live page.
-export const revalidate = 300;
-
-export async function generateMetadata() {
-  return applyManagedMetadata("/", baseMetadata);
-}
 export default function Home() {
   return (
     <div className="relative min-h-dvh overflow-hidden bg-black text-white">
-      <ManagedJsonLd path="/" />
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(255,45,149,0.32),rgba(0,0,0,0)_60%)] blur-2xl" />
         <div className="absolute -bottom-56 -left-40 h-[680px] w-[680px] rounded-full bg-[radial-gradient(circle_at_center,rgba(255,45,149,0.12),rgba(0,0,0,0)_60%)] blur-2xl" />

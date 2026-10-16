@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { BrandPeriod } from "@/components/BrandPeriod";
 import { ADMIN_LOGOUT_PATH } from "@/lib/adminEdge";
 import { getAuthUiState } from "@/lib/authUiState";
 import { LogoutVenueArtistButton } from "@/components/LogoutVenueArtistButton";
@@ -44,10 +43,7 @@ export async function SiteHeader() {
           className="group flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:gap-x-3 lg:flex-1"
         >
           <span className="flex shrink-0 items-center gap-2">
-            <span className="om-heading text-xl tracking-wide text-white sm:text-2xl">
-              MicStage
-              <BrandPeriod />
-            </span>
+            <span className="om-heading text-xl tracking-wide text-white sm:text-2xl">MicStage</span>
           </span>
           <span className="min-w-0 truncate text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 sm:text-[11px]">
             Open mics near you

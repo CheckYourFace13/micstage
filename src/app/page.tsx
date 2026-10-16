@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BrandPeriod } from "@/components/BrandPeriod";
 import { HomeDiscoveryPanel } from "@/components/home/HomeDiscoveryPanel";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
@@ -35,8 +34,7 @@ export default function Home() {
             <h1 className="om-heading mt-4 text-4xl leading-[0.95] tracking-wide sm:text-5xl md:text-6xl">
               Find it. Run it.
               <br />
-              Perform. Free
-              <BrandPeriod />
+              Perform. Free.
             </h1>
             <p className="mt-4 max-w-xl text-sm text-white/70 md:text-base">
               Discover real open mics near you, manage the schedule, organize performer signups, share your lineup, and keep

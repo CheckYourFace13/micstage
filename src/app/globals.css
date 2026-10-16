@@ -11,7 +11,6 @@ body {
 }
 
 :root {
-  --iscream-signature: #ff4d8d;
   --om-neon: 255 45 149;
   --om-purple: 123 97 255;
   --om-cyan: 34 211 238;
@@ -92,6 +91,3 @@ input[type="radio"]:focus-visible {
   font-weight: 700;
 }
 
-
-
-.brand-period { color: var(--iscream-signature, #ff4d8d); font-weight: inherit; }

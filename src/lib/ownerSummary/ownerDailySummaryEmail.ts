@@ -545,8 +545,8 @@ function ownerAttentionFromSummary(data: OwnerDailySummaryData) {
     inviteReady: data.growthFunnel.inviteReady,
     claimInvitesSentToday: data.listingsInventory.claimInvitesSentCount,
     unclaimedVerified: data.listingsInventory.unclaimedListings,
-    indexableScheduledListings: -1,
-    schedulesAutoConfirmedToday: -1,
+    indexableScheduledListings: data.listingsInventory.indexableScheduledListings,
+    schedulesAutoConfirmedToday: data.listingsInventory.schedulesAutoConfirmedToday,
     lastTickAgeHours: null,
   });
 }

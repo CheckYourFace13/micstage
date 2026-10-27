@@ -26,7 +26,7 @@ export type OpenMicMapTemplateDto = {
   title: string;
   weekday: Weekday;
   startTimeMin: number;
-  endTimeMin: number;
+  endTimeMin: number | null;
   performanceFormat: VenuePerformanceFormat;
   bookingRestrictionMode: string;
 };

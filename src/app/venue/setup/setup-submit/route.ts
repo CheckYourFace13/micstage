@@ -168,6 +168,7 @@ export async function POST(request: Request) {
           });
 
           for (const sched of listing.schedules) {
+            if (sched.endTimeMin == null) continue;
             const existing = await tx.eventTemplate.findFirst({
               where: {
                 venueId: created.id,

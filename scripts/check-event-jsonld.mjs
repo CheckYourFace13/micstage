@@ -100,6 +100,23 @@ assert.equal(
   0,
 );
 
+// Unknown end → Event without endDate
+const startOnly = buildListingEventJsonLd({
+  listingName: "Start only room",
+  url: "https://micstage.com/open-mics/start-only",
+  occurrences: [{ startDate: "2026-11-03T20:00:00.000Z", endDate: null }],
+});
+assert.equal(startOnly.length, 1);
+assert.equal("endDate" in startOnly[0], false);
+
+const nightStartOnly = buildVenueNightEventJsonLd({
+  venueName: "Start only venue",
+  url: "https://micstage.com/venues/x/lineup/2026-10-14",
+  nights: [{ eventName: "Open mic", start, end: null }],
+});
+assert.equal(nightStartOnly.length, 1);
+assert.equal("endDate" in nightStartOnly[0], false);
+
 // Empty nights / invalid start → no Event
 assert.equal(
   buildVenueNightEventJsonLd({

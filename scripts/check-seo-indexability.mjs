@@ -24,7 +24,12 @@ import {
 } from "../src/lib/publicListings/listingAboutFromLead.ts";
 import { shouldIndexDiscoveryPage } from "../src/lib/seo/discoveryIndex.ts";
 import { parseExplicitScheduleFromText } from "../src/lib/publicListings/explicitScheduleParse.ts";
+import {
+  explicitScheduleEndTimeMin,
+  resolveTrustedListingTimeZone,
+} from "../src/lib/publicListings/listingScheduleEnrichment.ts";
 import { buildOwnerAttentionItems } from "../src/lib/ownerSummary/ownerAttention.ts";
+import { scheduleWindowLabel } from "../src/lib/scheduleWindow.ts";
 import { buildPublicMetadata } from "../src/lib/publicSeo.ts";
 import fs from "node:fs";
 import path from "node:path";
@@ -283,8 +288,63 @@ const parsedSched = parseExplicitScheduleFromText("Open mic every Wednesday at 8
 assert.equal(parsedSched?.weekday, "WED");
 assert.equal(parsedSched?.startTimeMin, 20 * 60);
 assert.equal(parsedSched?.endTimeMin, null);
+assert.equal(explicitScheduleEndTimeMin(parsedSched), null);
+assert.equal(scheduleWindowLabel(parsedSched.startTimeMin, explicitScheduleEndTimeMin(parsedSched)), "8:00 PM");
 assert.ok(parsedSched?.signupMethod);
 assert.equal(parseExplicitScheduleFromText("Live music on weekends"), null);
+const parsedWithEnd = parseExplicitScheduleFromText("Open mic every Friday from 8:00 pm to 10:00 pm");
+assert.equal(explicitScheduleEndTimeMin(parsedWithEnd), 22 * 60);
+
+assert.equal(
+  resolveTrustedListingTimeZone({ timeZone: "America/Chicago", lat: 47.6062, lng: -122.3321 }),
+  "America/Los_Angeles",
+);
+assert.equal(resolveTrustedListingTimeZone({ timeZone: "America/Chicago", lat: null, lng: null }), null);
+assert.equal(resolveTrustedListingTimeZone({ timeZone: "", lat: null, lng: null }), null);
+assert.equal(
+  resolveTrustedListingTimeZone({ timeZone: "America/New_York", lat: null, lng: null }),
+  "America/New_York",
+);
+assert.equal(
+  resolveTrustedListingTimeZone({ timeZone: "America/Chicago", lat: 41.8781, lng: -87.6298 }),
+  "America/Chicago",
+);
+
+const enrichSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/publicListings/listingScheduleEnrichment.ts"), "utf8");
+assert.doesNotMatch(enrichSrc, /PLACEHOLDER_END_MIN/);
+assert.doesNotMatch(enrichSrc, /timeZone:\s*row\.timeZone\s*\|\|\s*"America\/Chicago"/);
+assert.doesNotMatch(enrichSrc, /startTimeMin\s*\+\s*90/);
+
+const summarySrc = fs.readFileSync(path.join(process.cwd(), "src/lib/ownerSummary/ownerDailySummaryEmail.ts"), "utf8");
+assert.doesNotMatch(summarySrc, /indexableScheduledListings:\s*-1/);
+assert.doesNotMatch(summarySrc, /schedulesAutoConfirmedToday:\s*-1/);
+assert.match(summarySrc, /indexableScheduledListings:\s*data\.listingsInventory\.indexableScheduledListings/);
+assert.match(summarySrc, /schedulesAutoConfirmedToday:\s*data\.listingsInventory\.schedulesAutoConfirmedToday/);
+const builderSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/ownerSummary/buildOwnerDailySummary.ts"), "utf8");
+assert.match(builderSrc, /indexableScheduledListings/);
+assert.match(builderSrc, /schedulesAutoConfirmedToday/);
+assert.match(builderSrc, /sourceUrl:\s*\{\s*not:\s*null\s*\}/);
+
+const scheduleFailed = buildOwnerAttentionItems({
+  outreachEnabled: true,
+  killSwitch: false,
+  emailsSentToday: 24,
+  dailyCap: 50,
+  providerHeadroom: 26,
+  bounceRate: 0,
+  complaintRate: 0,
+  autoSendReady: 10,
+  leadsCreatedToday: 3,
+  needsReviewCount: 10,
+  autoVerifiedToday: 2,
+  inviteReady: 4,
+  claimInvitesSentToday: 1,
+  unclaimedVerified: 20,
+  indexableScheduledListings: 0,
+  schedulesAutoConfirmedToday: 0,
+  lastTickAgeHours: 0.2,
+});
+assert.ok(scheduleFailed.some((i) => i.code === "schedule_enrichment"));
 
 const attentionNone = buildOwnerAttentionItems({
   outreachEnabled: true,

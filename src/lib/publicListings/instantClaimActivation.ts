@@ -374,6 +374,7 @@ export async function submitInstantClaim(
 
     // Import schedules as draft EventTemplates — not public, not bookable.
     for (const sched of locked.schedules) {
+      if (sched.endTimeMin == null) continue;
       const existing = await tx.eventTemplate.findFirst({
         where: {
           venueId: venue.id,

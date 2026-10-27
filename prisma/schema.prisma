@@ -1735,7 +1735,8 @@ model PublicOpenMicSchedule {
 
   weekday       Weekday
   startTimeMin  Int
-  endTimeMin    Int
+  /** Null when the official source did not state an end. Never invent a duration. */
+  endTimeMin    Int?
   timeZone      String
   title         String?
   description   String? @db.Text

@@ -52,12 +52,13 @@ function parseTimeInput(value: string | null | undefined): number | null {
   return hh * 60 + mm;
 }
 
-/** `9:00 PM – 1:00 AM (next day)` — one label for dashboards and public pages. */
+/** `9:00 PM – 1:00 AM (next day)` — start only when the real end is unknown. */
 export function scheduleWindowLabel(
   startTimeMin: number,
-  endTimeMin: number,
+  endTimeMin: number | null | undefined,
   opts?: { nextDaySuffix?: string },
 ): string {
+  if (endTimeMin == null) return minutesToTimeLabel(startTimeMin);
   const range = `${minutesToTimeLabel(startTimeMin)} – ${minutesToTimeLabel(endTimeMin)}`;
   if (!scheduleEndsNextDay(endTimeMin)) return range;
   return `${range} ${opts?.nextDaySuffix ?? "(next day)"}`;

@@ -4,6 +4,7 @@
  */
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import fs from "node:fs";
 
 process.env.MARKETING_CLICK_SECRET = "test-click-secret";
 process.env.MARKETING_UNSUBSCRIBE_SECRET = "test-unsub-secret";
@@ -1045,6 +1046,16 @@ assert.equal(stuckRamp.ramp, false);
 assert.equal(stuckRamp.reason, "hold_insufficient_sends");
 assert.ok((stuckRamp.recommendedSendsPerCron ?? 0) >= 2);
 assert.equal(blockedSecurityRamp.nextDailyMax, 25);
+
+const { originalOutreachAllowsFollowUp } = await import("../src/lib/growth/growthFollowUpAutomation.ts");
+assert.equal(originalOutreachAllowsFollowUp(null), false);
+assert.equal(originalOutreachAllowsFollowUp({ deliveredAt: null }), false);
+assert.equal(originalOutreachAllowsFollowUp({ deliveredAt: new Date(), bouncedAt: new Date() }), false);
+assert.equal(originalOutreachAllowsFollowUp({ deliveredAt: new Date(), complainedAt: new Date() }), false);
+assert.equal(originalOutreachAllowsFollowUp({ deliveredAt: new Date(), bouncedAt: null, complainedAt: null }), true);
+const followSrc = fs.readFileSync(new URL("../src/lib/growth/growthFollowUpAutomation.ts", import.meta.url), "utf8");
+assert.match(followSrc, /deliveredAt:\s*\{\s*not:\s*null\s*\}/);
+assert.match(followSrc, /originalOutreachAllowsFollowUp/);
 
 const { clampOutreachDailyMaxForRlsGate } = await import("../src/lib/database/databaseRlsSecurity.ts");
 assert.equal(clampOutreachDailyMaxForRlsGate(50, false), 25);

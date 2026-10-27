@@ -94,6 +94,8 @@ export type OwnerDailySummaryData = {
     googleVerifiedListings: number;
     listingsNote: string;
     needsReviewCount: number;
+    indexableScheduledListings: number;
+    schedulesAutoConfirmedToday: number;
   };
   /** Compact funnel + automation counters for ops email (not the full review dump). */
   growthFunnel: {
@@ -442,6 +444,8 @@ export async function buildOwnerDailySummary(
     autoRejectedToday,
     highContactsRecoveredToday,
     reviewReasonSample,
+    indexableScheduledListings,
+    schedulesAutoConfirmedToday,
   ] = await Promise.all([
     loadDiscoveryInventoryStats(prisma),
     countPendingListingClaimInvitesWithEmail(prisma),
@@ -606,6 +610,21 @@ export async function buildOwnerDailySummary(
         evidenceTerminalReason: true,
       },
       take: 500,
+    }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        removedAt: null,
+        verificationStatus: "VERIFIED",
+        OR: [{ formattedAddress: { not: "" } }, { city: { not: null } }],
+        schedules: { some: { isActive: true } },
+      },
+    }),
+    prisma.publicOpenMicSchedule.count({
+      where: {
+        isActive: true,
+        sourceUrl: { not: null },
+        lastVerifiedAt: { gte: startUtc, lt: endUtc },
+      },
     }),
   ]);
 
@@ -784,6 +803,8 @@ export async function buildOwnerDailySummary(
       googleVerifiedListings,
       listingsNote,
       needsReviewCount,
+      indexableScheduledListings,
+      schedulesAutoConfirmedToday,
     },
     growthFunnel: {
       waitingEnrichment,

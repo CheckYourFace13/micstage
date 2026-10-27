@@ -1,9 +1,8 @@
 /**
  * Confirm weekday/time on VERIFIED unscheduled listings from official sources only.
- * Never invents a schedule. End time is stored only when the source states it;
- * otherwise a 90-minute placeholder window is used solely because the schema
- * requires endTimeMin (description records that the end was not stated).
+ * Never invents a schedule, end time, or timezone.
  */
+import tzLookup from "tz-lookup";
 import type { PrismaClient, Weekday } from "@/generated/prisma/client";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
 import { evaluateFetchedEvidenceTrust, isNonVenueEvidenceHost } from "@/lib/publicListings/evidenceTrust";
@@ -15,7 +14,6 @@ import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { resolveScheduleEndMin } from "@/lib/scheduleWindow";
 
 const PAGE_TIMEOUT_MS = 8_000;
-const PLACEHOLDER_END_MIN = 90;
 
 export type ScheduleEnrichResult = {
   scanned: number;
@@ -50,6 +48,39 @@ function officialEnough(listingHost: string | null, pageUrl: string): boolean {
   return pageHost === listingHost || pageHost.endsWith(`.${listingHost}`) || listingHost.endsWith(`.${pageHost}`);
 }
 
+/**
+ * Timezone from stored geography (tz-lookup on lat/lng).
+ * Listing.timeZone defaults to America/Chicago for every row — that is not geography.
+ * A non-default stored IANA zone is treated as previously resolved.
+ * Returns null when the zone cannot be determined; caller must not activate.
+ */
+export function resolveTrustedListingTimeZone(listing: {
+  timeZone?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}): string | null {
+  if (listing.lat != null && listing.lng != null && Number.isFinite(listing.lat) && Number.isFinite(listing.lng)) {
+    try {
+      const zone = tzLookup(listing.lat, listing.lng);
+      if (typeof zone === "string" && zone.includes("/")) return zone;
+    } catch {
+      /* do not guess */
+    }
+  }
+  const stored = listing.timeZone?.trim() ?? "";
+  if (stored.includes("/") && stored !== "America/Chicago") return stored;
+  return null;
+}
+
+/** Stated end only. Midnight wrap when the source gave a real end at/before start. */
+export function explicitScheduleEndTimeMin(parsed: {
+  startTimeMin: number;
+  endTimeMin: number | null;
+}): number | null {
+  if (parsed.endTimeMin == null) return null;
+  return resolveScheduleEndMin(parsed.startTimeMin, parsed.endTimeMin);
+}
+
 export async function enrichVerifiedListingSchedules(
   prisma: PrismaClient,
   opts?: { limit?: number },
@@ -72,6 +103,8 @@ export async function enrichVerifiedListingSchedules(
       websiteUrl: true,
       sourceUrl: true,
       timeZone: true,
+      lat: true,
+      lng: true,
       signupMethod: true,
       growthLead: { select: { websiteUrl: true } },
     },
@@ -87,6 +120,11 @@ export async function enrichVerifiedListingSchedules(
     const site = row.websiteUrl || row.growthLead?.websiteUrl || row.sourceUrl;
     const listingHost = hostFromUrl(site);
     if (!site || !listingHost) {
+      skipped += 1;
+      continue;
+    }
+    const timeZone = resolveTrustedListingTimeZone(row);
+    if (!timeZone) {
       skipped += 1;
       continue;
     }
@@ -126,8 +164,7 @@ export async function enrichVerifiedListingSchedules(
       continue;
     }
 
-    const endRaw = parsed.endTimeMin ?? parsed.startTimeMin + PLACEHOLDER_END_MIN;
-    const endTimeMin = resolveScheduleEndMin(parsed.startTimeMin, endRaw);
+    const endTimeMin = explicitScheduleEndTimeMin(parsed);
     const now = new Date();
     const weekday = parsed.weekday as Weekday;
     const existing = await prisma.publicOpenMicSchedule.findFirst({
@@ -144,6 +181,7 @@ export async function enrichVerifiedListingSchedules(
         data: {
           startTimeMin: parsed.startTimeMin,
           endTimeMin,
+          timeZone,
           signupMethod: parsed.signupMethod || row.signupMethod,
           isActive: true,
           lastVerifiedAt: now,
@@ -158,7 +196,7 @@ export async function enrichVerifiedListingSchedules(
           weekday,
           startTimeMin: parsed.startTimeMin,
           endTimeMin,
-          timeZone: row.timeZone || "America/Chicago",
+          timeZone,
           signupMethod: parsed.signupMethod || row.signupMethod,
           isActive: true,
           lastVerifiedAt: now,

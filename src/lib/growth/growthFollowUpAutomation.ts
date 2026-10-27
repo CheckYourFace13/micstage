@@ -18,6 +18,18 @@ export type GrowthFollowUpResult = {
   skipped: number;
 };
 
+/** Follow-up only after confirmed delivery. Sent-without-deliveredAt is not enough. */
+export function originalOutreachAllowsFollowUp(send: {
+  deliveredAt: Date | null;
+  bouncedAt?: Date | null;
+  complainedAt?: Date | null;
+} | null): boolean {
+  if (!send?.deliveredAt) return false;
+  if (send.bouncedAt) return false;
+  if (send.complainedAt) return false;
+  return true;
+}
+
 export async function runGrowthFollowUpAutomation(
   prisma: PrismaClient,
   opts?: { limit?: number },
@@ -107,13 +119,14 @@ export async function runGrowthFollowUpAutomation(
         category: "OUTREACH",
         toEmailNormalized: email,
         status: "SENT",
+        deliveredAt: { not: null },
         bouncedAt: null,
         complainedAt: null,
       },
-      select: { id: true, deliveredAt: true },
+      select: { id: true, deliveredAt: true, bouncedAt: true, complainedAt: true },
       orderBy: { sentAt: "asc" },
     });
-    if (!originalSend) {
+    if (!originalOutreachAllowsFollowUp(originalSend)) {
       skipped += 1;
       continue;
     }

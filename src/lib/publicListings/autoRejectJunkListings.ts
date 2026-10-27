@@ -10,7 +10,7 @@ export type AutoRejectJunkResult = {
 };
 
 function autoRejectJunkPerRun(): number {
-  return Math.min(200, Math.max(0, parseIntEnv("LISTING_AUTO_REJECT_JUNK_PER_RUN", 80)));
+  return Math.min(400, Math.max(0, parseIntEnv("LISTING_AUTO_REJECT_JUNK_PER_RUN", 80)));
 }
 
 function appendNote(existing: string | null | undefined, reason: string): string {
@@ -34,28 +34,45 @@ export async function autoRejectJunkListings(
   const limit = opts?.limit ?? autoRejectJunkPerRun();
   if (limit <= 0) return { scanned: 0, rejected: 0, byReason: {} };
 
-  const rows = await prisma.publicOpenMicListing.findMany({
+  const select = {
+    id: true,
+    name: true,
+    region: true,
+    city: true,
+    formattedAddress: true,
+    websiteUrl: true,
+    sourceUrl: true,
+    internalNotes: true,
+    evidenceTerminalReason: true,
+    evidenceEnrichAttemptCount: true,
+    verificationStatus: true,
+    growthLead: { select: { discoveryMarketSlug: true } },
+  } as const;
+
+  const needsReview = await prisma.publicOpenMicListing.findMany({
     where: {
       claimedVenueId: null,
-      verificationStatus: { in: ["NEEDS_REVIEW", "UNVERIFIED", "VERIFIED"] },
+      verificationStatus: "NEEDS_REVIEW",
     },
-    orderBy: [{ updatedAt: "asc" }],
+    orderBy: [{ updatedAt: "desc" }],
     take: limit,
-    select: {
-      id: true,
-      name: true,
-      region: true,
-      city: true,
-      formattedAddress: true,
-      websiteUrl: true,
-      sourceUrl: true,
-      internalNotes: true,
-      evidenceTerminalReason: true,
-      evidenceEnrichAttemptCount: true,
-      verificationStatus: true,
-      growthLead: { select: { discoveryMarketSlug: true } },
-    },
+    select,
   });
+  const seen = new Set(needsReview.map((r) => r.id));
+  let rows = [...needsReview];
+  if (rows.length < limit) {
+    const extra = await prisma.publicOpenMicListing.findMany({
+      where: {
+        claimedVenueId: null,
+        verificationStatus: { in: ["UNVERIFIED", "VERIFIED"] },
+        id: { notIn: [...seen] },
+      },
+      orderBy: [{ updatedAt: "asc" }],
+      take: limit - rows.length,
+      select,
+    });
+    rows = [...rows, ...extra];
+  }
 
   let rejected = 0;
   const byReason: Record<string, number> = {};

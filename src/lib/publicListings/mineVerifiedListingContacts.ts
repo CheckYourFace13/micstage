@@ -43,6 +43,9 @@ const CONTACT_PATH_CANDIDATES = [
   "/bookings",
   "/private-events",
   "/venue",
+  "/info",
+  "/connect",
+  "/get-in-touch",
 ];
 
 /** Official same-domain role mailboxes — HIGH without requiring a personal name. */

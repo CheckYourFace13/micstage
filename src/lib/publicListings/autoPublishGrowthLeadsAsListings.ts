@@ -191,7 +191,7 @@ export async function autoPublishGrowthLeadsAsListings(
     skipped += 1;
     const reason = result.skipReason ?? "unknown";
     // Deterministic failures leave the active backlog so ticks stop re-scanning them forever.
-    if (reason.startsWith("failed_classifier") || reason === "missing_name") {
+    if (reason.startsWith("failed_classifier") || reason.startsWith("failed_display_quality") || reason === "missing_name") {
       rejectReasons[reason] = (rejectReasons[reason] ?? 0) + 1;
       await prisma.growthLead.update({
         where: { id: lead.id },

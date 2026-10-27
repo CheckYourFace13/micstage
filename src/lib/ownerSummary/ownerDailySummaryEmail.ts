@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import type { OwnerDailySummaryData } from "@/lib/ownerSummary/buildOwnerDailySummary";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { buildOwnerAttentionItems } from "@/lib/ownerSummary/ownerAttention";
@@ -58,6 +59,13 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Venue leads waiting to publish: ${inv.leadsAwaitingPublish}`,
     `  Google Business verified: ${inv.googleVerifiedListings}`,
     `  Hidden listing backlog (NEEDS_REVIEW): ${inv.needsReviewCount}`,
+    `  Verified listings with active schedule: ${inv.verifiedWithActiveSchedule}`,
+    `  Indexable listings: ${inv.indexableScheduledListings}`,
+    `  Schedules confirmed today: ${inv.schedulesAutoConfirmedToday}`,
+    `  Net-eligible outreach contacts: ${inv.netEligibleOutreach}`,
+    `  Provider headroom remaining: ${inv.remainingProviderHeadroom}`,
+    `  Claim contacts mined today: ${inv.claimContactsMinedToday}`,
+    `  Invite-ready total: ${inv.inviteReadyTotal}`,
     `  Note: ${inv.listingsNote}`,
     "",
     data.listingsInventory.listingsCreatedCount > 0
@@ -509,6 +517,9 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>New listings (24h):</strong> ${inv.listingsCreatedCount} · <strong>Claim invites sent (24h):</strong> ${inv.claimInvitesSentCount}</li>
     <li><strong>Pending claim invites (eligible to send):</strong> ${inv.pendingClaimInvites} · <strong>Leads waiting to publish:</strong> ${inv.leadsAwaitingPublish} · <strong>Google verified:</strong> ${inv.googleVerifiedListings}</li>
     <li><strong>Hidden listing backlog (NEEDS_REVIEW):</strong> ${inv.needsReviewCount}</li>
+    <li><strong>Verified with active schedule:</strong> ${inv.verifiedWithActiveSchedule} · <strong>Indexable:</strong> ${inv.indexableScheduledListings} · <strong>Schedules confirmed today:</strong> ${inv.schedulesAutoConfirmedToday}</li>
+    <li><strong>Net-eligible outreach:</strong> ${inv.netEligibleOutreach} · <strong>Provider headroom:</strong> ${inv.remainingProviderHeadroom}</li>
+    <li><strong>Claim contacts mined today:</strong> ${inv.claimContactsMinedToday} · <strong>Invite-ready:</strong> ${inv.inviteReadyTotal}</li>
   </ul>
   <p style="margin:0 0 12px;color:#6b7280;font-size:12px">${esc(inv.listingsNote)}</p>
   <h3 style="font-size:14px;margin:16px 0 8px">${esc(heading)}</h3>
@@ -530,6 +541,7 @@ export function ownerDailySummarySubject(data: OwnerDailySummaryData): string {
 }
 
 function ownerAttentionFromSummary(data: OwnerDailySummaryData) {
+  const chicagoHour = DateTime.now().setZone("America/Chicago").hour;
   return buildOwnerAttentionItems({
     outreachEnabled: data.marketing.outreachEnabled,
     killSwitch: data.growthEngine.killStatus,
@@ -540,14 +552,23 @@ function ownerAttentionFromSummary(data: OwnerDailySummaryData) {
     complaintRate: data.growthEngine.complaintRate,
     autoSendReady: data.growthEngine.autoSendReady,
     leadsCreatedToday: data.leadsCreatedCount,
+    listingsCreatedToday: data.listingsInventory.listingsCreatedCount,
     needsReviewCount: data.listingsInventory.needsReviewCount,
     autoVerifiedToday: data.growthFunnel.autoVerifiedToday,
+    autoRejectedToday: data.growthFunnel.autoRejectedToday,
     inviteReady: data.growthFunnel.inviteReady,
     claimInvitesSentToday: data.listingsInventory.claimInvitesSentCount,
     unclaimedVerified: data.listingsInventory.unclaimedListings,
     indexableScheduledListings: data.listingsInventory.indexableScheduledListings,
     schedulesAutoConfirmedToday: data.listingsInventory.schedulesAutoConfirmedToday,
     lastTickAgeHours: null,
+    netEligibleOutreach: data.listingsInventory.netEligibleOutreach,
+    chicagoHour,
+    unscheduledVerified: data.listingsInventory.unscheduledVerified,
+    uniqueClicks7d: data.growthEngine.clicks7d,
+    registrations7d: data.growthEngine.registrations7d,
+    claims7d: data.growthEngine.claims7d,
+    junkCandidateRate: data.growthFunnel.junkCandidateRate,
   });
 }
 
@@ -592,7 +613,7 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
     "PIPELINE",
     `  New growth leads (rows created): ${data.leadsCreatedCount}`,
     `  Outreach emails sent (OUTREACH / SENT): ${data.outreachEmailsSentCount}`,
-    `  Unique leads with CLICKED stage update (24h): ${data.uniqueClickLeadsCount}`,
+    `  Unique clicks (canonical, first-party): ${data.uniqueClickLeadsCount}`,
     `    Note: ${data.clicksNote}`,
     `  Growth replies logged (24h): ${data.growthRepliesCount}`,
     `    Note: ${data.repliesNote}`,
@@ -675,7 +696,7 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
   <ul style="margin:0;padding-left:18px;line-height:1.6">
     <li><strong>New growth leads:</strong> ${data.leadsCreatedCount}</li>
     <li><strong>Outreach emails sent:</strong> ${data.outreachEmailsSentCount}</li>
-    <li><strong>Click signal (leads):</strong> ${data.uniqueClickLeadsCount} — <span style="color:#6b7280">${esc(data.clicksNote)}</span></li>
+    <li><strong>Unique clicks:</strong> ${data.uniqueClickLeadsCount} — <span style="color:#6b7280">${esc(data.clicksNote)}</span></li>
     <li><strong>Replies logged:</strong> ${data.growthRepliesCount} — <span style="color:#6b7280">${esc(data.repliesNote)}</span></li>
   </ul>
 

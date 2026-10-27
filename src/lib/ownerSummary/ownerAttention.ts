@@ -10,14 +10,23 @@ export type OwnerAttentionInput = {
   complaintRate: number;
   autoSendReady: number;
   leadsCreatedToday: number;
+  listingsCreatedToday: number;
   needsReviewCount: number;
   autoVerifiedToday: number;
+  autoRejectedToday: number;
   inviteReady: number;
   claimInvitesSentToday: number;
   unclaimedVerified: number;
   indexableScheduledListings: number;
   schedulesAutoConfirmedToday: number;
   lastTickAgeHours: number | null;
+  netEligibleOutreach: number;
+  chicagoHour: number | null;
+  unscheduledVerified: number;
+  uniqueClicks7d: number;
+  registrations7d: number;
+  claims7d: number;
+  junkCandidateRate: number;
 };
 
 export function buildOwnerAttentionItems(input: OwnerAttentionInput): OwnerAttentionItem[] {
@@ -60,19 +69,49 @@ export function buildOwnerAttentionItems(input: OwnerAttentionInput): OwnerAtten
       message: `NEEDS_REVIEW is ${input.needsReviewCount} with 0 auto-verified today`,
     });
   }
-  if (input.unclaimedVerified >= 50 && input.inviteReady === 0 && input.claimInvitesSentToday === 0) {
+  const autoProcessed = input.autoVerifiedToday + input.autoRejectedToday;
+  if (input.listingsCreatedToday > 0 && input.listingsCreatedToday > 2 * Math.max(1, autoProcessed)) {
+    items.push({
+      code: "discovery_outpacing",
+      message: `Discovery created ${input.listingsCreatedToday} listings vs ${autoProcessed} auto-processed`,
+    });
+  }
+  if (input.junkCandidateRate >= 0.25 && input.listingsCreatedToday + input.autoRejectedToday >= 8) {
+    items.push({
+      code: "junk_rate",
+      message: `Junk candidate rate ${(input.junkCandidateRate * 100).toFixed(0)}% — classifier is rejecting a large share`,
+    });
+  }
+  if (
+    input.chicagoHour != null &&
+    input.chicagoHour >= 20 &&
+    input.outreachEnabled &&
+    !input.killSwitch &&
+    input.netEligibleOutreach > 0 &&
+    input.providerHeadroom > 0 &&
+    input.emailsSentToday < Math.min(input.dailyCap, input.emailsSentToday + input.providerHeadroom)
+  ) {
+    items.push({
+      code: "unused_outreach",
+      message: `${input.netEligibleOutreach} eligible contacts unused at end of send window (${input.emailsSentToday} sent, ${input.providerHeadroom} headroom)`,
+    });
+  }
+  if (input.unclaimedVerified > 100 && input.inviteReady === 0 && input.claimInvitesSentToday === 0) {
     items.push({
       code: "claim_invite_blocked",
       message: `${input.unclaimedVerified} verified unclaimed listings and 0 invite-ready contacts`,
     });
   }
-  if (
-    input.indexableScheduledListings === 0 &&
-    input.schedulesAutoConfirmedToday === 0
-  ) {
+  if (input.schedulesAutoConfirmedToday === 0 && input.unscheduledVerified > 50) {
     items.push({
       code: "schedule_enrichment",
-      message: "No indexable scheduled listings; schedule confirmation produced 0 rows today",
+      message: `0 schedules confirmed in 24h while ${input.unscheduledVerified} verified listings still lack an active schedule`,
+    });
+  }
+  if (input.uniqueClicks7d > 0 && input.registrations7d === 0 && input.claims7d === 0) {
+    items.push({
+      code: "clicks_no_convert",
+      message: `${input.uniqueClicks7d} unique clicks in 7 days but 0 registrations and 0 claims`,
     });
   }
   return items;

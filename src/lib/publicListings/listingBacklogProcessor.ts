@@ -13,6 +13,11 @@ import {
   resolveGrowthPipelineRuntimeSnapshot,
   type GrowthPipelineRuntimeSnapshot,
 } from "@/lib/growth/growthRuntimeSettings";
+import {
+  evaluateBacklogPressure,
+  backlogLimitsUnderPressure,
+  type BacklogPressure,
+} from "@/lib/growth/backlogPressure";
 
 const BACKLOG_ADAPTER = "listing_backlog_processor";
 const BACKLOG_MARKET = "_global";
@@ -40,6 +45,7 @@ export type ListingBacklogProcessorResult = {
   stagesSkippedForBudget: string[];
   runtime?: GrowthPipelineRuntimeSnapshot;
   killed?: boolean;
+  backlogPressure?: BacklogPressure;
 };
 
 /**
@@ -100,16 +106,30 @@ export async function runListingBacklogProcessor(
       stagesSkippedForBudget: ["all"],
       runtime,
       killed: true,
+      backlogPressure: await evaluateBacklogPressure(prisma),
     };
   }
 
   const remaining = () => TICK_BUDGET_MS - (Date.now() - started);
   const canRun = (needMs: number) => remaining() > needMs;
+  const pressure = await evaluateBacklogPressure(prisma);
+  const limits = pressure.active
+    ? backlogLimitsUnderPressure(runtime)
+    : {
+        publish: runtime.backlogPublishPerTick.effective,
+        junk: runtime.autoRejectJunkPerRun.effective,
+        googleVerify: runtime.backlogGoogleVerifyPerTick.effective,
+        promote: runtime.backlogPromotePerTick.effective,
+        evidence: runtime.backlogEvidenceEnrichPerTick.effective,
+        schedule: 8,
+        mine: runtime.verifiedContactMinePerTick.effective,
+        leadReprocess: 40,
+      };
 
   let junk = { scanned: 0, rejected: 0, byReason: {} as Record<string, number> };
   if (canRun(3_000)) {
     junk = await autoRejectJunkListings(prisma, {
-      limit: runtime.autoRejectJunkPerRun.effective,
+      limit: limits.junk,
     });
     stagesRun.push("auto_reject_junk");
   } else {
@@ -125,8 +145,8 @@ export async function runListingBacklogProcessor(
   };
   if (canRun(8_000)) {
     const pub = await autoPublishGrowthLeadsAsListings(prisma, {
-      publishLimit: runtime.backlogPublishPerTick.effective,
-      enrichLimit: Math.min(15, Math.floor(runtime.backlogPublishPerTick.effective / 4)),
+      publishLimit: limits.publish,
+      enrichLimit: Math.min(15, Math.floor(limits.publish / 4)),
       skipDownstream: true,
     });
     publish = {
@@ -144,7 +164,7 @@ export async function runListingBacklogProcessor(
   let googleVerify = emptyVerify;
   if (canRun(10_000)) {
     googleVerify = await verifyPublicListingsWithGoogle(prisma, {
-      limit: runtime.backlogGoogleVerifyPerTick.effective,
+      limit: limits.googleVerify,
     });
     stagesRun.push("google_verify");
   } else {
@@ -154,7 +174,7 @@ export async function runListingBacklogProcessor(
   let promote = { promoted: 0 };
   if (canRun(5_000)) {
     promote = await promotePlaceConfirmedListings(prisma, {
-      limit: runtime.backlogPromotePerTick.effective,
+      limit: limits.promote,
     });
     stagesRun.push("promote");
   } else {
@@ -164,7 +184,7 @@ export async function runListingBacklogProcessor(
   let evidenceEnrich = emptyEnrich;
   if (canRun(12_000)) {
     evidenceEnrich = await enrichListingsMissingTrustedEvidence(prisma, {
-      limit: runtime.backlogEvidenceEnrichPerTick.effective,
+      limit: limits.evidence,
     });
     stagesRun.push("evidence_enrich");
   } else {
@@ -173,7 +193,7 @@ export async function runListingBacklogProcessor(
 
   let scheduleEnrich = emptyScheduleEnrich;
   if (canRun(10_000)) {
-    scheduleEnrich = await enrichVerifiedListingSchedules(prisma, { limit: 8 });
+    scheduleEnrich = await enrichVerifiedListingSchedules(prisma, { limit: limits.schedule });
     stagesRun.push("schedule_enrich");
   } else {
     stagesSkippedForBudget.push("schedule_enrich");
@@ -193,7 +213,7 @@ export async function runListingBacklogProcessor(
   let contactMine = emptyMine;
   if (canRun(12_000)) {
     contactMine = await mineVerifiedListingOfficialEmails(prisma, {
-      limit: runtime.verifiedContactMinePerTick.effective,
+      limit: limits.mine,
     });
     stagesRun.push("contact_mine");
   } else {
@@ -202,7 +222,7 @@ export async function runListingBacklogProcessor(
 
   let leadsReprocessed = 0;
   if (canRun(2_000)) {
-    leadsReprocessed = await reprocessOldLeadsCursor(prisma, 40);
+    leadsReprocessed = await reprocessOldLeadsCursor(prisma, limits.leadReprocess);
     stagesRun.push("lead_reprocess");
   } else {
     stagesSkippedForBudget.push("lead_reprocess");
@@ -226,6 +246,7 @@ export async function runListingBacklogProcessor(
     stagesRun,
     stagesSkippedForBudget,
     runtime,
+    backlogPressure: pressure,
   };
 }
 

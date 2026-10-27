@@ -72,7 +72,7 @@ const CLAMPS: Record<GrowthPipelineRuntimeKey, { min: number; max: number }> = {
   LISTING_BACKLOG_PROMOTE_PER_TICK: { min: 0, max: 120 },
   LISTING_BACKLOG_EVIDENCE_ENRICH_PER_TICK: { min: 0, max: 80 },
   GROWTH_OUTREACH_EVIDENCE_ENRICH_PER_TICK: { min: 0, max: 12 },
-  LISTING_AUTO_REJECT_JUNK_PER_RUN: { min: 0, max: 300 },
+  LISTING_AUTO_REJECT_JUNK_PER_RUN: { min: 0, max: 400 },
   LISTING_VERIFIED_CONTACT_MINE_PER_TICK: { min: 0, max: 60 },
 };
 

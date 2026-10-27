@@ -100,6 +100,13 @@ const MUST_REJECT = [
   "Live Music in Rockford, IL",
   "Live Music & Events in Monroe, GA",
   "Places to Visit in Charleston",
+  "Louisville, KY",
+  "Kansas City, MO",
+  "Des Moines, IA",
+  "Kansas City-area brewery and taproom is closing after 14 years",
+  "Meetings-Events-Open Mics",
+  "null",
+  "undefined",
 ];
 
 // Real venue / event names — must pass.

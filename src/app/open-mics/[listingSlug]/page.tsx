@@ -28,6 +28,7 @@ import { displayListingAddress } from "@/lib/publicListings/discoveryMerge";
 import { scheduleWindowLabel } from "@/lib/scheduleWindow";
 import { weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
+import { ShareLinks } from "@/components/publicListings/ShareLinks";
 import { primaryDiscoverySlugForVenue, getVenueCityDiscoveryCounts } from "@/lib/discoveryMarket";
 
 export const dynamic = "force-dynamic";
@@ -77,8 +78,16 @@ export default async function PublicOpenMicListingPage(props: {
   const prisma = getPrismaOrNull();
   if (!prisma) return <PublicDataUnavailable title="Listing unavailable" />;
 
+  let leadType: "VENUE" | "PROMOTER_ACCOUNT" | "ARTIST" | null = null;
   if (traceId) {
-    await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: "VENUE" });
+    const lead = await prisma.growthLead.findUnique({
+      where: { id: traceId },
+      select: { leadType: true },
+    });
+    leadType = lead?.leadType === "PROMOTER_ACCOUNT" || lead?.leadType === "ARTIST" || lead?.leadType === "VENUE"
+      ? lead.leadType
+      : "VENUE";
+    await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: leadType ?? "VENUE" });
   }
 
   const listing = await loadPublicOpenMicListingBySlug(prisma, listingSlug);
@@ -348,17 +357,64 @@ export default async function PublicOpenMicListingPage(props: {
         )}
 
         <section className="mt-10 grid gap-6 border-t border-white/10 pt-8">
+          {listing.schedules.length > 0 ? (
+            <div>
+              <h2 className="text-base font-semibold">Share tonight</h2>
+              <ShareLinks url={absoluteUrl(path)} title={`${displayName} open mic`} className="mt-2" />
+            </div>
+          ) : null}
+
           <div>
             <h2 className="text-lg font-semibold">Run this open mic?</h2>
-            <p className="mt-1 text-sm text-white/65">Claim this page to manage schedule, bookings, and lineup on MicStage.</p>
-            <Link
-              href={`/claim/${listing.slug}${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
-              className="mt-3 inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-              data-track-event="listing_claim_cta_click"
-              data-listing-slug={listing.slug}
-            >
-              {traceId ? "Claim this open mic free" : "Claim this open mic"}
-            </Link>
+            {leadType === "PROMOTER_ACCOUNT" ? (
+              <>
+                <p className="mt-1 text-sm text-white/65">
+                  MicStage is free — no credit card. Manage this night as the host.
+                </p>
+                <Link
+                  href={`/host${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
+                  className="mt-3 inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
+                >
+                  Manage as host — free
+                </Link>
+              </>
+            ) : leadType === "VENUE" ? (
+              <>
+                <p className="mt-1 text-sm text-white/65">
+                  We found this listing. Claim it free — no credit card — to correct details and manage the night.
+                </p>
+                <Link
+                  href={`/claim/${listing.slug}${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
+                  className="mt-3 inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
+                  data-track-event="listing_claim_cta_click"
+                  data-listing-slug={listing.slug}
+                >
+                  Claim this open mic free
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-sm text-white/65">
+                  MicStage is free — no credit card. Claim the listing as the venue, or manage nights as the host.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href={`/claim/${listing.slug}${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
+                    className="inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
+                    data-track-event="listing_claim_cta_click"
+                    data-listing-slug={listing.slug}
+                  >
+                    I&apos;m the venue
+                  </Link>
+                  <Link
+                    href={`/host${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
+                    className="inline-flex h-11 items-center rounded-md border border-white/20 px-5 text-sm font-semibold text-white hover:bg-white/10"
+                  >
+                    I&apos;m the host
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
 
           <div>
@@ -392,13 +448,12 @@ export default async function PublicOpenMicListingPage(props: {
             </div>
           ) : null}
 
-          <div>
-            <h2 className="text-base font-semibold">Share</h2>
-            <p className="mt-1 text-sm text-white/60">
-              Link:{" "}
-              <span className="font-mono text-xs text-white/80">{absoluteUrl(path)}</span>
-            </p>
-          </div>
+          {listing.schedules.length === 0 ? (
+            <div>
+              <h2 className="text-base font-semibold">Share</h2>
+              <ShareLinks url={absoluteUrl(path)} title={`${displayName} open mic`} className="mt-2" />
+            </div>
+          ) : null}
         </section>
       </main>
     </div>

@@ -15,16 +15,33 @@ import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { relatedLocationsForLocationSlug } from "@/lib/relatedLocations";
 import { shouldIndexDiscoveryPage } from "@/lib/seo/discoveryIndex";
 import { jsDayToWeekday } from "@/lib/publicListings/listingSeo";
-import { weekdayToLabel } from "@/lib/time";
+import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import type { Weekday } from "@/generated/prisma/client";
+import { ShareLinks } from "@/components/publicListings/ShareLinks";
 
 export const dynamic = "force-dynamic";
 
 const WEEKDAY_ORDER: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-function listingCard(v: OpenMicFinderVenue) {
+function startLabelForDay(v: OpenMicFinderVenue, day: Weekday): string | null {
+  const starts = (v.scheduleStarts ?? []).filter((s) => s.weekday === day);
+  if (starts.length === 0) return null;
+  const min = Math.min(...starts.map((s) => s.startTimeMin));
+  return minutesToTimeLabel(min);
+}
+
+function listingCard(v: OpenMicFinderVenue, day?: Weekday) {
+  const start = day ? startLabelForDay(v, day) : null;
+  const knownBits = [
+    start ? `Starts ${start}` : null,
+    v.signupMethod ? `Signup: ${v.signupMethod}` : null,
+    v.cost ? `Cost: ${v.cost}` : null,
+    v.performanceFormats && v.performanceFormats.length > 0
+      ? v.performanceFormats.slice(0, 2).join(" · ")
+      : null,
+  ].filter(Boolean);
   return (
-    <li key={`${v.href}-${v.slug}`}>
+    <li key={`${v.href}-${v.slug}-${day ?? "all"}`}>
       <Link
         href={v.href}
         className="block rounded-xl border border-white/10 bg-black/30 p-4 hover:border-[rgb(var(--om-neon))]/40 hover:bg-black/45"
@@ -34,12 +51,12 @@ function listingCard(v: OpenMicFinderVenue) {
           <DiscoveryListingBadge kind={v.kind} bookable={v.bookable} hasSchedule={v.hasSchedule} />
         </div>
         <p className="mt-1 text-xs text-white/55">{[v.city, v.region].filter(Boolean).join(", ")}</p>
-        {v.scheduleWeekdays && v.scheduleWeekdays.length > 0 ? (
-          <p className="mt-1 text-xs text-white/50">
+        {knownBits.length > 0 ? <p className="mt-1 text-xs text-white/50">{knownBits.join(" · ")}</p> : null}
+        {!day && v.scheduleWeekdays && v.scheduleWeekdays.length > 0 ? (
+          <p className="mt-1 text-xs text-white/45">
             {v.scheduleWeekdays.map((d) => weekdayToLabel(d as Weekday)).join(" · ")}
           </p>
         ) : null}
-        {v.signupMethod ? <p className="mt-1 text-xs text-white/45">Signup: {v.signupMethod}</p> : null}
         <span className="mt-2 inline-block text-xs text-[rgb(var(--om-neon))] underline">
           {v.ctaLabel ? v.ctaLabel : v.bookable ? "View schedule and book →" : "View listing →"}
         </span>
@@ -106,8 +123,13 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
   const nearbyLocations = await relatedLocationsForLocationSlug(locationSlug, 6);
 
   const todayWeekday = jsDayToWeekday(new Date().getDay());
+  const tomorrowWeekday = WEEKDAY_ORDER[(WEEKDAY_ORDER.indexOf(todayWeekday) + 1) % 7]!;
   const tonight = listings.filter((l) => (l.scheduleWeekdays ?? []).includes(todayWeekday));
+  const tomorrow = listings.filter((l) => (l.scheduleWeekdays ?? []).includes(tomorrowWeekday));
   const tonightLabel = weekdayToLabel(todayWeekday);
+  const tomorrowLabel = weekdayToLabel(tomorrowWeekday);
+  const scheduledCount = listings.filter((l) => l.hasSchedule).length;
+  const showCalendar = scheduledCount >= 3;
   const thisWeekByDay = WEEKDAY_ORDER.map((day) => ({
     day,
     label: weekdayToLabel(day),
@@ -152,6 +174,14 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
               Trusted open-mic listings in {placeTitle}. Browse venues and rooms with schedules and signup details when
               available — music, comedy, poetry, and more.
             </p>
+            {showCalendar ? (
+              <div className="mt-3">
+                <ShareLinks
+                  url={absoluteUrl(`/locations/${locationSlug}/open-mics`)}
+                  title={`Open mics in ${placeTitle}`}
+                />
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-col items-end gap-2 text-sm">
             <Link className="text-white/70 hover:text-white" href="/find-open-mics">
@@ -190,16 +220,48 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
           </div>
         ) : (
           <div className="mt-8 grid gap-8">
-            {tonight.length > 0 ? (
+            {showCalendar && tonight.length > 0 ? (
               <section>
-                <h2 className="text-lg font-semibold">Open mics scheduled for {tonightLabel}</h2>
+                <h2 className="text-lg font-semibold">Tonight</h2>
                 <p className="mt-1 text-xs text-white/55">
-                  Based on recurring {tonightLabel} schedules on file — not a live confirmation that tonight&apos;s night
-                  is running. Confirm with the venue before you go.
+                  Recurring {tonightLabel} schedules on file — confirm with the venue before you go.
                 </p>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{tonight.map(listingCard)}</ul>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {tonight.map((v) => listingCard(v, todayWeekday))}
+                </ul>
               </section>
-            ) : (
+            ) : null}
+
+            {showCalendar && tomorrow.length > 0 ? (
+              <section>
+                <h2 className="text-lg font-semibold">Tomorrow</h2>
+                <p className="mt-1 text-xs text-white/55">
+                  Recurring {tomorrowLabel} schedules on file — confirm with the venue before you go.
+                </p>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {tomorrow.map((v) => listingCard(v, tomorrowWeekday))}
+                </ul>
+              </section>
+            ) : null}
+
+            {showCalendar && thisWeekByDay.length > 0 ? (
+              <section>
+                <h2 className="text-lg font-semibold">This week</h2>
+                <p className="mt-1 text-xs text-white/55">
+                  From published weekly schedules — confirm with the venue before you go.
+                </p>
+                <div className="mt-3 grid gap-3">
+                  {thisWeekByDay.map((g) => (
+                    <div key={g.day}>
+                      <h3 className="text-sm font-medium text-white/80">{g.label}</h3>
+                      <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {g.rows.map((v) => listingCard(v, g.day))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : tonight.length === 0 && !showCalendar ? (
               <p className="text-sm text-white/50">
                 No recurring {tonightLabel} schedules are on file for {placeTitle} right now. Browse the full list
                 below, or{" "}
@@ -208,63 +270,38 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
                 </Link>
                 .
               </p>
-            )}
-
-            {thisWeekByDay.length > 0 ? (
-              <section>
-                <h2 className="text-lg font-semibold">Recurring nights this week</h2>
-                <p className="mt-1 text-xs text-white/55">
-                  From published weekly schedules — confirm with the venue before you go.
-                </p>
-                <div className="mt-3 grid gap-3">
-                  {thisWeekByDay.map((g) => (
-                    <div key={g.day}>
-                      <h3 className="text-sm font-medium text-white/80">{g.label}</h3>
-                      <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-white/70">
-                        {g.rows.map((v) => (
-                          <li key={`${g.day}-${v.slug}`}>
-                            <Link href={v.href} className="underline hover:text-white">
-                              {v.name}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </section>
             ) : null}
 
             <section>
               <h2 className="text-lg font-semibold">Open mics in {placeTitle}</h2>
-              <ul className="mt-3 grid gap-2 sm:grid-cols-2">{listings.map(listingCard)}</ul>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">{listings.map((v) => listingCard(v))}</ul>
             </section>
 
             {bookable.length > 0 ? (
               <section>
                 <h2 className="text-lg font-semibold">Signups open on MicStage</h2>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{bookable.map(listingCard)}</ul>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{bookable.map((v) => listingCard(v))}</ul>
               </section>
             ) : null}
 
             {comedy.length > 0 ? (
               <section>
                 <h2 className="text-lg font-semibold">Comedy open mics</h2>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{comedy.map(listingCard)}</ul>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{comedy.map((v) => listingCard(v))}</ul>
               </section>
             ) : null}
 
             {music.length > 0 ? (
               <section>
                 <h2 className="text-lg font-semibold">Music open mics</h2>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{music.map(listingCard)}</ul>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{music.map((v) => listingCard(v))}</ul>
               </section>
             ) : null}
 
             {spoken.length > 0 ? (
               <section>
                 <h2 className="text-lg font-semibold">Poetry &amp; spoken word open mics</h2>
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{spoken.map(listingCard)}</ul>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">{spoken.map((v) => listingCard(v))}</ul>
               </section>
             ) : null}
           </div>

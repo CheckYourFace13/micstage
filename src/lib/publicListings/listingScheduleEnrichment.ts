@@ -81,6 +81,19 @@ export function explicitScheduleEndTimeMin(parsed: {
   return resolveScheduleEndMin(parsed.startTimeMin, parsed.endTimeMin);
 }
 
+const PRIORITY_MARKET =
+  /\b(chicago|new york|brooklyn|manhattan|los angeles|austin|nashville|denver|portland|seattle|atlanta|boston|philadelphia|houston|dallas|miami|minneapolis|detroit)\b/i;
+
+export function scheduleMarketPriorityScore(listing: {
+  city?: string | null;
+  region?: string | null;
+}): number {
+  const place = `${listing.city ?? ""} ${listing.region ?? ""}`.toLowerCase();
+  if (/\bchicago\b/.test(place) || /\bil\b/.test(place) || /\billinois\b/.test(place)) return 100;
+  if (PRIORITY_MARKET.test(place)) return 70;
+  return 10;
+}
+
 export async function enrichVerifiedListingSchedules(
   prisma: PrismaClient,
   opts?: { limit?: number },
@@ -88,7 +101,7 @@ export async function enrichVerifiedListingSchedules(
   const limit = Math.min(20, Math.max(0, opts?.limit ?? 8));
   if (limit <= 0) return { scanned: 0, confirmed: 0, uncertain: 0, skipped: 0 };
 
-  const rows = await prisma.publicOpenMicListing.findMany({
+  let rows = await prisma.publicOpenMicListing.findMany({
     where: {
       verificationStatus: "VERIFIED",
       removedAt: null,
@@ -100,17 +113,22 @@ export async function enrichVerifiedListingSchedules(
       id: true,
       slug: true,
       name: true,
+      city: true,
+      region: true,
       websiteUrl: true,
       sourceUrl: true,
       timeZone: true,
       lat: true,
       lng: true,
       signupMethod: true,
+      lastVerifiedAt: true,
       growthLead: { select: { websiteUrl: true } },
     },
     orderBy: { lastVerifiedAt: "desc" },
-    take: limit,
+    take: Math.min(80, Math.max(limit * 8, limit)),
   });
+  rows.sort((a, b) => scheduleMarketPriorityScore(b) - scheduleMarketPriorityScore(a));
+  rows = rows.slice(0, limit);
 
   let confirmed = 0;
   let uncertain = 0;

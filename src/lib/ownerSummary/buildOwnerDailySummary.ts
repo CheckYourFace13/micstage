@@ -96,6 +96,12 @@ export type OwnerDailySummaryData = {
     needsReviewCount: number;
     indexableScheduledListings: number;
     schedulesAutoConfirmedToday: number;
+    verifiedWithActiveSchedule: number;
+    unscheduledVerified: number;
+    netEligibleOutreach: number;
+    remainingProviderHeadroom: number;
+    claimContactsMinedToday: number;
+    inviteReadyTotal: number;
   };
   /** Compact funnel + automation counters for ops email (not the full review dump). */
   growthFunnel: {
@@ -109,6 +115,7 @@ export type OwnerDailySummaryData = {
     autoRejectedToday: number;
     highContactsRecoveredToday: number;
     reviewReasonBuckets: Array<{ reason: string; count: number }>;
+    junkCandidateRate: number;
   };
   recentListings: OwnerSummaryListingRow[];
   /** Top human-review items only (full queue lives in admin). */
@@ -298,9 +305,8 @@ export async function buildOwnerDailySummary(
   }
   signups.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-  const uniqueClickLeadsCount = new Set(clickLeads.map((r) => r.id)).size;
   const clicksNote =
-    "Proxy: growth leads moved to CLICKED (stage update in window) — dedicated link tracking not stored yet.";
+    "Canonical unique click: first-party MarketingOutreachClick rows (one per outreach send).";
 
   const repliesNote = "Growth pipeline responses logged in the last 24h (email + admin notes).";
 
@@ -446,6 +452,7 @@ export async function buildOwnerDailySummary(
     reviewReasonSample,
     indexableScheduledListings,
     schedulesAutoConfirmedToday,
+    unscheduledVerified,
   ] = await Promise.all([
     loadDiscoveryInventoryStats(prisma),
     countPendingListingClaimInvitesWithEmail(prisma),
@@ -626,6 +633,14 @@ export async function buildOwnerDailySummary(
         lastVerifiedAt: { gte: startUtc, lt: endUtc },
       },
     }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        removedAt: null,
+        verificationStatus: "VERIFIED",
+        claimedVenueId: null,
+        schedules: { none: { isActive: true } },
+      },
+    }),
   ]);
 
   const listingSource =
@@ -753,7 +768,7 @@ export async function buildOwnerDailySummary(
     }),
     prisma.growthLeadResponse.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
     prisma.growthLead.count({
-      where: { acquisitionStage: "CLICKED", updatedAt: { gte: startUtc, lt: endUtc } },
+      where: { acquisitionStage: "SIGNUP_STARTED", updatedAt: { gte: startUtc, lt: endUtc } },
     }),
     prisma.growthLead.count({
       where: { status: "JOINED", updatedAt: { gte: startUtc, lt: endUtc } },
@@ -774,7 +789,17 @@ export async function buildOwnerDailySummary(
   ]);
 
   const clicksNoteUpdated =
-    "Unique clicks from first-party /api/marketing/click tracking on outreach emails.";
+    "Canonical unique click: first-party MarketingOutreachClick (one row per outreach send). Same source in every summary section.";
+  const junkNameSample = reviewReasonBuckets
+    .filter((b) => b.reason.startsWith("junk_name_"))
+    .reduce((n, b) => n + b.count, 0);
+  const junkSampleTotal = reviewReasonBuckets.reduce((n, b) => n + b.count, 0);
+  const junkCandidateRate =
+    junkSampleTotal > 0
+      ? junkNameSample / junkSampleTotal
+      : listingsCreatedCount + autoRejectedToday > 0
+        ? autoRejectedToday / (listingsCreatedCount + autoRejectedToday)
+        : 0;
 
   return {
     windowLabel: `${reportLabel} (America/Chicago, last 24h through end of window)`,
@@ -784,7 +809,7 @@ export async function buildOwnerDailySummary(
     signupArtistCount: musicians.length,
     leadsCreatedCount: leadsCreated,
     outreachEmailsSentCount: outreachSends,
-    uniqueClickLeadsCount,
+    uniqueClickLeadsCount: uniqueClicksToday,
     clicksNote: clicksNoteUpdated,
     growthRepliesCount: responses,
     repliesNote,
@@ -805,6 +830,12 @@ export async function buildOwnerDailySummary(
       needsReviewCount,
       indexableScheduledListings,
       schedulesAutoConfirmedToday,
+      verifiedWithActiveSchedule: indexableScheduledListings,
+      unscheduledVerified,
+      netEligibleOutreach: eligibilityAudit.netSendEligible,
+      remainingProviderHeadroom: providerCapacity.remainingForOutreach,
+      claimContactsMinedToday: enrichStats.newHighContacts,
+      inviteReadyTotal: inviteReady,
     },
     growthFunnel: {
       waitingEnrichment,
@@ -817,6 +848,7 @@ export async function buildOwnerDailySummary(
       autoRejectedToday,
       highContactsRecoveredToday,
       reviewReasonBuckets,
+      junkCandidateRate,
     },
     recentListings,
     reviewQueue,

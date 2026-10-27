@@ -21,14 +21,16 @@ export type ListingNameRejection =
   | "NON_VENUE_TITLE"
   | "PATH_OR_URL_NAME"
   | "AGGREGATOR_OR_DIRECTORY"
-  | "CANCELLED_OR_CLOSED";
+  | "CANCELLED_OR_CLOSED"
+  | "BARE_CITY_STATE"
+  | "NEWS_HEADLINE";
 
 /**
  * Cancelled / closed / ended events must never become public VERIFIED inventory.
  * Prefer explicit cancellation language over bare "closed" (preserves venue names like "The Closed Door").
  */
 const CANCELLED_OR_CLOSED =
-  /\b(cancelled|canceled)\b|\bpermanently\s+closed\b|\bno\s+longer\s+(running|happening|active|hosting|taking\s+place)\b|\bfinal\s+night\b|\b(this\s+event\s+has\s+(been\s+)?(cancelled|canceled|ended|postponed))\b|^\s*(postponed|rescheduled)\s*:/i;
+  /\b(cancelled|canceled)\b|\bpermanently\s+closed\b|\bno\s+longer\s+(running|happening|active|hosting|taking\s+place)\b|\bfinal\s+night\b|\b(this\s+event\s+has\s+(been\s+)?(cancelled|canceled|ended|postponed))\b|^\s*(postponed|rescheduled)\s*:|\b(is|are)\s+closing\b|\bshutting\s+down\b/i;
 
 /** Whole-name generic page titles (nav labels / scraped page chrome, not venues). */
 const GENERIC_PAGE_TITLE =
@@ -65,6 +67,12 @@ const EXACT_JUNK_NAME = new Set(
     "directory",
     "category",
     "storefm",
+    "null",
+    "undefined",
+    "none",
+    "n/a",
+    "na",
+    "unknown",
   ].map((s) => s.toLowerCase()),
 );
 
@@ -187,7 +195,20 @@ const AGG_GEO_TOKENS = new Set([
   "north", "south", "east", "west", "saint", "st", "ft", "mount", "mt", "port", "bay", "grand", "city", "valley",
   "springs", "heights", "park", "beach", "hills", "township", "county", "downtown", "uptown", "midtown", "metro",
   "greater", "area", "village", "borough", "lake", "sf",
+  "des", "moines", "kansas",
 ]);
+
+const US_STATE_ABBR = new Set([
+  "al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga", "hi", "id", "il", "in", "ia", "ks", "ky", "la",
+  "me", "md", "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv", "nh", "nj", "nm", "ny", "nc", "nd", "oh", "ok",
+  "or", "pa", "ri", "sc", "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc",
+]);
+
+const HYPHEN_NAV_TITLE =
+  /^(meetings?[\s-]+events?[\s-]+open[\s-]?mics?|events?[\s-]+open[\s-]?mics?|meetings?[\s-]+events?)$/i;
+
+const NEWS_HEADLINE =
+  /(\b-area\b.{0,60}\b(closing|closed|shutter))|(\b(brewery|taproom|restaurant|venue|bar|club)\s+(and\s+\w+\s+)?(is|are)\s+closing\b)|(\baccording\s+to\b)|(\breported\s+that\b)|(\bannounced\s+(it|they|today)\b)/i;
 
 function tokenizeName(name: string): string[] {
   return name
@@ -216,6 +237,25 @@ function looksLikeOpenMicAggregator(name: string): boolean {
 }
 
 /** "Comedy Houston" / "Poetry Chicago" style city-scene shells (not "Comedy Bar"). */
+/** "Louisville, KY" / "Kansas City, MO" — geo tokens only, no venue identity. */
+export function looksLikeBareCityState(name: string): boolean {
+  const n = (name ?? "").trim();
+  const m = /^([A-Za-z][A-Za-z.\s'-]+),\s*([A-Za-z]{2})$/.exec(n);
+  if (!m) return false;
+  const st = m[2]!.toLowerCase();
+  if (!US_STATE_ABBR.has(st)) return false;
+  const toks = tokenizeName(m[1]!);
+  if (toks.length === 0 || toks.length > 4) return false;
+  return toks.every((t) => AGG_GEO_TOKENS.has(t));
+}
+
+function looksLikeNewsHeadline(name: string): boolean {
+  const n = (name ?? "").trim();
+  if (NEWS_HEADLINE.test(n)) return true;
+  if (n.length >= 70 && /\b(is|are|was|were|will)\b/i.test(n)) return true;
+  return false;
+}
+
 function looksLikeGenreCityShell(name: string): boolean {
   const toks = tokenizeName(name);
   if (toks.length < 2 || toks.length > 4) return false;
@@ -238,6 +278,9 @@ export function classifyListingName(name: string): ListingNameRejection | null {
   const n = (name ?? "").trim();
   if (!n || n.length < 4) return "TOO_SHORT";
   if (EXACT_JUNK_NAME.has(n.toLowerCase())) return "GENERIC_PAGE_TITLE";
+  if (looksLikeBareCityState(n)) return "BARE_CITY_STATE";
+  if (HYPHEN_NAV_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
+  if (looksLikeNewsHeadline(n)) return "NEWS_HEADLINE";
   // Single-token genre/chrome labels are not venue open mics.
   if (/^(poetry|comedy|jazz|blues|karaoke|trivia|music|live|events?|tickets?)$/i.test(n)) {
     return "GENERIC_PAGE_TITLE";

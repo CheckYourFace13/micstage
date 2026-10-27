@@ -1057,6 +1057,53 @@ const followSrc = fs.readFileSync(new URL("../src/lib/growth/growthFollowUpAutom
 assert.match(followSrc, /deliveredAt:\s*\{\s*not:\s*null\s*\}/);
 assert.match(followSrc, /originalOutreachAllowsFollowUp/);
 
+const { computeOutreachSendPacing } = await import("../src/lib/growth/outreachSendPacing.ts");
+const lastHour = computeOutreachSendPacing({
+  now: new Date("2026-10-27T19:10:00-05:00"),
+  remainingDailyBudget: 21,
+  configuredMaxPerCron: 5,
+});
+assert.equal(lastHour.inSendWindow, true);
+assert.ok(lastHour.sendsThisCron >= 5);
+assert.match(lastHour.reason, /last_hour_catchup/);
+const lastTick = computeOutreachSendPacing({
+  now: new Date("2026-10-27T19:50:00-05:00"),
+  remainingDailyBudget: 16,
+  configuredMaxPerCron: 5,
+});
+assert.ok(lastTick.sendsThisCron >= 16);
+
+const { buildVenueGrowthOutreachLetter } = await import("../src/lib/marketing/outreachTemplates.ts");
+const intro = buildVenueGrowthOutreachLetter("Blue Note Open Mic", 1, {
+  claimVenueUrl: "https://micstage.com/claim/blue-note",
+  listingFirst: true,
+});
+assert.match(intro.textBody, /no credit card/i);
+assert.match(intro.textBody, /We found/);
+assert.match(intro.textBody, /https:\/\/micstage.com\/claim\/blue-note/);
+
+const { backlogPressureFromCounts } = await import("../src/lib/growth/backlogPressure.ts");
+const pressureOn = backlogPressureFromCounts({
+  needsReviewCount: 1543,
+  autoVerifiedToday: 0,
+  autoRejectedToday: 0,
+  listingsCreatedToday: 16,
+});
+assert.equal(pressureOn.active, true);
+assert.equal(pressureOn.trickleOnly, true);
+const pressureOff = backlogPressureFromCounts({
+  needsReviewCount: 1543,
+  autoVerifiedToday: 2,
+  autoRejectedToday: 10,
+  listingsCreatedToday: 16,
+});
+assert.equal(pressureOff.active, false);
+
+const { classifyListingName } = await import("../src/lib/publicListings/listingQuality.ts");
+assert.equal(classifyListingName("Louisville, KY"), "BARE_CITY_STATE");
+assert.equal(classifyListingName("null"), "GENERIC_PAGE_TITLE");
+assert.ok(classifyListingName("Cole's Comedy Open Mic") == null);
+
 const { clampOutreachDailyMaxForRlsGate } = await import("../src/lib/database/databaseRlsSecurity.ts");
 assert.equal(clampOutreachDailyMaxForRlsGate(50, false), 25);
 assert.equal(clampOutreachDailyMaxForRlsGate(50, true), 50);

@@ -324,6 +324,20 @@ const builderSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/ownerSummar
 assert.match(builderSrc, /indexableScheduledListings/);
 assert.match(builderSrc, /schedulesAutoConfirmedToday/);
 assert.match(builderSrc, /sourceUrl:\s*\{\s*not:\s*null\s*\}/);
+assert.match(builderSrc, /uniqueClickLeadsCount:\s*uniqueClicksToday/);
+assert.doesNotMatch(builderSrc, /Proxy: growth leads moved to CLICKED/);
+
+const attentionExtras = {
+  listingsCreatedToday: 3,
+  autoRejectedToday: 2,
+  netEligibleOutreach: 4,
+  chicagoHour: 12,
+  unscheduledVerified: 10,
+  uniqueClicks7d: 0,
+  registrations7d: 1,
+  claims7d: 0,
+  junkCandidateRate: 0.05,
+};
 
 const scheduleFailed = buildOwnerAttentionItems({
   outreachEnabled: true,
@@ -343,6 +357,8 @@ const scheduleFailed = buildOwnerAttentionItems({
   indexableScheduledListings: 0,
   schedulesAutoConfirmedToday: 0,
   lastTickAgeHours: 0.2,
+  ...attentionExtras,
+  unscheduledVerified: 80,
 });
 assert.ok(scheduleFailed.some((i) => i.code === "schedule_enrichment"));
 
@@ -364,7 +380,68 @@ const attentionNone = buildOwnerAttentionItems({
   indexableScheduledListings: 5,
   schedulesAutoConfirmedToday: 1,
   lastTickAgeHours: 0.2,
+  ...attentionExtras,
 });
 assert.equal(attentionNone.length, 0);
+
+const discoveryOutpace = buildOwnerAttentionItems({
+  outreachEnabled: true,
+  killSwitch: false,
+  emailsSentToday: 24,
+  dailyCap: 50,
+  providerHeadroom: 26,
+  bounceRate: 0,
+  complaintRate: 0,
+  autoSendReady: 10,
+  leadsCreatedToday: 20,
+  listingsCreatedToday: 20,
+  needsReviewCount: 50,
+  autoVerifiedToday: 1,
+  autoRejectedToday: 1,
+  inviteReady: 4,
+  claimInvitesSentToday: 1,
+  unclaimedVerified: 20,
+  indexableScheduledListings: 5,
+  schedulesAutoConfirmedToday: 1,
+  lastTickAgeHours: 0.2,
+  netEligibleOutreach: 4,
+  chicagoHour: 12,
+  unscheduledVerified: 10,
+  uniqueClicks7d: 0,
+  registrations7d: 1,
+  claims7d: 0,
+  junkCandidateRate: 0.05,
+});
+assert.ok(discoveryOutpace.some((i) => i.code === "discovery_outpacing"));
+
+const clicksNoConvert = buildOwnerAttentionItems({
+  outreachEnabled: true,
+  killSwitch: false,
+  emailsSentToday: 24,
+  dailyCap: 50,
+  providerHeadroom: 26,
+  bounceRate: 0,
+  complaintRate: 0,
+  autoSendReady: 10,
+  leadsCreatedToday: 3,
+  listingsCreatedToday: 3,
+  needsReviewCount: 10,
+  autoVerifiedToday: 2,
+  autoRejectedToday: 2,
+  inviteReady: 4,
+  claimInvitesSentToday: 1,
+  unclaimedVerified: 20,
+  indexableScheduledListings: 5,
+  schedulesAutoConfirmedToday: 1,
+  lastTickAgeHours: 0.2,
+  netEligibleOutreach: 4,
+  chicagoHour: 12,
+  unscheduledVerified: 10,
+  uniqueClicks7d: 3,
+  registrations7d: 0,
+  claims7d: 0,
+  junkCandidateRate: 0.05,
+});
+assert.ok(clicksNoConvert.some((i) => i.code === "clicks_no_convert"));
 
 console.log(JSON.stringify({ ok: true, checks: "seo-indexability" }));

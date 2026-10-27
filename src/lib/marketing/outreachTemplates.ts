@@ -234,10 +234,10 @@ function buildOpenMicIntroLetter(
   const cta = ctaUrl?.trim();
   const ctaLabel = opts?.listingFirst ? "Claim this open mic free" : "Manage your listing";
   const paras = [
-    `We found ${name} while building MicStage, a free platform for finding and running open mics.`,
+    `We found ${name} while building MicStage — a free listing for your open mic. No credit card.`,
     opts?.listingFirst
-      ? "Your open mic is already listed — click below to see it and claim management free."
-      : "If you host this open mic, you can claim or manage the listing free, update the schedule, and optionally let performers sign up online.",
+      ? "It's already listed. Claim it free to correct details, manage the night, or take it down."
+      : "If this is your open mic, claim or manage it free — correct the listing, update the schedule, or take it down.",
   ];
   const textLines = [
     "Hi,",

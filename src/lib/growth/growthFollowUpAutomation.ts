@@ -72,6 +72,11 @@ export async function runGrowthFollowUpAutomation(
     orderBy: { sentAt: "asc" },
     take: 40,
   });
+  drafts.sort((a, b) => {
+    const ac = a.lead.acquisitionStage === "CLICKED" ? 0 : 1;
+    const bc = b.lead.acquisitionStage === "CLICKED" ? 0 : 1;
+    return ac - bc;
+  });
 
   const outreachRuntime = await resolveOutreachRuntimeSnapshot(prisma);
   let sent = 0;

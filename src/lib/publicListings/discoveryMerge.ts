@@ -70,6 +70,8 @@ function toFinderRow(
     scheduleWeekdays?: string[];
     performanceFormats?: string[];
     signupMethod?: string | null;
+    cost?: string | null;
+    scheduleStarts?: Array<{ weekday: string; startTimeMin: number }>;
     ctaLabel?: string | null;
   },
   counts: ReadonlyMap<string, number>,
@@ -93,6 +95,8 @@ function toFinderRow(
     scheduleWeekdays: opts.scheduleWeekdays,
     performanceFormats: opts.performanceFormats,
     signupMethod: opts.signupMethod ?? null,
+    cost: opts.cost ?? null,
+    scheduleStarts: opts.scheduleStarts,
   };
 }
 
@@ -162,7 +166,7 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
         bookingOpensDaysAhead: true,
         eventTemplates: {
           where: { isPublic: true },
-          select: { id: true, bookingRestrictionMode: true, weekday: true, performanceFormat: true },
+          select: { id: true, bookingRestrictionMode: true, weekday: true, performanceFormat: true, startTimeMin: true },
           take: 8,
         },
       },
@@ -220,6 +224,7 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
         v.eventTemplates.some((t) => t.bookingRestrictionMode !== "HOUSE_ONLY")) ||
       Boolean(hostSignup);
     const scheduleWeekdays = [...new Set(v.eventTemplates.map((t) => t.weekday))];
+    const scheduleStarts = v.eventTemplates.map((t) => ({ weekday: t.weekday, startTimeMin: t.startTimeMin }));
     const performanceFormats = [...new Set(v.eventTemplates.map((t) => t.performanceFormat).filter(Boolean))];
     const href = hostSignup ? `/nights/${hostSignup.nightId}/lineup` : venuePublicHref(v.slug);
     const ctaLabel = hostSignup
@@ -235,6 +240,7 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
         bookable,
         hasSchedule,
         scheduleWeekdays,
+        scheduleStarts,
         performanceFormats,
         ctaLabel,
       },
@@ -246,6 +252,7 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
     const kind = listingKind(l.verificationStatus);
     const hasSchedule = l.schedules.length > 0;
     const scheduleWeekdays = [...new Set(l.schedules.map((s) => s.weekday))];
+    const scheduleStarts = l.schedules.map((s) => ({ weekday: s.weekday, startTimeMin: s.startTimeMin }));
     const performanceFormats = [
       ...new Set(l.schedules.map((s) => s.performanceFormat).filter(Boolean) as string[]),
     ];
@@ -257,8 +264,10 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
         bookable: false,
         hasSchedule,
         scheduleWeekdays,
+        scheduleStarts,
         performanceFormats,
         signupMethod: l.signupMethod,
+        cost: l.cost,
       },
       counts,
     );

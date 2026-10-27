@@ -21,6 +21,9 @@ export type OpenMicFinderVenue = {
   /** Performance formats when known. */
   performanceFormats?: string[];
   signupMethod?: string | null;
+  cost?: string | null;
+  /** Earliest known start time (minutes from midnight) per weekday when scheduled. */
+  scheduleStarts?: Array<{ weekday: string; startTimeMin: number }>;
 };
 
 export type NearbyDiscoveryRow = {

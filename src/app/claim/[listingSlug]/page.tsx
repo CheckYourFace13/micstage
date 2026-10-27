@@ -24,10 +24,10 @@ export async function generateMetadata(props: { params: Promise<{ listingSlug: s
 
 export default async function ClaimListingPage(props: {
   params: Promise<{ listingSlug: string }>;
-  searchParams: Promise<{ growthLead?: string }>;
+  searchParams: Promise<{ growthLead?: string; email?: string }>;
 }) {
   const { listingSlug } = await props.params;
-  const { growthLead } = await props.searchParams;
+  const { growthLead, email: emailParam } = await props.searchParams;
   if (!isValidPublicSlug(listingSlug)) notFound();
 
   const prisma = getPrismaOrNull();
@@ -57,9 +57,23 @@ export default async function ClaimListingPage(props: {
       ? growthFromListing.growthLeadId
       : "");
 
+  const leadPrefill = growthLeadId
+    ? await prisma.growthLead.findUnique({
+        where: { id: growthLeadId },
+        select: { contactEmailNormalized: true, name: true },
+      })
+    : null;
+  const prefillEmail =
+    (typeof emailParam === "string" && emailParam.includes("@") ? emailParam.trim() : "") ||
+    leadPrefill?.contactEmailNormalized ||
+    "";
   const venueRegisterQs = new URLSearchParams({ claimListing: listing.slug });
   if (growthLeadId) venueRegisterQs.set("growthLead", growthLeadId);
-  const hostQs = growthLeadId ? `?growthLead=${encodeURIComponent(growthLeadId)}` : "";
+  if (prefillEmail) venueRegisterQs.set("email", prefillEmail);
+  const hostQs = new URLSearchParams();
+  if (growthLeadId) hostQs.set("growthLead", growthLeadId);
+  if (prefillEmail) hostQs.set("email", prefillEmail);
+  const hostHref = hostQs.toString() ? `/host?${hostQs.toString()}` : "/host";
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -73,7 +87,7 @@ export default async function ClaimListingPage(props: {
         </p>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <Link
-            href={`/host${hostQs}`}
+            href={hostHref}
             className="rounded-xl border border-violet-400/35 bg-violet-500/15 p-4 text-sm hover:bg-violet-500/25"
           >
             <p className="font-semibold text-white">I host this open mic</p>
@@ -89,7 +103,12 @@ export default async function ClaimListingPage(props: {
         </div>
         <p className="mt-6 text-xs text-white/50">Or submit a manual claim request below.</p>
         <div className="mt-8">
-          <ClaimListingForm listingSlug={listing.slug} listingName={listing.name} />
+          <ClaimListingForm
+            listingSlug={listing.slug}
+            listingName={listing.name}
+            defaultEmail={prefillEmail || undefined}
+            defaultName={leadPrefill?.name || undefined}
+          />
         </div>
       </main>
     </div>

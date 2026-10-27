@@ -1,5 +1,6 @@
 import type { OwnerDailySummaryData } from "@/lib/ownerSummary/buildOwnerDailySummary";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
+import { buildOwnerAttentionItems } from "@/lib/ownerSummary/ownerAttention";
 
 function esc(s: string): string {
   return s
@@ -523,13 +524,53 @@ export function ownerDailySummarySubject(data: OwnerDailySummaryData): string {
   const ready = data.growthEngine.autoSendReady;
   const verified = data.listingsInventory.verifiedListings;
   const sent = data.growthEngine.emailsSentToday;
-  return `MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified · ${ready} send-ready · ${sent} sent`;
+  const attention = ownerAttentionFromSummary(data);
+  const prefix = attention.length ? "ATTN · " : "";
+  return `${prefix}MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified · ${ready} send-ready · ${sent} sent`;
+}
+
+function ownerAttentionFromSummary(data: OwnerDailySummaryData) {
+  return buildOwnerAttentionItems({
+    outreachEnabled: data.marketing.outreachEnabled,
+    killSwitch: data.growthEngine.killStatus,
+    emailsSentToday: data.growthEngine.emailsSentToday,
+    dailyCap: data.growthEngine.dailyCap,
+    providerHeadroom: data.growthEngine.providerHeadroom,
+    bounceRate: data.growthEngine.bounceRate,
+    complaintRate: data.growthEngine.complaintRate,
+    autoSendReady: data.growthEngine.autoSendReady,
+    leadsCreatedToday: data.leadsCreatedCount,
+    needsReviewCount: data.listingsInventory.needsReviewCount,
+    autoVerifiedToday: data.growthFunnel.autoVerifiedToday,
+    inviteReady: data.growthFunnel.inviteReady,
+    claimInvitesSentToday: data.listingsInventory.claimInvitesSentCount,
+    unclaimedVerified: data.listingsInventory.unclaimedListings,
+    indexableScheduledListings: -1,
+    schedulesAutoConfirmedToday: -1,
+    lastTickAgeHours: null,
+  });
+}
+
+function renderAttentionText(data: OwnerDailySummaryData): string[] {
+  const items = ownerAttentionFromSummary(data);
+  if (items.length === 0) return ["ATTENTION REQUIRED: NONE", ""];
+  return ["ATTENTION REQUIRED", ...items.map((i) => `  - ${i.message}`), ""];
+}
+
+function renderAttentionHtml(data: OwnerDailySummaryData): string {
+  const items = ownerAttentionFromSummary(data);
+  if (items.length === 0) {
+    return `<p style="margin:0 0 16px;padding:10px 12px;background:#ecfdf5;color:#065f46;font-size:14px;font-weight:600">ATTENTION REQUIRED: NONE</p>`;
+  }
+  const lis = items.map((i) => `<li>${esc(i.message)}</li>`).join("");
+  return `<div style="margin:0 0 16px;padding:10px 12px;background:#fff7ed;border:1px solid #fdba74"><p style="margin:0 0 8px;font-weight:700;color:#9a3412">ATTENTION REQUIRED</p><ul style="margin:0;padding-left:18px">${lis}</ul></div>`;
 }
 
 export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string {
   const lines: string[] = [
     `MicStage Daily Summary (${data.windowLabel})`,
     "",
+    ...renderAttentionText(data),
     "SIGNUPS (24h)",
     `  Venues (new operator accounts): ${data.signupVenueCount}`,
     `  Artists: ${data.signupArtistCount}`,
@@ -619,6 +660,7 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
 <html><body style="font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#111827;max-width:720px;margin:0 auto;padding:16px">
   <h1 style="font-size:18px;margin:0 0 4px">MicStage Daily Summary</h1>
   <p style="margin:0 0 16px;color:#6b7280;font-size:13px">${esc(data.windowLabel)}</p>
+  ${renderAttentionHtml(data)}
 
   <h2 style="font-size:15px;margin:20px 0 8px">Signups (last 24h)</h2>
   <p style="margin:0 0 8px"><strong>Venues:</strong> ${data.signupVenueCount} · <strong>Artists:</strong> ${data.signupArtistCount}</p>

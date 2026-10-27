@@ -446,16 +446,18 @@ export async function verifyPublicListingsWithGoogle(
   const verifiedInventory = await prisma.publicOpenMicListing.count({
     where: { verificationStatus: "VERIFIED", removedAt: null, googlePlaceId: { not: null } },
   });
-  if (verifiedInventory >= inventoryTarget) {
-    return { verified: 0, needsReview: 0, outdated: 0, skipped: 0, noApiKey: false };
-  }
+  // Keep the Places cost cap for re-enrichment, but still place-check brand-new
+  // listings so NEEDS_REVIEW does not grow forever after the inventory target is met.
+  const onlyNeverChecked = verifiedInventory >= inventoryTarget;
 
   const now = new Date();
   const rows = await prisma.publicOpenMicListing.findMany({
     where: {
       claimedVenueId: null,
       verificationStatus: { not: "OUTDATED" },
-      OR: [{ googlePlaceId: null }, { googlePlaceVerifiedAt: null }],
+      OR: onlyNeverChecked
+        ? [{ AND: [{ googlePlaceId: null }, { googlePlaceVerifiedAt: null }] }]
+        : [{ googlePlaceId: null }, { googlePlaceVerifiedAt: null }],
       AND: [
         {
           OR: [{ placeVerifyNextAttemptAt: null }, { placeVerifyNextAttemptAt: { lte: now } }],

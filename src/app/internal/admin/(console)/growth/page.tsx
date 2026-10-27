@@ -412,7 +412,7 @@ export default async function AdminGrowthHubPage(props: {
         manual, CSV, and optional scheduled discovery jobs (adapters). Top venue leads in ACTIVE launch markets now
         auto-advance through draft → approval → send under existing send protections. Artists/promoters stay manual-first.
         Follow-up automation:{" "}
-        <span className="text-zinc-300">{growthFollowUpAutomationEnabled() ? "ON" : "OFF"}</span> (default off).
+        <span className="text-zinc-300">{growthFollowUpAutomationEnabled() ? "ON" : "OFF"}</span> (default on; set GROWTH_FOLLOW_UP_AUTOMATION_ENABLED=false to disable).
       </p>
       <p className="mt-2 max-w-2xl text-xs text-zinc-500">
         Cron: <code className="text-zinc-400">POST /api/cron/growth-pipeline</code> with{" "}

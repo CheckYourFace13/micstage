@@ -330,6 +330,16 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
    * bumped, so they are never evaluated. Half the window sweeps from a persisted cursor instead,
    * wrapping at the end, so every candidate is reached within a few ticks.
    */
+  const sendReadyScan = await prisma.growthLead.findMany({
+    where: {
+      ...priorityWhere,
+      discoveryHints: { path: ["outreachEvidence", "opsState"], equals: "AUTO_SEND_READY" },
+    },
+    select: { id: true },
+    orderBy: [{ updatedAt: "desc" }],
+    take: draftWorkTake,
+  });
+
   const hotScan = await prisma.growthLead.findMany({
     where: priorityWhere,
     select: { id: true },
@@ -352,8 +362,9 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     take: Math.max(2, Math.floor(hotTake / 2)),
   });
 
+  const sendReadyIds = new Set(sendReadyScan.map((r) => r.id));
   const multiVenueHostIds = new Set(multiVenueHostScan.map((r) => r.id));
-  const hotIds = new Set([...multiVenueHostScan, ...hotScan].map((r) => r.id));
+  const hotIds = new Set([...sendReadyScan, ...multiVenueHostScan, ...hotScan].map((r) => r.id));
 
   const scanStartId = await readDraftScanCursor(prisma);
   let cursorId = scanStartId;
@@ -378,8 +389,9 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
 
   const priorityEligibleIds: string[] = [];
   const priorityScanOrder = [
-    ...multiVenueHostScan,
-    ...hotScan.filter((r) => !multiVenueHostIds.has(r.id)),
+    ...sendReadyScan,
+    ...multiVenueHostScan.filter((r) => !sendReadyIds.has(r.id)),
+    ...hotScan.filter((r) => !multiVenueHostIds.has(r.id) && !sendReadyIds.has(r.id)),
     ...rotatingRows.filter((r) => !hotIds.has(r.id)),
   ];
   for (const row of priorityScanOrder) {

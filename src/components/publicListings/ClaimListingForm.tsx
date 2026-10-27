@@ -3,10 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 
-export function ClaimListingForm(props: { listingSlug: string; listingName: string }) {
-  const [contactName, setContactName] = useState("");
+export function ClaimListingForm(props: {
+  listingSlug: string;
+  listingName: string;
+  defaultEmail?: string;
+  defaultName?: string;
+}) {
+  const [contactName, setContactName] = useState(props.defaultName ?? "");
   const [role, setRole] = useState("host");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(props.defaultEmail ?? "");
   const [phone, setPhone] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [notes, setNotes] = useState("");

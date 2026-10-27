@@ -292,6 +292,10 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
             Find open mics near you
           </Link>
           {" · "}
+          <Link href="/resources" className="underline hover:text-white">
+            Open mic guides
+          </Link>
+          {" · "}
           <Link href="/map" className="underline hover:text-white">
             Open mic map
           </Link>

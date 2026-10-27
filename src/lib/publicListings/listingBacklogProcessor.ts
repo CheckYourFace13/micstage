@@ -7,6 +7,7 @@ import { verifyPublicListingsWithGoogle } from "@/lib/publicListings/googlePlace
 import { promotePlaceConfirmedListings } from "@/lib/publicListings/promotePlaceConfirmedListings";
 import { mineVerifiedListingOfficialEmails } from "@/lib/publicListings/mineVerifiedListingContacts";
 import { enrichGrowthLeadOfficialEvidence } from "@/lib/growth/outreachEvidenceEnrichment";
+import { enrichVerifiedListingSchedules } from "@/lib/publicListings/listingScheduleEnrichment";
 import { micstagePromotionKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 import {
   resolveGrowthPipelineRuntimeSnapshot,
@@ -32,6 +33,7 @@ export type ListingBacklogProcessorResult = {
   junkByReason: Record<string, number>;
   evidenceEnrich: Awaited<ReturnType<typeof enrichListingsMissingTrustedEvidence>>;
   outreachEvidenceEnrich: Awaited<ReturnType<typeof enrichGrowthLeadOfficialEvidence>>;
+  scheduleEnrich: Awaited<ReturnType<typeof enrichVerifiedListingSchedules>>;
   contactMine: Awaited<ReturnType<typeof mineVerifiedListingOfficialEmails>>;
   leadsReprocessed: number;
   stagesRun: string[];
@@ -61,6 +63,7 @@ export async function runListingBacklogProcessor(
     failed: 0,
     byFailureReason: {} as Record<string, number>,
   };
+  const emptyScheduleEnrich = { scanned: 0, confirmed: 0, uncertain: 0, skipped: 0 };
   const emptyOutreachEvidence = {
     processed: 0,
     crawled: 0,
@@ -90,6 +93,7 @@ export async function runListingBacklogProcessor(
       junkByReason: {},
       evidenceEnrich: emptyEnrich,
       outreachEvidenceEnrich: emptyOutreachEvidence,
+      scheduleEnrich: emptyScheduleEnrich,
       contactMine: emptyMine,
       leadsReprocessed: 0,
       stagesRun,
@@ -167,6 +171,14 @@ export async function runListingBacklogProcessor(
     stagesSkippedForBudget.push("evidence_enrich");
   }
 
+  let scheduleEnrich = emptyScheduleEnrich;
+  if (canRun(10_000)) {
+    scheduleEnrich = await enrichVerifiedListingSchedules(prisma, { limit: 8 });
+    stagesRun.push("schedule_enrich");
+  } else {
+    stagesSkippedForBudget.push("schedule_enrich");
+  }
+
   let outreachEvidenceEnrich = emptyOutreachEvidence;
   if (canRun(12_000)) {
     outreachEvidenceEnrich = await enrichGrowthLeadOfficialEvidence(prisma, {
@@ -208,6 +220,7 @@ export async function runListingBacklogProcessor(
     junkByReason: junk.byReason,
     evidenceEnrich,
     outreachEvidenceEnrich,
+    scheduleEnrich,
     contactMine,
     leadsReprocessed,
     stagesRun,

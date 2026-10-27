@@ -452,7 +452,7 @@ export default async function AdminGrowthLeadDetailPage(props: {
       <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <h2 className="text-sm font-medium text-white">Follow-up schedule (framework)</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Rows are stored for future workers. Global automation: {growthFollowUpAutomationEnabled() ? "ON" : "OFF"}.
+          One conservative follow-up may send 48–72h after a delivered first note. Global automation: {growthFollowUpAutomationEnabled() ? "ON" : "OFF"}.
         </p>
         <form action={createGrowthLeadFollowUpAction} className="mt-3 grid gap-2 text-sm sm:max-w-md">
           <input type="hidden" name="leadId" value={lead.id} />

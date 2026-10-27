@@ -117,7 +117,7 @@ export function performerLifecycleEmailEnabled(): boolean {
   return process.env.MARKETING_AUTO_PERFORMER_LIFECYCLE === "true";
 }
 
-/** Growth lead follow-up schedules exist in DB; no worker sends until this is true. */
+/** Conservative one-shot follow-up. On unless explicitly disabled. */
 export function growthFollowUpAutomationEnabled(): boolean {
-  return process.env.GROWTH_FOLLOW_UP_AUTOMATION_ENABLED === "true";
+  return process.env.GROWTH_FOLLOW_UP_AUTOMATION_ENABLED !== "false";
 }

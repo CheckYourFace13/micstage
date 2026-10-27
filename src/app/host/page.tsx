@@ -13,8 +13,10 @@ export const metadata: Metadata = buildPublicMetadata({
 
 const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
 
-export default async function HostLandingPage(props: { searchParams: Promise<{ growthLead?: string }> }) {
-  const { growthLead } = await props.searchParams;
+export default async function HostLandingPage(props: {
+  searchParams: Promise<{ growthLead?: string; email?: string; displayName?: string }>;
+}) {
+  const { growthLead, email: emailParam, displayName } = await props.searchParams;
   const traceId = typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim()) ? growthLead.trim() : "";
   if (traceId) {
     const prisma = getPrismaOrNull();
@@ -24,7 +26,12 @@ export default async function HostLandingPage(props: { searchParams: Promise<{ g
     }
   }
 
-  const registerHref = traceId ? `/register/promoter?growthLead=${encodeURIComponent(traceId)}` : "/register/promoter";
+  const registerQs = new URLSearchParams();
+  if (traceId) registerQs.set("growthLead", traceId);
+  if (typeof emailParam === "string" && emailParam.includes("@")) registerQs.set("email", emailParam.trim());
+  if (typeof displayName === "string" && displayName.trim()) registerQs.set("displayName", displayName.trim());
+  const registerQuery = registerQs.toString();
+  const registerHref = registerQuery ? `/register/promoter?${registerQuery}` : "/register/promoter";
 
   return (
     <div className="min-h-dvh bg-black text-white">

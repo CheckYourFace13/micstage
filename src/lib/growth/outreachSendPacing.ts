@@ -80,8 +80,10 @@ export function computeOutreachSendPacing(input: {
     reason = "no_ticks_left_in_window";
   } else {
     const evenSpread = Math.ceil(remaining / remainingTicks);
-    sendsThisCron = Math.min(configured, evenSpread);
-    reason = `paced_spread: min(configured=${configured}, ceil(${remaining}/${remainingTicks})=${evenSpread})`;
+    const behindBy = remaining - remainingTicks;
+    const catchUp = behindBy >= 4 ? Math.min(configured, remaining) : evenSpread;
+    sendsThisCron = Math.min(configured, Math.max(evenSpread, catchUp));
+    reason = `paced_spread: min(configured=${configured}, ceil(${remaining}/${remainingTicks})=${evenSpread}, catchUp=${catchUp})`;
   }
 
   return {

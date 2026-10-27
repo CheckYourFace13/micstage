@@ -142,7 +142,7 @@ export async function runWeeklyOpenMicDigestJob(prisma: PrismaClient, now: Date)
       nearbyVenues.push({ id: v.id, name: v.name, slug: v.slug, nights: uniq.slice(0, 5) });
     }
 
-    if (nearbyVenues.length === 0) continue;
+    if (nearbyVenues.length < 2) continue;
 
     const findUrl = absoluteUrl("/find-open-mics");
     const profileUrl = absoluteUrl("/artist");

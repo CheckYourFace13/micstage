@@ -29,7 +29,14 @@ export type OutreachAutoRampDecision = {
   ramp: boolean;
   nextDailyMax: number;
   reason: string;
+  /** When set, raise per-cron throughput so a healthy backlog can reach the 20-send ramp window. */
+  recommendedSendsPerCron?: number;
 };
+
+/** Enough per-tick volume that ~8 healthy daytime ticks can consume the daily max. */
+export function recommendedOutreachSendsPerCron(dailyMax: number): number {
+  return Math.min(15, Math.max(2, Math.ceil(Math.max(1, dailyMax) / 8)));
+}
 
 export function providerMarketingCeiling(providerMax = micstageResendDailyMax(), reserve = micstageTransactionalReserveSlots()): number {
   return Math.max(0, providerMax - reserve);
@@ -68,7 +75,12 @@ export function evaluateOutreachAutoRamp(input: {
     return { ramp: false, nextDailyMax: current, reason: "hold_window_not_elapsed" };
   }
   if (input.sentInWindow < OUTREACH_AUTORAMP_MIN_SENDS) {
-    return { ramp: false, nextDailyMax: current, reason: "hold_insufficient_sends" };
+    return {
+      ramp: false,
+      nextDailyMax: current,
+      reason: "hold_insufficient_sends",
+      recommendedSendsPerCron: recommendedOutreachSendsPerCron(current),
+    };
   }
   const nextStage = OUTREACH_AUTORAMP_STAGES.find((s) => s > current);
   if (nextStage == null) {
@@ -195,6 +207,37 @@ export async function applyOutreachAutoRamp(prisma: PrismaClient, now = new Date
         reason: decision.reason,
       },
     });
+  }
+
+  const alignPerCron =
+    decision.recommendedSendsPerCron ??
+    (health.ok && health.sendMultiplier >= 1 && complaints === 0 && securityGateClear
+      ? recommendedOutreachSendsPerCron(decision.nextDailyMax)
+      : undefined);
+  if (alignPerCron && health.ok && health.sendMultiplier >= 1 && complaints === 0 && securityGateClear) {
+    const perCronRow = await prisma.operationalRuntimeSetting.findUnique({
+      where: { key: "GROWTH_OUTREACH_SENDS_PER_CRON_RUN" },
+      select: { value: true },
+    });
+    const currentPerCron = Number.parseInt(perCronRow?.value || "0", 10) || 0;
+    if (currentPerCron < alignPerCron) {
+      await prisma.operationalRuntimeSetting.upsert({
+        where: { key: "GROWTH_OUTREACH_SENDS_PER_CRON_RUN" },
+        create: {
+          key: "GROWTH_OUTREACH_SENDS_PER_CRON_RUN",
+          valueType: "integer",
+          value: String(alignPerCron),
+          updatedBy: "outreach-auto-ramp",
+          reason: "align_per_cron_to_clear_insufficient_sends",
+        },
+        update: {
+          valueType: "integer",
+          value: String(alignPerCron),
+          updatedBy: "outreach-auto-ramp",
+          reason: "align_per_cron_to_clear_insufficient_sends",
+        },
+      });
+    }
   }
 
   return decision;

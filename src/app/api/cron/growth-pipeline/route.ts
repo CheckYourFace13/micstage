@@ -40,6 +40,8 @@ import { resolveOutreachRuntimeSnapshot } from "@/lib/growth/outreachRuntimeSett
 import { evaluateOutreachSendHealth } from "@/lib/growth/outreachHealthThrottle";
 import { evaluateOutreachTargetingIntegrity } from "@/lib/growth/outreachTargetingIntegrity";
 import { applyOutreachAutoRamp } from "@/lib/growth/outreachAutoRamp";
+import { runGrowthFollowUpAutomation } from "@/lib/growth/growthFollowUpAutomation";
+import { growthFollowUpAutomationEnabled } from "@/lib/marketing/emailConfig";
 import {
   growthRuntimeSnapshotForStatus,
   resolveGrowthPipelineRuntimeSnapshot,
@@ -154,6 +156,7 @@ async function handle(request: Request) {
     let directoryReprocess: Awaited<ReturnType<typeof runDirectoryLeadReprocessing>> | null = null;
     let googleContentPurge: Awaited<ReturnType<typeof purgeExpiredGoogleMapsContent>> | null = null;
     let drafts: Awaited<ReturnType<typeof runAutoGrowthOutreachDrafts>> | null = null;
+    let followUps: Awaited<ReturnType<typeof runGrowthFollowUpAutomation>> | null = null;
     let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
     let hostMultiVenueSweep: Awaited<ReturnType<typeof sweepHostMultiVenueProspects>> | null = null;
     let listingClaimInvites: Awaited<ReturnType<typeof runPendingListingClaimInvites>> | null = null;
@@ -254,6 +257,14 @@ async function handle(request: Request) {
         } else {
           try {
             drafts = await runAutoGrowthOutreachDrafts(prisma);
+            if (growthFollowUpAutomationEnabled()) {
+              try {
+                followUps = await runGrowthFollowUpAutomation(prisma, { limit: 4 });
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                console.error("[growth pipeline] follow-up automation failed", { error: msg, phase });
+              }
+            }
           } finally {
             await lock.release();
           }
@@ -441,6 +452,7 @@ async function handle(request: Request) {
         listingClaimInvites,
         onboardingNudges,
         autoDrafts: drafts,
+        followUps,
         growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,
         hint:
           phase === "tick"

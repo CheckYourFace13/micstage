@@ -23,6 +23,8 @@ import {
   isPublicListingSourceUrl,
 } from "../src/lib/publicListings/listingAboutFromLead.ts";
 import { shouldIndexDiscoveryPage } from "../src/lib/seo/discoveryIndex.ts";
+import { parseExplicitScheduleFromText } from "../src/lib/publicListings/explicitScheduleParse.ts";
+import { buildOwnerAttentionItems } from "../src/lib/ownerSummary/ownerAttention.ts";
 import { buildPublicMetadata } from "../src/lib/publicSeo.ts";
 import fs from "node:fs";
 import path from "node:path";
@@ -276,5 +278,33 @@ const mw = fs.readFileSync(path.join(process.cwd(), "src/middleware.ts"), "utf8"
 assert.match(mw, /www\.micstage\.com/);
 assert.match(mw, /micstage\.com/);
 assert.match(mw, /301/);
+
+const parsedSched = parseExplicitScheduleFromText("Open mic every Wednesday at 8:00 pm. Sign up at the door.");
+assert.equal(parsedSched?.weekday, "WED");
+assert.equal(parsedSched?.startTimeMin, 20 * 60);
+assert.equal(parsedSched?.endTimeMin, null);
+assert.ok(parsedSched?.signupMethod);
+assert.equal(parseExplicitScheduleFromText("Live music on weekends"), null);
+
+const attentionNone = buildOwnerAttentionItems({
+  outreachEnabled: true,
+  killSwitch: false,
+  emailsSentToday: 24,
+  dailyCap: 50,
+  providerHeadroom: 26,
+  bounceRate: 0,
+  complaintRate: 0,
+  autoSendReady: 10,
+  leadsCreatedToday: 3,
+  needsReviewCount: 10,
+  autoVerifiedToday: 2,
+  inviteReady: 4,
+  claimInvitesSentToday: 1,
+  unclaimedVerified: 20,
+  indexableScheduledListings: 5,
+  schedulesAutoConfirmedToday: 1,
+  lastTickAgeHours: 0.2,
+});
+assert.equal(attentionNone.length, 0);
 
 console.log(JSON.stringify({ ok: true, checks: "seo-indexability" }));

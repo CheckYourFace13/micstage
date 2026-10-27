@@ -1027,6 +1027,23 @@ const blockedSecurityRamp = evaluateOutreachAutoRamp({
 });
 assert.equal(blockedSecurityRamp.ramp, false);
 assert.equal(blockedSecurityRamp.reason, "hold_rls_security_gate");
+
+const stuckRamp = evaluateOutreachAutoRamp({
+  currentDailyMax: 25,
+  stageEnteredAt: rampEntered,
+  now: rampNow,
+  sentInWindow: 4,
+  complaints: 0,
+  hardBounceRate: 0,
+  bounceStopRate: 0.05,
+  healthOk: true,
+  targetingOk: true,
+  earlyComplaintThrottle: false,
+  securityGateClear: true,
+});
+assert.equal(stuckRamp.ramp, false);
+assert.equal(stuckRamp.reason, "hold_insufficient_sends");
+assert.ok((stuckRamp.recommendedSendsPerCron ?? 0) >= 2);
 assert.equal(blockedSecurityRamp.nextDailyMax, 25);
 
 const { clampOutreachDailyMaxForRlsGate } = await import("../src/lib/database/databaseRlsSecurity.ts");

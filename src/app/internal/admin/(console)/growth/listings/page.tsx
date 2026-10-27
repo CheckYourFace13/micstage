@@ -6,6 +6,7 @@ import {
   adminRejectListing,
   adminRejectListingClaim,
   adminResolveListingCorrection,
+  adminSaveVerifiedSchedule,
   adminSetListingVerification,
   adminUpdateListingDetails,
 } from "@/app/internal/admin/listingActions";
@@ -192,6 +193,42 @@ export default async function AdminListingsPage(props: {
                       Save edits
                     </button>
                   </form>
+                  <form action={adminSaveVerifiedSchedule} className="mt-2 flex flex-wrap items-end gap-1">
+                    <input type="hidden" name="listingId" value={l.id} />
+                    <select
+                      name="weekday"
+                      defaultValue="WED"
+                      className="h-8 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                    >
+                      <option value="SUN">Sun</option>
+                      <option value="MON">Mon</option>
+                      <option value="TUE">Tue</option>
+                      <option value="WED">Wed</option>
+                      <option value="THU">Thu</option>
+                      <option value="FRI">Fri</option>
+                      <option value="SAT">Sat</option>
+                    </select>
+                    <input
+                      name="startTime"
+                      type="time"
+                      required
+                      className="h-8 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                    />
+                    <input
+                      name="endTime"
+                      type="time"
+                      required
+                      className="h-8 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                    />
+                    <input
+                      name="signupMethod"
+                      placeholder="signup method"
+                      className="h-8 w-40 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100"
+                    />
+                    <button type="submit" className="h-8 rounded bg-emerald-800 px-3 text-xs hover:bg-emerald-700">
+                      Save verified schedule
+                    </button>
+                  </form>
                 </li>
               );
             })}
@@ -345,6 +382,46 @@ export default async function AdminListingsPage(props: {
                         Link
                       </button>
                     </form>
+                    {l._count.schedules === 0 ? (
+                      <form action={adminSaveVerifiedSchedule} className="mt-1 flex flex-wrap gap-1">
+                        <input type="hidden" name="listingId" value={l.id} />
+                        <select
+                          name="weekday"
+                          defaultValue="WED"
+                          className="h-7 rounded border border-zinc-700 bg-zinc-950 text-xs"
+                        >
+                          <option value="SUN">Sun</option>
+                          <option value="MON">Mon</option>
+                          <option value="TUE">Tue</option>
+                          <option value="WED">Wed</option>
+                          <option value="THU">Thu</option>
+                          <option value="FRI">Fri</option>
+                          <option value="SAT">Sat</option>
+                        </select>
+                        <input
+                          name="startTime"
+                          type="time"
+                          required
+                          className="h-7 rounded border border-zinc-700 bg-zinc-950 text-xs"
+                        />
+                        <input
+                          name="endTime"
+                          type="time"
+                          required
+                          className="h-7 rounded border border-zinc-700 bg-zinc-950 text-xs"
+                        />
+                        <input
+                          name="signupMethod"
+                          placeholder="signup"
+                          className="h-7 w-24 rounded border border-zinc-700 bg-zinc-950 text-xs"
+                        />
+                        <button type="submit" className="h-7 rounded bg-emerald-800 px-2 text-xs">
+                          Add schedule
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="mt-1 text-xs text-zinc-500">{l._count.schedules} schedule(s)</div>
+                    )}
                   </td>
                 </tr>
               ))}

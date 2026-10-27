@@ -403,5 +403,6 @@ export function listingIsPubliclyIndexable(listing: {
   if (!isPublicListingNameOk(listing.name)) return false;
   const hasLocation = Boolean(listing.formattedAddress?.trim() || listing.city?.trim());
   if (!hasLocation) return false;
-  return listing.schedules.length > 0 || listing.lastVerifiedAt != null;
+  // lastVerifiedAt alone is not a schedule. Unscheduled pages stay reachable but noindex.
+  return listing.schedules.length > 0;
 }

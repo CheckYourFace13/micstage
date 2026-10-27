@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { Weekday } from "@/generated/prisma/client";
 import { getOptionalAdminEmailFromLoginForm, assertAdminSession } from "@/lib/adminAuth";
 import { requirePrisma } from "@/lib/prisma";
 import {
@@ -9,6 +10,7 @@ import {
   sendListingClaimApprovedEmail,
   sendListingClaimInviteIfNeeded,
 } from "@/lib/publicListings/listingClaimInviteEmail";
+import { scheduleWindowFromTimeInputs } from "@/lib/scheduleWindow";
 
 const LISTINGS_PATH = "/internal/admin/growth/listings";
 
@@ -226,6 +228,84 @@ export async function adminUpdateListingDetails(formData: FormData) {
   revalidatePath(LISTINGS_PATH);
   revalidatePath(`/open-mics/${listing.slug}`);
   redirectListings("ok=listing_details_saved");
+}
+
+const WEEKDAYS: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+/** Add or refresh a verified weekday/time/signup on the existing listings admin page. */
+export async function adminSaveVerifiedSchedule(formData: FormData) {
+  await assertAdminSession();
+  const listingId = String(formData.get("listingId") ?? "").trim();
+  const weekdayRaw = String(formData.get("weekday") ?? "").trim().toUpperCase();
+  const startTime = String(formData.get("startTime") ?? "").trim();
+  const endTime = String(formData.get("endTime") ?? "").trim();
+  const signupMethod = String(formData.get("signupMethod") ?? "").trim();
+  const weekday = WEEKDAYS.find((d) => d === weekdayRaw);
+  if (!listingId || !weekday) {
+    redirectListings("err=bad_schedule");
+    return;
+  }
+  const window = scheduleWindowFromTimeInputs(startTime, endTime);
+  if (!window) {
+    redirectListings("err=bad_schedule_time");
+    return;
+  }
+
+  const prisma = requirePrisma();
+  const listing = await prisma.publicOpenMicListing.findUnique({
+    where: { id: listingId },
+    select: { slug: true, timeZone: true },
+  });
+  if (!listing) {
+    redirectListings("err=listing_not_found");
+    return;
+  }
+
+  const now = new Date();
+  const existing = await prisma.publicOpenMicSchedule.findFirst({
+    where: { listingId, weekday },
+    select: { id: true },
+  });
+  if (existing) {
+    await prisma.publicOpenMicSchedule.update({
+      where: { id: existing.id },
+      data: {
+        startTimeMin: window.startTimeMin,
+        endTimeMin: window.endTimeMin,
+        signupMethod: signupMethod || null,
+        isActive: true,
+        lastVerifiedAt: now,
+      },
+    });
+  } else {
+    await prisma.publicOpenMicSchedule.create({
+      data: {
+        listingId,
+        weekday,
+        startTimeMin: window.startTimeMin,
+        endTimeMin: window.endTimeMin,
+        timeZone: listing.timeZone || "America/Chicago",
+        signupMethod: signupMethod || null,
+        isActive: true,
+        lastVerifiedAt: now,
+        title: "Open mic",
+      },
+    });
+  }
+
+  await prisma.publicOpenMicListing.update({
+    where: { id: listingId },
+    data: {
+      lastVerifiedAt: now,
+      verificationStatus: "VERIFIED",
+      ...(signupMethod ? { signupMethod } : {}),
+    },
+  });
+
+  revalidatePath(LISTINGS_PATH);
+  revalidatePath(`/open-mics/${listing.slug}`);
+  revalidatePath("/sitemap.xml");
+  redirectListings("ok=schedule_verified");
 }
 
 export async function adminResolveListingCorrection(formData: FormData) {

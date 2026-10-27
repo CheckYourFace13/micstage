@@ -150,4 +150,13 @@ assert.equal(offenders.length, 0, `AdSense imports in forbidden surfaces:\n${off
 const performersPage = read("src/app/locations/[locationSlug]/performers/page.tsx");
 assert.doesNotMatch(performersPage, /AdSenseDisplayAd|ADSENSE_SLOTS/);
 
+const privacy = read("src/app/privacy/page.tsx");
+assert.match(privacy, /Advertising \(Google AdSense\)/);
+assert.match(privacy, /google\.com\/settings\/ads/);
+assert.match(privacy, /contact form/);
+assert.doesNotMatch(privacy, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+
+const layoutNoVercelInsights = read("src/app/layout.tsx");
+assert.doesNotMatch(layoutNoVercelInsights, /@vercel\/analytics|\/_vercel\/insights/);
+
 console.log("ok: adsense placement guard (editorial + city open-mics only)");

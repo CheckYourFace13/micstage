@@ -90,6 +90,7 @@ async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
           name: true,
           googlePlaceId: true,
           formattedAddress: true,
+          eventTemplates: { where: { isPublic: true }, select: { id: true, isPublic: true } },
         },
       }),
       prisma.publicOpenMicListing.findMany({

@@ -227,12 +227,20 @@ export function buildVenueNightEventJsonLd(input: {
   return out;
 }
 
+/** True when a public venue has at least one public recurring schedule. */
+export function venueHasPublicSchedule(v: {
+  eventTemplates?: Array<{ isPublic?: boolean | null }> | null;
+}): boolean {
+  return (v.eventTemplates ?? []).some((t) => t.isPublic === true);
+}
+
 /** Minimal venue quality gate for sitemap inclusion (no redesign). */
 export function venueIsSitemapEligible(v: {
   name: string;
   slug: string;
   googlePlaceId?: string | null;
   formattedAddress: string;
+  eventTemplates?: Array<{ isPublic?: boolean | null }> | null;
 }): boolean {
   const name = (v.name ?? "").trim();
   const slug = (v.slug ?? "").trim();
@@ -242,5 +250,6 @@ export function venueIsSitemapEligible(v: {
   if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return false;
   if (addr.length < 5) return false;
   if (!placeId) return false;
+  if (!venueHasPublicSchedule(v)) return false;
   return true;
 }

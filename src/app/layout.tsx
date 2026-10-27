@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
-import { Analytics } from "@vercel/analytics/next";
 import { Bebas_Neue, Inter } from "next/font/google";
 import { AdSenseScript } from "@/components/ads/AdSenseScript";
 import { MarketingTrackingClient } from "@/components/MarketingTrackingClient";
@@ -94,7 +93,6 @@ export default async function RootLayout({
         {!embed ? <SiteHeader /> : null}
         {children}
         {!embed ? <SiteFooter /> : null}
-        {!isAnalyticsDisabled() ? <Analytics /> : null}
         {!isAnalyticsDisabled() ? (
           <Suspense fallback={null}>
             <MarketingTrackingClient />

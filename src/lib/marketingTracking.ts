@@ -1,13 +1,10 @@
 "use client";
 
-import { track as vercelTrack } from "@vercel/analytics/react";
 import { conversionEventParams } from "@/lib/conversionAttribution";
 import { isAnalyticsDisabled } from "@/lib/productAnalytics";
 
 export const GA4_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID?.trim() ?? "";
 export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim() ?? "";
-
-type VercelProp = string | number | boolean | null | undefined;
 
 /** GA4 conversion events (canonical funnel names). */
 export type ConversionEventName =
@@ -105,15 +102,6 @@ export function trackMarketingEvent(name: MarketingEventName, params?: Record<st
 
   sendGa4Event(name, params);
   sendMetaEvent(name, params);
-  const vercelProps: Record<string, VercelProp> | undefined = params
-    ? Object.fromEntries(
-        Object.entries(params).map(([k, v]) => [
-          k,
-          typeof v === "string" || typeof v === "number" || typeof v === "boolean" || v == null ? v : String(v),
-        ]),
-      )
-    : undefined;
-  vercelTrack(name, vercelProps);
 
   if (window.gtag && GA4_MEASUREMENT_ID) {
     if (name === "search_performed") window.gtag("event", "search", params ?? {});

@@ -14,6 +14,7 @@ import {
   publicListingSeoDescription,
   buildListingEventJsonLd,
   buildVenueNightEventJsonLd,
+  venueHasPublicSchedule,
   venueIsSitemapEligible,
 } from "../src/lib/publicListings/listingSeo.ts";
 import {
@@ -52,6 +53,9 @@ assert.equal(isPublicListingRenderable(baseListing({ name: "How to mic a stage" 
 assert.equal(listingIsPubliclyIndexable(baseListing({ verificationStatus: "OUTDATED" })), false);
 assert.equal(listingIsPubliclyIndexable(baseListing({ removedAt: new Date() })), false);
 assert.equal(listingIsPubliclyIndexable(baseListing({ schedules: [], lastVerifiedAt: null })), false);
+// lastVerifiedAt is a confirmation stamp, not a schedule substitute
+assert.equal(listingIsPubliclyIndexable(baseListing({ schedules: [], lastVerifiedAt: new Date() })), false);
+assert.equal(listingMeetsPublicSeoIndexGate(baseListing({ schedules: [], lastVerifiedAt: new Date() })), false);
 
 // Trusted public listing indexable; removedAt cannot be sitemap/index
 assert.equal(listingMeetsPublicSeoIndexGate(baseListing()), true);
@@ -193,13 +197,27 @@ assert.equal(claimMeta.robots?.follow, false);
 assert.equal(claimMeta.robots?.googleBot?.index, false);
 assert.equal(claimMeta.robots?.googleBot?.follow, false);
 
-// Venue sitemap quality gate
+// Venue sitemap quality gate — place identity alone is not a schedule
+assert.equal(
+  venueHasPublicSchedule({ eventTemplates: [] }),
+  false,
+);
 assert.equal(
   venueIsSitemapEligible({
     name: "The Hideout",
     slug: "the-hideout",
     googlePlaceId: "ChIJabc",
     formattedAddress: "1354 W Wabansia Ave, Chicago, IL",
+  }),
+  false,
+);
+assert.equal(
+  venueIsSitemapEligible({
+    name: "The Hideout",
+    slug: "the-hideout",
+    googlePlaceId: "ChIJabc",
+    formattedAddress: "1354 W Wabansia Ave, Chicago, IL",
+    eventTemplates: [{ isPublic: true }],
   }),
   true,
 );

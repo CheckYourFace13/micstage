@@ -8,6 +8,7 @@ import {
   primaryDiscoverySlugForVenue,
 } from "@/lib/discoveryMarket";
 import { isValidPublicSlug, resolveLocationPlaceTitle } from "@/lib/locationSlugValidation";
+import { venueHasPublicSchedule } from "@/lib/publicListings/listingSeo";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { PublicDataUnavailable } from "@/components/PublicDataUnavailable";
 import { lineupNavLabelFromYmd } from "@/lib/time";
@@ -48,23 +49,34 @@ export async function generateMetadata(props: { params: Promise<{ venueSlug: str
       title: "Open mic venue",
       description: "MicStage public venue pages show schedules and bookings when available.",
       path,
+      index: false,
     });
   }
   try {
-    const venue = await prisma.venue.findUnique({ where: { slug: venueSlug } });
+    const venue = await prisma.venue.findUnique({
+      where: { slug: venueSlug },
+      select: {
+        name: true,
+        city: true,
+        region: true,
+        eventTemplates: { where: { isPublic: true }, select: { isPublic: true } },
+      },
+    });
     if (!venue) {
       return buildPublicMetadata({
         title: "Venue not found",
         description:
           "This MicStage venue page could not be found. Browse open mic venues and artists from the home page.",
         path,
+        index: false,
       });
     }
     const place = [venue.city, venue.region].filter(Boolean).join(", ");
     const title = place ? `${venue.name} open mic | ${place}` : `${venue.name} open mic schedule`;
     const description = `Book an open mic slot at ${venue.name}${place ? ` in ${place}` : ""}. View schedules, slots, and who is playing on MicStage.`;
+    const indexable = venueHasPublicSchedule(venue);
     return {
-      ...buildPublicMetadata({ title, description, path }),
+      ...buildPublicMetadata({ title, description, path, index: indexable }),
       title: { absolute: `${title} | MicStage` },
     };
   } catch {
@@ -72,6 +84,7 @@ export async function generateMetadata(props: { params: Promise<{ venueSlug: str
       title: "Open mic venue",
       description: "MicStage public venue pages show schedules and bookings when available.",
       path,
+      index: false,
     });
   }
 }

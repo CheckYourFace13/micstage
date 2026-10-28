@@ -67,6 +67,16 @@ assert.equal(listingIsPubliclyIndexable(baseListing({ removedAt: new Date() })),
 assert.equal(listingIsPubliclyIndexable(baseListing({ schedules: [], lastVerifiedAt: null })), false);
 // lastVerifiedAt is a confirmation stamp, not a schedule substitute
 assert.equal(listingIsPubliclyIndexable(baseListing({ schedules: [], lastVerifiedAt: new Date() })), false);
+assert.equal(
+  listingIsPubliclyIndexable(
+    baseListing({
+      schedules: [{ weekday: "THU", title: "Open mic", description: "TIME_UNCONFIRMED:duration_over_8h" }],
+    }),
+  ),
+  false,
+);
+assert.equal(isPublicListingNameOk("Check"), false);
+assert.equal(isPublicListingNameOk("Coffee Shop"), false);
 assert.equal(listingMeetsPublicSeoIndexGate(baseListing({ schedules: [], lastVerifiedAt: new Date() })), false);
 const officialUrls = expandOfficialEvidenceUrls(["https://examplevenue.com/"], 12);
 assert.ok(officialUrls.some((u) => u.includes("/weekly-events") || u.includes("/entertainment") || u.includes("/live-music")));

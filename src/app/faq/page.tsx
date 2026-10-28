@@ -96,11 +96,11 @@ const SECTIONS: { heading: string; items: { q: string; a: ReactNode }[] }[] = [
     items: [
       {
         q: "What does “verified” mean on a listing?",
-        a: "Verified means MicStage has evidence the night is a real open mic (name, place, and open-mic signals) and the listing meets our public quality gates. It does not mean MicStage owns the venue or that Amazon or Google endorses the night.",
+        a: "Verified means MicStage has evidence the night is a real open mic (name, place, and open-mic signals) and the listing is ready to show publicly. It does not mean MicStage owns the venue or that Amazon or Google endorses the night.",
       },
       {
         q: "Why does a listing say schedule not published?",
-        a: "We only show days and times we actually have. If a trusted schedule is not on file yet, we say so instead of inventing one. Claim the listing or send a correction when you have accurate details.",
+        a: "We only show days and times we actually have. If a trusted schedule is not on file yet, the listing says the schedule is being confirmed. Claim the listing or send a correction when you have accurate details.",
       },
       {
         q: "How do I claim a listing?",
@@ -117,7 +117,7 @@ const SECTIONS: { heading: string; items: { q: string; a: ReactNode }[] }[] = [
       },
       {
         q: "Something on a listing is wrong. How do I fix it?",
-        a: "Use the correction form on the listing page, or contact us. Do not invent schedules on MicStage — corrections should match what the room actually runs.",
+        a: "Use the correction form on the listing page, or contact us. Corrections should match the night the room actually runs.",
       },
     ],
   },

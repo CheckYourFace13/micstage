@@ -3,6 +3,7 @@ import type { OpenMicMapVenueDto } from "@/lib/map/openMicMapTypes";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
 import { loadDiscoverablePublicListings } from "@/lib/publicListings/queries";
 import { discoveryBadgeLabel, listingPublicHref } from "@/lib/publicListings/types";
+import { scheduleTimesArePubliclyConfirmed } from "@/lib/publicListings/scheduleTimeSanity";
 
 function uniqueWeekdays(schedules: { weekday: Weekday }[]): Weekday[] {
   const seen = new Set<Weekday>();
@@ -34,8 +35,9 @@ export async function loadPublicListingMapVenues(prisma: PrismaClient): Promise<
       bookingRestrictionMode: "NONE",
     }));
 
-    const first = l.schedules[0];
+    const first = l.schedules.find((s) => scheduleTimesArePubliclyConfirmed(s)) ?? l.schedules[0];
     const hasSchedule = l.schedules.length > 0;
+    const firstTimeConfirmed = first ? scheduleTimesArePubliclyConfirmed(first) : false;
     rows.push({
       slug: l.slug,
       href: listingPublicHref(l.slug),
@@ -61,7 +63,9 @@ export async function loadPublicListingMapVenues(prisma: PrismaClient): Promise<
             ymd: "",
             templateTitle: first.title ?? listingPublicHref(l.slug),
             weekday: first.weekday,
-            timeLabel: `${weekdayToLabel(first.weekday)} · ${minutesToTimeLabel(first.startTimeMin)}`,
+            timeLabel: firstTimeConfirmed
+              ? `${weekdayToLabel(first.weekday)} · ${minutesToTimeLabel(first.startTimeMin)}`
+              : `${weekdayToLabel(first.weekday)} · schedule being confirmed`,
             badge: "upcoming",
           }
         : null,

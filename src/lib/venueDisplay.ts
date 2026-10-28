@@ -1,15 +1,26 @@
 import type { VenuePerformanceFormat } from "@/generated/prisma/client";
 
-export function performanceFormatLabel(f: VenuePerformanceFormat): string {
+/** Canonical public label for performance-format enums. Never render CONSTANT_CASE. */
+export function humanizeEnumLabel(raw: string): string {
+  const words = String(raw ?? "")
+    .trim()
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((w) => w.toLowerCase());
+  if (words.length === 0) return "";
+  return words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(" ");
+}
+
+export function performanceFormatLabel(f: string | VenuePerformanceFormat | null | undefined): string {
   switch (f) {
     case "OPEN_VARIETY":
-      return "Open variety (mixed acts)";
+      return "Open variety";
     case "ACOUSTIC_ONLY":
-      return "Acoustic only";
+      return "Acoustic";
     case "GUITAR_VOCAL_ONLY":
-      return "Guitar & vocals only";
+      return "Guitar & vocals";
     case "FULL_BANDS_ALLOWED":
-      return "Full bands allowed";
+      return "Full bands";
     case "COMEDY_SPOKEN_WORD":
       return "Comedy / spoken word";
     case "COMEDY":
@@ -17,7 +28,7 @@ export function performanceFormatLabel(f: VenuePerformanceFormat): string {
     case "SPOKEN_WORD":
       return "Spoken word";
     default:
-      return f;
+      return humanizeEnumLabel(String(f ?? ""));
   }
 }
 

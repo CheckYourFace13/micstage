@@ -16,6 +16,7 @@ import { relatedLocationsForLocationSlug } from "@/lib/relatedLocations";
 import { shouldIndexDiscoveryPage } from "@/lib/seo/discoveryIndex";
 import { jsDayToWeekday } from "@/lib/publicListings/listingSeo";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
+import { performanceFormatLabel } from "@/lib/venueDisplay";
 import type { Weekday } from "@/generated/prisma/client";
 import { ShareLinks } from "@/components/publicListings/ShareLinks";
 
@@ -37,7 +38,7 @@ function listingCard(v: OpenMicFinderVenue, day?: Weekday) {
     v.signupMethod ? `Signup: ${v.signupMethod}` : null,
     v.cost ? `Cost: ${v.cost}` : null,
     v.performanceFormats && v.performanceFormats.length > 0
-      ? v.performanceFormats.slice(0, 2).join(" · ")
+      ? v.performanceFormats.slice(0, 2).map((f) => performanceFormatLabel(f)).join(" · ")
       : null,
   ].filter(Boolean);
   return (

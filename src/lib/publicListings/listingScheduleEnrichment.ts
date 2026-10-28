@@ -17,6 +17,11 @@ import { expandOfficialEvidenceUrls } from "@/lib/publicListings/evidenceEnrichm
 import { submitUrlsToIndexNow } from "@/lib/seo/searchEnginePing";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { resolveScheduleEndMin } from "@/lib/scheduleWindow";
+import {
+  evaluateScheduleTimeSanity,
+  markTimeUnconfirmedDescription,
+  scheduleDescriptionIsTimeUnconfirmed,
+} from "@/lib/publicListings/scheduleTimeSanity";
 import { SCHEDULE_ENRICH_LOCK, withPgAdvisoryLock } from "@/lib/growth/enrichmentLock";
 import { readDiscoveryCursor, writeDiscoveryCursor, readDiscoveryCursorJson, writeDiscoveryCursorJson } from "@/lib/growth/discovery/discoveryCursor";
 import { chicagoLast24hWindow } from "@/lib/ownerSummary/chicagoWindow";
@@ -276,7 +281,10 @@ async function enrichVerifiedListingSchedulesUnlocked(
       verificationStatus: "VERIFIED",
       removedAt: null,
       claimedVenueId: null,
-      schedules: { none: { isActive: true } },
+      OR: [
+        { schedules: { none: { isActive: true } } },
+        { schedules: { some: { isActive: true, description: { startsWith: "TIME_UNCONFIRMED" } } } },
+      ],
     },
     select: {
       id: true,
@@ -424,11 +432,30 @@ async function enrichVerifiedListingSchedulesUnlocked(
     const weekday = parsed.weekday as Weekday;
     const existing = await prisma.publicOpenMicSchedule.findFirst({
       where: { listingId: row.id, weekday },
-      select: { id: true },
+      select: { id: true, isActive: true, description: true },
     });
-    const description = parsed.endTimeMin
+    const baseDescription = parsed.endTimeMin
       ? `Confirmed from official source: ${parsed.raw}`
       : `Confirmed from official source: ${parsed.raw}. End time was not stated.`;
+    const sanity = evaluateScheduleTimeSanity({
+      startTimeMin: parsed.startTimeMin,
+      endTimeMin,
+      timeZone,
+      listingLat: row.lat,
+      listingLng: row.lng,
+      rawText: parsed.raw,
+    });
+    if (
+      !sanity.ok &&
+      existing?.isActive &&
+      !scheduleDescriptionIsTimeUnconfirmed(existing.description)
+    ) {
+      uncertain += 1;
+      continue;
+    }
+    const description = sanity.ok
+      ? baseDescription
+      : markTimeUnconfirmedDescription(baseDescription, sanity.reasons);
 
     if (existing) {
       await prisma.publicOpenMicSchedule.update({
@@ -439,7 +466,7 @@ async function enrichVerifiedListingSchedulesUnlocked(
           timeZone,
           signupMethod: parsed.signupMethod || row.signupMethod,
           isActive: true,
-          lastVerifiedAt: now,
+          ...(sanity.ok ? { lastVerifiedAt: now } : {}),
           sourceUrl,
           description,
         },
@@ -460,6 +487,11 @@ async function enrichVerifiedListingSchedulesUnlocked(
           description,
         },
       });
+    }
+
+    if (!sanity.ok) {
+      uncertain += 1;
+      continue;
     }
 
     await prisma.publicOpenMicListing.update({

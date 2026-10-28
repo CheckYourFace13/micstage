@@ -8,9 +8,9 @@ import { getAllResourceArticles } from "@/lib/resourcesContent";
 import { marketingSitemapSupplements } from "@/lib/marketing/indexability";
 import { publicListingWhereDiscoverable } from "@/lib/publicListings/queries";
 import { listingMeetsPublicSeoIndexGate, venueIsSitemapEligible } from "@/lib/publicListings/listingSeo";
-import { loadOpenMicFinderVenues } from "@/lib/publicListings/discoveryMerge";
+import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteOrigin();
@@ -80,7 +80,7 @@ async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    const [venues, listings, finderRows] = await Promise.all([
+    const [venues, listings] = await Promise.all([
       prisma.venue.findMany({
         select: {
           slug: true,
@@ -118,7 +118,6 @@ async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
           },
         },
       }),
-      loadOpenMicFinderVenues(prisma),
     ]);
 
     const venueEntries: MetadataRoute.Sitemap = venues
@@ -157,13 +156,26 @@ async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     const listingCountBySlug = new Map<string, { count: number; hasSchedule: boolean }>();
-    for (const row of finderRows) {
-      const slug = row.discoverySlug;
-      if (!slug) continue;
+    const addLocationInventory = (
+      city: string | null,
+      region: string | null,
+      hasSchedule: boolean,
+    ) => {
+      const place = (city ?? "").trim();
+      if (!place) return;
+      const slug = primaryDiscoverySlugForVenue(place, region, counts);
+      if (!slug) return;
       const cur = listingCountBySlug.get(slug) ?? { count: 0, hasSchedule: false };
       cur.count += 1;
-      if (row.hasSchedule) cur.hasSchedule = true;
+      if (hasSchedule) cur.hasSchedule = true;
       listingCountBySlug.set(slug, cur);
+    };
+    for (const v of venues) {
+      addLocationInventory(v.city, v.region, (v.eventTemplates ?? []).length > 0);
+    }
+    for (const l of listings) {
+      if (!isPublicListingNameOk(l.name)) continue;
+      addLocationInventory(l.city, l.region, l.schedules.length > 0);
     }
 
     const locationOpenMicEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()]

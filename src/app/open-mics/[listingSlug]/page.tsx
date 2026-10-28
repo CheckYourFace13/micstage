@@ -26,6 +26,7 @@ import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { displayListingAddress } from "@/lib/publicListings/discoveryMerge";
 import { scheduleWindowLabel } from "@/lib/scheduleWindow";
+import { scheduleTimesArePubliclyConfirmed } from "@/lib/publicListings/scheduleTimeSanity";
 import { weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { ShareLinks } from "@/components/publicListings/ShareLinks";
@@ -272,8 +273,9 @@ export default async function PublicOpenMicListingPage(props: {
                   <li key={s.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
                     <div className="font-semibold">Weekly on {weekdayToLabel(s.weekday)}</div>
                     <div className="mt-1 text-sm text-white/75">
-                      {scheduleWindowLabel(s.startTimeMin, s.endTimeMin)}
-                      {s.title ? ` · ${s.title}` : ""}
+                      {scheduleTimesArePubliclyConfirmed(s)
+                        ? `${scheduleWindowLabel(s.startTimeMin, s.endTimeMin)}${s.title ? ` · ${s.title}` : ""}`
+                        : "Schedule being confirmed."}
                     </div>
                     <div className="mt-1 text-xs text-white/55">{performanceFormatLabel(s.performanceFormat)}</div>
                     {s.signupMethod ? <div className="mt-2 text-xs text-white/60">Signup: {s.signupMethod}</div> : null}

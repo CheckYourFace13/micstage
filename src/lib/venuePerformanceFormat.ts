@@ -1,12 +1,13 @@
 import type { VenuePerformanceFormat } from "@/generated/prisma/client";
+import { performanceFormatLabel } from "@/lib/venueDisplay";
 
 export const VENUE_PERFORMANCE_FORMAT_OPTIONS: { value: VenuePerformanceFormat; label: string }[] = [
-  { value: "OPEN_VARIETY", label: "Open variety (mixed acts)" },
-  { value: "ACOUSTIC_ONLY", label: "Acoustic only" },
-  { value: "GUITAR_VOCAL_ONLY", label: "Guitar & vocals only" },
-  { value: "FULL_BANDS_ALLOWED", label: "Full bands allowed" },
-  { value: "COMEDY", label: "Comedy" },
-  { value: "SPOKEN_WORD", label: "Spoken word" },
+  { value: "OPEN_VARIETY", label: performanceFormatLabel("OPEN_VARIETY") },
+  { value: "ACOUSTIC_ONLY", label: performanceFormatLabel("ACOUSTIC_ONLY") },
+  { value: "GUITAR_VOCAL_ONLY", label: performanceFormatLabel("GUITAR_VOCAL_ONLY") },
+  { value: "FULL_BANDS_ALLOWED", label: performanceFormatLabel("FULL_BANDS_ALLOWED") },
+  { value: "COMEDY", label: performanceFormatLabel("COMEDY") },
+  { value: "SPOKEN_WORD", label: performanceFormatLabel("SPOKEN_WORD") },
 ];
 
 /** Values accepted from forms/API; includes legacy DB value until fully retired. */

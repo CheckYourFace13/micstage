@@ -252,7 +252,9 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
     const kind = listingKind(l.verificationStatus);
     const hasSchedule = l.schedules.length > 0;
     const scheduleWeekdays = [...new Set(l.schedules.map((s) => s.weekday))];
-    const scheduleStarts = l.schedules.map((s) => ({ weekday: s.weekday, startTimeMin: s.startTimeMin }));
+    const scheduleStarts = l.schedules
+      .filter((s) => !String(s.description ?? "").startsWith("TIME_UNCONFIRMED"))
+      .map((s) => ({ weekday: s.weekday, startTimeMin: s.startTimeMin }));
     const performanceFormats = [
       ...new Set(l.schedules.map((s) => s.performanceFormat).filter(Boolean) as string[]),
     ];

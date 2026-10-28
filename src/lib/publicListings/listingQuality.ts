@@ -73,8 +73,20 @@ const EXACT_JUNK_NAME = new Set(
     "n/a",
     "na",
     "unknown",
+    "check",
+    "coffee shop",
+    "coffee-shop",
+    "cafe",
+    "events-music",
+    "events music",
   ].map((s) => s.toLowerCase()),
 );
+
+/** Generic business-type shells with no distinctive venue identity. */
+function looksLikeGenericBusinessShell(name: string): boolean {
+  return /^(the\s+)?(coffee[\s-]?shop|cafe|coffeehouse|coffee\s+house)$/i.test(name.trim())
+    || /^events?\s*(?:&|and)\s*music$/i.test(name.trim());
+}
 
 /**
  * Listicle / number-led editorial titles ("10 Best...", "Top 12 Comedy Clubs...").
@@ -278,6 +290,7 @@ export function classifyListingName(name: string): ListingNameRejection | null {
   const n = (name ?? "").trim();
   if (!n || n.length < 4) return "TOO_SHORT";
   if (EXACT_JUNK_NAME.has(n.toLowerCase())) return "GENERIC_PAGE_TITLE";
+  if (looksLikeGenericBusinessShell(n)) return "GENERIC_PAGE_TITLE";
   if (looksLikeBareCityState(n)) return "BARE_CITY_STATE";
   if (HYPHEN_NAV_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
   if (looksLikeNewsHeadline(n)) return "NEWS_HEADLINE";
@@ -431,7 +444,14 @@ export function isPublicListingRenderable(listing: {
   return isPublicListingNameOk(listing.name);
 }
 
-/** Whether a listing page should be indexed (has substance beyond a bare scraped title). */
+function scheduleHasConfirmedPublicTime(s: unknown): boolean {
+  if (!s || typeof s !== "object") return true;
+  if (!("description" in s)) return true;
+  const d = (s as { description?: string | null }).description;
+  return !d?.startsWith("TIME_UNCONFIRMED");
+}
+
+/** Whether a listing page should be indexed (enough confirmed facts, not word count). */
 export function listingIsPubliclyIndexable(listing: {
   name: string;
   verificationStatus: string;
@@ -440,12 +460,19 @@ export function listingIsPubliclyIndexable(listing: {
   schedules: unknown[];
   lastVerifiedAt: Date | null;
   removedAt?: Date | null;
+  signupMethod?: string | null;
+  cost?: string | null;
+  sourceUrl?: string | null;
+  websiteUrl?: string | null;
+  hostName?: string | null;
 }): boolean {
   if (listing.removedAt) return false;
   if (listing.verificationStatus !== "VERIFIED") return false;
   if (!isPublicListingNameOk(listing.name)) return false;
   const hasLocation = Boolean(listing.formattedAddress?.trim() || listing.city?.trim());
   if (!hasLocation) return false;
-  // lastVerifiedAt alone is not a schedule. Unscheduled pages stay reachable but noindex.
-  return listing.schedules.length > 0;
+  const confirmedSchedules = listing.schedules.filter(scheduleHasConfirmedPublicTime);
+  if (confirmedSchedules.length > 0) return true;
+  // lastVerifiedAt is a stamp, not a schedule. Unscheduled/template-only pages stay reachable but noindex.
+  return false;
 }

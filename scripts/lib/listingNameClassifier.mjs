@@ -51,8 +51,22 @@ export const EXACT_JUNK_NAME = new Set(
     "n/a",
     "na",
     "unknown",
+    "check",
+    "coffee shop",
+    "coffee-shop",
+    "cafe",
+    "events-music",
+    "events music",
   ].map((s) => s.toLowerCase()),
 );
+
+function looksLikeGenericBusinessShell(name) {
+  const n = String(name ?? "").trim();
+  return (
+    /^(the\s+)?(coffee[\s-]?shop|cafe|coffeehouse|coffee\s+house)$/i.test(n) ||
+    /^events?\s*(?:&|and)\s*music$/i.test(n)
+  );
+}
 
 /**
  * Listicle / number-led editorial titles ("10 Best...", "Top 12 Comedy Clubs...").
@@ -214,6 +228,7 @@ export function classifyListingName(name) {
   const n = (name ?? "").trim();
   if (!n || n.length < 4) return "TOO_SHORT";
   if (EXACT_JUNK_NAME.has(n.toLowerCase())) return "GENERIC_PAGE_TITLE";
+  if (looksLikeGenericBusinessShell(n)) return "GENERIC_PAGE_TITLE";
   if (looksLikeBareCityState(n)) return "BARE_CITY_STATE";
   if (HYPHEN_NAV_TITLE.test(n)) return "GENERIC_PAGE_TITLE";
   if (looksLikeNewsHeadline(n)) return "NEWS_HEADLINE";

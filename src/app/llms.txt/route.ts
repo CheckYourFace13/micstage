@@ -27,7 +27,7 @@ Purpose: Help performers find verified open mics, and help hosts/venues run nigh
 ## How listings are verified
 Verified listings need a real place identity plus explicit open-mic evidence tied to that room.
 Search snippets and directory listicles alone are not enough. Schedules are shown only when known;
-missing fields mean unknown, not invented.
+missing fields stay blank until confirmed.
 Details: https://micstage.com/resources/how-micstage-verifies-open-mic-listings
 
 ## FAQ / about / contact

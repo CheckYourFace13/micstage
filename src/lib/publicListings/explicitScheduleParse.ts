@@ -207,20 +207,41 @@ function byDayFromLd(value: unknown): Weekday | null {
   return weekdayFromToken(s);
 }
 
+/** Wall-clock minutes from an ISO local datetime. Never Date.parse/getHours (UTC host skew). */
+function wallClockFromIsoDateTime(s: string): number | null {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(s.trim());
+  if (!m) return null;
+  const hour = Number.parseInt(m[2]!, 10);
+  const min = Number.parseInt(m[3]!, 10);
+  if (!Number.isFinite(hour) || !Number.isFinite(min) || hour > 23 || min > 59) return null;
+  // Date-only / all-day midnight is not an explicit show time.
+  if (hour === 0 && min === 0) return null;
+  return hour * 60 + min;
+}
+
+function weekdayFromIsoDatePrefix(s: string): Weekday | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s.trim());
+  if (!m) return null;
+  const y = Number.parseInt(m[1]!, 10);
+  const mo = Number.parseInt(m[2]!, 10);
+  const d = Number.parseInt(m[3]!, 10);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+  const day = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0)).getUTCDay();
+  return JS_DAY[day] ?? null;
+}
+
 function clockFromIsoOrClock(value: unknown): number | null {
   if (value == null) return null;
   const s = String(value).trim();
+  const iso = wallClockFromIsoDateTime(s);
+  if (iso != null) return iso;
+  if (/^\d{4}-\d{2}-\d{2}T00:00/.test(s)) return null;
   const clock = /^(\d{1,2}):(\d{2})(?::\d{2})?/.exec(s);
   if (clock) {
-    const hour = Number.parseInt(clock[1], 10);
-    const min = Number.parseInt(clock[2], 10);
+    const hour = Number.parseInt(clock[1]!, 10);
+    const min = Number.parseInt(clock[2]!, 10);
     if (hour > 23) return null;
     return hour * 60 + min;
-  }
-  const d = Date.parse(s);
-  if (!Number.isNaN(d)) {
-    const dt = new Date(d);
-    return dt.getHours() * 60 + dt.getMinutes();
   }
   return null;
 }
@@ -254,21 +275,17 @@ function parseLdEventNode(node: Record<string, unknown>): ExplicitScheduleParse 
 
   const startDate = node.startDate ?? schedule.startDate;
   if (startDate && /\b(every|weekly|each)\b/i.test(hay) && openMic) {
-    const parsed = Date.parse(String(startDate));
-    if (!Number.isNaN(parsed)) {
-      const dt = new Date(parsed);
-      const weekday = JS_DAY[dt.getDay()] ?? null;
-      const start = clockFromIsoOrClock(startDate);
-      if (weekday && start != null) {
-        return {
-          weekday,
-          startTimeMin: start,
-          endTimeMin: clockFromIsoOrClock(node.endDate ?? node.endTime),
-          signupMethod: SIGNUP_RE.exec(hay)?.[0]?.trim() ?? null,
-          recurring: true,
-          raw: String(startDate),
-        };
-      }
+    const weekday = weekdayFromIsoDatePrefix(String(startDate));
+    const start = clockFromIsoOrClock(startDate);
+    if (weekday && start != null) {
+      return {
+        weekday,
+        startTimeMin: start,
+        endTimeMin: clockFromIsoOrClock(node.endDate ?? node.endTime),
+        signupMethod: SIGNUP_RE.exec(hay)?.[0]?.trim() ?? null,
+        recurring: true,
+        raw: String(startDate),
+      };
     }
   }
   return null;

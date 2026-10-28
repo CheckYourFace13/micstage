@@ -107,6 +107,10 @@ const MUST_REJECT = [
   "Meetings-Events-Open Mics",
   "null",
   "undefined",
+  "Check",
+  "Coffee Shop",
+  "events-music",
+  "Events & Music",
 ];
 
 // Real venue / event names — must pass.

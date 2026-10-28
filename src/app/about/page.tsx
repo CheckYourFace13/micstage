@@ -60,8 +60,8 @@ export default function AboutPage() {
           <p className="mt-3 text-sm leading-relaxed text-white/75">
             Public listings are not a dump of search results. A listing is shown as verified when we can tie it to a
             real place and to explicit open-mic evidence (the name, a published schedule, or a trusted source page).
-            Pages still tell you when a schedule was last confirmed. We do not invent missing times, hosts, or signup
-            rules.
+            Pages still tell you when a schedule was last confirmed. Missing times, hosts, or signup rules stay blank
+            until a venue or official source confirms them.
           </p>
           <p className="mt-3 text-sm text-white/75">
             More detail:{" "}

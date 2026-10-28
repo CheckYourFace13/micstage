@@ -863,7 +863,7 @@ const ARTICLES: ResourceArticle[] = [
     ],
     keyTakeaways: [
       "Verified listings need a real place and explicit open-mic evidence.",
-      "Missing fields mean unknown — not invented.",
+      "Missing fields stay blank until a venue or official source confirms them.",
       "Corrections and claims keep public pages aligned with the door.",
     ],
     relatedDiscoveryLinks: [

@@ -17,6 +17,82 @@ export const CLAIM_FUNNEL_EVENT = {
 
 export type ClaimFunnelEventName = (typeof CLAIM_FUNNEL_EVENT)[keyof typeof CLAIM_FUNNEL_EVENT];
 
+/** 0f4dde2 Hostinger completed — do not mix older CLAIM_PAGE_REACHED into this funnel. */
+export const CLAIM_FUNNEL_INSTRUMENTED_AT = new Date("2026-10-28T01:33:58.000Z");
+
+export type InstrumentedClaimFunnelCounts = {
+  since: string;
+  pageViews: number;
+  roleSelections: number;
+  formStarts: number;
+  formSubmits: number;
+  completions: number;
+  failedValidation: number;
+  failedSession: number;
+  failedOther: number;
+};
+
+export async function loadInstrumentedClaimFunnel(
+  prisma: PrismaClient,
+  window: { startUtc: Date; endUtc: Date },
+): Promise<InstrumentedClaimFunnelCounts> {
+  const since = new Date(Math.max(window.startUtc.getTime(), CLAIM_FUNNEL_INSTRUMENTED_AT.getTime()));
+  const events = await prisma.listingClaimAuditEvent.findMany({
+    where: {
+      createdAt: { gte: since, lt: window.endUtc },
+      eventType: {
+        in: [
+          CLAIM_FUNNEL_EVENT.PAGE_VIEWED,
+          CLAIM_FUNNEL_EVENT.ROLE_VENUE,
+          CLAIM_FUNNEL_EVENT.ROLE_HOST,
+          CLAIM_FUNNEL_EVENT.FORM_STARTED,
+          CLAIM_FUNNEL_EVENT.FORM_SUBMITTED,
+          CLAIM_FUNNEL_EVENT.COMPLETED,
+          CLAIM_FUNNEL_EVENT.FAILED_VALIDATION,
+          CLAIM_FUNNEL_EVENT.FAILED_SESSION,
+          CLAIM_FUNNEL_EVENT.FAILED_OTHER,
+        ],
+      },
+    },
+    select: { listingId: true, eventType: true },
+  });
+
+  const sets: Record<string, Set<string>> = {
+    page: new Set(),
+    role: new Set(),
+    start: new Set(),
+    submit: new Set(),
+    done: new Set(),
+    failV: new Set(),
+    failS: new Set(),
+    failO: new Set(),
+  };
+  for (const row of events) {
+    if (row.eventType === CLAIM_FUNNEL_EVENT.PAGE_VIEWED) sets.page.add(row.listingId);
+    if (row.eventType === CLAIM_FUNNEL_EVENT.ROLE_VENUE || row.eventType === CLAIM_FUNNEL_EVENT.ROLE_HOST) {
+      sets.role.add(row.listingId);
+    }
+    if (row.eventType === CLAIM_FUNNEL_EVENT.FORM_STARTED) sets.start.add(row.listingId);
+    if (row.eventType === CLAIM_FUNNEL_EVENT.FORM_SUBMITTED) sets.submit.add(row.listingId);
+    if (row.eventType === CLAIM_FUNNEL_EVENT.COMPLETED) sets.done.add(row.listingId);
+    if (row.eventType === CLAIM_FUNNEL_EVENT.FAILED_VALIDATION) sets.failV.add(row.listingId);
+    if (row.eventType === CLAIM_FUNNEL_EVENT.FAILED_SESSION) sets.failS.add(row.listingId);
+    if (row.eventType === CLAIM_FUNNEL_EVENT.FAILED_OTHER) sets.failO.add(row.listingId);
+  }
+
+  return {
+    since: since.toISOString(),
+    pageViews: sets.page.size,
+    roleSelections: sets.role.size,
+    formStarts: sets.start.size,
+    formSubmits: sets.submit.size,
+    completions: sets.done.size,
+    failedValidation: sets.failV.size,
+    failedSession: sets.failS.size,
+    failedOther: sets.failO.size,
+  };
+}
+
 export const CLAIM_FUNNEL_CLIENT_EVENTS = [
   "role_selected_venue",
   "role_selected_host",

@@ -83,12 +83,10 @@ function LineupHelp(s) {
 // Instant claim: plain authority, optional post-claim
 {
   const claim = read("src/components/publicListings/InstantClaimForm.tsx");
-  assert.ok(/authorized to manage this open mic/i.test(claim));
-  assert.ok(/does not turn on online signups or booking/i.test(claim));
-  assert.ok(/update the schedule and details later/i.test(claim));
+  assert.ok(/authorized to manage this listing/i.test(claim));
   assert.ok(/Claim this open mic/i.test(claim));
-  assert.ok(/I'm the venue/i.test(claim));
-  assert.ok(/I'm the host/i.test(claim));
+  assert.ok(/I run this venue/i.test(claim));
+  assert.ok(/I host this open mic/i.test(claim));
   assert.ok(!/Post-claim activation/.test(claim));
 }
 
@@ -98,7 +96,8 @@ function LineupHelp(s) {
   assert.ok(/Your open mic is claimed/i.test(act));
   assert.ok(/Confirm schedule/i.test(act));
   assert.ok(/Improve listing/i.test(act));
-  assert.ok(/Turn on performer signups/i.test(act));
+  assert.ok(/Enable performer signup/i.test(act));
+  assert.ok(/Share your open mic/i.test(act));
   assert.ok(/Do this later/i.test(act));
   assert.ok(act.includes("SharePageButtons"), "claim activate surfaces share");
   assert.ok(!act.includes('href="/dashboard"'), "no dead /dashboard link");

@@ -19,6 +19,10 @@ import {
   type VenueAcquisitionMetrics,
 } from "@/lib/ownerSummary/hostAcquisitionMetrics";
 import { readScheduleRecoveryDayStats } from "@/lib/publicListings/listingScheduleEnrichment";
+import {
+  loadInstrumentedClaimFunnel,
+  type InstrumentedClaimFunnelCounts,
+} from "@/lib/publicListings/claimFunnelEvents";
 
 export type OwnerSummarySignupRow = {
   kind: "venue" | "artist";
@@ -119,6 +123,8 @@ export type OwnerDailySummaryData = {
       noScheduleFound: number;
     };
   };
+  /** Claim funnel events from 0f4dde2 forward only — do not mix older audit types. */
+  claimFunnelInstrumented: InstrumentedClaimFunnelCounts;
   performerFunnel: {
     guestSignupsToday: number;
     performerAccountsToday: number;
@@ -847,6 +853,7 @@ export async function buildOwnerDailySummary(
     guestSignupsToday,
     performerAccountsToday,
     weeklyAlertOptInsNewToday,
+    claimFunnelInstrumented,
   ] = await Promise.all([
     prisma.growthLead.count({
       where: { status: { notIn: ["REJECTED", "UNSUBSCRIBED", "BOUNCED"] } },
@@ -886,6 +893,7 @@ export async function buildOwnerDailySummary(
         createdAt: { gte: startUtc, lt: endUtc },
       },
     }),
+    loadInstrumentedClaimFunnel(prisma, { startUtc, endUtc }),
   ]);
 
   const clicksNoteUpdated =
@@ -952,6 +960,7 @@ export async function buildOwnerDailySummary(
         noScheduleFound: scheduleRecovery.noScheduleFound,
       },
     },
+    claimFunnelInstrumented,
     performerFunnel: {
       guestSignupsToday,
       performerAccountsToday,

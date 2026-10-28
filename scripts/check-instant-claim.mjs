@@ -411,9 +411,9 @@ function importedTemplateDefaults() {
   assert.ok(/w-full/.test(claim), "full-width CTA");
   assert.ok(/enterKeyHint/.test(claim), "mobile keyboard hints");
   assert.ok(/Claim this open mic/.test(claim));
-  assert.ok(/I'm the venue/.test(claim));
-  assert.ok(/I'm the host/.test(claim));
-  assert.ok(/does not turn on online signups or booking/.test(claim));
+  assert.ok(/I run this venue/.test(claim));
+  assert.ok(/I host this open mic/.test(claim));
+  assert.ok(/prefilledContactName/.test(claim));
 }
 
 console.log(

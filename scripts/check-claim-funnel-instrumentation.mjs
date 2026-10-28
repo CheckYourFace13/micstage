@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
   CLAIM_FUNNEL_EVENT,
+  CLAIM_FUNNEL_INSTRUMENTED_AT,
   claimFailureFunnelEvent,
   claimFunnelEventFromClient,
 } from "../src/lib/publicListings/claimFunnelEvents.ts";
@@ -47,6 +48,12 @@ import {
   assert.doesNotMatch(form, /type="tel"|name="phone"/);
   assert.doesNotMatch(form, /name="notes"/);
   assert.match(form, /emailConfirmedFromInvite/);
+  assert.match(form, /prefilledContactName/);
+  assert.match(form, /I run this venue/);
+  assert.match(form, /I host this open mic/);
+  assert.match(form, /type="button"/);
+  assert.match(form, /markStarted/);
+  assert.ok(CLAIM_FUNNEL_INSTRUMENTED_AT.getTime() > 0);
 }
 
 {
@@ -54,6 +61,7 @@ import {
   assert.match(invite, /CLAIM_FUNNEL_EVENT\.PAGE_VIEWED/);
   assert.match(invite, /CLAIM_FUNNEL_EVENT\.FAILED_SESSION/);
   assert.match(invite, /emailConfirmedFromInvite/);
+  assert.match(invite, /usableInvitedClaimContactName/);
   assert.doesNotMatch(invite, /intendedEmailNormalized\}/);
 }
 

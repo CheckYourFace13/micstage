@@ -115,6 +115,14 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Fetch blocked: ${inv.scheduleRecovery.fetchBlocked}`,
     `  No schedule found: ${inv.scheduleRecovery.noScheduleFound}`,
     "",
+    "CLAIM FUNNEL (since instrumentation deploy)",
+    `  Page views: ${data.claimFunnelInstrumented.pageViews}`,
+    `  Role selections: ${data.claimFunnelInstrumented.roleSelections}`,
+    `  Form starts: ${data.claimFunnelInstrumented.formStarts}`,
+    `  Submits: ${data.claimFunnelInstrumented.formSubmits}`,
+    `  Completions: ${data.claimFunnelInstrumented.completions}`,
+    `  Failures: validation ${data.claimFunnelInstrumented.failedValidation} · session ${data.claimFunnelInstrumented.failedSession} · other ${data.claimFunnelInstrumented.failedOther}`,
+    "",
     "PERFORMER",
     `  Guest signups (24h): ${data.performerFunnel.guestSignupsToday}`,
     `  Performer accounts (24h / 7d): ${data.performerFunnel.performerAccountsToday} / ${data.performerFunnel.performerAccounts7d}`,
@@ -579,6 +587,7 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>Top outreach blocks:</strong> ${inv.topOutreachBlockReasons.length ? inv.topOutreachBlockReasons.map((b) => `${esc(b.reason)}=${b.count}`).join(" · ") : "none"}</li>
     <li><strong>Claim contacts mined today:</strong> ${inv.claimContactsMinedToday} · <strong>Invite-ready:</strong> ${inv.inviteReadyTotal} · <strong>New invite-ready today:</strong> ${inv.inviteReadyNewToday} · <strong>Invites sent:</strong> ${inv.claimInvitesSentCount} · <strong>Claims started/completed:</strong> ${data.marketing.claimsStartedToday}/${data.marketing.claimsCompletedToday}</li>
     <li><strong>Schedule recovery:</strong> unscheduled ${inv.scheduleRecovery.unscheduledVerified} · scanned ${inv.scheduleRecovery.scannedToday} · pages ${inv.scheduleRecovery.officialPagesFetched} · found ${inv.scheduleRecovery.explicitScheduleFound} · created ${inv.scheduleRecovery.scheduleCreated} · ambiguous ${inv.scheduleRecovery.ambiguous} · blocked ${inv.scheduleRecovery.fetchBlocked} · none ${inv.scheduleRecovery.noScheduleFound}</li>
+    <li><strong>Claim funnel (post-0f4dde2):</strong> views ${data.claimFunnelInstrumented.pageViews} · roles ${data.claimFunnelInstrumented.roleSelections} · starts ${data.claimFunnelInstrumented.formStarts} · submits ${data.claimFunnelInstrumented.formSubmits} · completed ${data.claimFunnelInstrumented.completions} · fail ${data.claimFunnelInstrumented.failedValidation + data.claimFunnelInstrumented.failedSession + data.claimFunnelInstrumented.failedOther}</li>
     <li><strong>Performer funnel (24h):</strong> ${data.performerFunnel.guestSignupsToday} guest signups · ${data.performerFunnel.performerAccountsToday} accounts · ${data.performerFunnel.weeklyAlertOptInsNewToday} new weekly alerts · ${data.performerFunnel.weeklyAlertOptInsTotal} alert opt-ins total</li>
     <li><strong>Raw candidates:</strong> ${data.growthLayers.rawCandidatesTotal} total · ${data.growthLayers.rawCandidatesToday} new (24h) · ${data.growthLayers.junkRejectedToday} junk rejected</li>
     <li><strong>Qualified:</strong> ${data.growthLayers.realPlaceCandidates} real-place · ${data.growthLayers.verifiedListings} verified · ${data.growthLayers.scheduledListings} scheduled · ${data.growthLayers.indexableListings} indexable · <strong>City hubs with schedules:</strong> ${data.growthLayers.cityHubsWithScheduled}</li>

@@ -45,6 +45,22 @@ function cookieBase(maxAgeSec: number) {
   };
 }
 
+/** Usable person/business name already on file — never a generic open-mic title. */
+export function usableInvitedClaimContactName(input: {
+  hostName?: string | null;
+  growthLeadName?: string | null;
+  listingName?: string | null;
+}): string | null {
+  const genericOnly = /^(the\s+)?(weekly\s+)?open[\s-]*(mic|mike|jam|stage)(s| night)?$/i;
+  for (const raw of [input.hostName, input.growthLeadName, input.listingName]) {
+    const name = raw?.replace(/\s+/g, " ").trim() ?? "";
+    if (name.length < 2 || name.length > 80) continue;
+    if (genericOnly.test(name)) continue;
+    return name;
+  }
+  return null;
+}
+
 /** Mask for public UI — never show the full address. */
 export function maskClaimInviteEmail(email: string): string {
   const n = email.toLowerCase().trim();

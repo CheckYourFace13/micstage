@@ -68,29 +68,24 @@ export default async function ClaimActivatePage(props: {
             Confirm schedule
           </Link>
           <Link
-            href="/venue#profile"
-            className="inline-flex h-12 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10"
-          >
-            Improve listing
-          </Link>
-          <Link
             href="/venue#booking"
             className="inline-flex h-12 items-center justify-center rounded-md border border-white/15 bg-white/5 px-5 text-base font-semibold text-white hover:bg-white/10"
           >
-            Turn on performer signups
-          </Link>
-          <Link
-            href="/venue"
-            className="inline-flex h-11 items-center justify-center px-5 text-sm font-medium text-white/60 underline hover:text-white"
-          >
-            Do this later
+            Enable performer signup
           </Link>
         </div>
 
-        <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <p className="mb-3 text-sm font-medium text-white/85">Share your page</p>
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="mb-3 text-sm font-medium text-white/85">Share your open mic</p>
           <SharePageButtons url={publicUrl} label="Public page" />
         </div>
+
+        <Link
+          href="/venue"
+          className="mt-4 inline-flex h-11 items-center justify-center px-5 text-sm font-medium text-white/60 underline hover:text-white"
+        >
+          Do this later
+        </Link>
 
         <section className="mt-8 rounded-2xl border border-violet-400/25 bg-violet-500/10 p-4">
           <h2 className="text-base font-semibold text-white">Run another open mic?</h2>
@@ -118,6 +113,12 @@ export default async function ClaimActivatePage(props: {
 
         <details className="mt-8 rounded-2xl border border-white/10 bg-black/30 p-4">
           <summary className="cursor-pointer text-sm font-semibold text-white/80">More setup options (optional)</summary>
+          <Link
+            href="/venue#profile"
+            className="mt-3 inline-flex h-10 items-center text-sm text-white/70 underline hover:text-white"
+          >
+            Improve listing
+          </Link>
           <div className="mt-4">
             <ClaimActivationEditor
               venue={{

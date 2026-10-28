@@ -10,13 +10,13 @@ import { oncePerSession } from "@/lib/conversionAttribution";
 const ROLES: { value: ClaimAuthorityRole; label: string; next: string; funnel: "role_selected_venue" | "role_selected_host" }[] = [
   {
     value: "owner",
-    label: "I'm the venue",
+    label: "I run this venue",
     next: "You get this listing and can fix the schedule.",
     funnel: "role_selected_venue",
   },
   {
     value: "authorized_event_host",
-    label: "I'm the host",
+    label: "I host this open mic",
     next: "You can run this night without owning the room.",
     funnel: "role_selected_host",
   },
@@ -25,9 +25,9 @@ const ROLES: { value: ClaimAuthorityRole; label: string; next: string; funnel: "
 export function InstantClaimForm(props: {
   listingSlug: string;
   listingName: string;
-  /** Masked display. Full invited email stays on the server session. */
   invitedEmailMasked: string;
   emailConfirmedFromInvite?: boolean;
+  prefilledContactName?: string | null;
   address: string;
   cityLine?: string | null;
   evidenceSummary?: string | null;
@@ -35,7 +35,7 @@ export function InstantClaimForm(props: {
 }) {
   const router = useRouter();
   const emailKnown = Boolean(props.emailConfirmedFromInvite);
-  const [contactName, setContactName] = useState("");
+  const [contactName, setContactName] = useState(props.prefilledContactName?.trim() ?? "");
   const [role, setRole] = useState<ClaimAuthorityRole | "">("");
   const [loginEmail, setLoginEmail] = useState("");
   const [consent, setConsent] = useState(false);
@@ -66,6 +66,13 @@ export function InstantClaimForm(props: {
     beacon("claim_form_started");
   }
 
+  function selectRole(next: (typeof ROLES)[number]) {
+    markStarted();
+    setRole(next.value);
+    trackMarketingEvent("authority_confirmed", { listing_slug: props.listingSlug, role: next.value });
+    beacon(next.funnel);
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!contactName.trim()) {
@@ -73,7 +80,7 @@ export function InstantClaimForm(props: {
       return;
     }
     if (!role) {
-      setError("Choose whether you are the venue or the host.");
+      setError("Choose whether you run the venue or host this open mic.");
       return;
     }
     if (!emailKnown && !loginEmail.trim()) {
@@ -163,22 +170,40 @@ export function InstantClaimForm(props: {
       className="grid max-w-xl gap-4 pb-24 sm:pb-0"
       data-track-event="claim_submitted"
     >
-      <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 p-4">
-        <h1 className="om-heading text-2xl text-white sm:text-3xl">Claim this open mic</h1>
-        <p className="mt-2 text-lg font-semibold text-white">{props.listingName}</p>
+      <div>
+        <h1 className="om-heading text-2xl text-white sm:text-3xl">{props.listingName}</h1>
         {placeLine ? <p className="mt-1 text-sm text-white/70">{placeLine}</p> : null}
         <p className="mt-1 text-sm text-white/60">{props.address}</p>
-        <p className="mt-3 text-xs text-white/55">
-          Claiming your listing does not turn on online signups or booking. You can update the schedule and details later.
-        </p>
       </div>
 
+      <fieldset className="grid gap-2">
+        <legend className="text-sm text-white/80">Are you:</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {ROLES.map((r) => (
+            <button
+              key={r.value}
+              type="button"
+              onClick={() => selectRole(r)}
+              className={`min-h-16 rounded-md border px-3 py-2 text-left text-base text-white ${
+                role === r.value ? "border-[rgb(var(--om-neon))] bg-white/10" : "border-white/15 bg-black/40"
+              }`}
+            >
+              <span className="block font-semibold">{r.label}</span>
+              <span className="mt-0.5 block text-sm text-white/65">{r.next}</span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
       <label className="grid gap-1 text-sm">
-        <span className="text-white/80">Your name</span>
+        <span className="text-white/80">Name</span>
         <input
           required
           value={contactName}
-          onChange={(e) => setContactName(e.target.value)}
+          onChange={(e) => {
+            markStarted();
+            setContactName(e.target.value);
+          }}
           className="h-12 rounded-md border border-white/15 bg-black/40 px-3 text-base text-white"
           autoComplete="name"
           enterKeyHint="next"
@@ -186,41 +211,7 @@ export function InstantClaimForm(props: {
         />
       </label>
 
-      <fieldset className="grid gap-2 text-sm">
-        <legend className="text-white/80">Your role</legend>
-        {ROLES.map((r) => (
-          <label
-            key={r.value}
-            className={`flex min-h-14 items-start gap-3 rounded-md border px-3 py-2 text-base text-white ${
-              role === r.value ? "border-[rgb(var(--om-neon))] bg-white/10" : "border-white/15 bg-black/40"
-            }`}
-          >
-            <input
-              type="radio"
-              name="claim-role"
-              value={r.value}
-              checked={role === r.value}
-              onChange={() => {
-                setRole(r.value);
-                trackMarketingEvent("authority_confirmed", { listing_slug: props.listingSlug, role: r.value });
-                beacon(r.funnel);
-              }}
-              className="mt-1 h-5 w-5 shrink-0"
-            />
-            <span>
-              <span className="block font-semibold">{r.label}</span>
-              <span className="mt-0.5 block text-sm text-white/65">{r.next}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
-
-      {emailKnown ? (
-        <p className="text-sm text-white/70">
-          Invited email: <span className="font-medium text-white">{props.invitedEmailMasked}</span>
-          <span className="mt-0.5 block text-xs text-white/45">Already confirmed from your invite link.</span>
-        </p>
-      ) : (
+      {emailKnown ? null : (
         <label className="grid gap-1 text-sm">
           <span className="text-white/80">Invited email</span>
           <input
@@ -243,6 +234,7 @@ export function InstantClaimForm(props: {
           type="checkbox"
           checked={consent}
           onChange={(e) => {
+            markStarted();
             setConsent(e.target.checked);
             if (e.target.checked) {
               trackMarketingEvent("authority_confirmed", { listing_slug: props.listingSlug });
@@ -254,13 +246,13 @@ export function InstantClaimForm(props: {
           required
         />
         <span data-claim-authority="required">
-          Yes — I am authorized to manage this open mic and accept the{" "}
+          I confirm I&apos;m authorized to manage this listing and agree to{" "}
           <Link href="/terms" className="underline text-[rgb(var(--om-neon))]" target="_blank">
             Terms
           </Link>{" "}
-          and{" "}
+          /{" "}
           <Link href="/privacy" className="underline text-[rgb(var(--om-neon))]" target="_blank">
-            Privacy Policy
+            Privacy
           </Link>
           .
         </span>

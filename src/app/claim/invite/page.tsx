@@ -7,6 +7,7 @@ import {
   CLAIM_AUTHORITY_AFFIRMATION,
   getClaimInviteSession,
   maskClaimInviteEmail,
+  usableInvitedClaimContactName,
 } from "@/lib/publicListings/claimInviteSession";
 import { consumeListingClaimInviteTokenById } from "@/lib/publicListings/claimInviteToken";
 import { CLAIM_FUNNEL_EVENT, recordClaimFunnelEvent } from "@/lib/publicListings/claimFunnelEvents";
@@ -110,7 +111,9 @@ export default async function ClaimInviteSessionPage({
       region: true,
       claimedVenueId: true,
       about: true,
+      hostName: true,
       growthLeadId: true,
+      growthLead: { select: { name: true } },
       schedules: {
         where: { isActive: true },
         select: { weekday: true, startTimeMin: true, endTimeMin: true, title: true },
@@ -151,6 +154,11 @@ export default async function ClaimInviteSessionPage({
 
   const invitedEmailMasked = maskClaimInviteEmail(session.intendedEmailNormalized);
   const cityLine = [listing.city, listing.region].filter(Boolean).join(", ") || null;
+  const prefilledContactName = usableInvitedClaimContactName({
+    hostName: listing.hostName,
+    growthLeadName: listing.growthLead?.name,
+    listingName: listing.name,
+  });
 
   return (
     <div className="min-h-dvh bg-black text-white">
@@ -161,6 +169,7 @@ export default async function ClaimInviteSessionPage({
             listingName={listing.name}
             invitedEmailMasked={invitedEmailMasked}
             emailConfirmedFromInvite
+            prefilledContactName={prefilledContactName}
             address={listing.formattedAddress}
             cityLine={cityLine}
             evidenceSummary={evidenceSummary}

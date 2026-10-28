@@ -282,7 +282,7 @@ export default async function ArtistPortalPage({
                     href="/find-open-mics"
                     className="inline-flex h-12 items-center justify-center rounded-md border border-violet-400/40 bg-violet-500/20 px-5 text-base font-semibold text-violet-50 hover:bg-violet-500/30"
                   >
-                    Find open mics near me
+                    Find open mics near you — free
                   </Link>
                   <Link
                     href="/artist#profile"
@@ -306,7 +306,7 @@ export default async function ArtistPortalPage({
                     href="/find-open-mics"
                     className="inline-flex h-11 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold text-violet-50 hover:bg-violet-500/25"
                   >
-                    Find open mics near me
+                    Find open mics near you — free
                   </Link>
                   <Link
                     href="/artist#profile"
@@ -438,7 +438,7 @@ export default async function ArtistPortalPage({
                     href="/find-open-mics"
                     className="mt-4 inline-flex h-11 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold text-violet-50 hover:bg-violet-500/25"
                   >
-                    Find open mics near me
+                    Find open mics near you — free
                   </Link>
                 </div>
               );

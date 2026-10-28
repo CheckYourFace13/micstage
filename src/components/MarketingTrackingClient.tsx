@@ -97,6 +97,16 @@ export function MarketingTrackingClient() {
     if (pathname.startsWith("/venues/") || pathname.startsWith("/open-mics/")) {
       trackMarketingEvent("open_mic_page_viewed", { page_path: pathname });
     }
+    if (searchParams.get("ref") === "share" || searchParams.get("ref") === "host_share") {
+      oncePerSession(`trk:host_share_visit:${pathname}`, () => {
+        trackMarketingEvent("host_share_visit", { page_path: pathname });
+      });
+    }
+    if (pathname.startsWith("/register/musician") && (searchParams.get("ref") === "share" || searchParams.get("ref") === "host_share")) {
+      oncePerSession("trk:performer_from_share", () => {
+        trackMarketingEvent("performer_registration_from_share", { page_path: pathname });
+      });
+    }
   }, [pathname, searchParams]);
 
   useEffect(() => {

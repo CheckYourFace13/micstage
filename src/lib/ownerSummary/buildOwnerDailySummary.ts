@@ -102,6 +102,10 @@ export type OwnerDailySummaryData = {
     remainingProviderHeadroom: number;
     claimContactsMinedToday: number;
     inviteReadyTotal: number;
+    highEmailTotal: number;
+    unusedOutreachCapacity: number;
+    topOutreachBlockReasons: Array<{ reason: string; count: number }>;
+    cityHubsWithScheduled: number;
   };
   growthLayers: {
     rawCandidatesTotal: number;
@@ -116,6 +120,7 @@ export type OwnerDailySummaryData = {
     performersRegistered7d: number;
     performerSignups7d: number;
     weeklyDigestOptIns: number;
+    cityHubsWithScheduled: number;
   };
   /** Compact funnel + automation counters for ops email (not the full review dump). */
   growthFunnel: {
@@ -467,6 +472,7 @@ export async function buildOwnerDailySummary(
     indexableScheduledListings,
     schedulesAutoConfirmedToday,
     unscheduledVerified,
+    cityHubsWithScheduledRows,
   ] = await Promise.all([
     loadDiscoveryInventoryStats(prisma),
     countPendingListingClaimInvitesWithEmail(prisma),
@@ -653,6 +659,15 @@ export async function buildOwnerDailySummary(
         verificationStatus: "VERIFIED",
         claimedVenueId: null,
         schedules: { none: { isActive: true } },
+      },
+    }),
+    prisma.publicOpenMicListing.groupBy({
+      by: ["city"],
+      where: {
+        removedAt: null,
+        verificationStatus: "VERIFIED",
+        city: { not: null },
+        schedules: { some: { isActive: true } },
       },
     }),
   ]);
@@ -861,6 +876,10 @@ export async function buildOwnerDailySummary(
       remainingProviderHeadroom: providerCapacity.remainingForOutreach,
       claimContactsMinedToday: enrichStats.newHighContacts,
       inviteReadyTotal: inviteReady,
+      highEmailTotal: eligibilityAudit.highConfidenceContacts,
+      unusedOutreachCapacity: Math.max(0, outreachRuntime.effectiveDailyMax - outreachSends),
+      topOutreachBlockReasons: eligibilityAudit.topBlockReasons,
+      cityHubsWithScheduled: cityHubsWithScheduledRows.filter((r) => r.city?.trim()).length,
     },
     growthLayers: {
       rawCandidatesTotal,
@@ -875,6 +894,7 @@ export async function buildOwnerDailySummary(
       performersRegistered7d,
       performerSignups7d,
       weeklyDigestOptIns,
+      cityHubsWithScheduled: cityHubsWithScheduledRows.filter((r) => r.city?.trim()).length,
     },
     growthFunnel: {
       waitingEnrichment,

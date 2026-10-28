@@ -47,7 +47,7 @@ export default function Home() {
                 data-track-event="homepage_cta_find"
                 className="inline-flex min-h-12 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-6 text-base font-semibold text-black hover:brightness-110"
               >
-                Find open mics
+                Find open mics near you — free
               </Link>
               <Link
                 href="/host"

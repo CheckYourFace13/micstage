@@ -90,8 +90,12 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
     }
   }
   return buildPublicMetadata({
-    title: `Open Mics in ${place} | Schedules & Upcoming`,
-    description: `Trusted open mic nights in ${place} for music, comedy, poetry and more. See schedules and signup details on MicStage.`,
+    title: hasSchedule
+      ? `Open Mics in ${place} Tonight | Music, Comedy & Poetry`
+      : `Open Mics in ${place} | Music, Comedy & Poetry`,
+    description: hasSchedule
+      ? `Find open mics near you in ${place} — tonight and this week for music, comedy, and poetry. See schedules and signup details on MicStage.`
+      : `Find open mics near you in ${place} for music, comedy, and poetry. See schedules and signup details on MicStage.`,
     path: `/locations/${slug}/open-mics`,
     index,
   });

@@ -38,23 +38,12 @@ const IMPORT_LIKE_DISCOVERED_SOURCE_KINDS: GrowthLeadSourceKind[] = [
 ];
 
 /**
- * Skip cold outreach only when a VERIFIED public listing is awaiting claim / go-live. Once the
- * claim invite has gone out, the claim path has had its turn — matching `deferClaimPath` in
- * explainGrowthLeadOutreachEligibility, which otherwise marks these leads eligible forever while
- * draft creation blocked them.
+ * Claim-path deferral is decided per lead by `explainGrowthLeadOutreachEligibility`
+ * (`shouldDeferOutreachToClaimInvite`). Do not Prisma-exclude every verified listing —
+ * most HIGH emails are not claim-invite eligible and must stay on marketing outreach.
  */
 /** Outreach quotes the venue's own listing, so a draft this old no longer reflects current evidence. */
 const STALE_PENDING_DRAFT_DAYS = 30;
-
-const LISTING_BLOCKS_OUTREACH = {
-  publicListings: {
-    none: {
-      verificationStatus: "VERIFIED" as const,
-      promotionEligibleAt: null,
-      claimInviteEmailSentAt: null,
-    },
-  },
-} as const;
 
 function sourceSkipsDiscoveredStrictGate(sourceKind: GrowthLeadSourceKind): boolean {
   return IMPORT_LIKE_DISCOVERED_SOURCE_KINDS.includes(sourceKind);
@@ -268,7 +257,6 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     where: {
       contactEmailNormalized: { not: null },
       contactEmailConfidence: { in: emailReadyLevels },
-      ...LISTING_BLOCKS_OUTREACH,
       OR: [
         // Keep existing non-venue behavior.
         { status: "APPROVED" },
@@ -319,7 +307,6 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
     leadType: { in: ["VENUE", "PROMOTER_ACCOUNT"] },
     status: { in: ["DISCOVERED", "REVIEWED", "APPROVED"] },
     outreachDrafts: { none: { status: { in: ["PENDING_REVIEW", "APPROVED"] } } },
-    ...LISTING_BLOCKS_OUTREACH,
   };
   const priorityWindow = Math.min(64, draftWorkTake * 2);
   const hotTake = Math.max(1, Math.floor(priorityWindow / 2));
@@ -429,7 +416,6 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       status: "PENDING_REVIEW",
       lead: {
         leadType: "VENUE",
-        ...LISTING_BLOCKS_OUTREACH,
         AND: [
           { OR: [{ status: "DISCOVERED" }, { status: "REVIEWED" }, { status: "APPROVED" }] },
           { OR: [{ fitScore: { gte: venueAutoFitMin } }, { fitScore: null }] },

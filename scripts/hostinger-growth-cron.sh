@@ -17,11 +17,11 @@ curl -fsS -m 360 -X POST \
 #   -H "Authorization: Bearer $SECRET" \
 #   "$BASE/api/cron/growth-pipeline?phase=discovery"
 
-# --- Job 2b (optional): every 15 min offset — schedule + official contact mining only ---
+# --- Job 2b: every 15 min offset — schedule + official contact mining only ---
 # Schedule: 7,22,37,52 * * * *
-# curl -fsS -m 180 -X POST \
-#   -H "Authorization: Bearer $SECRET" \
-#   "$BASE/api/cron/growth-pipeline?phase=enrichment"
+curl -fsS -m 180 -X POST \
+  -H "Authorization: Bearer $SECRET" \
+  "$BASE/api/cron/growth-pipeline?phase=enrichment"
 
 # --- Job 3: daily 06:10 UTC — IndexNow for new resource guides ---
 # Schedule: 10 6 * * *

@@ -13,6 +13,7 @@ import {
 } from "@/lib/publicListings/claimInviteAutomation";
 import { micstageEmailMiningKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 import { getGrowthPipelineRuntimeCache } from "@/lib/growth/growthRuntimeSettings";
+import { CONTACT_MINE_LOCK, withPgAdvisoryLock } from "@/lib/growth/enrichmentLock";
 
 export type MineVerifiedContactsResult = {
   scanned: number;
@@ -147,6 +148,19 @@ function minePriority(row: {
  * same-domain official mailbox. Persists attempt metadata + domain cooldown.
  */
 export async function mineVerifiedListingOfficialEmails(
+  prisma: PrismaClient,
+  opts?: { limit?: number },
+): Promise<MineVerifiedContactsResult> {
+  if (micstageEmailMiningKillSwitch()) {
+    return { scanned: 0, mined: 0, highOfficial: 0, failed: 0, byFailureReason: { killed: 1 } };
+  }
+  const empty: MineVerifiedContactsResult = { scanned: 0, mined: 0, highOfficial: 0, failed: 0, byFailureReason: {} };
+  return withPgAdvisoryLock(prisma, CONTACT_MINE_LOCK, empty, () =>
+    mineVerifiedListingOfficialEmailsUnlocked(prisma, opts),
+  );
+}
+
+async function mineVerifiedListingOfficialEmailsUnlocked(
   prisma: PrismaClient,
   opts?: { limit?: number },
 ): Promise<MineVerifiedContactsResult> {

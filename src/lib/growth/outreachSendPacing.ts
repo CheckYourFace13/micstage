@@ -79,10 +79,8 @@ export function computeOutreachSendPacing(input: {
   } else if (remainingTicks <= 0) {
     reason = "no_ticks_left_in_window";
   } else if (hour >= endHour - 1) {
-    const lastHourCap = Math.min(remaining, Math.max(configured, 25));
-    const catchUp = Math.ceil(remaining / Math.max(1, remainingTicks));
-    sendsThisCron = Math.min(lastHourCap, Math.max(configured, catchUp));
-    reason = `last_hour_catchup: min(remaining=${remaining}, configured=${configured}, ceil(${remaining}/${remainingTicks})=${catchUp})`;
+    sendsThisCron = remaining;
+    reason = `last_hour_catchup: drain remaining=${remaining}`;
   } else {
     const evenSpread = Math.ceil(remaining / remainingTicks);
     const behindBy = remaining - remainingTicks;

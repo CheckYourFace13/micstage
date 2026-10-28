@@ -1123,4 +1123,67 @@ const { clampOutreachDailyMaxForRlsGate } = await import("../src/lib/database/da
 assert.equal(clampOutreachDailyMaxForRlsGate(50, false), 25);
 assert.equal(clampOutreachDailyMaxForRlsGate(50, true), 50);
 
+const {
+  shouldDeferOutreachToClaimInvite,
+  isStagedClaimInviteContactEligible,
+} = await import("../src/lib/publicListings/claimInviteAutomation.ts");
+const { officialClaimSiteHost } = await import("../src/lib/publicListings/claimInviteEligibility.ts");
+const { mapOutreachReasonToScorecardBucket } = await import("../src/lib/growth/outreachContactEligible.ts");
+const { buildListingClaimInvitePayload } = await import("../src/lib/publicListings/listingClaimInviteEmail.ts");
+
+assert.equal(officialClaimSiteHost("emptybottle.com", "https://facebook.com/emptybottle"), "emptybottle.com");
+assert.equal(officialClaimSiteHost(null, "https://facebook.com/emptybottle"), null);
+assert.equal(
+  isStagedClaimInviteContactEligible({
+    email: "booking@emptybottle.com",
+    confidence: "HIGH",
+    websiteUrl: "emptybottle.com",
+    sourceUrl: "https://facebook.com/emptybottle",
+  }),
+  true,
+);
+assert.equal(
+  shouldDeferOutreachToClaimInvite({
+    email: "host@gmail.com",
+    confidence: "HIGH",
+    leadWebsiteUrl: "https://bluenote.com",
+    listings: [
+      {
+        verificationStatus: "VERIFIED",
+        claimStatus: "UNCLAIMED",
+        claimedVenueId: null,
+        googlePlaceId: "ChIJtest",
+        evidenceTerminalReason: null,
+        internalNotes: null,
+        name: "Blue Note Open Mic",
+        about: "Weekly open mic",
+        websiteUrl: "https://bluenote.com",
+        sourceUrl: "https://bluenote.com/events",
+        claimInviteEmailSentAt: null,
+      },
+    ],
+  }),
+  false,
+);
+assert.equal(mapOutreachReasonToScorecardBucket("eligible"), "sendable_now");
+assert.equal(mapOutreachReasonToScorecardBucket("no_target_bound_open_mic_evidence"), "no_explicit_open_mic_evidence");
+assert.equal(mapOutreachReasonToScorecardBucket("defer_claim_path"), "other");
+const claimMail = buildListingClaimInvitePayload({
+  listingName: "Blue Note Open Mic",
+  listingSlug: "blue-note-open-mic",
+  city: "Chicago",
+  region: "IL",
+  claimUrl: "https://micstage.com/claim/invite/token",
+});
+assert.match(claimMail.textBody, /We found your open mic on MicStage/);
+assert.match(claimMail.textBody, /Claim it free to correct the schedule/);
+assert.match(claimMail.htmlBody, /Claim your listing free/);
+assert.match(claimMail.htmlBody, /open-mics\/blue-note-open-mic/);
+assert.match(claimMail.textBody, /No credit card/);
+
+const homeSrc = fs.readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+assert.match(homeSrc, /Find open mics near you — free/);
+const draftSrc = fs.readFileSync(new URL("../src/lib/growth/growthDraftAutomation.ts", import.meta.url), "utf8");
+assert.doesNotMatch(draftSrc, /LISTING_BLOCKS_OUTREACH/);
+
 console.log(JSON.stringify({ ok: true, checks: "marketing-outreach" }));

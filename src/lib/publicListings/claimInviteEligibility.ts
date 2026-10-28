@@ -11,13 +11,78 @@ export const CLAIM_INVITE_LISTING_WHERE = {
   growthLead: { contactEmailNormalized: { not: null } },
 } as const;
 
-function hostFromUrl(url: string | null | undefined): string | null {
+/** Directory / social hosts are never an official venue mailbox domain. */
+const NON_OFFICIAL_CLAIM_HOSTS = new Set([
+  "eventbrite.com",
+  "facebook.com",
+  "fb.com",
+  "instagram.com",
+  "yelp.com",
+  "tripadvisor.com",
+  "timeout.com",
+  "bandcamp.com",
+  "ticketmaster.com",
+  "dice.fm",
+  "residentadvisor.net",
+  "ra.co",
+  "songkick.com",
+  "bandsintown.com",
+  "meetup.com",
+  "craigslist.org",
+  "wikipedia.org",
+  "blogspot.com",
+  "chicagotribune.com",
+  "nytimes.com",
+  "latimes.com",
+  "washingtonpost.com",
+  "npr.org",
+  "spotify.com",
+  "youtube.com",
+]);
+
+/**
+ * Accepts full URLs and bare hosts (`emptybottle.com`) so stored websites without
+ * a scheme still count as an official business domain.
+ */
+export function parseWebsiteHost(url: string | null | undefined): string | null {
   if (!url?.trim()) return null;
+  const raw = url.trim();
   try {
-    return new URL(url.trim()).hostname.replace(/^www\./i, "").toLowerCase() || null;
+    const withProto = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+    return new URL(withProto).hostname.replace(/^www\./i, "").toLowerCase() || null;
   } catch {
     return null;
   }
+}
+
+function hostFromUrl(url: string | null | undefined): string | null {
+  return parseWebsiteHost(url);
+}
+
+export function isNonOfficialClaimHost(host: string | null | undefined): boolean {
+  if (!host) return true;
+  const h = host.replace(/^www\./i, "").toLowerCase();
+  if (NON_OFFICIAL_CLAIM_HOSTS.has(h)) return true;
+  for (const blocked of NON_OFFICIAL_CLAIM_HOSTS) {
+    if (h === blocked || h.endsWith(`.${blocked}`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Official venue host for claim-invite domain match.
+ * Prefers the listing website; ignores Facebook/directory source URLs so they
+ * do not create false domain mismatches.
+ */
+export function officialClaimSiteHost(
+  websiteUrl?: string | null,
+  sourceUrl?: string | null,
+): string | null {
+  const web = parseWebsiteHost(websiteUrl);
+  if (web && !isNonOfficialClaimHost(web)) return web;
+  const src = parseWebsiteHost(sourceUrl);
+  if (src && !isNonOfficialClaimHost(src)) return src;
+  return null;
 }
 
 function hostFromEmail(email: string): string | null {

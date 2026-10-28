@@ -16,6 +16,7 @@ import { venueIdsForVenueSession } from "@/lib/authz";
 import { getSession } from "@/lib/session";
 import { equipmentProvidedList } from "@/lib/venueDisplay";
 import { VenueBookingFlash } from "@/components/VenueBookingFlash";
+import { ShareLinks } from "@/components/publicListings/ShareLinks";
 import { VenueLineupBoard } from "@/components/venue/VenueLineupBoard";
 import { loadPublicVenueForLineup } from "@/lib/venuePublicLineupData";
 import {
@@ -256,6 +257,13 @@ export default async function VenuePublicPage(props: {
                 </Link>
               </div>
             ) : null}
+            <ShareLinks
+              className="mt-4"
+              url={absoluteUrl(`/venues/${venue.slug}`)}
+              title={`${venue.name} open mic`}
+              signupUrl={heroYmd ? absoluteUrl(`/venues/${venue.slug}/lineup/${heroYmd}`) : absoluteUrl(`/venues/${venue.slug}`)}
+              nextMicUrl={heroYmd ? absoluteUrl(`/venues/${venue.slug}/lineup/${heroYmd}`) : null}
+            />
             {venue.city && artistDiscoverySlug ? (
               <p className="mt-2 text-[11px] leading-snug text-white/50 md:text-xs md:leading-normal md:text-white/60">
                 <Link className="underline decoration-white/30 underline-offset-2 hover:text-white" href={`/locations/${artistDiscoverySlug}/performers`}>

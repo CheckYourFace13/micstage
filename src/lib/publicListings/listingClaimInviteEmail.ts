@@ -58,46 +58,36 @@ export function buildListingClaimInvitePayload(input: {
   const claimUrl =
     input.claimUrl?.trim() || `${base}/claim/${encodeURIComponent(input.listingSlug)}`;
   const openMicName = (input.venueName?.trim() || input.listingName).trim();
-  const subject = "Claim your free MicStage open mic listing";
-
-  // Keep the official title intact. Names that already end in sentence punctuation
-  // use "the …" so the following "and" remains grammatically clear.
-  const foundLead = /[.!?]$/.test(openMicName) ? "We found the" : "We found your";
-  const foundSentence = `${foundLead} ${openMicName} and created a free verified listing on MicStage so more performers can discover it.`;
+  const subject = "Claim your open mic on MicStage — free";
+  const foundSentence = `We found your open mic on MicStage.`;
+  const askSentence = "Claim it free to correct the schedule and manage performer signups.";
 
   const textBody = [
     "Hi,",
     "",
     foundSentence,
-    "",
-    "MicStage was created by an open-mic organizer who wanted an easier way to manage schedules, promote events, and organize performer signups. It is free and simple to use, and online booking remains optional.",
-    "",
-    "No account has been created for you. If you are authorized to manage this open mic, use the secure link below to claim the listing, confirm the details, and publish your schedule.",
+    askSentence,
     "",
     claimUrl,
     "",
-    "View the current listing:",
-    "",
+    "Your listing:",
     listingUrl,
     "",
-    "The claim link is private and expires. If you are not the correct person, reply and let us know.",
+    "No credit card. The claim link is private and expires.",
     "",
     "Thanks,",
     "Chris",
     "MicStage",
   ].join("\n");
 
-  // Email-safe, short HTML — no images, tracking pixels, or heavy branding.
   const htmlBody = [
     '<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#111827;max-width:560px;margin:0 auto;">',
     "<p style=\"margin:0 0 16px 0;\">Hi,</p>",
-    `<p style="margin:0 0 16px 0;">${escapeHtml(foundSentence)}</p>`,
-    '<p style="margin:0 0 16px 0;">MicStage was created by an open-mic organizer who wanted an easier way to manage schedules, promote events, and organize performer signups. It is free and simple to use, and online booking remains optional.</p>',
-    '<p style="margin:0 0 20px 0;">No account has been created for you. If you are authorized to manage this open mic, use the secure link below to claim the listing, confirm the details, and publish your schedule.</p>',
-    `<p style="margin:0 0 20px 0;"><a href="${escapeHtml(claimUrl)}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Claim Your Free Listing</a></p>`,
-    '<p style="margin:0 0 8px 0;">View the current listing:</p>',
-    `<p style="margin:0 0 20px 0;"><a href="${escapeHtml(listingUrl)}" style="color:#111827;">${escapeHtml(listingUrl)}</a></p>`,
-    '<p style="margin:0 0 16px 0;">The claim link is private and expires. If you are not the correct person, reply and let us know.</p>',
+    `<p style="margin:0 0 8px 0;">${escapeHtml(foundSentence)}</p>`,
+    `<p style="margin:0 0 20px 0;">${escapeHtml(askSentence)}</p>`,
+    `<p style="margin:0 0 20px 0;"><a href="${escapeHtml(claimUrl)}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Claim your listing free</a></p>`,
+    `<p style="margin:0 0 8px 0;">Your listing: <a href="${escapeHtml(listingUrl)}" style="color:#111827;">${escapeHtml(openMicName)}</a></p>`,
+    '<p style="margin:0 0 16px 0;">No credit card. The claim link is private and expires.</p>',
     '<p style="margin:0;">Thanks,<br />Chris<br />MicStage</p>',
     "</div>",
   ].join("");

@@ -8,7 +8,10 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
-export async function discoveryFetchText(url: string, opts?: { timeoutMs?: number }): Promise<string | null> {
+export async function discoveryFetchText(
+  url: string,
+  opts?: { timeoutMs?: number; acceptCalendar?: boolean },
+): Promise<string | null> {
   const timeoutMs = opts?.timeoutMs ?? 14_000;
   const delay = growthDiscoveryHttpDelayMs();
   const now = Date.now();
@@ -24,14 +27,20 @@ export async function discoveryFetchText(url: string, opts?: { timeoutMs?: numbe
       signal: ac.signal,
       headers: {
         "User-Agent": UA,
-        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        Accept: opts?.acceptCalendar
+          ? "text/calendar,text/plain,text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
+          : "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
       },
     });
     lastFetchAt = Date.now();
     if (!res.ok) return null;
     const ct = res.headers.get("content-type") ?? "";
-    if (!/text\/html|application\/xhtml/i.test(ct) && !ct.includes("text/plain")) {
+    const looksIcs = /\.ics(\?|$)/i.test(url);
+    const calendarOk =
+      Boolean(opts?.acceptCalendar) &&
+      (/text\/calendar|text\/plain|application\/ics/i.test(ct) || looksIcs);
+    if (!/text\/html|application\/xhtml/i.test(ct) && !ct.includes("text/plain") && !calendarOk) {
       return null;
     }
     const text = await res.text();

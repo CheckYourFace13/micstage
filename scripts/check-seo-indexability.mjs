@@ -23,7 +23,11 @@ import {
   isPublicListingSourceUrl,
 } from "../src/lib/publicListings/listingAboutFromLead.ts";
 import { shouldIndexDiscoveryPage } from "../src/lib/seo/discoveryIndex.ts";
-import { parseExplicitScheduleFromText } from "../src/lib/publicListings/explicitScheduleParse.ts";
+import {
+  parseExplicitScheduleFromHtml,
+  parseExplicitScheduleFromIcs,
+  parseExplicitScheduleFromText,
+} from "../src/lib/publicListings/explicitScheduleParse.ts";
 import {
   explicitScheduleEndTimeMin,
   resolveTrustedListingTimeZone,
@@ -137,7 +141,7 @@ assert.match(desc, /Monday/);
 assert.doesNotMatch(desc, /2020|2019/);
 
 const thinDesc = publicListingSeoDescription(baseListing({ schedules: [], lastVerifiedAt: new Date() }));
-assert.match(thinDesc, /Find schedule/);
+assert.match(thinDesc, /Find open mics near you/);
 assert.doesNotMatch(thinDesc, /happens weekly/);
 
 // Recurring weekday only → NO Event JSON-LD
@@ -298,6 +302,26 @@ assert.ok(parsedSched?.signupMethod);
 assert.equal(parseExplicitScheduleFromText("Live music on weekends"), null);
 const parsedWithEnd = parseExplicitScheduleFromText("Open mic every Friday from 8:00 pm to 10:00 pm");
 assert.equal(explicitScheduleEndTimeMin(parsedWithEnd), 22 * 60);
+assert.equal(parseExplicitScheduleFromText("Tuesday 8pm")?.weekday, "TUE");
+assert.equal(parseExplicitScheduleFromText("Tuesday 8pm")?.startTimeMin, 20 * 60);
+assert.equal(parseExplicitScheduleFromText("8:00 PM every Thursday")?.weekday, "THU");
+assert.equal(
+  parseExplicitScheduleFromHtml(
+    `<script type="application/ld+json">${JSON.stringify({
+      "@type": "Event",
+      name: "Weekly Open Mic",
+      eventSchedule: { "@type": "Schedule", byDay: "Tuesday", startTime: "19:00" },
+    })}</script>`,
+  )?.weekday,
+  "TUE",
+);
+assert.equal(
+  parseExplicitScheduleFromIcs(
+    "BEGIN:VEVENT\nSUMMARY:Open Mic Night\nRRULE:FREQ=WEEKLY;BYDAY=WE\nDTSTART:20260107T200000\nEND:VEVENT\n",
+  )?.weekday,
+  "WED",
+);
+assert.equal(parseExplicitScheduleFromText("Tuesday 8"), null);
 
 assert.equal(
   resolveTrustedListingTimeZone({ timeZone: "America/Chicago", lat: 47.6062, lng: -122.3321 }),
@@ -324,6 +348,10 @@ assert.doesNotMatch(summarySrc, /indexableScheduledListings:\s*-1/);
 assert.doesNotMatch(summarySrc, /schedulesAutoConfirmedToday:\s*-1/);
 assert.match(summarySrc, /indexableScheduledListings:\s*data\.listingsInventory\.indexableScheduledListings/);
 assert.match(summarySrc, /schedulesAutoConfirmedToday:\s*data\.listingsInventory\.schedulesAutoConfirmedToday/);
+assert.match(summarySrc, /HIGH emails/);
+assert.match(summarySrc, /Net eligible now/);
+assert.match(summarySrc, /Unused capacity/);
+assert.match(summarySrc, /City hubs with scheduled inventory/);
 const builderSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/ownerSummary/buildOwnerDailySummary.ts"), "utf8");
 assert.match(builderSrc, /indexableScheduledListings/);
 assert.match(builderSrc, /schedulesAutoConfirmedToday/);

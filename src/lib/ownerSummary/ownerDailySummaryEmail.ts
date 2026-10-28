@@ -68,23 +68,44 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Invite-ready total: ${inv.inviteReadyTotal}`,
     `  Note: ${inv.listingsNote}`,
     "",
-    "RAW INVENTORY",
-    `  Raw candidates total: ${data.growthLayers.rawCandidatesTotal}`,
-    `  New candidates (24h): ${data.growthLayers.rawCandidatesToday}`,
-    `  Deterministic junk rejected (24h): ${data.growthLayers.junkRejectedToday}`,
+    "RAW GROWTH",
+    `  New raw leads: ${data.growthLayers.rawCandidatesToday}`,
+    `  Total raw reservoir: ${data.growthLayers.rawCandidatesTotal}`,
+    `  Junk rejected (24h): ${data.growthLayers.junkRejectedToday}`,
     "",
-    "QUALIFIED INVENTORY",
-    `  Real-place candidates: ${data.growthLayers.realPlaceCandidates}`,
-    `  Verified listings: ${data.growthLayers.verifiedListings}`,
-    `  Scheduled listings: ${data.growthLayers.scheduledListings}`,
-    `  Indexable listings: ${data.growthLayers.indexableListings}`,
+    "LISTING GROWTH",
+    `  Verified: ${data.growthLayers.verifiedListings}`,
+    `  Schedules confirmed: ${data.growthLayers.scheduledListings}`,
+    `  Indexable: ${data.growthLayers.indexableListings}`,
+    `  City hubs with scheduled inventory: ${data.growthLayers.cityHubsWithScheduled}`,
     "",
-    "SUPPLY / DEMAND USERS (7d)",
-    `  Venues registered: ${data.growthLayers.venuesRegistered7d}`,
-    `  Hosts registered: ${data.growthLayers.hostsRegistered7d}`,
-    `  Performers registered: ${data.growthLayers.performersRegistered7d}`,
+    "CONTACT / CLAIM",
+    `  Official HIGH contacts mined (24h): ${inv.claimContactsMinedToday}`,
+    `  Claim-invite eligible: ${inv.inviteReadyTotal}`,
+    `  Claim invites sent (24h): ${inv.claimInvitesSentCount}`,
+    `  Claims started (24h): ${data.marketing.claimsStartedToday}`,
+    `  Claims completed (24h): ${data.marketing.claimsCompletedToday}`,
+    "",
+    "OUTREACH",
+    `  HIGH emails: ${inv.highEmailTotal}`,
+    `  Net eligible now: ${inv.netEligibleOutreach}`,
+    `  Safe capacity: ${data.marketing.dailyCap}`,
+    `  Actual sent: ${data.marketing.sentToday}`,
+    `  Delivered: ${data.marketing.deliveredToday}`,
+    `  Clicks: ${data.marketing.uniqueClicksToday}`,
+    `  Unused capacity: ${inv.unusedOutreachCapacity}`,
+    `  Top block reasons: ${inv.topOutreachBlockReasons.length ? inv.topOutreachBlockReasons.map((b) => `${b.reason}=${b.count}`).join(", ") : "none"}`,
+    "",
+    "USERS (7d)",
+    `  Venue accounts: ${data.growthLayers.venuesRegistered7d}`,
+    `  Host accounts: ${data.growthLayers.hostsRegistered7d}`,
+    `  Performer accounts: ${data.growthLayers.performersRegistered7d}`,
     `  Performer signups: ${data.growthLayers.performerSignups7d}`,
-    `  Weekly digest opt-ins: ${data.growthLayers.weeklyDigestOptIns}`,
+    `  Weekly alert opt-ins: ${data.growthLayers.weeklyDigestOptIns}`,
+    "",
+    "SEARCH",
+    `  Outreach clicks (24h / 7d): ${data.marketing.uniqueClicksToday} / ${data.marketing.uniqueClicks7d}`,
+    `  Indexed scheduled pages: ${data.growthLayers.indexableListings}`,
     "",
     data.listingsInventory.listingsCreatedCount > 0
       ? "NEW LISTINGS (24h)"
@@ -536,10 +557,11 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>Pending claim invites (eligible to send):</strong> ${inv.pendingClaimInvites} · <strong>Leads waiting to publish:</strong> ${inv.leadsAwaitingPublish} · <strong>Google verified:</strong> ${inv.googleVerifiedListings}</li>
     <li><strong>Hidden listing backlog (NEEDS_REVIEW):</strong> ${inv.needsReviewCount}</li>
     <li><strong>Verified with active schedule:</strong> ${inv.verifiedWithActiveSchedule} · <strong>Indexable:</strong> ${inv.indexableScheduledListings} · <strong>Schedules confirmed today:</strong> ${inv.schedulesAutoConfirmedToday}</li>
-    <li><strong>Net-eligible outreach:</strong> ${inv.netEligibleOutreach} · <strong>Provider headroom:</strong> ${inv.remainingProviderHeadroom}</li>
-    <li><strong>Claim contacts mined today:</strong> ${inv.claimContactsMinedToday} · <strong>Invite-ready:</strong> ${inv.inviteReadyTotal}</li>
+    <li><strong>HIGH emails:</strong> ${inv.highEmailTotal} · <strong>Net eligible now:</strong> ${inv.netEligibleOutreach} · <strong>Safe capacity:</strong> ${data.marketing.dailyCap} · <strong>Sent:</strong> ${data.marketing.sentToday} · <strong>Unused:</strong> ${inv.unusedOutreachCapacity}</li>
+    <li><strong>Top outreach blocks:</strong> ${inv.topOutreachBlockReasons.length ? inv.topOutreachBlockReasons.map((b) => `${esc(b.reason)}=${b.count}`).join(" · ") : "none"}</li>
+    <li><strong>Claim contacts mined today:</strong> ${inv.claimContactsMinedToday} · <strong>Invite-ready:</strong> ${inv.inviteReadyTotal} · <strong>Invites sent:</strong> ${inv.claimInvitesSentCount} · <strong>Claims started/completed:</strong> ${data.marketing.claimsStartedToday}/${data.marketing.claimsCompletedToday}</li>
     <li><strong>Raw candidates:</strong> ${data.growthLayers.rawCandidatesTotal} total · ${data.growthLayers.rawCandidatesToday} new (24h) · ${data.growthLayers.junkRejectedToday} junk rejected</li>
-    <li><strong>Qualified:</strong> ${data.growthLayers.realPlaceCandidates} real-place · ${data.growthLayers.verifiedListings} verified · ${data.growthLayers.scheduledListings} scheduled · ${data.growthLayers.indexableListings} indexable</li>
+    <li><strong>Qualified:</strong> ${data.growthLayers.realPlaceCandidates} real-place · ${data.growthLayers.verifiedListings} verified · ${data.growthLayers.scheduledListings} scheduled · ${data.growthLayers.indexableListings} indexable · <strong>City hubs with schedules:</strong> ${data.growthLayers.cityHubsWithScheduled}</li>
     <li><strong>Users (7d):</strong> ${data.growthLayers.venuesRegistered7d} venues · ${data.growthLayers.hostsRegistered7d} hosts · ${data.growthLayers.performersRegistered7d} performers · ${data.growthLayers.performerSignups7d} signups · ${data.growthLayers.weeklyDigestOptIns} digest opt-ins</li>
   </ul>
   <p style="margin:0 0 12px;color:#6b7280;font-size:12px">${esc(inv.listingsNote)}</p>

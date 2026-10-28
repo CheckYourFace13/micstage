@@ -450,7 +450,7 @@ async function main() {
     });
     fail("body_missing_listing_name", { tokenId: issued.tokenId, tokenStatus: "REVOKED" });
   }
-  if (!payload.htmlBody.includes("Claim Your Free Listing")) {
+  if (!payload.htmlBody.includes("Claim your listing free")) {
     await prisma.listingClaimInviteToken.update({
       where: { id: issued.tokenId },
       data: { status: "REVOKED", revokedAt: new Date() },

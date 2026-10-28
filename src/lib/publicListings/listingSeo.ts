@@ -50,9 +50,12 @@ export function publicListingSeoDescription(input: {
       trustedSchedules.map((s) => s.title).find((t) => t?.trim()) ||
       null;
     const signupBit = signup ? ` Signup: ${signup.trim()}.` : "";
-    return `${name} happens weekly on ${dayBit} in ${place}.${signupBit} See location and the latest schedule on MicStage.`;
+    const todayWeekday = (["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const)[new Date().getDay()];
+    const tonight = trustedSchedules.some((s) => s.weekday === todayWeekday);
+    const tonightBit = tonight ? ` Open mic tonight (${weekdayToLabel(todayWeekday)}).` : "";
+    return `${name} happens weekly on ${dayBit} in ${place}.${tonightBit}${signupBit} Find this open mic near you on MicStage.`;
   }
-  return `Find schedule, venue and signup details for ${name}${place ? ` in ${place}` : ""}. See current open-mic information on MicStage.`;
+  return `Find open mics near you — schedule, venue and signup details for ${name}${place ? ` in ${place}` : ""}. See current open-mic information on MicStage.`;
 }
 
 /**

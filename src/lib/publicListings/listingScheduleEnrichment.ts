@@ -7,11 +7,17 @@ import type { PrismaClient, Weekday } from "@/generated/prisma/client";
 import { discoveryFetchText } from "@/lib/growth/discovery/discoveryHttp";
 import { evaluateFetchedEvidenceTrust, isNonVenueEvidenceHost } from "@/lib/publicListings/evidenceTrust";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
-import { parseExplicitScheduleFromText } from "@/lib/publicListings/explicitScheduleParse";
+import {
+  extractOfficialIcsUrls,
+  parseExplicitScheduleFromHtml,
+  parseExplicitScheduleFromIcs,
+  parseExplicitScheduleFromText,
+} from "@/lib/publicListings/explicitScheduleParse";
 import { expandOfficialEvidenceUrls } from "@/lib/publicListings/evidenceEnrichment";
 import { submitUrlsToIndexNow } from "@/lib/seo/searchEnginePing";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { resolveScheduleEndMin } from "@/lib/scheduleWindow";
+import { SCHEDULE_ENRICH_LOCK, withPgAdvisoryLock } from "@/lib/growth/enrichmentLock";
 
 const PAGE_TIMEOUT_MS = 8_000;
 
@@ -94,6 +100,34 @@ export function scheduleMarketPriorityScore(listing: {
   return 10;
 }
 
+function looksLikeEventUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /eventbrite|facebook\.com\/events|\/events?\/|calendar|open-?mic/i.test(url);
+}
+
+/**
+ * Schedule-mining order: listings already getting impressions, biggest cities,
+ * official website, known social/event URL, HIGH contact, remaining verified.
+ */
+export function scheduleMiningPriorityScore(listing: {
+  city?: string | null;
+  region?: string | null;
+  websiteUrl?: string | null;
+  sourceUrl?: string | null;
+  facebookUrl?: string | null;
+  instagramUrl?: string | null;
+  highContact?: boolean;
+  searchImpressions?: number | null;
+}): number {
+  let score = scheduleMarketPriorityScore(listing);
+  const impressions = listing.searchImpressions ?? 0;
+  if (impressions > 0) score += 1000 + Math.min(500, impressions);
+  if (listing.websiteUrl?.trim()) score += 40;
+  if (listing.facebookUrl || listing.instagramUrl || looksLikeEventUrl(listing.sourceUrl)) score += 25;
+  if (listing.highContact) score += 15;
+  return score;
+}
+
 function officialSocialUrl(listing: { facebookUrl?: string | null; instagramUrl?: string | null }, pageUrl: string): boolean {
   const page = hostFromUrl(pageUrl);
   if (!page) return false;
@@ -113,12 +147,10 @@ function crawlableOfficial(
   return officialSocialUrl(listing, pageUrl);
 }
 
-export async function enrichVerifiedListingSchedules(
+async function enrichVerifiedListingSchedulesUnlocked(
   prisma: PrismaClient,
-  opts?: { limit?: number },
+  limit: number,
 ): Promise<ScheduleEnrichResult> {
-  const limit = Math.min(48, Math.max(0, opts?.limit ?? 24));
-  if (limit <= 0) return { scanned: 0, confirmed: 0, uncertain: 0, skipped: 0 };
 
   let rows = await prisma.publicOpenMicListing.findMany({
     where: {
@@ -143,12 +175,29 @@ export async function enrichVerifiedListingSchedules(
       lng: true,
       signupMethod: true,
       lastVerifiedAt: true,
-      growthLead: { select: { websiteUrl: true, facebookUrl: true, instagramUrl: true } },
+      growthLead: {
+        select: {
+          websiteUrl: true,
+          facebookUrl: true,
+          instagramUrl: true,
+          contactEmailConfidence: true,
+        },
+      },
     },
     orderBy: { lastVerifiedAt: "desc" },
-    take: Math.min(80, Math.max(limit * 8, limit)),
+    take: Math.min(160, Math.max(limit * 10, limit)),
   });
-  rows.sort((a, b) => scheduleMarketPriorityScore(b) - scheduleMarketPriorityScore(a));
+  rows.sort(
+    (a, b) =>
+      scheduleMiningPriorityScore({
+        ...b,
+        highContact: b.growthLead?.contactEmailConfidence === "HIGH",
+      }) -
+      scheduleMiningPriorityScore({
+        ...a,
+        highContact: a.growthLead?.contactEmailConfidence === "HIGH",
+      }),
+  );
   rows = rows.slice(0, limit);
 
   let confirmed = 0;
@@ -195,12 +244,25 @@ export async function enrichVerifiedListingSchedules(
         nameOk: isPublicListingNameOk(row.name),
       });
       if (!trust.trusted) continue;
-      const hit = parseExplicitScheduleFromText(pageText);
+      const hit =
+        parseExplicitScheduleFromHtml(html) || parseExplicitScheduleFromText(pageText);
       if (hit) {
         parsed = hit;
         sourceUrl = url;
         break;
       }
+      for (const icsUrl of extractOfficialIcsUrls(html, url)) {
+        if (!crawlableOfficial(listingHost, icsUrl, row)) continue;
+        const ics = await discoveryFetchText(icsUrl, { timeoutMs: PAGE_TIMEOUT_MS, acceptCalendar: true });
+        if (!ics) continue;
+        const icsHit = parseExplicitScheduleFromIcs(ics);
+        if (icsHit) {
+          parsed = icsHit;
+          sourceUrl = icsUrl;
+          break;
+        }
+      }
+      if (parsed) break;
     }
 
     if (!parsed || !sourceUrl) {
@@ -265,4 +327,15 @@ export async function enrichVerifiedListingSchedules(
   }
 
   return { scanned: rows.length, confirmed, uncertain, skipped };
+}
+
+export async function enrichVerifiedListingSchedules(
+  prisma: PrismaClient,
+  opts?: { limit?: number },
+): Promise<ScheduleEnrichResult> {
+  const limit = Math.min(48, Math.max(0, opts?.limit ?? 24));
+  if (limit <= 0) return { scanned: 0, confirmed: 0, uncertain: 0, skipped: 0 };
+  return withPgAdvisoryLock(prisma, SCHEDULE_ENRICH_LOCK, { scanned: 0, confirmed: 0, uncertain: 0, skipped: 0 }, () =>
+    enrichVerifiedListingSchedulesUnlocked(prisma, limit),
+  );
 }

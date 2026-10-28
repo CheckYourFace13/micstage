@@ -46,6 +46,8 @@ export type MarketingEventName =
   | "claim_started"
   | "claim_submitted"
   | "claim_email_opened"
+  | "host_share_visit"
+  | "performer_registration_from_share"
   | "claim_page_reached"
   | "claim_form_started"
   | "authority_confirmed"

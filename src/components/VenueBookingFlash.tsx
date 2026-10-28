@@ -46,20 +46,20 @@ export function VenueBookingFlash({
       <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-4 text-sm text-white">
         <p className="font-semibold">Signup confirmed.</p>
         <p className="mt-1 text-white/80">
-          Save your spot history and find your next open mic — create a free account.
+          Your spot is saved. One more click makes a free performer account so you can find open mics near you.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
             href={registerHref}
             className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black hover:brightness-110"
           >
-            Create free account
+            Finish free account
           </Link>
           <Link
             href="/find-open-mics"
             className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Find another mic nearby
+            Find open mics near you — free
           </Link>
         </div>
       </div>

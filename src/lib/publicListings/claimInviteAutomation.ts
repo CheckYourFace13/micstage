@@ -6,7 +6,11 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
 import { startOfUtcDay } from "@/lib/marketing/sendCaps";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
-import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
+import {
+  emailDomainMatchesSiteHost,
+  officialClaimSiteHost,
+  parseWebsiteHost,
+} from "@/lib/publicListings/claimInviteEligibility";
 import { isFreeMailDomain } from "@/lib/publicListings/claimAutoApproval";
 import { resolveClaimInviteRuntimeSnapshot } from "@/lib/publicListings/claimInviteRuntimeSettings";
 import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
@@ -83,12 +87,7 @@ function envTruthy(v: string | undefined): boolean {
 }
 
 function hostFromUrl(url: string | null | undefined): string | null {
-  if (!url?.trim()) return null;
-  try {
-    return new URL(url.trim()).hostname.replace(/^www\./i, "").toLowerCase() || null;
-  } catch {
-    return null;
-  }
+  return parseWebsiteHost(url);
 }
 
 function emailDomain(email: string): string | null {
@@ -322,9 +321,95 @@ export function isStagedClaimInviteContactEligible(input: {
   if (isBlockedClaimInviteDomain(email)) return false;
   const local = email.split("@")[0]?.toLowerCase() ?? "";
   if (BLOCKED_CLAIM_LOCAL_PARTS.has(local)) return false;
-  const siteHost = hostFromUrl(input.websiteUrl) || hostFromUrl(input.sourceUrl);
+  const siteHost = officialClaimSiteHost(input.websiteUrl, input.sourceUrl);
   if (!siteHost || !emailDomainMatchesSiteHost(email, siteHost)) return false;
   return true;
+}
+
+export type ClaimInviteBlockReason =
+  | "already_invited"
+  | "email_domain_mismatch"
+  | "source_not_official"
+  | "listing_evidence_insufficient"
+  | "missing_google_place"
+  | "free_mail"
+  | "blocked_local_part"
+  | "geo_issue"
+  | "already_claimed"
+  | "not_verified"
+  | "no_email"
+  | "other";
+
+export function classifyStagedClaimInviteBlocker(input: {
+  email: string | null | undefined;
+  confidence: string | null | undefined;
+  websiteUrl?: string | null;
+  sourceUrl?: string | null;
+  listing: Parameters<typeof listingPassesStagedClaimInviteSafety>[0] & {
+    claimInviteEmailSentAt?: Date | null;
+  };
+}): ClaimInviteBlockReason | "invite_ready" {
+  if (input.listing.claimInviteEmailSentAt) return "already_invited";
+  if (input.listing.verificationStatus !== "VERIFIED") return "not_verified";
+  if (input.listing.claimStatus === "CLAIMED" || input.listing.claimedVenueId) return "already_claimed";
+  const email = normalizeMarketingEmail(input.email ?? "");
+  if (!email) return "no_email";
+  if (input.confidence !== "HIGH") return "other";
+  if (isFreeMailDomain(email)) return "free_mail";
+  if (isBlockedClaimInviteDomain(email)) return "source_not_official";
+  const local = email.split("@")[0]?.toLowerCase() ?? "";
+  if (BLOCKED_CLAIM_LOCAL_PARTS.has(local)) return "blocked_local_part";
+  const siteHost = officialClaimSiteHost(input.websiteUrl, input.sourceUrl);
+  if (!siteHost) return "source_not_official";
+  if (!emailDomainMatchesSiteHost(email, siteHost)) return "email_domain_mismatch";
+  const safety = listingPassesStagedClaimInviteSafety(input.listing);
+  if (!safety.ok) {
+    if (safety.reason === "missing_google_place") return "missing_google_place";
+    if (safety.reason === "geo_conflict") return "geo_issue";
+    if (
+      safety.reason === "open_mic_evidence_required" ||
+      safety.reason === "evidence_terminal_block" ||
+      safety.reason === "cancellation_signal" ||
+      safety.reason === "public_display_quality"
+    ) {
+      return "listing_evidence_insufficient";
+    }
+    return "other";
+  }
+  return "invite_ready";
+}
+
+/** Defer generic marketing only when a claim invite can actually send. */
+export function shouldDeferOutreachToClaimInvite(input: {
+  email: string | null | undefined;
+  confidence: string | null | undefined;
+  leadWebsiteUrl?: string | null;
+  listings: Array<
+    Parameters<typeof listingPassesStagedClaimInviteSafety>[0] & {
+      claimInviteEmailSentAt?: Date | null;
+      websiteUrl?: string | null;
+      sourceUrl?: string | null;
+      openMicEvidenceRows?: Parameters<typeof listingPassesStagedClaimInviteSafety>[0]["storedEvidence"];
+    }
+  >;
+}): boolean {
+  return input.listings.some((listing) => {
+    if (listing.claimInviteEmailSentAt) return false;
+    const websiteUrl = listing.websiteUrl ?? input.leadWebsiteUrl;
+    return (
+      classifyStagedClaimInviteBlocker({
+        email: input.email,
+        confidence: input.confidence,
+        websiteUrl,
+        sourceUrl: listing.sourceUrl,
+        listing: {
+          ...listing,
+          websiteUrl,
+          storedEvidence: listing.storedEvidence ?? listing.openMicEvidenceRows ?? null,
+        },
+      }) === "invite_ready"
+    );
+  });
 }
 
 export function listingPassesStagedClaimInviteSafety(listing: {

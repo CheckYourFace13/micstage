@@ -13,6 +13,7 @@ import type {
   PrismaClient,
 } from "@/generated/prisma/client";
 import { emailDomainMatchesSiteHost } from "@/lib/publicListings/claimInviteEligibility";
+import { shouldDeferOutreachToClaimInvite } from "@/lib/publicListings/claimInviteAutomation";
 import { isMarketingEmailSuppressed } from "@/lib/marketing/suppression";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import {
@@ -372,6 +373,9 @@ const LISTING_IDENTITY_SELECT = {
   verificationStatus: true,
   claimStatus: true,
   claimInviteEmailSentAt: true,
+  claimedVenueId: true,
+  evidenceTerminalReason: true,
+  internalNotes: true,
   removedAt: true,
   name: true,
   formattedAddress: true,
@@ -489,12 +493,12 @@ export async function explainGrowthLeadOutreachEligibility(
     : null;
   const sup = email ? await isMarketingEmailSuppressed(prisma, email) : { suppressed: false };
 
-  const verifiedUnclaimed = lead.publicListings.some(
-    (l) =>
-      l.verificationStatus === "VERIFIED" &&
-      l.claimStatus !== "CLAIMED" &&
-      !l.claimInviteEmailSentAt,
-  );
+  const deferClaimPath = shouldDeferOutreachToClaimInvite({
+    email,
+    confidence: lead.contactEmailConfidence,
+    leadWebsiteUrl: lead.websiteUrl,
+    listings: lead.publicListings,
+  });
 
   const recentSend =
     email &&
@@ -518,7 +522,7 @@ export async function explainGrowthLeadOutreachEligibility(
     leadGooglePlaceId: lead.googlePlaceId,
     hasPendingDraft: hasOtherInFlightOutreachDraft(lead.outreachDrafts, opts?.ignoreDraftId),
     hasRecentOutreachSend: Boolean(recentSend),
-    deferClaimPath: verifiedUnclaimed,
+    deferClaimPath,
     listingRemoved: lead.publicListings.some((l) => l.removedAt != null),
     contact,
     suppressionBlocked: sup.suppressed,
@@ -527,10 +531,70 @@ export async function explainGrowthLeadOutreachEligibility(
   return { ...result, lead };
 }
 
+export type OutreachScorecardBucket =
+  | "sendable_now"
+  | "already_sent"
+  | "suppressed"
+  | "bounced"
+  | "complained"
+  | "unsubscribed"
+  | "duplicate"
+  | "no_explicit_open_mic_evidence"
+  | "wrong_target_identity"
+  | "geography_conflict"
+  | "chamber_tourism_directory"
+  | "retry_cooldown"
+  | "domain_cap"
+  | "listing_already_claimed"
+  | "account_already_exists"
+  | "other";
+
+export function mapOutreachReasonToScorecardBucket(reason: OutreachEligibilityReason): OutreachScorecardBucket {
+  switch (reason) {
+    case "eligible":
+      return "sendable_now";
+    case "already_contacted":
+      return "already_sent";
+    case "suppressed":
+      return "suppressed";
+    case "bounced":
+      return "bounced";
+    case "complained":
+      return "complained";
+    case "unsubscribed":
+      return "unsubscribed";
+    case "duplicate_recent_send":
+      return "duplicate";
+    case "no_target_bound_open_mic_evidence":
+    case "stale_open_mic_evidence":
+    case "weak_open_mic_signal":
+    case "artist_bio_false_positive":
+    case "microphone_equipment_false_positive":
+      return "no_explicit_open_mic_evidence";
+    case "weak_identity":
+    case "wrong_lead_type":
+    case "service_company":
+    case "festival_event_not_venue":
+    case "name_quality":
+      return "wrong_target_identity";
+    case "geography_conflict":
+      return "geography_conflict";
+    case "chamber_tourism":
+    case "directory_aggregator":
+      return "chamber_tourism_directory";
+    case "auto_research_retry":
+      return "retry_cooldown";
+    default:
+      return "other";
+  }
+}
+
 export type OutreachEligibilityAuditCounts = Record<OutreachEligibilityReason, number> & {
   totalLeads: number;
   highConfidenceContacts: number;
   netSendEligible: number;
+  scorecardBuckets: Record<OutreachScorecardBucket, number>;
+  topBlockReasons: Array<{ reason: string; count: number }>;
 };
 
 /** Read-only production audit of general outreach pool. */
@@ -573,6 +637,25 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
     name_quality: 0,
     geography_conflict: 0,
     festival_event_not_venue: 0,
+    scorecardBuckets: {
+      sendable_now: 0,
+      already_sent: 0,
+      suppressed: 0,
+      bounced: 0,
+      complained: 0,
+      unsubscribed: 0,
+      duplicate: 0,
+      no_explicit_open_mic_evidence: 0,
+      wrong_target_identity: 0,
+      geography_conflict: 0,
+      chamber_tourism_directory: 0,
+      retry_cooldown: 0,
+      domain_cap: 0,
+      listing_already_claimed: 0,
+      account_already_exists: 0,
+      other: 0,
+    },
+    topBlockReasons: [] as Array<{ reason: string; count: number }>,
   } satisfies OutreachEligibilityAuditCounts;
 
   counts.totalLeads = await prisma.growthLead.count();
@@ -642,12 +725,12 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
     for (const row of rows) {
       const email = normalizeMarketingEmail(row.contactEmailNormalized ?? "") ?? "";
       const sup = email ? await isMarketingEmailSuppressed(prisma, email) : { suppressed: false };
-      const verifiedUnclaimed = row.publicListings.some(
-        (l) =>
-          l.verificationStatus === "VERIFIED" &&
-          l.claimStatus !== "CLAIMED" &&
-          !l.claimInviteEmailSentAt,
-      );
+      const deferClaimPath = shouldDeferOutreachToClaimInvite({
+        email,
+        confidence: row.contactEmailConfidence,
+        leadWebsiteUrl: row.websiteUrl,
+        listings: row.publicListings,
+      });
       const ident = identityFieldsFromListings(row.publicListings);
       const { reason } = evaluateGrowthLeadOutreachEligibility({
         ...row,
@@ -657,18 +740,25 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
         leadGooglePlaceId: row.googlePlaceId,
         hasPendingDraft: row.outreachDrafts.length > 0,
         hasRecentOutreachSend: recentSet.has(email),
-        deferClaimPath: verifiedUnclaimed,
+        deferClaimPath,
         listingRemoved: false,
         contact: contactMap.get(email) ?? null,
         suppressionBlocked: sup.suppressed,
       });
       counts[reason] += 1;
       if (reason === "eligible") counts.netSendEligible += 1;
+      counts.scorecardBuckets[mapOutreachReasonToScorecardBucket(reason)] += 1;
     }
 
     cursor = rows[rows.length - 1]?.id;
     if (rows.length < batchSize) break;
   }
+
+  counts.topBlockReasons = (Object.entries(counts.scorecardBuckets) as Array<[OutreachScorecardBucket, number]>)
+    .filter(([bucket, n]) => bucket !== "sendable_now" && n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([reason, count]) => ({ reason, count }));
 
   return counts;
 }

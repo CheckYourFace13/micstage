@@ -206,7 +206,7 @@ export default async function PublicOpenMicListingPage(props: {
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <nav className="text-xs text-white/50">
           <Link href="/find-open-mics" className="hover:text-white">
-            Find open mics
+            Find open mics near you — free
           </Link>
           {cityHref && place ? (
             <>

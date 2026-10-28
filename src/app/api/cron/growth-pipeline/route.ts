@@ -24,6 +24,7 @@ import { sourceListingCoordinatesWithoutGoogle } from "@/lib/publicListings/list
 import { runDirectoryLeadReprocessing } from "@/lib/growth/discovery/directoryLeadReprocessing";
 import { purgeExpiredGoogleMapsContent } from "@/lib/compliance/googleMapsContentRetention";
 import { runPendingListingClaimInvites, runPendingListingClaimInviteReminders } from "@/lib/publicListings/listingClaimInviteEmail";
+import { CLAIM_INVITE_REMINDERS_PER_CRON_MAX } from "@/lib/publicListings/claimInviteReminder";
 import { runOnboardingSetupNudges } from "@/lib/onboarding/setupNudges";
 import {
   countPendingListingClaimInvitesWithEmail,
@@ -233,17 +234,19 @@ async function handle(request: Request) {
       const inviteBatch = Math.min(await listingClaimInvitesPerCron(prisma), resendBudget.remaining);
       if (inviteBatch > 0) {
         listingClaimInvites = await runPendingListingClaimInvites(prisma, inviteBatch);
-        const leftover = Math.max(0, inviteBatch - listingClaimInvites.sent);
-        listingClaimReminders =
-          leftover > 0
-            ? await runPendingListingClaimInviteReminders(prisma, leftover)
-            : { sent: 0, skipped: 0, candidates: 0 };
-        resendBudget = await resendDailyBudgetSnapshot(prisma);
-        pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
       } else {
         listingClaimInvites = { sent: 0, skipped: 0, candidates: 0 };
-        listingClaimReminders = { sent: 0, skipped: 0, candidates: 0 };
       }
+      const leftover =
+        inviteBatch > 0
+          ? Math.max(0, inviteBatch - listingClaimInvites.sent)
+          : Math.min(CLAIM_INVITE_REMINDERS_PER_CRON_MAX, resendBudget.remaining);
+      listingClaimReminders =
+        leftover > 0
+          ? await runPendingListingClaimInviteReminders(prisma, leftover)
+          : { sent: 0, skipped: 0, candidates: 0 };
+      resendBudget = await resendDailyBudgetSnapshot(prisma);
+      pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
     }
 
     if (emailMiningEnabled) {

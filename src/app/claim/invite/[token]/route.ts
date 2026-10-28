@@ -68,14 +68,10 @@ export async function GET(
     }
   }
 
-  const tokenRow = await prisma.listingClaimInviteToken.findUnique({
-    where: { id: peeked.tokenId },
-    select: { expiresAt: true },
-  });
-  const remainingSec = tokenRow
-    ? Math.max(60, Math.floor((tokenRow.expiresAt.getTime() - Date.now()) / 1000))
-    : 60 * 60 * 2;
-  const sessionTtl = Math.min(60 * 60 * 2, remainingSec);
+  // Full two-hour claim session after a successful exchange. Submit still
+  // revalidates the token. Do not clamp to remaining token seconds — a 60s
+  // cookie after revival/near-expiry drops people on "session expired".
+  const sessionTtl = 60 * 60 * 2;
 
   const res = NextResponse.redirect(new URL("/claim/invite", origin));
   try {

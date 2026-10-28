@@ -7,28 +7,38 @@ import type { ClaimAuthorityRole } from "@/lib/publicListings/claimAutoApproval"
 import { trackConversionEvent, trackMarketingEvent } from "@/lib/marketingTracking";
 import { oncePerSession } from "@/lib/conversionAttribution";
 
-const ROLES: { value: ClaimAuthorityRole; label: string }[] = [
-  { value: "owner", label: "I'm the venue" },
-  { value: "authorized_event_host", label: "I'm the host" },
+const ROLES: { value: ClaimAuthorityRole; label: string; next: string; funnel: "role_selected_venue" | "role_selected_host" }[] = [
+  {
+    value: "owner",
+    label: "I'm the venue",
+    next: "You get this listing and can fix the schedule.",
+    funnel: "role_selected_venue",
+  },
+  {
+    value: "authorized_event_host",
+    label: "I'm the host",
+    next: "You can run this night without owning the room.",
+    funnel: "role_selected_host",
+  },
 ];
 
 export function InstantClaimForm(props: {
   listingSlug: string;
   listingName: string;
-  /** Masked display. Full invited email is prefilled from the secure session. */
+  /** Masked display. Full invited email stays on the server session. */
   invitedEmailMasked: string;
-  invitedEmail?: string;
+  emailConfirmedFromInvite?: boolean;
   address: string;
   cityLine?: string | null;
   evidenceSummary?: string | null;
   authorityAffirmation: string;
 }) {
   const router = useRouter();
+  const emailKnown = Boolean(props.emailConfirmedFromInvite);
   const [contactName, setContactName] = useState("");
   const [role, setRole] = useState<ClaimAuthorityRole | "">("");
-  const [loginEmail, setLoginEmail] = useState(props.invitedEmail ?? "");
-  const [authority, setAuthority] = useState(false);
-  const [legal, setLegal] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [manualReason, setManualReason] = useState<string | null>(null);
@@ -41,10 +51,19 @@ export function InstantClaimForm(props: {
     });
   }, [props.listingSlug]);
 
+  function beacon(event: "role_selected_venue" | "role_selected_host" | "claim_form_started") {
+    void fetch("/api/claim/funnel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event, listingSlug: props.listingSlug }),
+    }).catch(() => undefined);
+  }
+
   function markStarted() {
     if (startedRef.current) return;
     startedRef.current = true;
     trackMarketingEvent("claim_form_started", { listing_slug: props.listingSlug });
+    beacon("claim_form_started");
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -57,11 +76,11 @@ export function InstantClaimForm(props: {
       setError("Choose whether you are the venue or the host.");
       return;
     }
-    if (!loginEmail.trim()) {
+    if (!emailKnown && !loginEmail.trim()) {
       setError("Enter the email from your invitation.");
       return;
     }
-    if (!authority || !legal) {
+    if (!consent) {
       setError("Confirm you can manage this listing and accept Terms and Privacy.");
       return;
     }
@@ -76,10 +95,10 @@ export function InstantClaimForm(props: {
           listingSlug: props.listingSlug,
           contactName: contactName.trim(),
           role,
-          loginEmail: loginEmail.trim(),
-          authorityConfirmed: authority,
-          termsAccepted: legal,
-          privacyAccepted: legal,
+          loginEmail: emailKnown ? undefined : loginEmail.trim(),
+          authorityConfirmed: true,
+          termsAccepted: true,
+          privacyAccepted: true,
         }),
       });
       const data = (await res.json()) as {
@@ -133,17 +152,21 @@ export function InstantClaimForm(props: {
     );
   }
 
+  const placeLine = props.cityLine && props.address.toLowerCase().includes(props.cityLine.toLowerCase())
+    ? null
+    : props.cityLine;
+
   return (
     <form
       onSubmit={(e) => void onSubmit(e)}
       onFocusCapture={markStarted}
-      className="grid max-w-xl gap-4"
+      className="grid max-w-xl gap-4 pb-24 sm:pb-0"
       data-track-event="claim_submitted"
     >
       <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 p-4">
-        <h1 className="om-heading text-3xl text-white">Claim this free listing</h1>
+        <h1 className="om-heading text-2xl text-white sm:text-3xl">Claim this open mic</h1>
         <p className="mt-2 text-lg font-semibold text-white">{props.listingName}</p>
-        {props.cityLine ? <p className="mt-1 text-sm text-white/70">{props.cityLine}</p> : null}
+        {placeLine ? <p className="mt-1 text-sm text-white/70">{placeLine}</p> : null}
         <p className="mt-1 text-sm text-white/60">{props.address}</p>
         <p className="mt-3 text-xs text-white/55">
           Claiming your listing does not turn on online signups or booking. You can update the schedule and details later.
@@ -159,6 +182,7 @@ export function InstantClaimForm(props: {
           className="h-12 rounded-md border border-white/15 bg-black/40 px-3 text-base text-white"
           autoComplete="name"
           enterKeyHint="next"
+          autoCapitalize="words"
         />
       </label>
 
@@ -167,7 +191,9 @@ export function InstantClaimForm(props: {
         {ROLES.map((r) => (
           <label
             key={r.value}
-            className="flex min-h-12 items-center gap-3 rounded-md border border-white/15 bg-black/40 px-3 text-base text-white"
+            className={`flex min-h-14 items-start gap-3 rounded-md border px-3 py-2 text-base text-white ${
+              role === r.value ? "border-[rgb(var(--om-neon))] bg-white/10" : "border-white/15 bg-black/40"
+            }`}
           >
             <input
               type="radio"
@@ -177,53 +203,49 @@ export function InstantClaimForm(props: {
               onChange={() => {
                 setRole(r.value);
                 trackMarketingEvent("authority_confirmed", { listing_slug: props.listingSlug, role: r.value });
+                beacon(r.funnel);
               }}
-              className="h-5 w-5 shrink-0"
+              className="mt-1 h-5 w-5 shrink-0"
             />
-            <span>{r.label}</span>
+            <span>
+              <span className="block font-semibold">{r.label}</span>
+              <span className="mt-0.5 block text-sm text-white/65">{r.next}</span>
+            </span>
           </label>
         ))}
       </fieldset>
 
-      <label className="grid gap-1 text-sm">
-        <span className="text-white/80">Invited email</span>
-        <input
-          required
-          type="email"
-          inputMode="email"
-          value={loginEmail}
-          onChange={(e) => setLoginEmail(e.target.value)}
-          placeholder={props.invitedEmailMasked}
-          className="h-12 rounded-md border border-white/15 bg-black/40 px-3 text-base text-white"
-          autoComplete="email"
-          enterKeyHint="done"
-        />
-        <span className="text-xs text-white/45">
-          Use {props.invitedEmailMasked}. A different email goes to a short review.
-        </span>
-      </label>
+      {emailKnown ? (
+        <p className="text-sm text-white/70">
+          Invited email: <span className="font-medium text-white">{props.invitedEmailMasked}</span>
+          <span className="mt-0.5 block text-xs text-white/45">Already confirmed from your invite link.</span>
+        </p>
+      ) : (
+        <label className="grid gap-1 text-sm">
+          <span className="text-white/80">Invited email</span>
+          <input
+            required
+            type="email"
+            inputMode="email"
+            value={loginEmail}
+            onChange={(e) => setLoginEmail(e.target.value)}
+            placeholder={props.invitedEmailMasked}
+            className="h-12 rounded-md border border-white/15 bg-black/40 px-3 text-base text-white"
+            autoComplete="email"
+            enterKeyHint="done"
+          />
+          <span className="text-xs text-white/45">Use {props.invitedEmailMasked}.</span>
+        </label>
+      )}
 
       <label className="flex items-start gap-2 text-sm text-white/80">
         <input
           type="checkbox"
-          checked={authority}
+          checked={consent}
           onChange={(e) => {
-            setAuthority(e.target.checked);
-            if (e.target.checked) trackMarketingEvent("authority_confirmed", { listing_slug: props.listingSlug });
-          }}
-          className="mt-1 h-5 w-5 shrink-0"
-          required
-        />
-        <span data-claim-authority="required">Yes — I am authorized to manage this open mic.</span>
-      </label>
-
-      <label className="flex items-start gap-2 text-sm text-white/80">
-        <input
-          type="checkbox"
-          checked={legal}
-          onChange={(e) => {
-            setLegal(e.target.checked);
+            setConsent(e.target.checked);
             if (e.target.checked) {
+              trackMarketingEvent("authority_confirmed", { listing_slug: props.listingSlug });
               trackMarketingEvent("terms_confirmed", { listing_slug: props.listingSlug });
               trackMarketingEvent("privacy_confirmed", { listing_slug: props.listingSlug });
             }
@@ -231,8 +253,8 @@ export function InstantClaimForm(props: {
           className="mt-1 h-5 w-5 shrink-0"
           required
         />
-        <span>
-          I accept the{" "}
+        <span data-claim-authority="required">
+          Yes — I am authorized to manage this open mic and accept the{" "}
           <Link href="/terms" className="underline text-[rgb(var(--om-neon))]" target="_blank">
             Terms
           </Link>{" "}
@@ -246,13 +268,15 @@ export function InstantClaimForm(props: {
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-      <button
-        type="submit"
-        disabled={status === "loading"}
-        className="inline-flex h-12 w-full items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-base font-semibold text-black disabled:opacity-60"
-      >
-        {status === "loading" ? "Claiming…" : "Claim this open mic"}
-      </button>
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black/90 p-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
+        <button
+          type="submit"
+          disabled={status === "loading"}
+          className="inline-flex h-12 w-full items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-base font-semibold text-black disabled:opacity-60"
+        >
+          {status === "loading" ? "Claiming…" : "Claim this open mic"}
+        </button>
+      </div>
     </form>
   );
 }

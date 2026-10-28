@@ -23,6 +23,7 @@
     "test:open-mic-evidence": "node scripts/check-public-open-mic-evidence.mjs",
     "test:instant-claim": "node scripts/check-instant-claim.mjs",
     "test:claim-conversion": "npx tsx scripts/check-claim-conversion-pass.mjs",
+    "test:claim-funnel": "npx tsx scripts/check-claim-funnel-instrumentation.mjs",
     "test:onboarding": "node scripts/check-onboarding-simplification.mjs",
     "test:product-audit": "node scripts/check-product-audit-p0.mjs",
     "test:open-mic-removal": "node scripts/check-open-mic-self-removal.mjs",

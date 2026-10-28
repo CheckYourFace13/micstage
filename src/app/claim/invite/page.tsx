@@ -9,6 +9,7 @@ import {
   maskClaimInviteEmail,
 } from "@/lib/publicListings/claimInviteSession";
 import { consumeListingClaimInviteTokenById } from "@/lib/publicListings/claimInviteToken";
+import { CLAIM_FUNNEL_EVENT, recordClaimFunnelEvent } from "@/lib/publicListings/claimFunnelEvents";
 import { sanitizePublicListingAbout } from "@/lib/publicListings/listingAboutFromLead";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
@@ -77,6 +78,12 @@ export default async function ClaimInviteSessionPage({
     markUsed: false,
   });
   if (!peeked.ok) {
+    await recordClaimFunnelEvent(prisma, {
+      listingId: session.listingId,
+      eventType: CLAIM_FUNNEL_EVENT.FAILED_SESSION,
+      dedupeMs: 15 * 60 * 1000,
+      meta: { reason: peeked.reason, tokenId: session.tokenId },
+    });
     return (
       <div className="min-h-dvh bg-black text-white">
         <main className="mx-auto max-w-xl px-4 py-16">
@@ -103,6 +110,7 @@ export default async function ClaimInviteSessionPage({
       region: true,
       claimedVenueId: true,
       about: true,
+      growthLeadId: true,
       schedules: {
         where: { isActive: true },
         select: { weekday: true, startTimeMin: true, endTimeMin: true, title: true },
@@ -120,12 +128,14 @@ export default async function ClaimInviteSessionPage({
     );
   }
 
-  // Privacy-safe funnel: page reached (no email, no token).
-  await prisma.listingClaimAuditEvent.create({
-    data: {
-      listingId: listing.id,
-      eventType: "CLAIM_PAGE_REACHED",
-      meta: { listingSlug: listing.slug },
+  await recordClaimFunnelEvent(prisma, {
+    listingId: listing.id,
+    eventType: CLAIM_FUNNEL_EVENT.PAGE_VIEWED,
+    dedupeMs: 30 * 60 * 1000,
+    meta: {
+      listingSlug: listing.slug,
+      tokenId: session.tokenId,
+      growthLeadId: listing.growthLeadId,
     },
   });
 
@@ -144,21 +154,23 @@ export default async function ClaimInviteSessionPage({
 
   return (
     <div className="min-h-dvh bg-black text-white">
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
-        <Link href={`/open-mics/${listing.slug}`} className="text-sm text-[rgb(var(--om-neon))] underline">
-          ← View public listing
-        </Link>
-        <div className="mt-8">
+      <main className="mx-auto max-w-2xl px-4 py-5 sm:px-6 sm:py-10">
+        <div>
           <InstantClaimForm
             listingSlug={listing.slug}
             listingName={listing.name}
             invitedEmailMasked={invitedEmailMasked}
-            invitedEmail={session.intendedEmailNormalized}
+            emailConfirmedFromInvite
             address={listing.formattedAddress}
             cityLine={cityLine}
             evidenceSummary={evidenceSummary}
             authorityAffirmation={CLAIM_AUTHORITY_AFFIRMATION}
           />
+          <p className="mt-6 text-center text-xs text-white/35">
+            <Link href={`/open-mics/${listing.slug}`} className="underline-offset-2 hover:underline">
+              View public listing
+            </Link>
+          </p>
         </div>
       </main>
     </div>

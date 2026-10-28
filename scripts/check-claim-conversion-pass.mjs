@@ -4,7 +4,11 @@
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { claimInviteReminderEligibility, reminderLanePriority } from "../src/lib/publicListings/claimInviteReminder.ts";
+import {
+  claimInviteReminderEligibility,
+  classifyClaimInviteEngagement,
+  reminderLanePriority,
+} from "../src/lib/publicListings/claimInviteReminder.ts";
 import { rotateUnscheduledBatch } from "../src/lib/publicListings/listingScheduleEnrichment.ts";
 import { buildListingClaimInvitePayload } from "../src/lib/publicListings/listingClaimInviteEmail.ts";
 
@@ -136,9 +140,22 @@ const now = new Date("2026-10-27T12:00:00.000Z");
   const form = fs.readFileSync(new URL("../src/components/publicListings/InstantClaimForm.tsx", import.meta.url), "utf8");
   assert.match(form, /I'm the venue/);
   assert.match(form, /I'm the host/);
-  assert.match(form, /invitedEmail/);
+  assert.match(form, /emailConfirmedFromInvite/);
+  assert.match(form, /You get this listing and can fix the schedule/);
+  assert.match(form, /You can run this night without owning the room/);
+  assert.match(form, /Already confirmed from your invite link/);
   const token = fs.readFileSync(new URL("../src/lib/publicListings/claimInviteToken.ts", import.meta.url), "utf8");
   assert.match(token, /reviveExpiredClaimInviteTokenIfClaimable/);
+}
+
+{
+  const clicked = classifyClaimInviteEngagement(["CLAIM_PAGE_VIEWED"]);
+  assert.equal(clicked.clicked, true);
+  assert.equal(clicked.completed, false);
+  const submittedOnly = classifyClaimInviteEngagement(["CLAIM_SUBMIT_ATTEMPT"]);
+  assert.equal(submittedOnly.completed, false);
+  const done = classifyClaimInviteEngagement(["CLAIM_COMPLETED"]);
+  assert.equal(done.completed, true);
 }
 
 console.log(JSON.stringify({ ok: true, checks: "claim-conversion-pass" }));

@@ -9,6 +9,7 @@ import { issueListingClaimInviteToken } from "@/lib/publicListings/claimInviteTo
 import { isMarketingEmailSuppressed } from "@/lib/marketing/suppression";
 import {
   claimInviteAutomationMaySend,
+  claimInviteReminderMaySend,
   claimInviteDailyBudgetSnapshot,
   countClaimInvitesSentTodayForDomain,
   getClaimInvitePauseState,
@@ -777,14 +778,13 @@ export async function runPendingListingClaimInviteReminders(
   prisma: PrismaClient,
   limit = CLAIM_INVITE_REMINDERS_PER_CRON_MAX,
 ): Promise<{ sent: number; skipped: number; candidates: number }> {
-  const may = await claimInviteAutomationMaySend(prisma);
+  const may = await claimInviteReminderMaySend(prisma);
   if (!may.ok) return { sent: 0, skipped: 0, candidates: 0 };
 
   const { remaining: resendRemaining } = await resendDailyBudgetSnapshot(prisma);
   const effectiveLimit = Math.min(
     CLAIM_INVITE_REMINDERS_PER_CRON_MAX,
     limit,
-    may.perCron,
     may.dailyRemaining,
     resendRemaining,
   );

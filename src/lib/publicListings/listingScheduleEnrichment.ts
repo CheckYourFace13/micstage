@@ -340,6 +340,7 @@ async function enrichVerifiedListingSchedulesUnlocked(
   let fetchBlocked = 0;
   let noScheduleFound = 0;
 
+  try {
   for (const row of rows) {
     const site = row.websiteUrl || row.growthLead?.websiteUrl || row.sourceUrl;
     const listingHost = hostFromUrl(site);
@@ -473,6 +474,20 @@ async function enrichVerifiedListingSchedulesUnlocked(
     await submitUrlsToIndexNow([page]).catch(() => undefined);
     confirmed += 1;
   }
+  } finally {
+    const result: ScheduleEnrichResult = {
+      scanned: rows.length,
+      confirmed,
+      uncertain,
+      skipped,
+      officialPagesFetched,
+      explicitFound,
+      ambiguous,
+      fetchBlocked,
+      noScheduleFound,
+    };
+    await recordScheduleRecoveryDayStats(prisma, allRows.length, result).catch(() => undefined);
+  }
 
   const result: ScheduleEnrichResult = {
     scanned: rows.length,
@@ -485,7 +500,6 @@ async function enrichVerifiedListingSchedulesUnlocked(
     fetchBlocked,
     noScheduleFound,
   };
-  await recordScheduleRecoveryDayStats(prisma, allRows.length, result);
   return result;
 }
 

@@ -3,6 +3,11 @@ import { getPrismaOrNull } from "@/lib/prisma";
 import { CLAIM_AUTHORITY_ROLES, type ClaimAuthorityRole } from "@/lib/publicListings/claimAutoApproval";
 import { submitInstantClaim } from "@/lib/publicListings/instantClaimActivation";
 import {
+  CLAIM_FUNNEL_EVENT,
+  claimFailureFunnelEvent,
+  recordClaimFunnelEvent,
+} from "@/lib/publicListings/claimFunnelEvents";
+import {
   clearClaimInviteSession,
   getClaimInviteSession,
 } from "@/lib/publicListings/claimInviteSession";
@@ -33,6 +38,7 @@ export async function POST(request: Request) {
   if (!prisma) {
     return NextResponse.json({ ok: false, error: "Unavailable" }, { status: 503 });
   }
+  const db = prisma;
 
   if (!originAllowed(request)) {
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
@@ -49,40 +55,67 @@ export async function POST(request: Request) {
   const listingSlug = typeof body.listingSlug === "string" ? body.listingSlug : "";
   const contactName = typeof body.contactName === "string" ? body.contactName : "";
   const role = typeof body.role === "string" ? body.role : "";
-  const loginEmail = typeof body.loginEmail === "string" ? body.loginEmail : "";
   const authorityConfirmed = body.authorityConfirmed === true;
   const termsAccepted = body.termsAccepted === true;
   const privacyAccepted = body.privacyAccepted === true;
+  const loginEmail = claimSession?.intendedEmailNormalized ?? "";
 
   if (!listingSlug) {
     return NextResponse.json({ ok: false, error: "Missing listing" }, { status: 400 });
   }
+
+  const listingForAudit = await db.publicOpenMicListing.findUnique({
+    where: { slug: listingSlug.trim() },
+    select: { id: true, slug: true, growthLeadId: true },
+  });
+
+  async function recordFail(eventType: Parameters<typeof recordClaimFunnelEvent>[1]["eventType"], reason: string) {
+    if (!listingForAudit) return;
+    await recordClaimFunnelEvent(db, {
+      listingId: listingForAudit.id,
+      eventType,
+      meta: {
+        listingSlug: listingForAudit.slug,
+        tokenId: claimSession?.tokenId,
+        growthLeadId: listingForAudit.growthLeadId,
+        reason,
+      },
+    });
+  }
+
   if (!claimSession) {
+    await recordFail(CLAIM_FUNNEL_EVENT.FAILED_SESSION, "no_session");
     return NextResponse.json({ ok: false, error: "Invitation session expired" }, { status: 400 });
   }
   if (!CLAIM_AUTHORITY_ROLES.includes(role as ClaimAuthorityRole)) {
+    await recordFail(CLAIM_FUNNEL_EVENT.FAILED_VALIDATION, "invalid_role");
     return NextResponse.json({ ok: false, error: "Invalid role" }, { status: 400 });
   }
   if (!authorityConfirmed || !termsAccepted || !privacyAccepted) {
+    await recordFail(CLAIM_FUNNEL_EVENT.FAILED_VALIDATION, "consent_required");
     return NextResponse.json({ ok: false, error: "Consent required" }, { status: 400 });
   }
 
   const emailKey = loginEmail.trim().toLowerCase() || "unknown";
-  const listingForAudit = await prisma.publicOpenMicListing.findUnique({
-    where: { slug: listingSlug.trim() },
-    select: { id: true },
-  });
   if (listingForAudit) {
-    await prisma.listingClaimAuditEvent.create({
+    await db.listingClaimAuditEvent.create({
       data: {
         listingId: listingForAudit.id,
         eventType: "CLAIM_SUBMIT_ATTEMPT",
         meta: {
           listingSlug: listingSlug.trim().slice(0, 120),
-          hasSession: Boolean(claimSession),
-          // domain only — never full email
+          hasSession: true,
           emailDomain: emailKey.includes("@") ? emailKey.slice(emailKey.indexOf("@") + 1) : null,
         },
+      },
+    });
+    await recordClaimFunnelEvent(db, {
+      listingId: listingForAudit.id,
+      eventType: CLAIM_FUNNEL_EVENT.FORM_SUBMITTED,
+      meta: {
+        listingSlug: listingForAudit.slug,
+        tokenId: claimSession.tokenId,
+        growthLeadId: listingForAudit.growthLeadId,
       },
     });
   }
@@ -104,11 +137,12 @@ export async function POST(request: Request) {
       slug: listingSlug.slice(0, 80),
       emailDomain: emailKey.includes("@") ? emailKey.slice(emailKey.indexOf("@") + 1) : null,
     });
+    await recordFail(CLAIM_FUNNEL_EVENT.FAILED_OTHER, "rate_limited");
     return NextResponse.json({ ok: false, error: "Too many attempts" }, { status: 429 });
   }
 
   try {
-    const result = await submitInstantClaim(prisma, {
+    const result = await submitInstantClaim(db, {
       tokenId: claimSession.tokenId,
       listingSlug,
       contactName,
@@ -117,11 +151,25 @@ export async function POST(request: Request) {
       authorityConfirmed,
       termsAccepted,
       privacyAccepted,
-      sessionIntendedEmailNormalized: claimSession?.intendedEmailNormalized,
+      sessionIntendedEmailNormalized: claimSession.intendedEmailNormalized,
     });
 
     if (!result.ok) {
+      await recordFail(claimFailureFunnelEvent({ status: result.status, error: result.error }), result.error);
       return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
+    }
+
+    if (listingForAudit) {
+      await recordClaimFunnelEvent(db, {
+        listingId: listingForAudit.id,
+        eventType: CLAIM_FUNNEL_EVENT.COMPLETED,
+        meta: {
+          listingSlug: listingForAudit.slug,
+          tokenId: claimSession.tokenId,
+          growthLeadId: listingForAudit.growthLeadId,
+          decision: result.decision,
+        },
+      });
     }
 
     await clearClaimInviteSession();
@@ -149,6 +197,7 @@ export async function POST(request: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";
     console.error("[api/claim/instant]", msg);
+    await recordFail(CLAIM_FUNNEL_EVENT.FAILED_OTHER, "exception");
     return NextResponse.json({ ok: false, error: "Claim failed" }, { status: 500 });
   }
 }

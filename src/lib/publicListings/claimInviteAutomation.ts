@@ -511,6 +511,27 @@ export async function claimInviteAutomationMaySend(prisma: PrismaClient): Promis
   };
 }
 
+/** Reminders reuse claim-invite safety, but do not require leftover new-invite slots. */
+export async function claimInviteReminderMaySend(prisma: PrismaClient): Promise<{
+  ok: boolean;
+  reason?: string;
+  dailyRemaining: number;
+}> {
+  const snap = await resolveClaimInviteRuntimeSnapshot(prisma);
+  if (!snap.claimInvitesEnabled) {
+    return { ok: false, reason: "claim_invites_disabled", dailyRemaining: 0 };
+  }
+  const pause = await getClaimInvitePauseState(prisma);
+  if (pause.paused) {
+    return { ok: false, reason: `paused:${pause.reason ?? "unknown"}`, dailyRemaining: 0 };
+  }
+  const daily = await claimInviteDailyBudgetSnapshot(prisma);
+  if (daily.remaining <= 0) {
+    return { ok: false, reason: "daily_claim_invite_cap", dailyRemaining: 0 };
+  }
+  return { ok: true, dailyRemaining: daily.remaining };
+}
+
 export function redactEmail(email: string): string {
   const n = email.toLowerCase().trim();
   const at = n.indexOf("@");

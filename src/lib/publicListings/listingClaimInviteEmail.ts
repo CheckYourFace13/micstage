@@ -18,6 +18,13 @@ import {
   recordClaimInviteSendStat,
 } from "@/lib/publicListings/claimInviteAutomation";
 import type { GrowthLeadOpenMicSignalTier } from "@/generated/prisma/client";
+import {
+  CLAIM_INVITE_REMINDER_EVENT,
+  CLAIM_INVITE_REMINDERS_PER_CRON_MAX,
+  claimInviteReminderEligibility,
+  classifyClaimInviteEngagement,
+  reminderLanePriority,
+} from "@/lib/publicListings/claimInviteReminder";
 
 const REPLY_TO = "drummer@micstage.com";
 
@@ -52,15 +59,18 @@ export function buildListingClaimInvitePayload(input: {
   /** Prefer signed token URL when available. Use "[SECURE CLAIM LINK]" in previews. */
   claimUrl?: string;
   venueName?: string | null;
+  isReminder?: boolean;
 }): { subject: string; textBody: string; htmlBody: string } {
   const base = appBaseUrl().replace(/\/$/, "");
   const listingUrl = `${base}/open-mics/${encodeURIComponent(input.listingSlug)}`;
   const claimUrl =
     input.claimUrl?.trim() || `${base}/claim/${encodeURIComponent(input.listingSlug)}`;
   const openMicName = (input.venueName?.trim() || input.listingName).trim();
-  const subject = "Claim your open mic on MicStage — free";
+  const subject = input.isReminder
+    ? "Reminder: claim your open mic on MicStage — free"
+    : "Claim your open mic on MicStage — free";
   const foundSentence = `We found your open mic on MicStage.`;
-  const askSentence = "Claim it free to correct the schedule and manage performer signups.";
+  const askSentence = "You can claim it free to correct the schedule and manage performer signups.";
 
   const textBody = [
     "Hi,",
@@ -85,7 +95,7 @@ export function buildListingClaimInvitePayload(input: {
     "<p style=\"margin:0 0 16px 0;\">Hi,</p>",
     `<p style="margin:0 0 8px 0;">${escapeHtml(foundSentence)}</p>`,
     `<p style="margin:0 0 20px 0;">${escapeHtml(askSentence)}</p>`,
-    `<p style="margin:0 0 20px 0;"><a href="${escapeHtml(claimUrl)}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Claim your listing free</a></p>`,
+    `<p style="margin:0 0 20px 0;"><a href="${escapeHtml(claimUrl)}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Claim this open mic</a></p>`,
     `<p style="margin:0 0 8px 0;">Your listing: <a href="${escapeHtml(listingUrl)}" style="color:#111827;">${escapeHtml(openMicName)}</a></p>`,
     '<p style="margin:0 0 16px 0;">No credit card. The claim link is private and expires.</p>',
     '<p style="margin:0;">Thanks,<br />Chris<br />MicStage</p>',
@@ -621,6 +631,217 @@ export async function runPendingListingClaimInvites(
       sent += 1;
       regionSentThisTick.add(regionKey);
     } else skipped += 1;
+  }
+
+  return { sent, skipped, candidates };
+}
+
+async function sendListingClaimInviteReminderIfNeeded(
+  prisma: PrismaClient,
+  listingId: string,
+): Promise<{ sent: boolean; reason?: string }> {
+  const runtime = await resolveClaimInviteRuntimeSnapshot(prisma);
+  if (!runtime.claimInvitesEnabled) {
+    return { sent: false, reason: "claim_invites_disabled" };
+  }
+  const pause = await getClaimInvitePauseState(prisma);
+  if (pause.paused) {
+    return { sent: false, reason: `paused:${pause.reason ?? "unknown"}` };
+  }
+  const claimDaily = await claimInviteDailyBudgetSnapshot(prisma);
+  if (claimDaily.remaining <= 0) {
+    return { sent: false, reason: "daily_claim_invite_cap" };
+  }
+
+  const listing = await prisma.publicOpenMicListing.findUnique({
+    where: { id: listingId },
+    include: {
+      schedules: { select: { title: true, description: true } },
+      claimAuditEvents: { select: { eventType: true } },
+      openMicEvidenceRows: {
+        select: {
+          trusted: true,
+          detectedPhrase: true,
+          evidenceExcerpt: true,
+          evidenceTitle: true,
+          reasonCode: true,
+          fetchedAt: true,
+          evidenceDate: true,
+          currentnessScore: true,
+          sourceType: true,
+        },
+      },
+      growthLead: {
+        select: {
+          contactEmailNormalized: true,
+          contactEmailConfidence: true,
+          websiteUrl: true,
+          discoveryMarketSlug: true,
+        },
+      },
+    },
+  });
+  if (!listing) return { sent: false, reason: "listing_not_found" };
+  if (!listing.claimInviteEmailSentAt) return { sent: false, reason: "not_sent" };
+  if (listing.claimedVenueId || listing.claimStatus === "CLAIMED") {
+    return { sent: false, reason: "already_claimed" };
+  }
+
+  const engagement = classifyClaimInviteEngagement(listing.claimAuditEvents.map((e) => e.eventType));
+  const email = normalizeMarketingEmail(
+    listing.claimInviteEmail || listing.growthLead?.contactEmailNormalized || "",
+  );
+  if (!email) return { sent: false, reason: "no_email" };
+
+  const suppressed = await isMarketingEmailSuppressed(prisma, email);
+  const gate = claimInviteReminderEligibility({
+    sentAt: listing.claimInviteEmailSentAt,
+    claimed: Boolean(listing.claimedVenueId),
+    alreadyReminded: engagement.reminded,
+    bounced: suppressed.reason === "HARD_BOUNCE",
+    complained: suppressed.reason === "COMPLAINT",
+    unsubscribed: suppressed.reason === "UNSUBSCRIBED" || suppressed.suppressed,
+    clicked: engagement.clicked,
+    completed: engagement.completed,
+  });
+  if (!gate.eligible) return { sent: false, reason: gate.reason ?? "not_eligible" };
+
+  const safety = listingPassesStagedClaimInviteSafety({
+    ...listing,
+    discoveryMarketSlug: listing.growthLead?.discoveryMarketSlug,
+    schedules: listing.schedules,
+    storedEvidence: listing.openMicEvidenceRows,
+  });
+  if (!safety.ok) return { sent: false, reason: safety.reason };
+
+  if (
+    !isStagedClaimInviteContactEligible({
+      email,
+      confidence: listing.growthLead?.contactEmailConfidence,
+      websiteUrl: listing.websiteUrl ?? listing.growthLead?.websiteUrl,
+      sourceUrl: listing.sourceUrl,
+    })
+  ) {
+    return { sent: false, reason: "email_not_eligible" };
+  }
+
+  const domain = email.slice(email.indexOf("@") + 1).toLowerCase();
+  const domainSent = await countClaimInvitesSentTodayForDomain(prisma, domain);
+  if (domainSent >= listingClaimInvitesPerDomainDailyMax()) {
+    return { sent: false, reason: "domain_daily_cap" };
+  }
+
+  const issued = await issueListingClaimInviteToken(prisma, {
+    listingId,
+    intendedEmailNormalized: email,
+  });
+  const base = appBaseUrl().replace(/\/$/, "");
+  const claimUrl = `${base}/claim/invite/${issued.rawToken}`;
+  const payload = buildListingClaimInvitePayload({
+    listingName: listing.name,
+    listingSlug: listing.slug,
+    city: listing.city,
+    region: listing.region,
+    venueName: listing.name,
+    claimUrl,
+    isReminder: true,
+  });
+
+  const sendResult = await sendTransactional(email, payload.subject, payload.textBody, payload.htmlBody);
+  if (!sendResult.ok) {
+    await prisma.listingClaimInviteToken.update({
+      where: { id: issued.tokenId },
+      data: { status: "REVOKED", revokedAt: new Date() },
+    });
+    return { sent: false, reason: "send_skipped_or_failed" };
+  }
+
+  await prisma.listingClaimAuditEvent.create({
+    data: {
+      listingId,
+      eventType: CLAIM_INVITE_REMINDER_EVENT,
+      meta: {
+        tokenId: issued.tokenId,
+        hasProviderMessageId: Boolean(sendResult.messageId),
+        emailDomain: domain,
+        lane: gate.lane ?? null,
+      },
+    },
+  });
+  await recordClaimInviteSendStat(prisma);
+  return { sent: true };
+}
+
+/** At most one reminder per historical invite. Shares claim-invite daily/domain caps. */
+export async function runPendingListingClaimInviteReminders(
+  prisma: PrismaClient,
+  limit = CLAIM_INVITE_REMINDERS_PER_CRON_MAX,
+): Promise<{ sent: number; skipped: number; candidates: number }> {
+  const may = await claimInviteAutomationMaySend(prisma);
+  if (!may.ok) return { sent: 0, skipped: 0, candidates: 0 };
+
+  const { remaining: resendRemaining } = await resendDailyBudgetSnapshot(prisma);
+  const effectiveLimit = Math.min(
+    CLAIM_INVITE_REMINDERS_PER_CRON_MAX,
+    limit,
+    may.perCron,
+    may.dailyRemaining,
+    resendRemaining,
+  );
+  if (effectiveLimit <= 0) return { sent: 0, skipped: 0, candidates: 0 };
+
+  const invited = await prisma.publicOpenMicListing.findMany({
+    where: {
+      claimInviteEmailSentAt: { not: null },
+      claimedVenueId: null,
+      claimStatus: { not: "CLAIMED" },
+      verificationStatus: "VERIFIED",
+      removedAt: null,
+      claimAuditEvents: { none: { eventType: CLAIM_INVITE_REMINDER_EVENT } },
+    },
+    select: {
+      id: true,
+      claimInviteEmailSentAt: true,
+      claimInviteEmail: true,
+      claimedVenueId: true,
+      claimStatus: true,
+      claimAuditEvents: { select: { eventType: true } },
+    },
+    orderBy: { claimInviteEmailSentAt: "asc" },
+    take: 200,
+  });
+
+  const ranked = invited
+    .map((row) => {
+      const engagement = classifyClaimInviteEngagement(row.claimAuditEvents.map((e) => e.eventType));
+      const gate = claimInviteReminderEligibility({
+        sentAt: row.claimInviteEmailSentAt,
+        claimed: Boolean(row.claimedVenueId),
+        alreadyReminded: engagement.reminded,
+        bounced: false,
+        complained: false,
+        unsubscribed: false,
+        clicked: engagement.clicked,
+        completed: engagement.completed,
+      });
+      return { id: row.id, gate };
+    })
+    .filter((row) => row.gate.eligible)
+    .sort(
+      (a, b) =>
+        reminderLanePriority(b.gate.lane ?? "never_clicked") -
+        reminderLanePriority(a.gate.lane ?? "never_clicked"),
+    );
+
+  let sent = 0;
+  let skipped = 0;
+  let candidates = 0;
+  for (const row of ranked) {
+    if (sent >= effectiveLimit) break;
+    candidates += 1;
+    const result = await sendListingClaimInviteReminderIfNeeded(prisma, row.id);
+    if (result.sent) sent += 1;
+    else skipped += 1;
   }
 
   return { sent, skipped, candidates };

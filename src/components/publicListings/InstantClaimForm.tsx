@@ -8,17 +8,16 @@ import { trackConversionEvent, trackMarketingEvent } from "@/lib/marketingTracki
 import { oncePerSession } from "@/lib/conversionAttribution";
 
 const ROLES: { value: ClaimAuthorityRole; label: string }[] = [
-  { value: "owner", label: "I own this venue" },
-  { value: "manager", label: "I manage this venue" },
-  { value: "authorized_employee", label: "I work here and can manage the open mic" },
-  { value: "authorized_event_host", label: "I host the open mic here" },
+  { value: "owner", label: "I'm the venue" },
+  { value: "authorized_event_host", label: "I'm the host" },
 ];
 
 export function InstantClaimForm(props: {
   listingSlug: string;
   listingName: string;
-  /** Masked only — never pass the full invited address to the client. */
+  /** Masked display. Full invited email is prefilled from the secure session. */
   invitedEmailMasked: string;
+  invitedEmail?: string;
   address: string;
   cityLine?: string | null;
   evidenceSummary?: string | null;
@@ -26,8 +25,8 @@ export function InstantClaimForm(props: {
 }) {
   const router = useRouter();
   const [contactName, setContactName] = useState("");
-  const [role, setRole] = useState<ClaimAuthorityRole>("owner");
-  const [loginEmail, setLoginEmail] = useState("");
+  const [role, setRole] = useState<ClaimAuthorityRole | "">("");
+  const [loginEmail, setLoginEmail] = useState(props.invitedEmail ?? "");
   const [authority, setAuthority] = useState(false);
   const [legal, setLegal] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
@@ -52,6 +51,10 @@ export function InstantClaimForm(props: {
     e.preventDefault();
     if (!contactName.trim()) {
       setError("Enter your name.");
+      return;
+    }
+    if (!role) {
+      setError("Choose whether you are the venue or the host.");
       return;
     }
     if (!loginEmail.trim()) {
@@ -159,23 +162,28 @@ export function InstantClaimForm(props: {
         />
       </label>
 
-      <label className="grid gap-1 text-sm">
-        <span className="text-white/80">Your role</span>
-        <select
-          value={role}
-          onChange={(e) => {
-            setRole(e.target.value as ClaimAuthorityRole);
-            trackMarketingEvent("authority_confirmed", { listing_slug: props.listingSlug, role: e.target.value });
-          }}
-          className="h-12 rounded-md border border-white/15 bg-black/40 px-3 text-base text-white"
-        >
-          {ROLES.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <fieldset className="grid gap-2 text-sm">
+        <legend className="text-white/80">Your role</legend>
+        {ROLES.map((r) => (
+          <label
+            key={r.value}
+            className="flex min-h-12 items-center gap-3 rounded-md border border-white/15 bg-black/40 px-3 text-base text-white"
+          >
+            <input
+              type="radio"
+              name="claim-role"
+              value={r.value}
+              checked={role === r.value}
+              onChange={() => {
+                setRole(r.value);
+                trackMarketingEvent("authority_confirmed", { listing_slug: props.listingSlug, role: r.value });
+              }}
+              className="h-5 w-5 shrink-0"
+            />
+            <span>{r.label}</span>
+          </label>
+        ))}
+      </fieldset>
 
       <label className="grid gap-1 text-sm">
         <span className="text-white/80">Invited email</span>
@@ -243,7 +251,7 @@ export function InstantClaimForm(props: {
         disabled={status === "loading"}
         className="inline-flex h-12 w-full items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-base font-semibold text-black disabled:opacity-60"
       >
-        {status === "loading" ? "Claiming…" : "Claim this free listing"}
+        {status === "loading" ? "Claiming…" : "Claim this open mic"}
       </button>
     </form>
   );

@@ -153,6 +153,7 @@ export default async function ClaimInviteSessionPage({
             listingSlug={listing.slug}
             listingName={listing.name}
             invitedEmailMasked={invitedEmailMasked}
+            invitedEmail={session.intendedEmailNormalized}
             address={listing.formattedAddress}
             cityLine={cityLine}
             evidenceSummary={evidenceSummary}

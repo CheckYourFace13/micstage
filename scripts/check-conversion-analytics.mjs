@@ -38,6 +38,9 @@ assert.match(read("src/components/MicStageProductAnalytics.tsx"), /performer_sig
 assert.match(read("src/components/MicStageProductAnalytics.tsx"), /host_first_series/);
 assert.match(read("src/components/publicListings/InstantClaimForm.tsx"), /venue_claim_complete/);
 assert.match(read("src/app/open-mics/[listingSlug]/page.tsx"), /listing_claim_cta_click/);
+assert.match(read("src/app/open-mics/[listingSlug]/page.tsx"), /listing_performer_registration_click/);
+assert.match(read("src/components/VenueBookingFlash.tsx"), /guest_signup_account_cta_shown/);
+assert.match(read("src/components/VenueBookingFlash.tsx"), /guest_signup_account_cta_clicked/);
 assert.match(read("src/app/page.tsx"), /host_cta_click/);
 assert.match(read("src/app/register/promoter/register-submit/route.ts"), /JOINED_HOST/);
 assert.match(read("src/app/promoter/actions.ts"), /hostMilestoneQuery/);

@@ -18,6 +18,7 @@ import {
   type HostAcquisitionMetrics,
   type VenueAcquisitionMetrics,
 } from "@/lib/ownerSummary/hostAcquisitionMetrics";
+import { readScheduleRecoveryDayStats } from "@/lib/publicListings/listingScheduleEnrichment";
 
 export type OwnerSummarySignupRow = {
   kind: "venue" | "artist";
@@ -102,10 +103,29 @@ export type OwnerDailySummaryData = {
     remainingProviderHeadroom: number;
     claimContactsMinedToday: number;
     inviteReadyTotal: number;
+    inviteReadyNewToday: number;
     highEmailTotal: number;
     unusedOutreachCapacity: number;
     topOutreachBlockReasons: Array<{ reason: string; count: number }>;
     cityHubsWithScheduled: number;
+    scheduleRecovery: {
+      unscheduledVerified: number;
+      scannedToday: number;
+      officialPagesFetched: number;
+      explicitScheduleFound: number;
+      scheduleCreated: number;
+      ambiguous: number;
+      fetchBlocked: number;
+      noScheduleFound: number;
+    };
+  };
+  performerFunnel: {
+    guestSignupsToday: number;
+    performerAccountsToday: number;
+    performerAccounts7d: number;
+    weeklyAlertOptInsTotal: number;
+    weeklyAlertOptInsNewToday: number;
+    sharedSignupVisitsToday: number;
   };
   growthLayers: {
     rawCandidatesTotal: number;
@@ -817,7 +837,17 @@ export async function buildOwnerDailySummary(
     loadVenueAcquisitionMetrics(prisma, startUtc, endUtc, sevenDayStart),
   ]);
 
-  const [rawCandidatesTotal, performersRegistered7d, performerSignups7d, weeklyDigestOptIns] = await Promise.all([
+  const [
+    rawCandidatesTotal,
+    performersRegistered7d,
+    performerSignups7d,
+    weeklyDigestOptIns,
+    inviteReadyNewToday,
+    scheduleRecovery,
+    guestSignupsToday,
+    performerAccountsToday,
+    weeklyAlertOptInsNewToday,
+  ] = await Promise.all([
     prisma.growthLead.count({
       where: { status: { notIn: ["REJECTED", "UNSUBSCRIBED", "BOUNCED"] } },
     }),
@@ -826,6 +856,36 @@ export async function buildOwnerDailySummary(
       where: { createdAt: { gte: sevenDayStart, lt: endUtc }, cancelledAt: null },
     }),
     prisma.musicianUser.count({ where: { weeklyNearbyOpenMicAlerts: true } }),
+    prisma.publicOpenMicListing.count({
+      where: {
+        claimInviteEmailSentAt: null,
+        claimedVenueId: null,
+        claimStatus: { not: "CLAIMED" },
+        verificationStatus: "VERIFIED",
+        removedAt: null,
+        growthLead: {
+          contactEmailNormalized: { not: null },
+          contactEmailConfidence: "HIGH",
+          updatedAt: { gte: startUtc, lt: endUtc },
+        },
+      },
+    }),
+    readScheduleRecoveryDayStats(prisma, now),
+    prisma.booking.count({
+      where: {
+        createdAt: { gte: startUtc, lt: endUtc },
+        cancelledAt: null,
+        musicianId: null,
+      },
+    }),
+    prisma.musicianUser.count({ where: { createdAt: { gte: startUtc, lt: endUtc } } }),
+    prisma.musicianUser.count({
+      where: {
+        weeklyNearbyOpenMicAlerts: true,
+        updatedAt: { gte: startUtc, lt: endUtc },
+        createdAt: { gte: startUtc, lt: endUtc },
+      },
+    }),
   ]);
 
   const clicksNoteUpdated =
@@ -876,10 +936,29 @@ export async function buildOwnerDailySummary(
       remainingProviderHeadroom: providerCapacity.remainingForOutreach,
       claimContactsMinedToday: enrichStats.newHighContacts,
       inviteReadyTotal: inviteReady,
+      inviteReadyNewToday,
       highEmailTotal: eligibilityAudit.highConfidenceContacts,
       unusedOutreachCapacity: Math.max(0, outreachRuntime.effectiveDailyMax - outreachSends),
       topOutreachBlockReasons: eligibilityAudit.topBlockReasons,
       cityHubsWithScheduled: cityHubsWithScheduledRows.filter((r) => r.city?.trim()).length,
+      scheduleRecovery: {
+        unscheduledVerified: scheduleRecovery.unscheduledVerified || unscheduledVerified,
+        scannedToday: scheduleRecovery.scanned,
+        officialPagesFetched: scheduleRecovery.officialPagesFetched,
+        explicitScheduleFound: scheduleRecovery.explicitFound,
+        scheduleCreated: scheduleRecovery.created,
+        ambiguous: scheduleRecovery.ambiguous,
+        fetchBlocked: scheduleRecovery.fetchBlocked,
+        noScheduleFound: scheduleRecovery.noScheduleFound,
+      },
+    },
+    performerFunnel: {
+      guestSignupsToday,
+      performerAccountsToday,
+      performerAccounts7d: performersRegistered7d,
+      weeklyAlertOptInsTotal: weeklyDigestOptIns,
+      weeklyAlertOptInsNewToday,
+      sharedSignupVisitsToday: 0,
     },
     growthLayers: {
       rawCandidatesTotal,

@@ -71,7 +71,7 @@ function read(rel) {
   assert.ok(!LineupHelp(mus), "no lineup help clutter on signup");
   const artist = read("src/app/artist/page.tsx");
   assert.ok(/Your account is ready/i.test(artist));
-  assert.ok(/Find open mics near me/i.test(artist));
+  assert.ok(/Find open mics near you/i.test(artist));
   assert.ok(/Build my profile/i.test(artist));
   assert.ok(/Do this later/i.test(artist));
   assert.ok(artist.includes("/find-open-mics"), "discover without profile gate");
@@ -86,7 +86,9 @@ function LineupHelp(s) {
   assert.ok(/authorized to manage this open mic/i.test(claim));
   assert.ok(/does not turn on online signups or booking/i.test(claim));
   assert.ok(/update the schedule and details later/i.test(claim));
-  assert.ok(/Claim this free listing/i.test(claim));
+  assert.ok(/Claim this open mic/i.test(claim));
+  assert.ok(/I'm the venue/i.test(claim));
+  assert.ok(/I'm the host/i.test(claim));
   assert.ok(!/Post-claim activation/.test(claim));
 }
 

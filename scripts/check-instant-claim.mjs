@@ -410,7 +410,9 @@ function importedTemplateDefaults() {
   assert.ok(/text-base/.test(claim), "16px inputs avoid iOS zoom");
   assert.ok(/w-full/.test(claim), "full-width CTA");
   assert.ok(/enterKeyHint/.test(claim), "mobile keyboard hints");
-  assert.ok(/Claim this free listing/.test(claim));
+  assert.ok(/Claim this open mic/.test(claim));
+  assert.ok(/I'm the venue/.test(claim));
+  assert.ok(/I'm the host/.test(claim));
   assert.ok(/does not turn on online signups or booking/.test(claim));
 }
 

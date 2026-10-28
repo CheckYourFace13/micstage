@@ -106,6 +106,65 @@ export type ConsumeClaimInviteTokenResult =
         | "wrong_recipient";
     };
 
+async function listingStillClaimableViaInvite(
+  prisma: PrismaClient,
+  listingId: string,
+): Promise<boolean> {
+  const listing = await prisma.publicOpenMicListing.findUnique({
+    where: { id: listingId },
+    select: {
+      verificationStatus: true,
+      removedAt: true,
+      claimedVenueId: true,
+      claimStatus: true,
+    },
+  });
+  if (!listing || listing.removedAt) return false;
+  if (listing.verificationStatus !== "VERIFIED") return false;
+  if (listing.claimedVenueId || listing.claimStatus === "CLAIMED") return false;
+  return true;
+}
+
+type ClaimInviteTokenRow = {
+  id: string;
+  listingId: string;
+  tokenHash: string;
+  intendedEmailNormalized: string;
+  status: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+  revokedAt: Date | null;
+};
+
+/**
+ * Possession of the original secret still opens an unclaimed VERIFIED listing.
+ * Used/revoked tokens stay dead. Does not loosen eligibility — only expiry.
+ */
+async function reviveExpiredClaimInviteTokenIfClaimable(
+  prisma: PrismaClient,
+  row: ClaimInviteTokenRow,
+): Promise<ClaimInviteTokenRow | null> {
+  if (row.status === "USED" || row.usedAt) return null;
+  if (row.status === "REVOKED" || row.revokedAt) return null;
+  const expired = row.status === "EXPIRED" || row.expiresAt.getTime() <= Date.now();
+  if (!expired) return row;
+  const still = await listingStillClaimableViaInvite(prisma, row.listingId);
+  if (!still) {
+    if (row.status === "ACTIVE") {
+      await prisma.listingClaimInviteToken.update({
+        where: { id: row.id },
+        data: { status: "EXPIRED" },
+      });
+    }
+    return null;
+  }
+  const expiresAt = new Date(Date.now() + claimInviteTokenTtlDays() * 24 * 60 * 60 * 1000);
+  return prisma.listingClaimInviteToken.update({
+    where: { id: row.id },
+    data: { status: "ACTIVE", expiresAt },
+  });
+}
+
 /**
  * Validates a claim token. Optionally marks USED (one-time).
  * Does not log the raw token.
@@ -133,38 +192,31 @@ export async function consumeListingClaimInviteToken(
 
   if (row.status === "USED" || row.usedAt) return { ok: false, reason: "used" };
   if (row.status === "REVOKED" || row.revokedAt) return { ok: false, reason: "revoked" };
-  if (row.status === "EXPIRED" || row.expiresAt.getTime() <= Date.now()) {
-    if (row.status === "ACTIVE") {
-      await prisma.listingClaimInviteToken.update({
-        where: { id: row.id },
-        data: { status: "EXPIRED" },
-      });
-    }
-    return { ok: false, reason: "expired" };
-  }
+  const live = await reviveExpiredClaimInviteTokenIfClaimable(prisma, row);
+  if (!live) return { ok: false, reason: "expired" };
 
   // Soft-removed / non-VERIFIED listings cannot be claimed via an old invite link.
   const listingLive = await prisma.publicOpenMicListing.findUnique({
-    where: { id: row.listingId },
+    where: { id: live.listingId },
     select: { verificationStatus: true, removedAt: true },
   });
   if (!listingLive || listingLive.removedAt || listingLive.verificationStatus !== "VERIFIED") {
     return { ok: false, reason: "revoked" };
   }
 
-  if (input.listingId && input.listingId !== row.listingId) {
+  if (input.listingId && input.listingId !== live.listingId) {
     return { ok: false, reason: "wrong_listing" };
   }
   if (
     input.loginEmailNormalized &&
-    input.loginEmailNormalized.trim().toLowerCase() !== row.intendedEmailNormalized
+    input.loginEmailNormalized.trim().toLowerCase() !== live.intendedEmailNormalized
   ) {
     return { ok: false, reason: "wrong_recipient" };
   }
 
   if (input.markUsed !== false) {
     const updated = await prisma.listingClaimInviteToken.updateMany({
-      where: { id: row.id, status: "ACTIVE", usedAt: null },
+      where: { id: live.id, status: "ACTIVE", usedAt: null },
       data: { status: "USED", usedAt: new Date() },
     });
     if (updated.count === 0) return { ok: false, reason: "used" };
@@ -172,9 +224,9 @@ export async function consumeListingClaimInviteToken(
 
   return {
     ok: true,
-    tokenId: row.id,
-    listingId: row.listingId,
-    intendedEmailNormalized: row.intendedEmailNormalized,
+    tokenId: live.id,
+    listingId: live.listingId,
+    intendedEmailNormalized: live.intendedEmailNormalized,
   };
 }
 
@@ -197,37 +249,30 @@ export async function consumeListingClaimInviteTokenById(
 
   if (row.status === "USED" || row.usedAt) return { ok: false, reason: "used" };
   if (row.status === "REVOKED" || row.revokedAt) return { ok: false, reason: "revoked" };
-  if (row.status === "EXPIRED" || row.expiresAt.getTime() <= Date.now()) {
-    if (row.status === "ACTIVE") {
-      await prisma.listingClaimInviteToken.update({
-        where: { id: row.id },
-        data: { status: "EXPIRED" },
-      });
-    }
-    return { ok: false, reason: "expired" };
-  }
+  const liveById = await reviveExpiredClaimInviteTokenIfClaimable(prisma, row);
+  if (!liveById) return { ok: false, reason: "expired" };
 
   const listingLiveById = await prisma.publicOpenMicListing.findUnique({
-    where: { id: row.listingId },
+    where: { id: liveById.listingId },
     select: { verificationStatus: true, removedAt: true },
   });
   if (!listingLiveById || listingLiveById.removedAt || listingLiveById.verificationStatus !== "VERIFIED") {
     return { ok: false, reason: "revoked" };
   }
 
-  if (input.listingId && input.listingId !== row.listingId) {
+  if (input.listingId && input.listingId !== liveById.listingId) {
     return { ok: false, reason: "wrong_listing" };
   }
   if (
     input.loginEmailNormalized &&
-    input.loginEmailNormalized.trim().toLowerCase() !== row.intendedEmailNormalized
+    input.loginEmailNormalized.trim().toLowerCase() !== liveById.intendedEmailNormalized
   ) {
     return { ok: false, reason: "wrong_recipient" };
   }
 
   if (input.markUsed !== false) {
     const updated = await prisma.listingClaimInviteToken.updateMany({
-      where: { id: row.id, status: "ACTIVE", usedAt: null },
+      where: { id: liveById.id, status: "ACTIVE", usedAt: null },
       data: { status: "USED", usedAt: new Date() },
     });
     if (updated.count === 0) return { ok: false, reason: "used" };
@@ -235,9 +280,9 @@ export async function consumeListingClaimInviteTokenById(
 
   return {
     ok: true,
-    tokenId: row.id,
-    listingId: row.listingId,
-    intendedEmailNormalized: row.intendedEmailNormalized,
+    tokenId: liveById.id,
+    listingId: liveById.listingId,
+    intendedEmailNormalized: liveById.intendedEmailNormalized,
   };
 }
 

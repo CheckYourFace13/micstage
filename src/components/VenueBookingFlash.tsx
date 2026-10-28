@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { trackMarketingEvent } from "@/lib/marketingTracking";
+import { oncePerSession } from "@/lib/conversionAttribution";
 
 /**
  * Shows booking/cancel success after redirect. Props come from server searchParams so the message survives
@@ -42,28 +44,7 @@ export function VenueBookingFlash({
   const registerHref = `/register/musician${registerQs.toString() ? `?${registerQs.toString()}` : ""}`;
 
   if (!isMusician) {
-    return (
-      <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-4 text-sm text-white">
-        <p className="font-semibold">Signup confirmed.</p>
-        <p className="mt-1 text-white/80">
-          Your spot is saved. One more click makes a free performer account so you can find open mics near you.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link
-            href={registerHref}
-            className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black hover:brightness-110"
-          >
-            Finish free account
-          </Link>
-          <Link
-            href="/find-open-mics"
-            className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
-          >
-            Find open mics near you — free
-          </Link>
-        </div>
-      </div>
-    );
+    return <GuestAccountCta registerHref={registerHref} />;
   }
 
   return (
@@ -85,6 +66,38 @@ export function VenueBookingFlash({
         </Link>
         <Link href="/artist" className="inline-flex h-11 items-center justify-center px-3 text-sm text-white/70 underline hover:text-white">
           Save performer profile
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function GuestAccountCta({ registerHref }: { registerHref: string }) {
+  useEffect(() => {
+    oncePerSession("trk:guest_signup_account_cta_shown", () => {
+      trackMarketingEvent("guest_signup_account_cta_shown");
+    });
+  }, []);
+
+  return (
+    <div className="mt-6 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-4 text-sm text-white">
+      <p className="font-semibold">Signup confirmed.</p>
+      <p className="mt-1 text-white/80">
+        Your spot is saved. One more click makes a free performer account so you can find open mics near you.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href={registerHref}
+          onClick={() => trackMarketingEvent("guest_signup_account_cta_clicked")}
+          className="inline-flex h-11 items-center justify-center rounded-md bg-[rgb(var(--om-neon))] px-4 text-sm font-semibold text-black hover:brightness-110"
+        >
+          Finish free account
+        </Link>
+        <Link
+          href="/find-open-mics"
+          className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
+        >
+          Find open mics near you — free
         </Link>
       </div>
     </div>

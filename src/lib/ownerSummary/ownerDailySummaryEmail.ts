@@ -66,6 +66,7 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Provider headroom remaining: ${inv.remainingProviderHeadroom}`,
     `  Claim contacts mined today: ${inv.claimContactsMinedToday}`,
     `  Invite-ready total: ${inv.inviteReadyTotal}`,
+    `  Invite-ready new today: ${inv.inviteReadyNewToday}`,
     `  Note: ${inv.listingsNote}`,
     "",
     "RAW GROWTH",
@@ -82,6 +83,7 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     "CONTACT / CLAIM",
     `  Official HIGH contacts mined (24h): ${inv.claimContactsMinedToday}`,
     `  Claim-invite eligible: ${inv.inviteReadyTotal}`,
+    `  New invite-ready today: ${inv.inviteReadyNewToday}`,
     `  Claim invites sent (24h): ${inv.claimInvitesSentCount}`,
     `  Claims started (24h): ${data.marketing.claimsStartedToday}`,
     `  Claims completed (24h): ${data.marketing.claimsCompletedToday}`,
@@ -102,6 +104,22 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Performer accounts: ${data.growthLayers.performersRegistered7d}`,
     `  Performer signups: ${data.growthLayers.performerSignups7d}`,
     `  Weekly alert opt-ins: ${data.growthLayers.weeklyDigestOptIns}`,
+    "",
+    "SCHEDULE RECOVERY",
+    `  Unscheduled verified: ${inv.scheduleRecovery.unscheduledVerified}`,
+    `  Scanned today: ${inv.scheduleRecovery.scannedToday}`,
+    `  Official pages fetched: ${inv.scheduleRecovery.officialPagesFetched}`,
+    `  Explicit schedule found: ${inv.scheduleRecovery.explicitScheduleFound}`,
+    `  Schedule created: ${inv.scheduleRecovery.scheduleCreated}`,
+    `  Ambiguous: ${inv.scheduleRecovery.ambiguous}`,
+    `  Fetch blocked: ${inv.scheduleRecovery.fetchBlocked}`,
+    `  No schedule found: ${inv.scheduleRecovery.noScheduleFound}`,
+    "",
+    "PERFORMER",
+    `  Guest signups (24h): ${data.performerFunnel.guestSignupsToday}`,
+    `  Performer accounts (24h / 7d): ${data.performerFunnel.performerAccountsToday} / ${data.performerFunnel.performerAccounts7d}`,
+    `  Weekly alert opt-ins: ${data.performerFunnel.weeklyAlertOptInsNewToday} new / ${data.performerFunnel.weeklyAlertOptInsTotal} total`,
+    `  Shared signup visits (24h): ${data.performerFunnel.sharedSignupVisitsToday}`,
     "",
     "SEARCH",
     `  Outreach clicks (24h / 7d): ${data.marketing.uniqueClicksToday} / ${data.marketing.uniqueClicks7d}`,
@@ -559,7 +577,9 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>Verified with active schedule:</strong> ${inv.verifiedWithActiveSchedule} · <strong>Indexable:</strong> ${inv.indexableScheduledListings} · <strong>Schedules confirmed today:</strong> ${inv.schedulesAutoConfirmedToday}</li>
     <li><strong>HIGH emails:</strong> ${inv.highEmailTotal} · <strong>Net eligible now:</strong> ${inv.netEligibleOutreach} · <strong>Safe capacity:</strong> ${data.marketing.dailyCap} · <strong>Sent:</strong> ${data.marketing.sentToday} · <strong>Unused:</strong> ${inv.unusedOutreachCapacity}</li>
     <li><strong>Top outreach blocks:</strong> ${inv.topOutreachBlockReasons.length ? inv.topOutreachBlockReasons.map((b) => `${esc(b.reason)}=${b.count}`).join(" · ") : "none"}</li>
-    <li><strong>Claim contacts mined today:</strong> ${inv.claimContactsMinedToday} · <strong>Invite-ready:</strong> ${inv.inviteReadyTotal} · <strong>Invites sent:</strong> ${inv.claimInvitesSentCount} · <strong>Claims started/completed:</strong> ${data.marketing.claimsStartedToday}/${data.marketing.claimsCompletedToday}</li>
+    <li><strong>Claim contacts mined today:</strong> ${inv.claimContactsMinedToday} · <strong>Invite-ready:</strong> ${inv.inviteReadyTotal} · <strong>New invite-ready today:</strong> ${inv.inviteReadyNewToday} · <strong>Invites sent:</strong> ${inv.claimInvitesSentCount} · <strong>Claims started/completed:</strong> ${data.marketing.claimsStartedToday}/${data.marketing.claimsCompletedToday}</li>
+    <li><strong>Schedule recovery:</strong> unscheduled ${inv.scheduleRecovery.unscheduledVerified} · scanned ${inv.scheduleRecovery.scannedToday} · pages ${inv.scheduleRecovery.officialPagesFetched} · found ${inv.scheduleRecovery.explicitScheduleFound} · created ${inv.scheduleRecovery.scheduleCreated} · ambiguous ${inv.scheduleRecovery.ambiguous} · blocked ${inv.scheduleRecovery.fetchBlocked} · none ${inv.scheduleRecovery.noScheduleFound}</li>
+    <li><strong>Performer funnel (24h):</strong> ${data.performerFunnel.guestSignupsToday} guest signups · ${data.performerFunnel.performerAccountsToday} accounts · ${data.performerFunnel.weeklyAlertOptInsNewToday} new weekly alerts · ${data.performerFunnel.weeklyAlertOptInsTotal} alert opt-ins total</li>
     <li><strong>Raw candidates:</strong> ${data.growthLayers.rawCandidatesTotal} total · ${data.growthLayers.rawCandidatesToday} new (24h) · ${data.growthLayers.junkRejectedToday} junk rejected</li>
     <li><strong>Qualified:</strong> ${data.growthLayers.realPlaceCandidates} real-place · ${data.growthLayers.verifiedListings} verified · ${data.growthLayers.scheduledListings} scheduled · ${data.growthLayers.indexableListings} indexable · <strong>City hubs with schedules:</strong> ${data.growthLayers.cityHubsWithScheduled}</li>
     <li><strong>Users (7d):</strong> ${data.growthLayers.venuesRegistered7d} venues · ${data.growthLayers.hostsRegistered7d} hosts · ${data.growthLayers.performersRegistered7d} performers · ${data.growthLayers.performerSignups7d} signups · ${data.growthLayers.weeklyDigestOptIns} digest opt-ins</li>

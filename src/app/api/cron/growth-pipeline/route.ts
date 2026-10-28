@@ -23,7 +23,7 @@ import { mineVerifiedListingOfficialEmails } from "@/lib/publicListings/mineVeri
 import { sourceListingCoordinatesWithoutGoogle } from "@/lib/publicListings/listingCoordinateSourcing";
 import { runDirectoryLeadReprocessing } from "@/lib/growth/discovery/directoryLeadReprocessing";
 import { purgeExpiredGoogleMapsContent } from "@/lib/compliance/googleMapsContentRetention";
-import { runPendingListingClaimInvites } from "@/lib/publicListings/listingClaimInviteEmail";
+import { runPendingListingClaimInvites, runPendingListingClaimInviteReminders } from "@/lib/publicListings/listingClaimInviteEmail";
 import { runOnboardingSetupNudges } from "@/lib/onboarding/setupNudges";
 import {
   countPendingListingClaimInvitesWithEmail,
@@ -166,6 +166,7 @@ async function handle(request: Request) {
     let emailMining: Awaited<ReturnType<typeof runMarketingSocialPayloadBatch>> | null = null;
     let hostMultiVenueSweep: Awaited<ReturnType<typeof sweepHostMultiVenueProspects>> | null = null;
     let listingClaimInvites: Awaited<ReturnType<typeof runPendingListingClaimInvites>> | null = null;
+    let listingClaimReminders: Awaited<ReturnType<typeof runPendingListingClaimInviteReminders>> | null = null;
     let onboardingNudges: Awaited<ReturnType<typeof runOnboardingSetupNudges>> | null = null;
     let resendBudget: Awaited<ReturnType<typeof resendDailyBudgetSnapshot>> | null = null;
     let pendingClaimInvites: number | null = null;
@@ -232,10 +233,16 @@ async function handle(request: Request) {
       const inviteBatch = Math.min(await listingClaimInvitesPerCron(prisma), resendBudget.remaining);
       if (inviteBatch > 0) {
         listingClaimInvites = await runPendingListingClaimInvites(prisma, inviteBatch);
+        const leftover = Math.max(0, inviteBatch - listingClaimInvites.sent);
+        listingClaimReminders =
+          leftover > 0
+            ? await runPendingListingClaimInviteReminders(prisma, leftover)
+            : { sent: 0, skipped: 0, candidates: 0 };
         resendBudget = await resendDailyBudgetSnapshot(prisma);
         pendingClaimInvites = await countPendingListingClaimInvitesWithEmail(prisma);
       } else {
         listingClaimInvites = { sent: 0, skipped: 0, candidates: 0 };
+        listingClaimReminders = { sent: 0, skipped: 0, candidates: 0 };
       }
     }
 
@@ -470,6 +477,7 @@ async function handle(request: Request) {
         resendBudget,
         pendingClaimInvites,
         listingClaimInvites,
+        listingClaimReminders,
         onboardingNudges,
         autoDrafts: drafts,
         followUps,

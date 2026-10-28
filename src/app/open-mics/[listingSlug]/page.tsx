@@ -418,6 +418,19 @@ export default async function PublicOpenMicListingPage(props: {
           </div>
 
           <div>
+            <h2 className="text-base font-semibold">Perform here</h2>
+            <p className="mt-1 text-sm text-white/60">Browse stays free. A performer account is optional.</p>
+            <Link
+              href={`/register/musician?ref=listing&listing=${encodeURIComponent(listing.slug)}`}
+              className="mt-3 inline-flex h-11 items-center rounded-md border border-white/20 px-5 text-sm font-semibold text-white hover:bg-white/10"
+              data-track-event="listing_performer_registration_click"
+              data-listing-slug={listing.slug}
+            >
+              Create a free performer account
+            </Link>
+          </div>
+
+          <div>
             <h2 className="text-base font-semibold">Get reminders</h2>
             <p className="mt-1 text-sm text-white/60">Email when this listing is updated or bookable on MicStage.</p>
             <div className="mt-3">

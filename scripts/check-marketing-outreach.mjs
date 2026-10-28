@@ -1176,8 +1176,8 @@ const claimMail = buildListingClaimInvitePayload({
   claimUrl: "https://micstage.com/claim/invite/token",
 });
 assert.match(claimMail.textBody, /We found your open mic on MicStage/);
-assert.match(claimMail.textBody, /Claim it free to correct the schedule/);
-assert.match(claimMail.htmlBody, /Claim your listing free/);
+assert.match(claimMail.textBody, /claim it free to correct the schedule/i);
+assert.match(claimMail.htmlBody, /Claim this open mic/);
 assert.match(claimMail.htmlBody, /open-mics\/blue-note-open-mic/);
 assert.match(claimMail.textBody, /No credit card/);
 

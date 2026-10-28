@@ -7,7 +7,7 @@ import { verifyPublicListingsWithGoogle } from "@/lib/publicListings/googlePlace
 import { promotePlaceConfirmedListings } from "@/lib/publicListings/promotePlaceConfirmedListings";
 import { mineVerifiedListingOfficialEmails } from "@/lib/publicListings/mineVerifiedListingContacts";
 import { enrichGrowthLeadOfficialEvidence } from "@/lib/growth/outreachEvidenceEnrichment";
-import { enrichVerifiedListingSchedules } from "@/lib/publicListings/listingScheduleEnrichment";
+import { EMPTY_SCHEDULE_ENRICH_RESULT, enrichVerifiedListingSchedules } from "@/lib/publicListings/listingScheduleEnrichment";
 import { micstagePromotionKillSwitch } from "@/lib/publicListings/automationKillSwitches";
 import {
   resolveGrowthPipelineRuntimeSnapshot,
@@ -69,7 +69,7 @@ export async function runListingBacklogProcessor(
     failed: 0,
     byFailureReason: {} as Record<string, number>,
   };
-  const emptyScheduleEnrich = { scanned: 0, confirmed: 0, uncertain: 0, skipped: 0 };
+  const emptyScheduleEnrich = { ...EMPTY_SCHEDULE_ENRICH_RESULT };
   const emptyOutreachEvidence = {
     processed: 0,
     crawled: 0,

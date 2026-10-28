@@ -15,7 +15,7 @@ import {
 } from "@/lib/growth/growthRuntimeSettings";
 import {
   evaluateBacklogPressure,
-  backlogLimitsUnderPressure,
+  independentProcessingBudgets,
   type BacklogPressure,
 } from "@/lib/growth/backlogPressure";
 
@@ -113,18 +113,8 @@ export async function runListingBacklogProcessor(
   const remaining = () => TICK_BUDGET_MS - (Date.now() - started);
   const canRun = (needMs: number) => remaining() > needMs;
   const pressure = await evaluateBacklogPressure(prisma);
-  const limits = pressure.active
-    ? backlogLimitsUnderPressure(runtime)
-    : {
-        publish: runtime.backlogPublishPerTick.effective,
-        junk: runtime.autoRejectJunkPerRun.effective,
-        googleVerify: runtime.backlogGoogleVerifyPerTick.effective,
-        promote: runtime.backlogPromotePerTick.effective,
-        evidence: runtime.backlogEvidenceEnrichPerTick.effective,
-        schedule: 8,
-        mine: runtime.verifiedContactMinePerTick.effective,
-        leadReprocess: 40,
-      };
+  /** Independent of discovery — never shrink publish because the raw reservoir is large. */
+  const limits = independentProcessingBudgets(runtime);
 
   let junk = { scanned: 0, rejected: 0, byReason: {} as Record<string, number> };
   if (canRun(3_000)) {

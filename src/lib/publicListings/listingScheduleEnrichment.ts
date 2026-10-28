@@ -94,11 +94,30 @@ export function scheduleMarketPriorityScore(listing: {
   return 10;
 }
 
+function officialSocialUrl(listing: { facebookUrl?: string | null; instagramUrl?: string | null }, pageUrl: string): boolean {
+  const page = hostFromUrl(pageUrl);
+  if (!page) return false;
+  const official = [listing.facebookUrl, listing.instagramUrl]
+    .map((u) => hostFromUrl(u))
+    .filter((h): h is string => Boolean(h));
+  if (official.length === 0) return false;
+  return official.some((h) => page === h || page.endsWith(`.${h}`) || h.endsWith(`.${page}`));
+}
+
+function crawlableOfficial(
+  listingHost: string | null,
+  pageUrl: string,
+  listing: { facebookUrl?: string | null; instagramUrl?: string | null },
+): boolean {
+  if (officialEnough(listingHost, pageUrl)) return true;
+  return officialSocialUrl(listing, pageUrl);
+}
+
 export async function enrichVerifiedListingSchedules(
   prisma: PrismaClient,
   opts?: { limit?: number },
 ): Promise<ScheduleEnrichResult> {
-  const limit = Math.min(20, Math.max(0, opts?.limit ?? 8));
+  const limit = Math.min(48, Math.max(0, opts?.limit ?? 24));
   if (limit <= 0) return { scanned: 0, confirmed: 0, uncertain: 0, skipped: 0 };
 
   let rows = await prisma.publicOpenMicListing.findMany({
@@ -117,12 +136,14 @@ export async function enrichVerifiedListingSchedules(
       region: true,
       websiteUrl: true,
       sourceUrl: true,
+      facebookUrl: true,
+      instagramUrl: true,
       timeZone: true,
       lat: true,
       lng: true,
       signupMethod: true,
       lastVerifiedAt: true,
-      growthLead: { select: { websiteUrl: true } },
+      growthLead: { select: { websiteUrl: true, facebookUrl: true, instagramUrl: true } },
     },
     orderBy: { lastVerifiedAt: "desc" },
     take: Math.min(80, Math.max(limit * 8, limit)),
@@ -137,17 +158,21 @@ export async function enrichVerifiedListingSchedules(
   for (const row of rows) {
     const site = row.websiteUrl || row.growthLead?.websiteUrl || row.sourceUrl;
     const listingHost = hostFromUrl(site);
-    if (!site || !listingHost) {
-      skipped += 1;
-      continue;
-    }
     const timeZone = resolveTrustedListingTimeZone(row);
     if (!timeZone) {
       skipped += 1;
       continue;
     }
-    const seeds = [row.websiteUrl, row.growthLead?.websiteUrl, row.sourceUrl].filter((u): u is string => Boolean(u?.trim()));
-    const urls = expandOfficialEvidenceUrls(seeds, 6).filter((u) => officialEnough(listingHost, u));
+    const seeds = [
+      row.websiteUrl,
+      row.growthLead?.websiteUrl,
+      row.sourceUrl,
+      row.facebookUrl,
+      row.instagramUrl,
+      row.growthLead?.facebookUrl,
+      row.growthLead?.instagramUrl,
+    ].filter((u): u is string => Boolean(u?.trim()));
+    const urls = expandOfficialEvidenceUrls(seeds, 12).filter((u) => crawlableOfficial(listingHost, u, row));
     if (urls.length === 0) {
       skipped += 1;
       continue;
@@ -159,11 +184,12 @@ export async function enrichVerifiedListingSchedules(
       const html = await discoveryFetchText(url, { timeoutMs: PAGE_TIMEOUT_MS });
       if (!html) continue;
       const pageText = stripHtml(html);
+      const social = officialSocialUrl(row, url);
       const trust = evaluateFetchedEvidenceTrust({
         pageText,
         excerpt: null,
-        onOfficialVenueDomain: officialEnough(listingHost, url),
-        sourceKind: "official_website",
+        onOfficialVenueDomain: officialEnough(listingHost, url) || social,
+        sourceKind: social ? "official_social" : "official_website",
         placeIdentityStrong: true,
         geoConflict: false,
         nameOk: isPublicListingNameOk(row.name),

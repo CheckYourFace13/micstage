@@ -11,11 +11,17 @@ curl -fsS -m 360 -X POST \
   -H "Authorization: Bearer $SECRET" \
   "$BASE/api/cron/growth-pipeline?phase=tick"
 
-# --- Job 2: every 30 min at :00 and :30 — nationwide discovery + publish/verify/promote ---
+# --- Job 2: every 30 min at :00 and :30 — nationwide discovery (independent of backlog) ---
 # Schedule: 0,30 * * * *
 # curl -fsS -m 300 -X POST \
 #   -H "Authorization: Bearer $SECRET" \
 #   "$BASE/api/cron/growth-pipeline?phase=discovery"
+
+# --- Job 2b (optional): every 15 min offset — schedule + official contact mining only ---
+# Schedule: 7,22,37,52 * * * *
+# curl -fsS -m 180 -X POST \
+#   -H "Authorization: Bearer $SECRET" \
+#   "$BASE/api/cron/growth-pipeline?phase=enrichment"
 
 # --- Job 3: daily 06:10 UTC — IndexNow for new resource guides ---
 # Schedule: 10 6 * * *

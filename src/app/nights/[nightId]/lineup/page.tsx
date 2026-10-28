@@ -31,10 +31,19 @@ export async function generateMetadata(props: { params: Promise<{ nightId: strin
 
 export default async function HostNightLineupPage(props: {
   params: Promise<{ nightId: string }>;
-  searchParams: Promise<{ bookError?: string; reserve?: string; booked?: string; cancelled?: string; embed?: string }>;
+  searchParams: Promise<{
+    bookError?: string;
+    reserve?: string;
+    booked?: string;
+    cancelled?: string;
+    embed?: string;
+    email?: string;
+    stageName?: string;
+  }>;
 }) {
   const { nightId } = await props.params;
-  const { bookError, reserve, booked, cancelled, embed } = await props.searchParams;
+  const { bookError, reserve, booked, cancelled, embed, email: guestEmail, stageName: guestName } =
+    await props.searchParams;
   const embedMode = embed === "1";
 
   let ctx = await loadHostNightLineupContext(nightId);
@@ -105,7 +114,14 @@ export default async function HostNightLineupPage(props: {
           </header>
         ) : null}
 
-        <VenueBookingFlash initialBooked={booked === "1"} initialCancelled={cancelled === "1"} />
+        <VenueBookingFlash
+          initialBooked={booked === "1"}
+          initialCancelled={cancelled === "1"}
+          isMusician={isMusician}
+          guestEmail={typeof guestEmail === "string" ? guestEmail : ""}
+          guestName={typeof guestName === "string" ? guestName : ""}
+          returnPath={returnPath}
+        />
 
         {bookError ? (
           <div className="mb-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">

@@ -28,6 +28,7 @@ import {
   explicitScheduleEndTimeMin,
   resolveTrustedListingTimeZone,
 } from "../src/lib/publicListings/listingScheduleEnrichment.ts";
+import { expandOfficialEvidenceUrls } from "../src/lib/publicListings/evidenceEnrichment.ts";
 import { buildOwnerAttentionItems } from "../src/lib/ownerSummary/ownerAttention.ts";
 import { scheduleWindowLabel } from "../src/lib/scheduleWindow.ts";
 import { buildPublicMetadata } from "../src/lib/publicSeo.ts";
@@ -63,6 +64,9 @@ assert.equal(listingIsPubliclyIndexable(baseListing({ schedules: [], lastVerifie
 // lastVerifiedAt is a confirmation stamp, not a schedule substitute
 assert.equal(listingIsPubliclyIndexable(baseListing({ schedules: [], lastVerifiedAt: new Date() })), false);
 assert.equal(listingMeetsPublicSeoIndexGate(baseListing({ schedules: [], lastVerifiedAt: new Date() })), false);
+const officialUrls = expandOfficialEvidenceUrls(["https://examplevenue.com/"], 12);
+assert.ok(officialUrls.some((u) => u.includes("/weekly-events") || u.includes("/entertainment") || u.includes("/live-music")));
+assert.ok(officialUrls.length >= 6);
 
 // Trusted public listing indexable; removedAt cannot be sitemap/index
 assert.equal(listingMeetsPublicSeoIndexGate(baseListing()), true);
@@ -412,7 +416,69 @@ const discoveryOutpace = buildOwnerAttentionItems({
   claims7d: 0,
   junkCandidateRate: 0.05,
 });
-assert.ok(discoveryOutpace.some((i) => i.code === "discovery_outpacing"));
+assert.equal(discoveryOutpace.some((i) => i.code === "discovery_outpacing"), false);
+assert.equal(discoveryOutpace.some((i) => i.code === "verification_backlog"), false);
+
+const largeReservoirOk = buildOwnerAttentionItems({
+  outreachEnabled: true,
+  killSwitch: false,
+  emailsSentToday: 24,
+  dailyCap: 50,
+  providerHeadroom: 26,
+  bounceRate: 0,
+  complaintRate: 0,
+  autoSendReady: 10,
+  leadsCreatedToday: 20,
+  listingsCreatedToday: 16,
+  needsReviewCount: 1559,
+  autoVerifiedToday: 2,
+  autoRejectedToday: 4,
+  inviteReady: 4,
+  claimInvitesSentToday: 1,
+  unclaimedVerified: 20,
+  indexableScheduledListings: 5,
+  schedulesAutoConfirmedToday: 1,
+  lastTickAgeHours: 0.2,
+  netEligibleOutreach: 4,
+  chicagoHour: 12,
+  unscheduledVerified: 10,
+  uniqueClicks7d: 0,
+  registrations7d: 1,
+  claims7d: 0,
+  junkCandidateRate: 0.05,
+});
+assert.equal(largeReservoirOk.some((i) => i.code === "verification_backlog"), false);
+assert.equal(largeReservoirOk.some((i) => i.code === "processing_stalled"), false);
+
+const processingStalled = buildOwnerAttentionItems({
+  outreachEnabled: true,
+  killSwitch: false,
+  emailsSentToday: 24,
+  dailyCap: 50,
+  providerHeadroom: 26,
+  bounceRate: 0,
+  complaintRate: 0,
+  autoSendReady: 10,
+  leadsCreatedToday: 20,
+  listingsCreatedToday: 16,
+  needsReviewCount: 1559,
+  autoVerifiedToday: 0,
+  autoRejectedToday: 0,
+  inviteReady: 4,
+  claimInvitesSentToday: 1,
+  unclaimedVerified: 20,
+  indexableScheduledListings: 5,
+  schedulesAutoConfirmedToday: 1,
+  lastTickAgeHours: 0.2,
+  netEligibleOutreach: 4,
+  chicagoHour: 12,
+  unscheduledVerified: 10,
+  uniqueClicks7d: 0,
+  registrations7d: 1,
+  claims7d: 0,
+  junkCandidateRate: 0.05,
+});
+assert.ok(processingStalled.some((i) => i.code === "processing_stalled"));
 
 const clicksNoConvert = buildOwnerAttentionItems({
   outreachEnabled: true,

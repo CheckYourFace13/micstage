@@ -7,7 +7,7 @@ import {
   discoveryIngestCapForAdapter,
   growthDiscoveryAllocationSummary,
 } from "@/lib/growth/growthDiscoveryAllocation";
-import { evaluateBacklogPressure, trickleDiscoveryAdapters } from "@/lib/growth/backlogPressure";
+import { evaluateBacklogPressure } from "@/lib/growth/backlogPressure";
 import { ingestGrowthLeadCandidate } from "@/lib/growth/growthLeadIngest";
 import { ingestHostLaneLeadCandidate, isHostLaneCandidate } from "@/lib/growth/hostLeadIngest";
 import type { GrowthLeadCandidate } from "@/lib/growth/growthLeadCandidate";
@@ -166,9 +166,6 @@ export async function runGrowthLeadDiscovery(prisma: PrismaClient): Promise<Grow
   for (const slug of markets) {
     for (const adapter of adapters) {
       if (adapter.id === AUTONOMOUS_WEB_SEARCH_ADAPTER_ID) {
-        continue;
-      }
-      if (pressure.trickleOnly && !trickleDiscoveryAdapters(adapter.id)) {
         continue;
       }
       try {

@@ -1089,15 +1089,30 @@ const pressureOn = backlogPressureFromCounts({
   autoRejectedToday: 0,
   listingsCreatedToday: 16,
 });
-assert.equal(pressureOn.active, true);
-assert.equal(pressureOn.trickleOnly, true);
+assert.equal(pressureOn.trickleOnly, false);
+assert.equal(pressureOn.discoveryIngestMultiplier, 1);
+assert.equal(pressureOn.processingStalled, true);
 const pressureOff = backlogPressureFromCounts({
   needsReviewCount: 1543,
   autoVerifiedToday: 2,
   autoRejectedToday: 10,
   listingsCreatedToday: 16,
 });
-assert.equal(pressureOff.active, false);
+assert.equal(pressureOff.trickleOnly, false);
+assert.equal(pressureOff.processingStalled, false);
+
+const { discoveryIngestCapForAdapter, growthDiscoveryAllocationSummary } = await import(
+  "../src/lib/growth/growthDiscoveryAllocation.ts"
+);
+const webCap = discoveryIngestCapForAdapter({ id: "autonomous_web_search_venue" }, pressureOn);
+assert.ok(webCap >= 220);
+const seedCap = discoveryIngestCapForAdapter({ id: "autonomous_seed_url_crawl_venue" }, pressureOn);
+assert.ok(seedCap >= 80);
+assert.match(growthDiscoveryAllocationSummary(pressureOn), /does not throttle/i);
+
+const { discoveryBadgeLabel } = await import("../src/lib/publicListings/types.ts");
+assert.equal(discoveryBadgeLabel("verified", false, { hasSchedule: false }), "Schedule needs confirmation");
+assert.equal(discoveryBadgeLabel("verified", false, { hasSchedule: true }), "Verified listing");
 
 const { classifyListingName } = await import("../src/lib/publicListings/listingQuality.ts");
 assert.equal(classifyListingName("Louisville, KY"), "BARE_CITY_STATE");

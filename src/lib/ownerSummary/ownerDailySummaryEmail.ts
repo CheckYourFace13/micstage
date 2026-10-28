@@ -68,6 +68,24 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Invite-ready total: ${inv.inviteReadyTotal}`,
     `  Note: ${inv.listingsNote}`,
     "",
+    "RAW INVENTORY",
+    `  Raw candidates total: ${data.growthLayers.rawCandidatesTotal}`,
+    `  New candidates (24h): ${data.growthLayers.rawCandidatesToday}`,
+    `  Deterministic junk rejected (24h): ${data.growthLayers.junkRejectedToday}`,
+    "",
+    "QUALIFIED INVENTORY",
+    `  Real-place candidates: ${data.growthLayers.realPlaceCandidates}`,
+    `  Verified listings: ${data.growthLayers.verifiedListings}`,
+    `  Scheduled listings: ${data.growthLayers.scheduledListings}`,
+    `  Indexable listings: ${data.growthLayers.indexableListings}`,
+    "",
+    "SUPPLY / DEMAND USERS (7d)",
+    `  Venues registered: ${data.growthLayers.venuesRegistered7d}`,
+    `  Hosts registered: ${data.growthLayers.hostsRegistered7d}`,
+    `  Performers registered: ${data.growthLayers.performersRegistered7d}`,
+    `  Performer signups: ${data.growthLayers.performerSignups7d}`,
+    `  Weekly digest opt-ins: ${data.growthLayers.weeklyDigestOptIns}`,
+    "",
     data.listingsInventory.listingsCreatedCount > 0
       ? "NEW LISTINGS (24h)"
       : "RECENT LISTINGS (latest inventory)",
@@ -520,6 +538,9 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>Verified with active schedule:</strong> ${inv.verifiedWithActiveSchedule} · <strong>Indexable:</strong> ${inv.indexableScheduledListings} · <strong>Schedules confirmed today:</strong> ${inv.schedulesAutoConfirmedToday}</li>
     <li><strong>Net-eligible outreach:</strong> ${inv.netEligibleOutreach} · <strong>Provider headroom:</strong> ${inv.remainingProviderHeadroom}</li>
     <li><strong>Claim contacts mined today:</strong> ${inv.claimContactsMinedToday} · <strong>Invite-ready:</strong> ${inv.inviteReadyTotal}</li>
+    <li><strong>Raw candidates:</strong> ${data.growthLayers.rawCandidatesTotal} total · ${data.growthLayers.rawCandidatesToday} new (24h) · ${data.growthLayers.junkRejectedToday} junk rejected</li>
+    <li><strong>Qualified:</strong> ${data.growthLayers.realPlaceCandidates} real-place · ${data.growthLayers.verifiedListings} verified · ${data.growthLayers.scheduledListings} scheduled · ${data.growthLayers.indexableListings} indexable</li>
+    <li><strong>Users (7d):</strong> ${data.growthLayers.venuesRegistered7d} venues · ${data.growthLayers.hostsRegistered7d} hosts · ${data.growthLayers.performersRegistered7d} performers · ${data.growthLayers.performerSignups7d} signups · ${data.growthLayers.weeklyDigestOptIns} digest opt-ins</li>
   </ul>
   <p style="margin:0 0 12px;color:#6b7280;font-size:12px">${esc(inv.listingsNote)}</p>
   <h3 style="font-size:14px;margin:16px 0 8px">${esc(heading)}</h3>

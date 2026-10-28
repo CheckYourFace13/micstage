@@ -103,6 +103,20 @@ export type OwnerDailySummaryData = {
     claimContactsMinedToday: number;
     inviteReadyTotal: number;
   };
+  growthLayers: {
+    rawCandidatesTotal: number;
+    rawCandidatesToday: number;
+    junkRejectedToday: number;
+    realPlaceCandidates: number;
+    verifiedListings: number;
+    scheduledListings: number;
+    indexableListings: number;
+    venuesRegistered7d: number;
+    hostsRegistered7d: number;
+    performersRegistered7d: number;
+    performerSignups7d: number;
+    weeklyDigestOptIns: number;
+  };
   /** Compact funnel + automation counters for ops email (not the full review dump). */
   growthFunnel: {
     waitingEnrichment: number;
@@ -788,6 +802,17 @@ export async function buildOwnerDailySummary(
     loadVenueAcquisitionMetrics(prisma, startUtc, endUtc, sevenDayStart),
   ]);
 
+  const [rawCandidatesTotal, performersRegistered7d, performerSignups7d, weeklyDigestOptIns] = await Promise.all([
+    prisma.growthLead.count({
+      where: { status: { notIn: ["REJECTED", "UNSUBSCRIBED", "BOUNCED"] } },
+    }),
+    prisma.musicianUser.count({ where: { createdAt: { gte: sevenDayStart, lt: endUtc } } }),
+    prisma.booking.count({
+      where: { createdAt: { gte: sevenDayStart, lt: endUtc }, cancelledAt: null },
+    }),
+    prisma.musicianUser.count({ where: { weeklyNearbyOpenMicAlerts: true } }),
+  ]);
+
   const clicksNoteUpdated =
     "Canonical unique click: first-party MarketingOutreachClick (one row per outreach send). Same source in every summary section.";
   const junkNameSample = reviewReasonBuckets
@@ -836,6 +861,20 @@ export async function buildOwnerDailySummary(
       remainingProviderHeadroom: providerCapacity.remainingForOutreach,
       claimContactsMinedToday: enrichStats.newHighContacts,
       inviteReadyTotal: inviteReady,
+    },
+    growthLayers: {
+      rawCandidatesTotal,
+      rawCandidatesToday: leadsCreated,
+      junkRejectedToday: autoRejectedToday,
+      realPlaceCandidates: googleVerifiedListings,
+      verifiedListings: inventory.verifiedListings,
+      scheduledListings: indexableScheduledListings,
+      indexableListings: indexableScheduledListings,
+      venuesRegistered7d: venueRegs7d,
+      hostsRegistered7d: promoterRegs7d,
+      performersRegistered7d,
+      performerSignups7d,
+      weeklyDigestOptIns,
     },
     growthFunnel: {
       waitingEnrichment,

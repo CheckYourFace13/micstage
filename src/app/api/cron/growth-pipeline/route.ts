@@ -18,6 +18,8 @@ import {
 } from "@/lib/growth/discoveryExecutionGuard";
 import { autoPublishGrowthLeadsAsListings } from "@/lib/publicListings/autoPublishGrowthLeadsAsListings";
 import { runListingBacklogProcessor } from "@/lib/publicListings/listingBacklogProcessor";
+import { enrichVerifiedListingSchedules } from "@/lib/publicListings/listingScheduleEnrichment";
+import { mineVerifiedListingOfficialEmails } from "@/lib/publicListings/mineVerifiedListingContacts";
 import { sourceListingCoordinatesWithoutGoogle } from "@/lib/publicListings/listingCoordinateSourcing";
 import { runDirectoryLeadReprocessing } from "@/lib/growth/discovery/directoryLeadReprocessing";
 import { purgeExpiredGoogleMapsContent } from "@/lib/compliance/googleMapsContentRetention";
@@ -54,7 +56,7 @@ const GROWTH_OUTREACH_LOCK_K2 = 20_993_312;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type GrowthPipelinePhase = "all" | "discovery" | "outreach" | "tick";
+type GrowthPipelinePhase = "all" | "discovery" | "outreach" | "tick" | "enrichment";
 
 function authorize(request: Request): boolean {
   const expected = process.env.CRON_SECRET?.trim() || process.env.MICSTAGE_CRON_SECRET?.trim();
@@ -66,7 +68,7 @@ function authorize(request: Request): boolean {
 
 function parsePhase(request: Request): GrowthPipelinePhase {
   const p = new URL(request.url).searchParams.get("phase")?.trim().toLowerCase();
-  if (p === "discovery" || p === "outreach" || p === "tick") return p;
+  if (p === "discovery" || p === "outreach" || p === "tick" || p === "enrichment") return p;
   return "all";
 }
 
@@ -94,7 +96,7 @@ async function handle(request: Request) {
   const authOk = authorize(request);
   const phaseEarly = parsePhase(request);
   /** Log any request that would run discovery if authorized (not tick/outreach). */
-  const isDiscoveryPhaseRequest = phaseEarly !== "outreach" && phaseEarly !== "tick";
+  const isDiscoveryPhaseRequest = phaseEarly !== "outreach" && phaseEarly !== "tick" && phaseEarly !== "enrichment";
   const discoverySourceLog = isDiscoveryPhaseRequest
     ? beginDiscoveryRequestSourceLog(request, {
         phase: phaseEarly,
@@ -152,6 +154,10 @@ async function handle(request: Request) {
     let discoveryError: string | null = null;
     let listingAutoPublish: Awaited<ReturnType<typeof autoPublishGrowthLeadsAsListings>> | null = null;
     let listingBacklog: Awaited<ReturnType<typeof runListingBacklogProcessor>> | null = null;
+    let enrichmentWorkers: {
+      scheduleEnrich: Awaited<ReturnType<typeof enrichVerifiedListingSchedules>>;
+      contactMine: Awaited<ReturnType<typeof mineVerifiedListingOfficialEmails>>;
+    } | null = null;
     let coordinateSourcing: Awaited<ReturnType<typeof sourceListingCoordinatesWithoutGoogle>> | null = null;
     let directoryReprocess: Awaited<ReturnType<typeof runDirectoryLeadReprocessing>> | null = null;
     let googleContentPurge: Awaited<ReturnType<typeof purgeExpiredGoogleMapsContent>> | null = null;
@@ -164,6 +170,19 @@ async function handle(request: Request) {
     let resendBudget: Awaited<ReturnType<typeof resendDailyBudgetSnapshot>> | null = null;
     let pendingClaimInvites: number | null = null;
     let outreachSkippedReason: string | null = null;
+
+    if (phase === "enrichment") {
+      try {
+        const [scheduleEnrich, contactMine] = await Promise.all([
+          enrichVerifiedListingSchedules(prisma, { limit: 32 }),
+          mineVerifiedListingOfficialEmails(prisma, { limit: 32 }),
+        ]);
+        enrichmentWorkers = { scheduleEnrich, contactMine };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[growth pipeline] enrichment workers failed", { error: msg, phase });
+      }
+    }
 
     if (emailMiningEnabled) {
       const batchSize = resolveMarketingSocialPayloadBatchSize(request);
@@ -441,6 +460,7 @@ async function handle(request: Request) {
         discoveryError,
         listingAutoPublish,
         listingBacklog,
+        enrichmentWorkers,
         coordinateSourcing,
         googleContentPurge,
         directoryReprocess,
@@ -456,9 +476,9 @@ async function handle(request: Request) {
         growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,
         hint:
           phase === "tick"
-            ? "One cron call: mine venue emails then draft/send outreach. Schedule every 15 min on Hostinger. Use ?phase=discovery hourly for nationwide venue discovery."
+            ? "One cron call: mine venue emails then draft/send outreach. Schedule every 15 min on Hostinger. Use ?phase=discovery for nationwide venue discovery and ?phase=enrichment for schedule/contact workers."
             : phase === "all"
-              ? "On Hostinger, prefer ?phase=tick (every 15 min) and ?phase=discovery (hourly) as separate cron calls to avoid 504 gateway timeouts."
+              ? "On Hostinger, prefer ?phase=tick (every 15 min), ?phase=discovery (hourly), and optional ?phase=enrichment as separate cron calls to avoid 504 gateway timeouts."
               : undefined,
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },

@@ -92,6 +92,30 @@ export default async function ClaimActivatePage(props: {
           <SharePageButtons url={publicUrl} label="Public page" />
         </div>
 
+        <section className="mt-8 rounded-2xl border border-violet-400/25 bg-violet-500/10 p-4">
+          <h2 className="text-base font-semibold text-white">Run another open mic?</h2>
+          <p className="mt-1 text-sm text-white/70">Add the next night in a minute — no referral code needed.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/host"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-violet-400/40 bg-violet-500/20 px-4 text-sm font-semibold text-violet-50 hover:bg-violet-500/30"
+            >
+              Add another night
+            </Link>
+            <Link
+              href="/register/venue"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              Add another venue
+            </Link>
+          </div>
+          <h3 className="mt-5 text-sm font-semibold text-white">Know another venue or host?</h3>
+          <p className="mt-1 text-sm text-white/70">Send them straight to host or venue signup.</p>
+          <div className="mt-3">
+            <SharePageButtons url={absoluteUrl("/host")} label="Host signup" />
+          </div>
+        </section>
+
         <details className="mt-8 rounded-2xl border border-white/10 bg-black/30 p-4">
           <summary className="cursor-pointer text-sm font-semibold text-white/80">More setup options (optional)</summary>
           <div className="mt-4">

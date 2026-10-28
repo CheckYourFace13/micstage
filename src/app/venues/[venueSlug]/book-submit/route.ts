@@ -273,5 +273,13 @@ export async function POST(request: Request) {
     revalidatePath(`/nights/${slotPreview.instance.template.promoterNightId}/lineup`);
   }
   revalidatePath(ARTIST_DASHBOARD_HREF);
-  return redirectTo(appendQueryToPath(returnBase, { booked: "1" }));
+  const extra: Record<string, string> = { booked: "1" };
+  if (session?.kind !== "musician") {
+    extra.guest = "1";
+    const guestName = optString(formData, "performerName");
+    const guestEmail = optString(formData, "performerEmail");
+    if (guestName) extra.stageName = guestName.slice(0, 80);
+    if (guestEmail) extra.email = guestEmail.slice(0, 120);
+  }
+  return redirectTo(appendQueryToPath(returnBase, extra));
 }

@@ -110,11 +110,13 @@ export async function POST(request: Request) {
     }
 
     const now = new Date();
+    const weeklyNearbyOpenMicAlerts = formData.get("weeklyNearbyOpenMicAlerts") === "on";
     const musician = await prisma.musicianUser.create({
       data: {
         email,
         passwordHash,
         stageName,
+        weeklyNearbyOpenMicAlerts,
         registrationContentConsentAt: now,
         registrationContentConsentVersion: REGISTRATION_CONTENT_CONSENT_VERSION,
       },

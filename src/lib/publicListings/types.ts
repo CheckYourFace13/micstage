@@ -52,7 +52,7 @@ export function discoveryBadgeLabel(
     return opts?.hasSchedule === false ? "Listed on MicStage" : "Schedule on MicStage";
   }
   if (kind === "verified") {
-    return opts?.hasSchedule === false ? "Schedule details needed" : "Verified listing";
+    return opts?.hasSchedule === false ? "Schedule needs confirmation" : "Verified listing";
   }
   return "Unclaimed listing";
 }

@@ -80,31 +80,54 @@ export async function runWeeklyOpenMicDigestJob(prisma: PrismaClient, now: Date)
 
   const horizonEnd = new Date(now.getTime() + DIGEST_HORIZON_DAYS * 24 * 60 * 60 * 1000);
 
-  const venues = await prisma.venue.findMany({
-    where: {
-      eventTemplates: { some: { isPublic: true } },
-    },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      city: true,
-      region: true,
-      lat: true,
-      lng: true,
-      eventTemplates: {
-        where: { isPublic: true },
-        select: {
-          instances: {
-            where: { date: { gte: now, lte: horizonEnd }, isCancelled: false },
-            select: { date: true },
-            orderBy: { date: "asc" },
-            take: 20,
+  const [venues, publicScheduled] = await Promise.all([
+    prisma.venue.findMany({
+      where: {
+        eventTemplates: { some: { isPublic: true } },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        city: true,
+        region: true,
+        lat: true,
+        lng: true,
+        eventTemplates: {
+          where: { isPublic: true },
+          select: {
+            instances: {
+              where: { date: { gte: now, lte: horizonEnd }, isCancelled: false },
+              select: { date: true },
+              orderBy: { date: "asc" },
+              take: 20,
+            },
           },
         },
       },
-    },
-  });
+    }),
+    prisma.publicOpenMicListing.findMany({
+      where: {
+        verificationStatus: "VERIFIED",
+        removedAt: null,
+        claimedVenueId: null,
+        schedules: { some: { isActive: true } },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        city: true,
+        region: true,
+        lat: true,
+        lng: true,
+        schedules: {
+          where: { isActive: true },
+          select: { weekday: true },
+        },
+      },
+    }),
+  ]);
 
   for (const m of musicians) {
     stats.musiciansConsidered += 1;
@@ -120,7 +143,7 @@ export async function runWeeklyOpenMicDigestJob(prisma: PrismaClient, now: Date)
       Math.max(10, m.travelRadiusMiles ?? DEFAULT_RADIUS_MI),
     );
 
-    const nearbyVenues: { id: string; name: string; slug: string; nights: string[] }[] = [];
+    const nearbyVenues: { id: string; name: string; href: string; nights: string[] }[] = [];
 
     for (const v of venues) {
       let near = false;
@@ -139,10 +162,33 @@ export async function runWeeklyOpenMicDigestJob(prisma: PrismaClient, now: Date)
       }
       const uniq = [...new Set(nights)].sort();
       if (uniq.length === 0) continue;
-      nearbyVenues.push({ id: v.id, name: v.name, slug: v.slug, nights: uniq.slice(0, 5) });
+      nearbyVenues.push({
+        id: v.id,
+        name: v.name,
+        href: `/venues/${v.slug}`,
+        nights: uniq.slice(0, 5),
+      });
     }
 
-    if (nearbyVenues.length < 2) continue;
+    for (const l of publicScheduled) {
+      if (nearbyVenues.some((row) => row.id === l.id)) continue;
+      let near = false;
+      if (hasCoords && l.lat != null && l.lng != null) {
+        near = venueWithinRadius(m.homeLat!, m.homeLng!, radius, l.lat, l.lng);
+      } else if (hasCity) {
+        near = cityLooseMatch(m.homeCity, m.homeRegion, l.city, l.region);
+      }
+      if (!near) continue;
+      if (l.schedules.length === 0) continue;
+      nearbyVenues.push({
+        id: l.id,
+        name: l.name,
+        href: `/open-mics/${l.slug}`,
+        nights: l.schedules.map((s) => s.weekday),
+      });
+    }
+
+    if (nearbyVenues.length < 1) continue;
 
     const findUrl = absoluteUrl("/find-open-mics");
     const profileUrl = absoluteUrl("/artist");
@@ -151,7 +197,7 @@ export async function runWeeklyOpenMicDigestJob(prisma: PrismaClient, now: Date)
       .slice(0, 12)
       .map(
         (v) =>
-          `- ${v.name} — ${v.nights.map((d) => d).join(", ")} — ${absoluteUrl(`/venues/${v.slug}`)}`,
+          `- ${v.name} — ${v.nights.map((d) => d).join(", ")} — ${absoluteUrl(v.href)}`,
       )
       .join("\n");
     const text = `Hi ${m.stageName},
@@ -172,7 +218,7 @@ You opted in to this weekly email in your artist profile. Turn it off anytime: $
       .slice(0, 12)
       .map(
         (v) =>
-          `<li><strong>${escapeHtml(v.name)}</strong> — ${escapeHtml(v.nights.join(", "))} — <a href="${escapeHtml(absoluteUrl(`/venues/${v.slug}`))}">View on MicStage</a></li>`,
+          `<li><strong>${escapeHtml(v.name)}</strong> — ${escapeHtml(v.nights.join(", "))} — <a href="${escapeHtml(absoluteUrl(v.href))}">View on MicStage</a></li>`,
       )
       .join("")}</ul>
 <p><a href="${escapeHtml(findUrl)}">Find more open mics</a></p>

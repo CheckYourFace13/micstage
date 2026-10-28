@@ -438,7 +438,7 @@ export function ArtistProfileForm({ musician, venuesForInterest }: Props) {
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
+        <div id="weekly-alerts" className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
           <div className="text-sm font-semibold text-white">Email from MicStage</div>
           <label className="flex cursor-pointer items-start gap-3 text-sm text-white/80">
             <input

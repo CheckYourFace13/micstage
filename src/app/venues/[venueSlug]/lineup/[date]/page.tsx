@@ -51,10 +51,19 @@ export async function generateMetadata(props: {
 
 export default async function VenueLineupDatePage(props: {
   params: Promise<{ venueSlug: string; date: string }>;
-  searchParams: Promise<{ bookError?: string; reserve?: string; booked?: string; cancelled?: string; embed?: string }>;
+  searchParams: Promise<{
+    bookError?: string;
+    reserve?: string;
+    booked?: string;
+    cancelled?: string;
+    embed?: string;
+    email?: string;
+    stageName?: string;
+  }>;
 }) {
   const { venueSlug, date: dateParam } = await props.params;
-  const { bookError, reserve, booked, cancelled, embed } = await props.searchParams;
+  const { bookError, reserve, booked, cancelled, embed, email: guestEmail, stageName: guestName } =
+    await props.searchParams;
   const embedMode = embed === "1";
 
   if (!isValidPublicSlug(venueSlug) || !isValidLineupYmd(dateParam)) notFound();
@@ -132,7 +141,14 @@ export default async function VenueLineupDatePage(props: {
           </p>
         ) : null}
 
-        <VenueBookingFlash initialBooked={booked === "1"} initialCancelled={cancelled === "1"} />
+        <VenueBookingFlash
+          initialBooked={booked === "1"}
+          initialCancelled={cancelled === "1"}
+          isMusician={isMusician}
+          guestEmail={typeof guestEmail === "string" ? guestEmail : ""}
+          guestName={typeof guestName === "string" ? guestName : ""}
+          returnPath={returnPath}
+        />
 
         {bookError ? (
           <div className="mb-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">

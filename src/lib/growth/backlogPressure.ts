@@ -1,7 +1,12 @@
 /**
- * Adaptive discovery vs backlog allocation.
- * When NEEDS_REVIEW outruns verification, keep a nationwide trickle and
- * spend the rest of the tick on processing existing inventory.
+ * Processing-health signal only.
+ *
+ * A large NEEDS_REVIEW / raw reservoir is an asset, not a reason to slow
+ * nationwide discovery. Discovery always runs at the maximum safe rate
+ * allowed by Serp/API budgets, provider quotas, cost caps, and crawl safety.
+ *
+ * Alert only when processing has actually stalled (tick running, work arriving,
+ * and nothing verified or rejected).
  */
 import type { PrismaClient } from "@/generated/prisma/client";
 import { chicagoLast24hWindow } from "@/lib/ownerSummary/chicagoWindow";
@@ -15,9 +20,11 @@ export type BacklogPressure = {
   autoRejectedToday: number;
   listingsCreatedToday: number;
   keepingPace: boolean;
-  /** 1 = normal discovery; ~0.12 = nationwide trickle. */
+  /** Always 1 — discovery is never throttled by backlog size. */
   discoveryIngestMultiplier: number;
+  /** Always false — raw discovery and processing run in parallel. */
   trickleOnly: boolean;
+  processingStalled: boolean;
   reason: string;
 };
 
@@ -31,24 +38,27 @@ export function backlogPressureFromCounts(input: {
   const keepingPace =
     input.autoVerifiedToday > 0 ||
     (input.listingsCreatedToday > 0 && processed >= input.listingsCreatedToday);
-  const active =
-    input.needsReviewCount > BACKLOG_PRESSURE_NEEDS_REVIEW &&
+  /** Tick-side work arrived but nothing was verified or rejected. */
+  const processingStalled =
+    input.needsReviewCount >= 200 &&
     input.autoVerifiedToday === 0 &&
-    !keepingPace;
+    input.autoRejectedToday === 0 &&
+    input.listingsCreatedToday > 0;
   return {
-    active,
+    active: processingStalled,
     needsReviewCount: input.needsReviewCount,
     autoVerifiedToday: input.autoVerifiedToday,
     autoRejectedToday: input.autoRejectedToday,
     listingsCreatedToday: input.listingsCreatedToday,
     keepingPace,
-    discoveryIngestMultiplier: active ? 0.12 : 1,
-    trickleOnly: active,
-    reason: active
-      ? `backlog_pressure: NEEDS_REVIEW=${input.needsReviewCount} autoVerifiedToday=0 processed=${processed} created=${input.listingsCreatedToday}`
+    discoveryIngestMultiplier: 1,
+    trickleOnly: false,
+    processingStalled,
+    reason: processingStalled
+      ? `processing_stalled: NEEDS_REVIEW=${input.needsReviewCount} verified=0 rejected=0 created=${input.listingsCreatedToday}`
       : keepingPace
         ? `processing_keeps_pace: verified=${input.autoVerifiedToday} rejected=${input.autoRejectedToday} created=${input.listingsCreatedToday}`
-        : `normal_discovery: NEEDS_REVIEW=${input.needsReviewCount}`,
+        : `reservoir_ok: NEEDS_REVIEW=${input.needsReviewCount} processed=${processed} created=${input.listingsCreatedToday}`,
   };
 }
 
@@ -87,11 +97,16 @@ export async function evaluateBacklogPressure(
   });
 }
 
-export function trickleDiscoveryAdapters(adapterId: string): boolean {
-  return adapterId === "autonomous_web_search_venue";
+/** @deprecated Discovery is never trickle-gated. Kept for call-site compatibility. */
+export function trickleDiscoveryAdapters(_adapterId: string): boolean {
+  return true;
 }
 
-export function backlogLimitsUnderPressure(runtime: {
+/**
+ * Independent full-speed processing budgets.
+ * Never reduce publish because the raw reservoir is large.
+ */
+export function independentProcessingBudgets(runtime: {
   backlogPublishPerTick: { effective: number };
   backlogGoogleVerifyPerTick: { effective: number };
   backlogPromotePerTick: { effective: number };
@@ -109,13 +124,20 @@ export function backlogLimitsUnderPressure(runtime: {
   leadReprocess: number;
 } {
   return {
-    publish: Math.min(8, runtime.backlogPublishPerTick.effective),
+    publish: Math.max(runtime.backlogPublishPerTick.effective, 40),
     junk: Math.max(runtime.autoRejectJunkPerRun.effective, 250),
     googleVerify: Math.max(runtime.backlogGoogleVerifyPerTick.effective, 12),
     promote: Math.max(runtime.backlogPromotePerTick.effective, 80),
     evidence: Math.max(runtime.backlogEvidenceEnrichPerTick.effective, 40),
-    schedule: 16,
-    mine: Math.max(runtime.verifiedContactMinePerTick.effective, 28),
-    leadReprocess: 10,
+    schedule: 32,
+    mine: Math.max(runtime.verifiedContactMinePerTick.effective, 32),
+    leadReprocess: 40,
   };
+}
+
+/** @deprecated Use {@link independentProcessingBudgets}. */
+export function backlogLimitsUnderPressure(
+  runtime: Parameters<typeof independentProcessingBudgets>[0],
+): ReturnType<typeof independentProcessingBudgets> {
+  return independentProcessingBudgets(runtime);
 }

@@ -129,7 +129,7 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
   const tonightLabel = weekdayToLabel(todayWeekday);
   const tomorrowLabel = weekdayToLabel(tomorrowWeekday);
   const scheduledCount = listings.filter((l) => l.hasSchedule).length;
-  const showCalendar = scheduledCount >= 3;
+  const showCalendar = scheduledCount >= 1;
   const thisWeekByDay = WEEKDAY_ORDER.map((day) => ({
     day,
     label: weekdayToLabel(day),
@@ -171,8 +171,8 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
             <div className="text-xs font-medium uppercase tracking-widest text-white/60">Open mics</div>
             <h1 className="om-heading mt-2 text-3xl tracking-wide sm:text-4xl">Open Mics in {placeTitle}</h1>
             <p className="mt-2 max-w-2xl text-sm text-white/70">
-              Trusted open-mic listings in {placeTitle}. Browse venues and rooms with schedules and signup details when
-              available — music, comedy, poetry, and more.
+              Trusted open-mic listings in {placeTitle}. Verified rooms appear even when the exact time still needs
+              confirmation. Scheduled nights get the calendar sections below.
             </p>
             {showCalendar ? (
               <div className="mt-3">

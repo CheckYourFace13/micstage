@@ -46,6 +46,11 @@ const CONTACT_PATH_CANDIDATES = [
   "/info",
   "/connect",
   "/get-in-touch",
+  "/management",
+  "/our-team",
+  "/who-we-are",
+  "/host",
+  "/hosts",
 ];
 
 /** Official same-domain role mailboxes — HIGH without requiring a personal name. */

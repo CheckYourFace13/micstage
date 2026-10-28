@@ -63,17 +63,15 @@ export function buildOwnerAttentionItems(input: OwnerAttentionInput): OwnerAtten
   if (input.leadsCreatedToday === 0) {
     items.push({ code: "discovery_stopped", message: "No new growth leads in the last 24h" });
   }
-  if (input.needsReviewCount >= 200 && input.autoVerifiedToday === 0) {
+  if (
+    input.needsReviewCount >= 200 &&
+    input.autoVerifiedToday === 0 &&
+    input.autoRejectedToday === 0 &&
+    input.listingsCreatedToday > 0
+  ) {
     items.push({
-      code: "verification_backlog",
-      message: `NEEDS_REVIEW is ${input.needsReviewCount} with 0 auto-verified today`,
-    });
-  }
-  const autoProcessed = input.autoVerifiedToday + input.autoRejectedToday;
-  if (input.listingsCreatedToday > 0 && input.listingsCreatedToday > 2 * Math.max(1, autoProcessed)) {
-    items.push({
-      code: "discovery_outpacing",
-      message: `Discovery created ${input.listingsCreatedToday} listings vs ${autoProcessed} auto-processed`,
+      code: "processing_stalled",
+      message: `Processing produced 0 verifies and 0 rejects while ${input.listingsCreatedToday} listings were created (NEEDS_REVIEW=${input.needsReviewCount})`,
     });
   }
   if (input.junkCandidateRate >= 0.25 && input.listingsCreatedToday + input.autoRejectedToday >= 8) {

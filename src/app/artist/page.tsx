@@ -485,6 +485,26 @@ export default async function ArtistPortalPage({
                     </div>
                   );
                 })}
+                <div className="rounded-xl border border-violet-400/25 bg-violet-500/10 p-4">
+                  <p className="font-semibold text-white">After your set</p>
+                  <p className="mt-1 text-sm text-white/70">
+                    Find another mic, keep your profile current, or get a weekly nearby digest.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href="/find-open-mics"
+                      className="inline-flex h-11 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/15 px-4 text-sm font-semibold text-violet-50 hover:bg-violet-500/25"
+                    >
+                      Find another mic nearby
+                    </Link>
+                    <Link
+                      href="/artist#weekly-alerts"
+                      className="inline-flex h-11 items-center justify-center rounded-md border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white hover:bg-white/10"
+                    >
+                      Weekly nearby-mic alerts
+                    </Link>
+                  </div>
+                </div>
               </div>
             );
           })()}

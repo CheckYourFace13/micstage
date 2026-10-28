@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import QRCode from "react-qr-code";
 
 export function ShareLinks(props: { url: string; title: string; className?: string }) {
   const [notice, setNotice] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
   const encoded = encodeURIComponent(props.url);
   const encodedTitle = encodeURIComponent(props.title);
 
@@ -65,7 +67,21 @@ export function ShareLinks(props: { url: string; title: string; className?: stri
       >
         Share
       </button>
+      <button
+        type="button"
+        onClick={() => setShowQr((v) => !v)}
+        className="rounded-md border border-white/15 bg-white/5 px-3 py-1.5 hover:bg-white/10"
+      >
+        {showQr ? "Hide QR" : "QR code"}
+      </button>
       {notice ? <span className="text-emerald-300/90">{notice}</span> : null}
+      {showQr ? (
+        <div className="mt-1 w-full basis-full">
+          <div className="w-fit rounded-xl border border-white/15 bg-white p-3">
+            <QRCode value={props.url} size={128} />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

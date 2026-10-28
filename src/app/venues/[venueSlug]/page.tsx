@@ -91,10 +91,18 @@ export async function generateMetadata(props: { params: Promise<{ venueSlug: str
 
 export default async function VenuePublicPage(props: {
   params: Promise<{ venueSlug: string }>;
-  searchParams: Promise<{ bookError?: string; reserve?: string; booked?: string; cancelled?: string }>;
+  searchParams: Promise<{
+    bookError?: string;
+    reserve?: string;
+    booked?: string;
+    cancelled?: string;
+    guest?: string;
+    email?: string;
+    stageName?: string;
+  }>;
 }) {
   const { venueSlug } = await props.params;
-  const { bookError, reserve, booked, cancelled } = await props.searchParams;
+  const { bookError, reserve, booked, cancelled, email: guestEmail, stageName: guestName } = await props.searchParams;
   const session = await getSession();
   const now = new Date();
 
@@ -307,7 +315,14 @@ export default async function VenuePublicPage(props: {
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pastPerformersLd) }} />
         ) : null}
 
-        <VenueBookingFlash initialBooked={booked === "1"} initialCancelled={cancelled === "1"} />
+        <VenueBookingFlash
+          initialBooked={booked === "1"}
+          initialCancelled={cancelled === "1"}
+          isMusician={isMusician}
+          guestEmail={typeof guestEmail === "string" ? guestEmail : ""}
+          guestName={typeof guestName === "string" ? guestName : ""}
+          returnPath={`/venues/${venueSlug}`}
+        />
 
         {bookError ? (
           <div className="mt-6 rounded-xl border border-[rgba(var(--om-neon),0.45)] bg-[rgba(var(--om-neon),0.1)] px-4 py-3 text-sm text-white">

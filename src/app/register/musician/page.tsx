@@ -130,6 +130,15 @@ export default async function MusicianRegisterPage(props: {
             />
           </label>
 
+          <label className="flex items-start gap-3 text-sm text-white/80">
+            <input
+              type="checkbox"
+              name="weeklyNearbyOpenMicAlerts"
+              className="mt-1 h-4 w-4 rounded border-white/20 bg-black/40"
+            />
+            <span>Email me weekly nearby open mics (opt-in). You can turn this off anytime in your profile.</span>
+          </label>
+
           <RegistrationContentConsent />
 
           <FormSubmitButton

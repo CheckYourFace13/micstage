@@ -91,7 +91,7 @@ export default async function PromoterRegisterPage(props: {
               type="text"
               defaultValue={prefillName}
               className="h-12 rounded-md border border-white/10 bg-black/40 px-3 text-base text-white placeholder:text-white/40"
-              placeholder="Chris or your host brand"
+              placeholder="Your host brand"
               required
               autoComplete="name"
             />

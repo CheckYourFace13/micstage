@@ -21,7 +21,10 @@ export default async function ResetVenuePasswordPage(props: {
         </a>
 
         <h1 className="om-heading mt-6 text-4xl tracking-wide">Reset password</h1>
-        <p className="mt-2 text-sm text-white/70">Venue owners and managers can request a secure reset link by email.</p>
+        <p className="mt-2 text-sm text-white/70">
+          Venue owners and managers can request a secure reset link by email. If this email belongs to a host or
+          performer account instead, we still send the correct link.
+        </p>
 
         <form action={requestVenuePasswordReset} className="mt-8 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
           {showRate ? (

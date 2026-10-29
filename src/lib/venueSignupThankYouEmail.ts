@@ -5,28 +5,18 @@ import { transactionalFromAddress } from "@/lib/marketing/emailConfig";
 const SUBJECT = "Thank you for joining MicStage";
 
 const BODY_TEXT = [
-  "I just wanted to personally thank you for joining MicStage and trusting me this early on. It really means a lot!",
+  "Thank you for joining MicStage.",
   "",
-  "The site is completely free to use, with no hidden charges or surprises. I'd also love to hear any ideas or changes you think would make the site better for venues like yours.",
+  "The site is completely free to use, with no hidden charges or surprises. Reply to this email if you have ideas or need help getting set up.",
   "",
-  "You can reach me anytime at drummer@micstage.com",
-  "",
-  "Thanks again,",
-  "Chris",
+  "Thanks,",
+  "MicStage",
 ].join("\n");
 
+/** Operational Reply-To only — never shown in the body and never paired with a personal name. */
 const REPLY_TO = "drummer@micstage.com";
 
-/**
- * When `VENUE_SIGNUP_THANK_YOU_SEND_FROM_DRUMMER=true`, sends as Chris &lt;drummer@micstage.com&gt; (must be a verified sender in Resend).
- * Otherwise uses the normal transactional From (EMAIL_FROM / EMAIL_FROM_TRANSACTIONAL) and sets Reply-To to drummer@micstage.com.
- */
 function fromForSignupThankYou(): { fromOverride: string; replyTo?: string } {
-  const useDrummer =
-    process.env.VENUE_SIGNUP_THANK_YOU_SEND_FROM_DRUMMER?.trim().toLowerCase() === "true";
-  if (useDrummer) {
-    return { fromOverride: "Chris <drummer@micstage.com>" };
-  }
   return {
     fromOverride: transactionalFromAddress(),
     replyTo: REPLY_TO,
@@ -42,8 +32,8 @@ function signupThankYouHtml(text: string): string {
 }
 
 /**
- * Sends a single plain thank-you email after venue signup. Idempotent via `Venue.signupThankYouEmailSentAt`.
- * Does not personalize with venue or owner names. Failures are logged; signup must never depend on this.
+ * Sends a single thank-you email after venue signup. Idempotent via `Venue.signupThankYouEmailSentAt`.
+ * Brand-only voice. Failures are logged; signup must never depend on this.
  */
 export async function sendVenueSignupThankYouEmailIfNeeded(
   prisma: PrismaClient,

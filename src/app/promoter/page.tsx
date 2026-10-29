@@ -300,7 +300,7 @@ export default async function HostDashboardPage(props: {
                     name="name"
                     required
                     defaultValue={user?.application?.brandName || ""}
-                    placeholder="Chris's Open Mic"
+                    placeholder="Friday Night Open Mic"
                     className="h-12 rounded-md border border-white/10 bg-black/40 px-3 text-white"
                   />
                 </label>

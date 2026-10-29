@@ -103,6 +103,11 @@ export default async function MusicianLoginPage(props: {
             <Link className="underline hover:text-white" href="/reset/musician">
               Reset it
             </Link>
+            {" "}
+            or use the{" "}
+            <Link className="underline hover:text-white" href="/reset">
+              any-account reset
+            </Link>
             .<br />
             New artist?{" "}
             <Link

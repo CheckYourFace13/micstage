@@ -21,7 +21,7 @@ export async function requestVenuePasswordReset(formData: FormData) {
   });
   if (!rl.allowed) redirect("/reset/venue?error=rate");
 
-  await createPasswordReset({ accountType: "VENUE", email });
+  await createPasswordReset({ accountType: "VENUE", email, fallbackToAnyType: true });
   redirect("/reset/venue?sent=1");
 }
 

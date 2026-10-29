@@ -8,6 +8,8 @@ import type { PrismaClient } from "@/generated/prisma/client";
 export const OPEN_MIC_REMOVAL_REASON = {
   PROMOTER: "REMOVED_BY_AUTHORIZED_PROMOTER",
   VENUE_OWNER: "REMOVED_BY_VENUE_OWNER",
+  AUTHORITATIVE_CONTACT: "REMOVED_BY_AUTHORITATIVE_CONTACT",
+  SUPPORT: "REMOVED_BY_SUPPORT",
 } as const;
 
 const GENERIC_SERIES = new Set([
@@ -316,7 +318,10 @@ export type RemoveOpenMicResult =
 export async function removeOpenMicListing(opts: {
   prisma: PrismaClient;
   listingId: string;
-  actor: { kind: "promoter"; promoterId: string } | { kind: "venue_owner"; venueOwnerId: string };
+  actor:
+    | { kind: "promoter"; promoterId: string }
+    | { kind: "venue_owner"; venueOwnerId: string }
+    | { kind: "support"; label: string };
   reasonCode: (typeof OPEN_MIC_REMOVAL_REASON)[keyof typeof OPEN_MIC_REMOVAL_REASON];
 }): Promise<RemoveOpenMicResult> {
   const { prisma, listingId, actor, reasonCode } = opts;
@@ -338,9 +343,13 @@ export async function removeOpenMicListing(opts: {
     return { ok: false, error: "This open mic is already removed.", status: 404 };
   }
 
-  const stamp = `[${now.toISOString().slice(0, 10)}] ${reasonCode} by ${actor.kind}:${
-    actor.kind === "promoter" ? actor.promoterId : actor.venueOwnerId
-  }`;
+  const actorRef =
+    actor.kind === "promoter"
+      ? actor.promoterId
+      : actor.kind === "venue_owner"
+        ? actor.venueOwnerId
+        : actor.label;
+  const stamp = `[${now.toISOString().slice(0, 10)}] ${reasonCode} by ${actor.kind}:${actorRef}`;
 
   const revoked = await prisma.$transaction(async (tx) => {
     await tx.publicOpenMicListing.update({

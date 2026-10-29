@@ -54,8 +54,8 @@ export function growthOutreachSubject(leadType: GrowthLeadType, step: GrowthOutr
   }
 }
 
-const SIGN_OFF_TEXT = ["Thanks,", "Chris", "MicStage"].join("\n");
-const SIGN_OFF_HTML = "<p>Thanks,<br />Chris<br />MicStage</p>";
+const SIGN_OFF_TEXT = ["Thanks,", "MicStage"].join("\n");
+const SIGN_OFF_HTML = "<p>Thanks,<br />MicStage</p>";
 
 function venueSalutationLines(venueName: string, contactEmail: string | null | undefined): { text: string; html: string } {
   const parts = resolveVenueOutreachSalutationParts(venueName, contactEmail);

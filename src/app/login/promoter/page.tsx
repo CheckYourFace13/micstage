@@ -95,6 +95,11 @@ export default async function PromoterLoginPage(props: {
             <Link className="underline hover:text-white" href="/reset/promoter">
               Reset it
             </Link>
+            {" "}
+            or use the{" "}
+            <Link className="underline hover:text-white" href="/reset">
+              any-account reset
+            </Link>
             .<br />
             Need access?{" "}
             <Link className="underline hover:text-white" href="/promoter/apply">

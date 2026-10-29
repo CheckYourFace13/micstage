@@ -87,7 +87,6 @@ export function buildListingClaimInvitePayload(input: {
     "No credit card. The claim link is private and expires.",
     "",
     "Thanks,",
-    "Chris",
     "MicStage",
   ].join("\n");
 
@@ -99,7 +98,7 @@ export function buildListingClaimInvitePayload(input: {
     `<p style="margin:0 0 20px 0;"><a href="${escapeHtml(claimUrl)}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px;">Claim this open mic</a></p>`,
     `<p style="margin:0 0 8px 0;">Your listing: <a href="${escapeHtml(listingUrl)}" style="color:#111827;">${escapeHtml(openMicName)}</a></p>`,
     '<p style="margin:0 0 16px 0;">No credit card. The claim link is private and expires.</p>',
-    '<p style="margin:0;">Thanks,<br />Chris<br />MicStage</p>',
+    '<p style="margin:0;">Thanks,<br />MicStage</p>',
     "</div>",
   ].join("");
 
@@ -126,7 +125,6 @@ export function buildListingClaimReceivedPayload(input: {
     "MicStage is completely free for venues. Once approved, you can publish your schedule, take bookings, and unlock marketing help from us.",
     "",
     "Thanks,",
-    "Chris",
     "MicStage",
   ].join("\n");
 
@@ -135,7 +133,7 @@ export function buildListingClaimReceivedPayload(input: {
     `<p>Thanks — we received your claim request for <strong>${escapeHtml(input.listingName)}</strong> on MicStage. Our team will review it shortly and email you next steps.</p>`,
     `<p><a href="${escapeHtml(listingUrl)}">View listing</a></p>`,
     "<p>MicStage is completely free for venues. Once approved, you can publish your schedule, take bookings, and unlock marketing help from us.</p>",
-    "<p>Thanks,<br />Chris<br />MicStage</p>",
+    "<p>Thanks,<br />MicStage</p>",
   ].join("");
 
   return { subject, textBody, htmlBody };
@@ -177,7 +175,6 @@ export function buildListingClaimApprovedPayload(input: {
     "Reply if you want help with the first setup — happy to walk you through it.",
     "",
     "Thanks,",
-    "Chris",
     "MicStage",
   ].join("\n");
 
@@ -195,7 +192,7 @@ export function buildListingClaimApprovedPayload(input: {
     `<ul style="margin:0 0 1em 1.2em;padding:0;">${MICSTAGE_VENUE_FREE_SERVICES.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>`,
     `<p><a href="${escapeHtml(listingUrl)}">Public listing</a></p>`,
     "<p>Reply if you want help with setup.</p>",
-    "<p>Thanks,<br />Chris<br />MicStage</p>",
+    "<p>Thanks,<br />MicStage</p>",
   ].join("");
 
   return { subject, textBody, htmlBody };

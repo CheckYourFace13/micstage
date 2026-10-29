@@ -33,6 +33,37 @@ function isNonPublicBindHost(host: string): boolean {
   return h === "0.0.0.0" || h === "::" || h === "";
 }
 
+/** Hosts that must never appear in customer-facing email links. */
+export function isNonBrowserPublicHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (isNonPublicBindHost(h)) return true;
+  if (h === "localhost" || h === "::1" || h.startsWith("127.") || h.endsWith(".local") || h.includes("localhost")) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Public origin for outbound email links (password reset, claim invites, outreach).
+ * Skips listen/bind hosts (`0.0.0.0`, `::`) and loopback (`localhost`, `127.0.0.1`).
+ * If `APP_URL` is a Hostinger bind address, falls through to `NEXT_PUBLIC_APP_URL`, then production `https://micstage.com`.
+ */
+export function publicOriginForOutboundEmail(): string {
+  const fallback = process.env.NODE_ENV === "production" ? "https://micstage.com" : "http://localhost:3000";
+  const candidates = [process.env.APP_URL, process.env.NEXT_PUBLIC_APP_URL, fallback];
+  for (const raw of candidates) {
+    if (!raw?.trim()) continue;
+    const normalized = normalizeSiteOrigin(raw);
+    try {
+      const host = new URL(normalized).hostname;
+      if (!isNonBrowserPublicHost(host)) return normalized;
+    } catch {
+      continue;
+    }
+  }
+  return fallback;
+}
+
 /**
  * Canonical public base URL for server-issued redirects (e.g. admin logout).
  * Prefer `APP_URL`, then `NEXT_PUBLIC_APP_URL`, then `https://micstage.com` — do not use `request.url` origin.

@@ -20,7 +20,7 @@ export async function requestPromoterPasswordReset(formData: FormData) {
     windowSec: 60 * 30,
   });
   if (!rl.allowed) redirect("/reset/promoter?error=rate");
-  await createPasswordReset({ accountType: "PROMOTER", email });
+  await createPasswordReset({ accountType: "PROMOTER", email, fallbackToAnyType: true });
   redirect("/reset/promoter?sent=1");
 }
 

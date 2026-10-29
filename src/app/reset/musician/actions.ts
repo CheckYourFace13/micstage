@@ -20,7 +20,7 @@ export async function requestMusicianPasswordReset(formData: FormData) {
     windowSec: 60 * 30,
   });
   if (!rl.allowed) redirect("/reset/musician?error=rate");
-  await createPasswordReset({ accountType: "MUSICIAN", email });
+  await createPasswordReset({ accountType: "MUSICIAN", email, fallbackToAnyType: true });
   redirect("/reset/musician?sent=1");
 }
 

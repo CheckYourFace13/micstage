@@ -2,6 +2,7 @@ import { assertAdminSession, getOptionalAdminEmailFromLoginForm } from "@/lib/ad
 import { requirePrisma } from "@/lib/prisma";
 import {
   adminGenerateResetLink,
+  adminIngestCorrectionReply,
   adminSendResetEmail,
 } from "@/app/internal/admin/actions";
 import Link from "next/link";
@@ -22,6 +23,10 @@ export default async function AdminOverviewPage(props: {
     resetError?: string;
     resetLink?: string;
     linkError?: string;
+    replyIngested?: string;
+    replyAction?: string;
+    replyIntent?: string;
+    replyError?: string;
   }>;
 }) {
   await assertAdminSession();
@@ -226,8 +231,9 @@ export default async function AdminOverviewPage(props: {
       <section className="rounded border border-zinc-700 bg-zinc-900 p-4">
         <h2 className="text-sm font-semibold text-white">Password reset tools</h2>
         <p className="mt-1 text-xs text-zinc-500">
-          Sends real email via Resend, or generates an internal link (new token; ~30m TTL). Public reset still does not
-          reveal whether an account exists — here you get explicit errors for operations.
+          Sends a secure reset email via Resend, or generates an internal link (new token; 2 hour TTL). Auto-detect
+          looks up every matching role. Never emails a password or hash. Public reset still does not reveal whether an
+          account exists — here you get explicit errors.
         </p>
         <div className="mt-4 grid gap-6 md:grid-cols-2">
           <form action={adminSendResetEmail} className="grid gap-2 text-sm">
@@ -239,6 +245,7 @@ export default async function AdminOverviewPage(props: {
             <label className="grid gap-1">
               <span className="text-zinc-400">Account type</span>
               <select name="accountType" className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-white">
+                <option value="">Auto-detect (all matching roles)</option>
                 <option value="MUSICIAN">Artist (musician)</option>
                 <option value="VENUE">Venue (owner or manager email)</option>
                 <option value="PROMOTER">Promoter</option>
@@ -260,6 +267,7 @@ export default async function AdminOverviewPage(props: {
             <label className="grid gap-1">
               <span className="text-zinc-400">Account type</span>
               <select name="accountType" className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-white">
+                <option value="">Auto-detect (all matching roles)</option>
                 <option value="MUSICIAN">Artist (musician)</option>
                 <option value="VENUE">Venue (owner or manager email)</option>
                 <option value="PROMOTER">Promoter</option>
@@ -273,6 +281,40 @@ export default async function AdminOverviewPage(props: {
             </button>
           </form>
         </div>
+      </section>
+
+      <section className="rounded border border-zinc-700 bg-zinc-900 p-4">
+        <h2 className="text-sm font-semibold text-white">Ingest official reply</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Paste a first-party mailbox reply. High-confidence delete language stops outreach and marks a single matching
+          listing for removal. Ambiguous replies are flagged for review only.
+        </p>
+        {params.replyIngested ? (
+          <p className="mt-2 text-xs text-emerald-400">
+            Logged: {params.replyIntent ?? "unknown"} → {params.replyAction ?? "logged"}
+          </p>
+        ) : null}
+        {params.replyError ? (
+          <p className="mt-2 text-xs text-red-400">Need the sender email and reply body.</p>
+        ) : null}
+        <form action={adminIngestCorrectionReply} className="mt-4 grid gap-2 text-sm">
+          <input type="hidden" name="returnPath" value="/internal/admin" />
+          <label className="grid gap-1">
+            <span className="text-zinc-400">From email</span>
+            <input name="fromEmail" type="email" required className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1" />
+          </label>
+          <label className="grid gap-1">
+            <span className="text-zinc-400">Subject</span>
+            <input name="subject" className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1" />
+          </label>
+          <label className="grid gap-1">
+            <span className="text-zinc-400">Reply body</span>
+            <textarea name="text" required rows={6} className="rounded border border-zinc-600 bg-zinc-950 px-2 py-1" />
+          </label>
+          <button type="submit" className="rounded bg-zinc-700 px-3 py-2 text-sm text-white hover:bg-zinc-600">
+            Classify and apply
+          </button>
+        </form>
       </section>
     </main>
   );

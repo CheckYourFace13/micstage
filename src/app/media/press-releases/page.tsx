@@ -102,7 +102,7 @@ export default function MediaPressReleasesPage() {
             <div className="mt-3 space-y-1 text-sm text-white/80 print:text-black">
               <p>MicStage Communications</p>
               <p>Media page: https://micstage.com/media</p>
-              <p className="hidden print:block">Email: drummer@micstage.com</p>
+              <p className="hidden print:block">Contact: https://micstage.com/contact</p>
             </div>
           </section>
         </article>

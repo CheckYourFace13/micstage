@@ -15,6 +15,7 @@ import {
   createPasswordResetLinkForAdmin,
   sendPasswordResetEmailForAdmin,
 } from "@/lib/passwordReset";
+import { ingestInboundCorrectionReply } from "@/lib/marketing/ingestInboundCorrectionReply";
 
 function sanitizeAdminReturnPath(raw: unknown): string {
   if (typeof raw !== "string") return ADMIN_PATH_PREFIX;
@@ -402,7 +403,7 @@ export async function adminSendResetEmail(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const type = accountTypeFromForm(formData.get("accountType"));
   const ret = sanitizeAdminReturnPath(formData.get("returnPath"));
-  if (!email || !type) redirect(`${ret}?resetError=missing_fields`);
+  if (!email) redirect(`${ret}?resetError=missing_fields`);
 
   const out = await sendPasswordResetEmailForAdmin({ accountType: type, email });
   if (!out.ok) {
@@ -416,11 +417,31 @@ export async function adminGenerateResetLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const type = accountTypeFromForm(formData.get("accountType"));
   const ret = sanitizeAdminReturnPath(formData.get("returnPath"));
-  if (!email || !type) redirect(`${ret}?linkError=missing_fields`);
+  if (!email) redirect(`${ret}?linkError=missing_fields`);
 
   const out = await createPasswordResetLinkForAdmin({ accountType: type, email });
   if (!out.ok) {
     redirect(`${ret}?linkError=${encodeURIComponent(out.error)}`);
   }
   redirect(`${ret}?resetLink=${encodeURIComponent(out.link)}`);
+}
+
+export async function adminIngestCorrectionReply(formData: FormData) {
+  await assertAdminSession();
+  const ret = sanitizeAdminReturnPath(formData.get("returnPath"));
+  const fromEmail = String(formData.get("fromEmail") ?? "").trim();
+  const subject = String(formData.get("subject") ?? "").trim();
+  const text = String(formData.get("text") ?? "").trim();
+  if (!fromEmail || !text) redirect(`${ret}?replyError=missing_fields`);
+
+  const prisma = requirePrisma();
+  const out = await ingestInboundCorrectionReply(prisma, {
+    fromEmail,
+    subject,
+    text,
+    source: "support_note",
+  });
+  redirect(
+    `${ret}?replyIngested=1&replyAction=${encodeURIComponent(out.action)}&replyIntent=${encodeURIComponent(out.classification.intent)}`,
+  );
 }

@@ -3,18 +3,30 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { normalizeMarketingEmail } from "@/lib/marketing/normalizeEmail";
 import { recordMarketingProviderWebhook } from "@/lib/marketing/marketingWebhook";
+import { ingestInboundCorrectionReply } from "@/lib/marketing/ingestInboundCorrectionReply";
+
+type ResendAddress = string | { email?: string; address?: string } | null | undefined;
 
 type ResendWebhookBody = {
   type?: string;
   created_at?: string;
   data?: {
     email_id?: string;
-    from?: string;
-    to?: string[];
+    from?: ResendAddress;
+    to?: ResendAddress[] | string;
     subject?: string;
+    text?: string;
+    html?: string;
     bounce?: { message?: string; type?: string; subType?: string; diagnosticCode?: string[] };
   };
 };
+
+function extractAddress(value: ResendAddress | ResendAddress[] | string): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return extractAddress(value[0]);
+  return value.email ?? value.address ?? "";
+}
 
 /** Resend marks Permanent vs Transient; only true soft Transient is excluded from suppression + health. */
 export function isResendHardBounce(
@@ -135,7 +147,7 @@ export async function processVerifiedResendWebhook(
     }));
 
   const providerMessageId = event.data?.email_id?.trim();
-  const toEmail = normalizeMarketingEmail(event.data?.to?.[0] ?? "");
+  const toEmail = normalizeMarketingEmail(extractAddress(event.data?.to ?? ""));
   const send = providerMessageId
     ? await prisma.marketingEmailSend.findFirst({
         where: { providerMessageId },
@@ -232,6 +244,18 @@ export async function processVerifiedResendWebhook(
       });
     }
     if (targetEmail) await suppressMarketingContact(prisma, targetEmail, "COMPLAINT");
+  } else if (type === "email.received" || type === "email.replied") {
+    const fromEmail = extractAddress(event.data?.from);
+    const inboundText = [event.data?.subject ?? "", event.data?.text ?? "", event.data?.html ?? ""]
+      .filter(Boolean)
+      .join("\n");
+    await ingestInboundCorrectionReply(prisma, {
+      fromEmail,
+      subject: event.data?.subject ?? null,
+      text: inboundText,
+      providerMessageId: providerMessageId ?? null,
+      source: "resend_inbound",
+    });
   }
 
   await prisma.marketingProviderWebhookEvent.update({

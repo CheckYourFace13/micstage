@@ -27,6 +27,7 @@
     "test:onboarding": "node scripts/check-onboarding-simplification.mjs",
     "test:product-audit": "node scripts/check-product-audit-p0.mjs",
     "test:open-mic-removal": "node scripts/check-open-mic-self-removal.mjs",
+    "test:support-privacy": "npx tsx scripts/check-support-privacy-pass.mjs",
     "test:database-security": "npx tsx scripts/check-database-security.mjs",
     "test:host-multi-venue": "npx tsx scripts/check-host-multi-venue.mjs",
     "test:host-discovery-lane": "npx tsx scripts/check-host-discovery-lane.mjs",

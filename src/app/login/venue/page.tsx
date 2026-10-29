@@ -42,6 +42,11 @@ export default async function VenueLoginPage(props: {
               <Link className="underline hover:text-white" href="/reset/venue">
                 Reset it
               </Link>
+              {" "}
+              or use the{" "}
+              <Link className="underline hover:text-white" href="/reset">
+                any-account reset
+              </Link>
               .<br />
               New venue?{" "}
               <Link className="underline hover:text-white" href="/register/venue">

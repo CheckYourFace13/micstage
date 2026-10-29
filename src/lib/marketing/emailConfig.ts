@@ -1,4 +1,5 @@
 import type { MarketingEmailCategory } from "@/generated/prisma/client";
+import { publicOriginForOutboundEmail } from "@/lib/publicSeo";
 
 export type MicStageEmailCategory = "transactional" | "outreach" | "marketing";
 
@@ -110,7 +111,7 @@ export function marketingUnsubscribeMailto(): string | undefined {
 }
 
 export function appBaseUrl(): string {
-  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return publicOriginForOutboundEmail();
 }
 
 export function performerLifecycleEmailEnabled(): boolean {

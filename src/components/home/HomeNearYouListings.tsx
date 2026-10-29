@@ -20,8 +20,9 @@ type NearbyRow = {
 export function HomeNearYouListings() {
   const [rows, setRows] = useState<NearbyRow[] | null>(null);
   const [label, setLabel] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [denied, setDenied] = useState(false);
+  const [geoAttempted, setGeoAttempted] = useState(false);
 
   const loadNearby = useCallback(async (lat: number, lng: number, context: string) => {
     setLoading(true);
@@ -45,22 +46,29 @@ export function HomeNearYouListings() {
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      setLoading(false);
+      setGeoAttempted(true);
       setRows([]);
       return;
     }
+    setLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        setGeoAttempted(true);
         void loadNearby(pos.coords.latitude, pos.coords.longitude, "Near you");
       },
       () => {
         setDenied(true);
+        setGeoAttempted(true);
         setLoading(false);
         setRows([]);
       },
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
     );
   }, [loadNearby]);
+
+  if (!geoAttempted) {
+    return null;
+  }
 
   if (loading) {
     return <p className="mt-6 text-sm text-white/50">Finding open mics near you…</p>;

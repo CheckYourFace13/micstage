@@ -1,0 +1,28 @@
+---
+description: Customer-facing MicStage identity — brand name only; never use Chris's personal details
+alwaysApply: true
+---
+
+# MicStage identity
+
+For any customer-facing email, page, support response, autoresponder, or template:
+
+- Prefer the brand name **MicStage**.
+- Never use Chris's name, email, or personal information.
+- If a human first name is genuinely needed, use **Casey**.
+- Do not invent a last name for Casey.
+
+## Sign-off
+
+```
+Thanks,
+MicStage
+```
+
+Not `Thanks, Chris`. Not `Casey Lastname`. Not a personal mailbox in the body.
+
+## Allowed routing vs identity
+
+Business-domain operational addresses may be used as sender/Reply-To routing. They must not appear as a personal identity (no `Chris <…>`, no personal email on public pages).
+
+Internal ops mail (owner summaries, admin alerts) is not customer-facing; still do not copy personal identity into customer copy.

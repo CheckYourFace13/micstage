@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { sendEmail } from "@/lib/mailer";
 import { absoluteUrl } from "@/lib/publicSeo";
+import { scheduleTimesArePubliclyConfirmed } from "@/lib/publicListings/scheduleTimeSanity";
 import { storageYmdUtc } from "@/lib/venuePublicLineup";
 
 const EARTH_RADIUS_MI = 3959;
@@ -123,7 +124,7 @@ export async function runWeeklyOpenMicDigestJob(prisma: PrismaClient, now: Date)
         lng: true,
         schedules: {
           where: { isActive: true },
-          select: { weekday: true },
+          select: { weekday: true, startTimeMin: true, description: true },
         },
       },
     }),
@@ -179,12 +180,13 @@ export async function runWeeklyOpenMicDigestJob(prisma: PrismaClient, now: Date)
         near = cityLooseMatch(m.homeCity, m.homeRegion, l.city, l.region);
       }
       if (!near) continue;
-      if (l.schedules.length === 0) continue;
+      const confirmedDays = l.schedules.filter((s) => scheduleTimesArePubliclyConfirmed(s));
+      if (confirmedDays.length === 0) continue;
       nearbyVenues.push({
         id: l.id,
         name: l.name,
         href: `/open-mics/${l.slug}`,
-        nights: l.schedules.map((s) => s.weekday),
+        nights: confirmedDays.map((s) => s.weekday),
       });
     }
 

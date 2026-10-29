@@ -102,6 +102,8 @@ const ARTICLES: ResourceArticle[] = [
       { href: "/map", label: "Open mic map" },
       { href: "/find-open-mics", label: "Find open mics near you" },
       { href: "/locations", label: "Open mics by location" },
+      { href: "/host", label: "Start hosting free" },
+      { href: "/register/venue", label: "Claim or list your venue" },
     ],
   },
   {
@@ -303,6 +305,7 @@ const ARTICLES: ResourceArticle[] = [
       { href: "/map", label: "Map of open mic venues" },
       { href: "/find-open-mics", label: "Find open mics" },
       { href: "/locations", label: "Locations" },
+      { href: "/host", label: "Start hosting free" },
     ],
   },
   {
@@ -404,6 +407,7 @@ const ARTICLES: ResourceArticle[] = [
       { href: "/find-open-mics", label: "Find open mics (discovery)" },
       { href: "/locations", label: "Explore locations" },
       { href: "/map", label: "Open mic map" },
+      { href: "/host", label: "Start hosting free" },
     ],
   },
   {
@@ -504,6 +508,7 @@ const ARTICLES: ResourceArticle[] = [
       { href: "/map", label: "Venue map" },
       { href: "/venues", label: "Venue pages" },
       { href: "/locations", label: "Locations" },
+      { href: "/register/musician", label: "Create a performer account" },
     ],
   },
   {
@@ -704,6 +709,7 @@ const ARTICLES: ResourceArticle[] = [
       { href: "/map", label: "Browse the venue map" },
       { href: "/venues", label: "Read venue pages before you go" },
       { href: "/locations", label: "Explore locations" },
+      { href: "/register/musician", label: "Create a performer account" },
     ],
   },
   {
@@ -870,6 +876,8 @@ const ARTICLES: ResourceArticle[] = [
       { href: "/about", label: "About MicStage" },
       { href: "/find-open-mics", label: "Find open mics" },
       { href: "/host", label: "For hosts" },
+      { href: "/register/venue", label: "Claim or list your venue" },
+      { href: "/register/musician", label: "Performer registration" },
     ],
   },
 ];

@@ -130,8 +130,14 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Shared signup visits (24h): ${data.performerFunnel.sharedSignupVisitsToday}`,
     "",
     "SEARCH",
+    `  GSC 28d: not connected in production reporting (Search Console API not wired)`,
     `  Outreach clicks (24h / 7d): ${data.marketing.uniqueClicksToday} / ${data.marketing.uniqueClicks7d}`,
     `  Indexed scheduled pages: ${data.growthLayers.indexableListings}`,
+    "",
+    "RETENTION",
+    `  Weekly digest opt-ins: ${data.performerFunnel.weeklyAlertOptInsTotal}`,
+    `  New opt-ins (24h): ${data.performerFunnel.weeklyAlertOptInsNewToday}`,
+    `  Shared signup visits (24h): ${data.performerFunnel.sharedSignupVisitsToday}`,
     "",
     data.listingsInventory.listingsCreatedCount > 0
       ? "NEW LISTINGS (24h)"

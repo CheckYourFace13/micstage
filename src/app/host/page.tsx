@@ -3,6 +3,8 @@ import Link from "next/link";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { getPrismaOrNull } from "@/lib/prisma";
+import { ShareLinks } from "@/components/publicListings/ShareLinks";
+import { absoluteUrl } from "@/lib/publicSeo";
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Run every open mic you host — free",
@@ -88,6 +90,10 @@ export default async function HostLandingPage(props: {
           >
             Host sign in
           </Link>
+        </div>
+
+        <div className="mt-8">
+          <ShareLinks url={absoluteUrl("/host")} title="Run every open mic you host — free on MicStage" />
         </div>
 
         <p className="mt-8 text-sm text-white/55">

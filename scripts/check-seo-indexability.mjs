@@ -551,4 +551,19 @@ const clicksNoConvert = buildOwnerAttentionItems({
 });
 assert.ok(clicksNoConvert.some((i) => i.code === "clicks_no_convert"));
 
+const homeNearYou = fs.readFileSync(path.join(process.cwd(), "src/components/home/HomeNearYouListings.tsx"), "utf8");
+assert.match(homeNearYou, /if \(!geoAttempted\) \{\s*return null;/s);
+assert.match(homeNearYou, /useState\(false\)/);
+const finderPage = fs.readFileSync(path.join(process.cwd(), "src/app/find-open-mics/page.tsx"), "utf8");
+assert.match(finderPage, /FinderVerifiedFallback/);
+assert.match(finderPage, /loadHomepageVerifiedOpenMics/);
+const homepageVerified = fs.readFileSync(path.join(process.cwd(), "src/lib/publicListings/homepageVerified.ts"), "utf8");
+assert.match(homepageVerified, /Schedule being confirmed/);
+assert.match(homepageVerified, /listingDisplayCityRegion/);
+const summaryEmail = fs.readFileSync(path.join(process.cwd(), "src/lib/ownerSummary/ownerDailySummaryEmail.ts"), "utf8");
+assert.match(summaryEmail, /GSC 28d/);
+assert.match(summaryEmail, /RETENTION/);
+assert.match(builderSrc, /trueIndexableCount/);
+assert.match(builderSrc, /scheduledVerifiedCount/);
+
 console.log(JSON.stringify({ ok: true, checks: "seo-indexability" }));

@@ -611,6 +611,9 @@ check("curated and imported venues are exempt from the place gate", () => {
 const {
   listingHasGeoConflict,
   inferExplicitCityFromListingTitle,
+  inferExplicitMemberPlaceFromTitle,
+  suggestedListingCityRegion,
+  listingDisplayCityRegion,
 } = await import("../src/lib/publicListings/evidenceTrust.ts");
 
 check("infers Indianapolis from explicit in-City title", () => {
@@ -655,6 +658,51 @@ check("matching title and city metros are not a conflict", () => {
     }),
     false,
   );
+});
+
+check("Irving Theater title is corrected off Chicago onto Indianapolis", () => {
+  const s = suggestedListingCityRegion({
+    name: "Acoustic Open Mic in Indianapolis at Irving Theater",
+    city: "Chicago",
+    region: "IL",
+    formattedAddress: "Acoustic Open Mic in Indianapolis at Irving Theater, Chicago, IL",
+  });
+  assert.equal(s?.city, "Indianapolis");
+  assert.equal(s?.region, "IN");
+});
+
+check("Evanston title displays Evanston not Chicago", () => {
+  const d = listingDisplayCityRegion({
+    name: "Open Mic in Evanston at The Spot",
+    city: "Chicago",
+    region: "IL",
+    formattedAddress: "The Spot, Evanston, IL",
+  });
+  assert.equal(d.city, "Evanston");
+  assert.equal(d.region, "IL");
+  assert.equal(inferExplicitMemberPlaceFromTitle("Open Mic in Evanston at The Spot")?.city, "Evanston");
+});
+
+check("Arlington Heights address suburb is not stamped Chicago", () => {
+  const s = suggestedListingCityRegion({
+    name: "Old Republic Open Mic",
+    city: "Chicago",
+    region: "IL",
+    formattedAddress: "123 Main St, Arlington Heights, IL 60004",
+  });
+  assert.equal(s?.city, "Arlington Heights");
+  assert.equal(s?.region, "IL");
+});
+
+check("Evanston stored city is not reverted by Chicago-stamped address", () => {
+  const input = {
+    name: "OPEN MIC IN EVANSTON at PRAIRIE MOON",
+    city: "Evanston",
+    region: "IL",
+    formattedAddress: "OPEN MIC IN EVANSTON at PRAIRIE MOON, Chicago, IL",
+  };
+  assert.equal(suggestedListingCityRegion(input), null);
+  assert.equal(listingDisplayCityRegion(input).city, "Evanston");
 });
 
 if (failures.length) {

@@ -400,27 +400,127 @@ function metroForCityRegion(
  * Pull an explicit "in City" / "City, ST" cue from a listing/event title.
  * Used to avoid stamping the discovery-market city onto an out-of-market venue.
  */
-export function inferExplicitCityFromListingTitle(
+function titleCasePlace(raw: string): string {
+  return raw
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function matchTitlePlaceMember(
   name: string | null | undefined,
-): { city: string; region: string; metro: string } | null {
+): { member: string; metro: (typeof US_METRO_GEO)[number] } | null {
   const n = (name || "").trim();
   if (!n) return null;
-
   const ordered = [...US_METRO_GEO].sort(
     (a, b) => Math.max(...b.members.map((m) => m.length)) - Math.max(...a.members.map((m) => m.length)),
   );
-
   for (const m of ordered) {
     for (const mem of [...m.members].sort((a, b) => b.length - a.length)) {
       const memRe = mem.replace(/\s+/g, "\\s+");
       const inCity = new RegExp(`\\bin\\s+${memRe}\\b`, "i");
       const cityState = new RegExp(`\\b${memRe}\\s*,\\s*${m.region}\\b`, "i");
       if (inCity.test(n) || cityState.test(n)) {
-        return { city: m.city, region: m.region, metro: m.metro };
+        return { member: mem, metro: m };
       }
     }
   }
   return null;
+}
+
+export function inferExplicitCityFromListingTitle(
+  name: string | null | undefined,
+): { city: string; region: string; metro: string } | null {
+  const hit = matchTitlePlaceMember(name);
+  if (!hit) return null;
+  return { city: hit.metro.city, region: hit.metro.region, metro: hit.metro.metro };
+}
+
+/** Member place from title ("in Evanston") rather than the metro hub city. */
+export function inferExplicitMemberPlaceFromTitle(
+  name: string | null | undefined,
+): { city: string; region: string; metro: string } | null {
+  const hit = matchTitlePlaceMember(name);
+  if (!hit) return null;
+  return { city: titleCasePlace(hit.member), region: hit.metro.region, metro: hit.metro.metro };
+}
+
+export function parseCityRegionFromFormattedAddress(
+  formattedAddress: string | null | undefined,
+): { city: string; region: string } | null {
+  const addr = (formattedAddress || "").trim();
+  if (!addr) return null;
+  const matches = [...addr.matchAll(/([A-Za-z][A-Za-z .'-]{1,48}),\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\b/g)];
+  const last = matches[matches.length - 1];
+  if (!last) return null;
+  const city = last[1].trim().replace(/\s+/g, " ");
+  const region = last[2].toUpperCase();
+  if (/^(united states|usa|us)$/i.test(city)) return null;
+  if (city.length < 3) return null;
+  return { city, region };
+}
+
+/**
+ * True city/state for a listing card. Never stamps the discovery-market hub
+ * (e.g. Chicago) onto an Indianapolis or Evanston venue.
+ */
+export function suggestedListingCityRegion(input: {
+  name: string;
+  city: string | null | undefined;
+  region: string | null | undefined;
+  formattedAddress?: string | null;
+}): { city: string; region: string; reason: string } | null {
+  const storedCity = (input.city || "").trim();
+  const storedRegion = (input.region || "").trim();
+  const storedMetro = metroForCityRegion(storedCity, storedRegion);
+  const titleMember = inferExplicitMemberPlaceFromTitle(input.name);
+  const titleHub = inferExplicitCityFromListingTitle(input.name);
+  const addrPlace = parseCityRegionFromFormattedAddress(input.formattedAddress);
+
+  if (titleHub && storedMetro && titleHub.metro !== storedMetro.metro && titleMember) {
+    return { city: titleMember.city, region: titleMember.region, reason: "title_metro_conflict" };
+  }
+
+  if (titleMember && storedCity && titleMember.city.toLowerCase() !== storedCity.toLowerCase()) {
+    const memberIsHub = titleMember.city.toLowerCase() === titleHub?.city.toLowerCase();
+    if (!memberIsHub) {
+      return { city: titleMember.city, region: titleMember.region, reason: "title_suburb" };
+    }
+  }
+
+  if (addrPlace) {
+    const addrMetro = metroForCityRegion(addrPlace.city, addrPlace.region);
+    if (titleMember && titleMember.city.toLowerCase() === storedCity.toLowerCase()) {
+      return null;
+    }
+    if (addrMetro && storedMetro && addrMetro.metro !== storedMetro.metro) {
+      return { city: addrPlace.city, region: addrPlace.region, reason: "address_metro_conflict" };
+    }
+    if (storedCity && addrPlace.city.toLowerCase() !== storedCity.toLowerCase()) {
+      if (storedMetro && addrMetro && storedMetro.metro === addrMetro.metro) {
+        const addrIsHub = addrPlace.city.toLowerCase() === addrMetro.city.toLowerCase();
+        const storedIsHub = storedCity.toLowerCase() === storedMetro.city.toLowerCase();
+        if (addrIsHub && !storedIsHub) {
+          return null;
+        }
+        return { city: addrPlace.city, region: addrPlace.region, reason: "address_suburb" };
+      }
+    }
+  }
+
+  return null;
+}
+
+export function listingDisplayCityRegion(input: {
+  name: string;
+  city: string | null | undefined;
+  region: string | null | undefined;
+  formattedAddress?: string | null;
+}): { city: string | null; region: string | null } {
+  const suggested = suggestedListingCityRegion(input);
+  if (suggested) return { city: suggested.city, region: suggested.region };
+  return { city: input.city?.trim() || null, region: input.region?.trim() || null };
 }
 
 export function listingHasGeoConflict(input: {

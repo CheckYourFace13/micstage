@@ -13,6 +13,7 @@ import { loadDiscoveryMarketOpenMics } from "@/lib/publicListings/discoveryMerge
 import type { OpenMicFinderVenue } from "@/lib/publicListings/types";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { relatedLocationsForLocationSlug } from "@/lib/relatedLocations";
+import { rollupDiscoveryLabel } from "@/lib/discoveryMarket";
 import { shouldIndexDiscoveryPage } from "@/lib/seo/discoveryIndex";
 import { jsDayToWeekday } from "@/lib/publicListings/listingSeo";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
@@ -125,6 +126,12 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
   }
 
   const bookable = listings.filter((l) => l.bookable);
+  const hubCity = placeTitle.split(",")[0]?.trim().toLowerCase() ?? "";
+  const includesOtherCities = listings.some((l) => {
+    const c = (l.city ?? "").trim().toLowerCase();
+    return c && hubCity && c !== hubCity && !c.includes(hubCity);
+  });
+  const isMetroHub = Boolean(rollupDiscoveryLabel(locationSlug) || includesOtherCities);
   const nearbyLocations = await relatedLocationsForLocationSlug(locationSlug, 6);
 
   const todayWeekday = jsDayToWeekday(new Date().getDay());
@@ -179,14 +186,18 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
               Trusted open-mic listings in {placeTitle}. Verified rooms appear even when the exact time still needs
               confirmation. Scheduled nights get the calendar sections below.
             </p>
-            {showCalendar ? (
-              <div className="mt-3">
-                <ShareLinks
-                  url={absoluteUrl(`/locations/${locationSlug}/open-mics`)}
-                  title={`Open mics in ${placeTitle}`}
-                />
-              </div>
+            {isMetroHub ? (
+              <p className="mt-2 max-w-2xl text-xs text-white/55">
+                This is a metro hub, not a single city boundary. Nearby suburbs may appear here; each card shows that
+                room&apos;s own city and state.
+              </p>
             ) : null}
+            <div className="mt-3">
+              <ShareLinks
+                url={absoluteUrl(`/locations/${locationSlug}/open-mics`)}
+                title={`Open mics in ${placeTitle}`}
+              />
+            </div>
           </div>
           <div className="flex flex-col items-end gap-2 text-sm">
             <Link className="text-white/70 hover:text-white" href="/find-open-mics">

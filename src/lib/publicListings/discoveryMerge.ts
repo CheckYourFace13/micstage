@@ -18,6 +18,7 @@ import {
   listingPublicHref,
   venuePublicHref,
 } from "@/lib/publicListings/types";
+import { listingDisplayCityRegion, listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 
 export type PublicDiscoveryLocationRow = {
   key: string;
@@ -76,8 +77,14 @@ function toFinderRow(
   },
   counts: ReadonlyMap<string, number>,
 ): OpenMicFinderVenue {
-  const city = (base.city ?? "").trim();
-  const discoverySlug = city ? primaryDiscoverySlugForVenue(city, base.region, counts) || null : null;
+  const displayed = listingDisplayCityRegion({
+    name: base.name,
+    city: base.city,
+    region: base.region,
+  });
+  const city = (displayed.city ?? "").trim();
+  const region = displayed.region ?? base.region;
+  const discoverySlug = city ? primaryDiscoverySlugForVenue(city, region, counts) || null : null;
   return {
     slug: base.slug,
     href: opts.href,
@@ -87,8 +94,8 @@ function toFinderRow(
     badgeLabel: discoveryBadgeLabel(opts.kind, opts.bookable, { hasSchedule: opts.hasSchedule }),
     ctaLabel: opts.ctaLabel ?? null,
     name: base.name,
-    city: base.city,
-    region: base.region,
+    city: displayed.city ?? base.city,
+    region,
     lat: base.lat,
     lng: base.lng,
     discoverySlug,
@@ -395,6 +402,16 @@ export async function loadDiscoveryMarketOpenMics(
     .filter((row) => {
       const city = (row.city ?? "").trim();
       if (!city) return false;
+      if (
+        listingHasGeoConflict({
+          name: row.name,
+          city: row.city,
+          region: row.region,
+          formattedAddress: null,
+        })
+      ) {
+        return false;
+      }
       return venueIncludedInDiscoveryPage({ city, region: row.region }, locationSlug, counts);
     })
     .sort((a, b) => a.name.localeCompare(b.name));

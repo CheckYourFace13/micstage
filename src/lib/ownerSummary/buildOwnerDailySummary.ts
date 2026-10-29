@@ -23,6 +23,7 @@ import {
   loadInstrumentedClaimFunnel,
   type InstrumentedClaimFunnelCounts,
 } from "@/lib/publicListings/claimFunnelEvents";
+import { listingMeetsPublicSeoIndexGate } from "@/lib/publicListings/listingSeo";
 
 export type OwnerSummarySignupRow = {
   kind: "venue" | "artist";
@@ -698,6 +699,27 @@ export async function buildOwnerDailySummary(
     }),
   ]);
 
+  const indexGateRows = await prisma.publicOpenMicListing.findMany({
+    where: { verificationStatus: "VERIFIED", removedAt: null },
+    select: {
+      name: true,
+      verificationStatus: true,
+      formattedAddress: true,
+      city: true,
+      region: true,
+      lastVerifiedAt: true,
+      removedAt: true,
+      sourceUrl: true,
+      websiteUrl: true,
+      schedules: {
+        where: { isActive: true },
+        select: { title: true, description: true, performanceFormat: true },
+      },
+    },
+  });
+  const trueIndexableCount = indexGateRows.filter((l) => listingMeetsPublicSeoIndexGate(l)).length;
+  const scheduledVerifiedCount = indexGateRows.filter((l) => l.schedules.length > 0).length;
+
   const listingSource =
     listingsCreatedInWindow.length > 0 ? listingsCreatedInWindow : recentListingsFallback;
 
@@ -936,9 +958,9 @@ export async function buildOwnerDailySummary(
       googleVerifiedListings,
       listingsNote,
       needsReviewCount,
-      indexableScheduledListings,
+      indexableScheduledListings: trueIndexableCount,
       schedulesAutoConfirmedToday,
-      verifiedWithActiveSchedule: indexableScheduledListings,
+      verifiedWithActiveSchedule: scheduledVerifiedCount,
       unscheduledVerified,
       netEligibleOutreach: eligibilityAudit.netSendEligible,
       remainingProviderHeadroom: providerCapacity.remainingForOutreach,
@@ -975,8 +997,8 @@ export async function buildOwnerDailySummary(
       junkRejectedToday: autoRejectedToday,
       realPlaceCandidates: googleVerifiedListings,
       verifiedListings: inventory.verifiedListings,
-      scheduledListings: indexableScheduledListings,
-      indexableListings: indexableScheduledListings,
+      scheduledListings: scheduledVerifiedCount,
+      indexableListings: trueIndexableCount,
       venuesRegistered7d: venueRegs7d,
       hostsRegistered7d: promoterRegs7d,
       performersRegistered7d,

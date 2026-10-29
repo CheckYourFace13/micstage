@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FindOpenMicsClient } from "@/components/find-open-mics/FindOpenMicsClient";
+import { FinderVerifiedFallback } from "@/components/find-open-mics/FinderVerifiedFallback";
 import { loadOpenMicFinderVenues, loadPublicDiscoveryLocationRows } from "@/lib/discoveryLocationRows";
 import { hasGoogleMapsBrowserKey } from "@/lib/env/publicGoogleMaps.server";
 import { getPrismaOrNull } from "@/lib/prisma";
+import { loadHomepageVerifiedOpenMics } from "@/lib/publicListings/homepageVerified";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 export const dynamic = "force-dynamic";
@@ -24,13 +26,15 @@ export default async function FindOpenMicsPage() {
   const prisma = getPrismaOrNull();
   let locationRows: Awaited<ReturnType<typeof loadPublicDiscoveryLocationRows>> = [];
   let venues: Awaited<ReturnType<typeof loadOpenMicFinderVenues>> = [];
+  let fallback: Awaited<ReturnType<typeof loadHomepageVerifiedOpenMics>> = [];
   let loadError = false;
 
   try {
     if (prisma) {
-      [locationRows, venues] = await Promise.all([
+      [locationRows, venues, fallback] = await Promise.all([
         loadPublicDiscoveryLocationRows(prisma),
         loadOpenMicFinderVenues(prisma),
+        loadHomepageVerifiedOpenMics(prisma, 12),
       ]);
     }
   } catch (e) {
@@ -94,6 +98,7 @@ export default async function FindOpenMicsPage() {
                   showGooglePlaceSuggestions={showGooglePlaceSuggestions}
                 />
               </div>
+              <FinderVerifiedFallback listings={fallback} />
             </div>
           )}
         </div>

@@ -557,6 +557,7 @@ assert.match(homeNearYou, /useState\(false\)/);
 const finderPage = fs.readFileSync(path.join(process.cwd(), "src/app/find-open-mics/page.tsx"), "utf8");
 assert.match(finderPage, /FinderVerifiedFallback/);
 assert.match(finderPage, /loadHomepageVerifiedOpenMics/);
+assert.doesNotMatch(finderPage, /loadOpenMicFinderVenues/);
 const homepageVerified = fs.readFileSync(path.join(process.cwd(), "src/lib/publicListings/homepageVerified.ts"), "utf8");
 assert.match(homepageVerified, /Schedule being confirmed/);
 assert.match(homepageVerified, /listingDisplayCityRegion/);

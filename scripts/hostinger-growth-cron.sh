@@ -32,3 +32,9 @@ curl -fsS -m 180 -X POST \
 # Schedule: 0 6 * * 0
 # curl -fsS -m 120 -X POST -H "Authorization: Bearer $SECRET" \
 #   "$BASE/api/cron/seo-index-ping"
+
+# --- Job 5: weekly Sunday 14:00 UTC — nearby open-mic digest (opt-in artists only) ---
+# Live Hostinger schedule: 0 14 * * 0
+curl -fsS -m 180 \
+  -H "Authorization: Bearer $SECRET" \
+  "$BASE/api/cron/weekly-open-mic-digest"

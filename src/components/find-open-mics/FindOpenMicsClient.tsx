@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { VenuePlacePicker } from "@/app/register/venue/VenuePlacePicker";
 import { DiscoveryListingBadge } from "@/components/discovery/DiscoveryListingBadge";
 import { EmptyDiscoveryActions } from "@/components/publicListings/EmptyDiscoveryActions";
-import type { OpenMicFinderVenue, PublicDiscoveryLocationRow } from "@/lib/discoveryLocationRows";
+import type { PublicDiscoveryLocationRow } from "@/lib/discoveryLocationRows";
 import { trackMarketingEvent } from "@/lib/marketingTracking";
 
 /** Keep in sync with `MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY` in discoveryMarket (client-safe copy). */
@@ -28,11 +28,10 @@ type NearbyVenue = {
 
 export function FindOpenMicsClient(props: {
   locationRows: PublicDiscoveryLocationRow[];
-  venues: OpenMicFinderVenue[];
   /** From server only - whether Google Places suggestions UI may load. */
   showGooglePlaceSuggestions?: boolean;
 }) {
-  const { locationRows, venues, showGooglePlaceSuggestions = false } = props;
+  const { locationRows, showGooglePlaceSuggestions = false } = props;
   const [mode, setMode] = useState<"nearby" | "metro">("nearby");
   const [nearbyList, setNearbyList] = useState<NearbyVenue[] | null>(null);
   const [nearbyContext, setNearbyContext] = useState<string | null>(null);

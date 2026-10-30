@@ -107,6 +107,22 @@ assert.doesNotMatch(resetMail.text, /\bChris\b/);
 assert.doesNotMatch(resetMail.html, /\bChris\b/);
 assert.doesNotMatch(resetMail.text, /@gmail\.com|iscreamstudio/i);
 
+const {
+  ianSupportEmailContent,
+  unityAckEmailContent,
+  redactEmail,
+} = await import("../src/lib/ops/closeCustomerSupportLoops.ts");
+const ianSupport = ianSupportEmailContent();
+assert.match(ianSupport.text, /Thanks,\nMicStage/);
+assert.match(ianSupport.html, /Thanks,<br \/>MicStage/);
+assert.doesNotMatch(ianSupport.text, /\bChris\b|\bCasey\b|iscreamstudio/i);
+assert.doesNotMatch(ianSupport.html, /\bChris\b|\bCasey\b|iscreamstudio/i);
+const unityAck = unityAckEmailContent();
+assert.match(unityAck.text, /will not contact you about marketing/);
+assert.match(unityAck.text, /Thanks,\nMicStage/);
+assert.doesNotMatch(unityAck.text, /\bChris\b|\bCasey\b|iscreamstudio/i);
+assert.equal(redactEmail("ian@example.com"), "ia…@example.com");
+
 const invite = buildListingClaimInvitePayload({
   listingName: "QA Open Mic",
   listingSlug: "qa-open-mic",

@@ -18,6 +18,8 @@ const { publicOriginForOutboundEmail, isNonBrowserPublicHost } = await import(".
 const {
   selectResetAccountTypes,
   PASSWORD_RESET_TTL_MINUTES,
+  SUPPORT_PASSWORD_RESET_TTL_MINUTES,
+  passwordResetExpiryLabel,
   passwordResetPathForType,
   passwordResetEmailContent,
   isPasswordResetTokenUsable,
@@ -46,6 +48,9 @@ process.env.APP_URL = "https://micstage.com";
 assert.equal(publicOriginForOutboundEmail(), "https://micstage.com");
 
 assert.equal(PASSWORD_RESET_TTL_MINUTES, 120);
+assert.equal(SUPPORT_PASSWORD_RESET_TTL_MINUTES, 24 * 60);
+assert.equal(passwordResetExpiryLabel(120), "2 hours");
+assert.equal(passwordResetExpiryLabel(1440), "24 hours");
 assert.equal(passwordResetPathForType("VENUE"), "/reset/venue");
 assert.equal(passwordResetPathForType("PROMOTER"), "/reset/promoter");
 assert.equal(passwordResetPathForType("MUSICIAN"), "/reset/musician");
@@ -102,21 +107,36 @@ const resetMail = passwordResetEmailContent([
   { accountType: "VENUE", link: "https://micstage.com/reset/venue/tok" },
 ]);
 assert.match(resetMail.text, /https:\/\/micstage.com\/reset\/venue\/tok/);
+assert.match(resetMail.text, /expires in 2 hours/);
 assert.match(resetMail.text, /Thanks,\nMicStage/);
 assert.doesNotMatch(resetMail.text, /\bChris\b/);
 assert.doesNotMatch(resetMail.html, /\bChris\b/);
 assert.doesNotMatch(resetMail.text, /@gmail\.com|iscreamstudio/i);
+
+const supportResetMail = passwordResetEmailContent(
+  [{ accountType: "PROMOTER", link: "https://micstage.com/reset/promoter/tok" }],
+  { ttlMinutes: SUPPORT_PASSWORD_RESET_TTL_MINUTES },
+);
+assert.match(supportResetMail.text, /expires in 24 hours/);
+assert.doesNotMatch(supportResetMail.text, /expires in 2 hours/);
+assert.doesNotMatch(supportResetMail.text, /\bChris\b|iscreamstudio/i);
 
 const {
   ianSupportEmailContent,
   unityAckEmailContent,
   redactEmail,
 } = await import("../src/lib/ops/closeCustomerSupportLoops.ts");
+const { ianResetFollowupEmailContent } = await import("../src/lib/ops/ianSupportResetFollowup.ts");
 const ianSupport = ianSupportEmailContent();
 assert.match(ianSupport.text, /Thanks,\nMicStage/);
 assert.match(ianSupport.html, /Thanks,<br \/>MicStage/);
 assert.doesNotMatch(ianSupport.text, /\bChris\b|\bCasey\b|iscreamstudio/i);
 assert.doesNotMatch(ianSupport.html, /\bChris\b|\bCasey\b|iscreamstudio/i);
+const ianFollowup = ianResetFollowupEmailContent();
+assert.match(ianFollowup.text, /24-hour window/);
+assert.match(ianFollowup.text, /Thanks,\nMicStage/);
+assert.doesNotMatch(ianFollowup.text, /\bChris\b|\bCasey\b|iscreamstudio/i);
+assert.doesNotMatch(ianFollowup.html, /\bChris\b|\bCasey\b|iscreamstudio/i);
 const unityAck = unityAckEmailContent();
 assert.match(unityAck.text, /will not contact you about marketing/);
 assert.match(unityAck.text, /Thanks,\nMicStage/);

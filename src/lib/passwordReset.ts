@@ -4,8 +4,19 @@ import { sendEmail } from "@/lib/mailer";
 import { publicOriginForOutboundEmail } from "@/lib/publicSeo";
 import { PasswordResetAccountType } from "@/generated/prisma/client";
 
-/** Long enough that a delayed inbox click still works; still short-lived. */
+/** Self-service forgot-password / claim setup: short-lived. */
 export const PASSWORD_RESET_TTL_MINUTES = 120;
+
+/** Admin/support recovery: long enough for a delayed inbox click. */
+export const SUPPORT_PASSWORD_RESET_TTL_MINUTES = 24 * 60;
+
+export function passwordResetExpiryLabel(ttlMinutes: number): string {
+  if (ttlMinutes > 0 && ttlMinutes % 60 === 0) {
+    const hours = ttlMinutes / 60;
+    return hours === 1 ? "1 hour" : `${hours} hours`;
+  }
+  return `${ttlMinutes} minutes`;
+}
 
 export const ALL_PASSWORD_RESET_ACCOUNT_TYPES: PasswordResetAccountType[] = [
   "VENUE",
@@ -65,11 +76,16 @@ function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-export function passwordResetEmailContent(links: Array<{ accountType: PasswordResetAccountType; link: string }>): {
+export function passwordResetEmailContent(
+  links: Array<{ accountType: PasswordResetAccountType; link: string }>,
+  opts?: { ttlMinutes?: number },
+): {
   subject: string;
   html: string;
   text: string;
 } {
+  const ttlMinutes = opts?.ttlMinutes ?? PASSWORD_RESET_TTL_MINUTES;
+  const expiry = passwordResetExpiryLabel(ttlMinutes);
   const subject = "MicStage password reset";
   const linkLinesText = links.map((row) => {
     const label = passwordResetRoleLabel(row.accountType);
@@ -83,7 +99,7 @@ export function passwordResetEmailContent(links: Array<{ accountType: PasswordRe
     "<p>Hi,</p>",
     "<p>We received a request to reset your MicStage password.</p>",
     ...linkLinesHtml,
-    `<p>Each link expires in ${PASSWORD_RESET_TTL_MINUTES} minutes.</p>`,
+    `<p>Each link expires in ${expiry}.</p>`,
     "<p>If you did not request this, you can ignore this email.</p>",
     "<p>Thanks,<br />MicStage</p>",
   ].join("");
@@ -94,7 +110,7 @@ export function passwordResetEmailContent(links: Array<{ accountType: PasswordRe
     "",
     ...linkLinesText,
     "",
-    `Each link expires in ${PASSWORD_RESET_TTL_MINUTES} minutes.`,
+    `Each link expires in ${expiry}.`,
     "",
     "If you did not request this, you can ignore this email.",
     "",
@@ -126,19 +142,41 @@ async function accountExistsForReset(accountType: PasswordResetAccountType, emai
   return found.includes(accountType);
 }
 
+/** Expire unused prior tokens for the same email + role so only the newest link works. */
+async function supersedeUnusedResetTokens(input: {
+  accountType: PasswordResetAccountType;
+  email: string;
+}): Promise<number> {
+  const prisma = requirePrisma();
+  const now = new Date();
+  const res = await prisma.passwordResetToken.updateMany({
+    where: {
+      email: input.email,
+      accountType: input.accountType,
+      usedAt: null,
+      expiresAt: { gt: now },
+    },
+    data: { expiresAt: now },
+  });
+  return res.count;
+}
+
 /** Creates DB row; returns raw token for URL. */
 async function issuePasswordResetToken(input: {
   accountType: PasswordResetAccountType;
   email: string;
+  ttlMinutes: number;
 }): Promise<{ rawToken: string; path: string } | null> {
   const prisma = requirePrisma();
   const email = input.email.trim().toLowerCase();
   const exists = await accountExistsForReset(input.accountType, email);
   if (!exists) return null;
 
+  await supersedeUnusedResetTokens({ accountType: input.accountType, email });
+
   const rawToken = crypto.randomBytes(32).toString("hex");
   const tokenHash = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000);
+  const expiresAt = new Date(Date.now() + input.ttlMinutes * 60 * 1000);
 
   await prisma.passwordResetToken.create({
     data: {
@@ -156,19 +194,24 @@ async function issuePasswordResetToken(input: {
 async function issueLinksForTypes(
   email: string,
   types: PasswordResetAccountType[],
+  ttlMinutes: number,
 ): Promise<Array<{ accountType: PasswordResetAccountType; link: string }>> {
   const origin = publicPasswordResetOrigin();
   const links: Array<{ accountType: PasswordResetAccountType; link: string }> = [];
   for (const accountType of types) {
-    const issued = await issuePasswordResetToken({ accountType, email });
+    const issued = await issuePasswordResetToken({ accountType, email, ttlMinutes });
     if (!issued) continue;
     links.push({ accountType, link: `${origin}${issued.path}` });
   }
   return links;
 }
 
-async function sendResetLinks(email: string, links: Array<{ accountType: PasswordResetAccountType; link: string }>) {
-  const content = passwordResetEmailContent(links);
+async function sendResetLinks(
+  email: string,
+  links: Array<{ accountType: PasswordResetAccountType; link: string }>,
+  ttlMinutes: number,
+) {
+  const content = passwordResetEmailContent(links, { ttlMinutes });
   await sendEmail({
     to: email,
     subject: content.subject,
@@ -191,9 +234,9 @@ export async function createPasswordReset(input: {
   });
   if (types.length === 0) return { sent: true, types: [] };
 
-  const links = await issueLinksForTypes(email, types);
+  const links = await issueLinksForTypes(email, types, PASSWORD_RESET_TTL_MINUTES);
   if (links.length === 0) return { sent: true, types: [] };
-  await sendResetLinks(email, links);
+  await sendResetLinks(email, links, PASSWORD_RESET_TTL_MINUTES);
   return { sent: true, types: links.map((l) => l.accountType) };
 }
 
@@ -215,7 +258,7 @@ export async function createPasswordResetLinkForAdmin(input: {
       error: "No MicStage account found for that email.",
     };
   }
-  const links = await issueLinksForTypes(email, types);
+  const links = await issueLinksForTypes(email, types, SUPPORT_PASSWORD_RESET_TTL_MINUTES);
   if (links.length === 0) {
     return { ok: false, error: "Could not issue a reset token for that account." };
   }
@@ -237,12 +280,12 @@ export async function sendPasswordResetEmailForAdmin(input: {
   if (types.length === 0) {
     return { ok: false, error: "No MicStage account found for that email." };
   }
-  const links = await issueLinksForTypes(email, types);
+  const links = await issueLinksForTypes(email, types, SUPPORT_PASSWORD_RESET_TTL_MINUTES);
   if (links.length === 0) {
     return { ok: false, error: "Could not issue a reset token for that account." };
   }
   try {
-    await sendResetLinks(email, links);
+    await sendResetLinks(email, links, SUPPORT_PASSWORD_RESET_TTL_MINUTES);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Email send failed.";
     console.error("[passwordReset] admin send failed", { message });

@@ -189,11 +189,10 @@ export async function evaluateOutreachSendHealth(prisma: PrismaClient): Promise<
     }),
   ]);
 
-  const hardBounces = hardBounceRows.length;
   const bounceEmails = [
     ...new Set(hardBounceRows.map((r) => r.toEmailNormalized.trim().toLowerCase()).filter(Boolean)),
   ];
-  let allHardBounceRecipientsSuppressed = false;
+  let covered = new Set<string>();
   if (bounceEmails.length > 0) {
     const [suppressedContacts, emailSuppressions] = await Promise.all([
       prisma.marketingContact.findMany({
@@ -213,14 +212,19 @@ export async function evaluateOutreachSendHealth(prisma: PrismaClient): Promise<
         select: { emailNormalized: true },
       }),
     ]);
-    const covered = new Set([
+    covered = new Set([
       ...suppressedContacts.map((c) => c.emailNormalized),
       ...emailSuppressions.map((s) => s.emailNormalized),
     ]);
-    allHardBounceRecipientsSuppressed = bounceEmails.every((e) => covered.has(e));
-  } else {
-    allHardBounceRecipientsSuppressed = true;
   }
+  // Residual risk only: already-suppressed historical bad addresses must not
+  // permanently lock the send multiplier. Suppression itself is unchanged.
+  const hardBounceRowsUnsuppressed = hardBounceRows.filter((r) => {
+    const email = r.toEmailNormalized.trim().toLowerCase();
+    return email.length > 0 && !covered.has(email);
+  });
+  const hardBounces = hardBounceRowsUnsuppressed.length;
+  const allHardBounceRecipientsSuppressed = hardBounceRows.length === 0 || hardBounces === 0;
 
   return evaluateOutreachHealthFromCounts({
     sentSample,

@@ -495,8 +495,9 @@ export async function verifyPublicListingsWithGoogle(
         },
       },
     },
-    // Age-aware: oldest eligible first so new discoveries cannot starve the backlog.
-    orderBy: [{ createdAt: "asc" }, { placeVerifyAttemptCount: "asc" }, { updatedAt: "asc" }],
+    // Prefer never/low-attempt rows so known duplicates/weak matches with high
+    // attempt counts cannot head-of-line-block the ~never-attempted backlog.
+    orderBy: [{ placeVerifyAttemptCount: "asc" }, { createdAt: "asc" }, { updatedAt: "asc" }],
     take: limit,
   });
 
@@ -564,18 +565,22 @@ export async function verifyPublicListingsWithGoogle(
         select: { slug: true },
       });
       if (duplicate) {
+        // Deterministic duplicate of an already-placed listing — leave the queue
+        // instead of re-burning Text Search on the same identity every cooldown.
         await prisma.publicOpenMicListing.update({
           where: { id: row.id },
           data: {
-            verificationStatus: "NEEDS_REVIEW",
+            verificationStatus: "OUTDATED",
             lastVerifiedAt: new Date(),
+            evidenceTerminalReason: "DUPLICATE_GOOGLE_PLACE",
+            placeVerifyNextAttemptAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
             internalNotes: appendInternalNote(
               row.internalNotes,
               `Duplicate Google place (already on ${duplicate.slug})`,
             ),
           },
         });
-        needsReview += 1;
+        outdated += 1;
       } else {
         // Google confirmed the place exists. Only publish (VERIFIED) when there is
         // ALSO explicit open-mic evidence from a trusted, venue-tied source
@@ -637,30 +642,42 @@ export async function verifyPublicListingsWithGoogle(
             select: { slug: true },
           })
         : null;
-      const data: {
-        verificationStatus: typeof row.verificationStatus;
-        lastVerifiedAt: Date;
-        internalNotes: string;
-        googlePlaceId?: string;
-        googlePlaceVerifiedAt?: Date;
-      } = {
-        verificationStatus: row.verificationStatus === "VERIFIED" ? "NEEDS_REVIEW" : row.verificationStatus,
-        lastVerifiedAt: new Date(),
-        internalNotes: appendInternalNote(
-          row.internalNotes,
-          duplicate
-            ? `${result.reason}; duplicate Google place (${duplicate.slug})`
-            : result.reason,
-        ),
-      };
-      if (result.placeId && !duplicate) {
-        data.googlePlaceId = result.placeId;
+      if (duplicate) {
+        await prisma.publicOpenMicListing.update({
+          where: { id: row.id },
+          data: {
+            verificationStatus: "OUTDATED",
+            lastVerifiedAt: new Date(),
+            evidenceTerminalReason: "DUPLICATE_GOOGLE_PLACE",
+            placeVerifyNextAttemptAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+            internalNotes: appendInternalNote(
+              row.internalNotes,
+              `${result.reason}; Duplicate Google place (already on ${duplicate.slug})`,
+            ),
+          },
+        });
+        outdated += 1;
+      } else {
+        const data: {
+          verificationStatus: typeof row.verificationStatus;
+          lastVerifiedAt: Date;
+          internalNotes: string;
+          googlePlaceId?: string;
+          googlePlaceVerifiedAt?: Date;
+        } = {
+          verificationStatus: row.verificationStatus === "VERIFIED" ? "NEEDS_REVIEW" : row.verificationStatus,
+          lastVerifiedAt: new Date(),
+          internalNotes: appendInternalNote(row.internalNotes, result.reason),
+        };
+        if (result.placeId) {
+          data.googlePlaceId = result.placeId;
+        }
+        if (shouldStampPlaceVerifiedAt(result)) {
+          data.googlePlaceVerifiedAt = new Date();
+        }
+        await prisma.publicOpenMicListing.update({ where: { id: row.id }, data });
+        needsReview += 1;
       }
-      if (shouldStampPlaceVerifiedAt(result)) {
-        data.googlePlaceVerifiedAt = new Date();
-      }
-      await prisma.publicOpenMicListing.update({ where: { id: row.id }, data });
-      needsReview += 1;
     }
 
     await sleep(250);

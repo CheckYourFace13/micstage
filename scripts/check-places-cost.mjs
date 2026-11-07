@@ -206,6 +206,26 @@ assert.equal(shouldStampPlaceVerifiedAt({ outcome: "needs_review" }), false);
 assert.equal(shouldStampPlaceVerifiedAt({ outcome: "verified" }), true);
 const promote = readFileSync("src/lib/publicListings/promotePlaceConfirmedListings.ts", "utf8");
 assert.match(promote, /googlePlaceVerifiedAt:\s*\{\s*not:\s*null\s*\}/);
+assert.match(promote, /PROMOTE_ROTATE_KEY|rotateId/);
+assert.match(promote, /readDiscoveryCursor/);
+
+const evidence = readFileSync("src/lib/publicListings/evidenceEnrichment.ts", "utf8");
+assert.equal(evidence.includes("googlePlaceVerifiedAt: { not: null }"), false);
+assert.match(evidence, /placeStrong/);
+assert.match(evidence, /trustedForPromote/);
+
+const junk = readFileSync("src/lib/publicListings/autoRejectJunkListings.ts", "utf8");
+assert.match(junk, /DUPLICATE_GOOGLE_PLACE/);
+assert.match(junk, /JUNK_ROTATE_KEY|rotateId/);
+assert.match(junk, /readDiscoveryCursor/);
+
+assert.match(verify, /placeVerifyAttemptCount:\s*"asc"/);
+assert.match(verify, /DUPLICATE_GOOGLE_PLACE/);
+
+const geoInf = readFileSync("src/lib/growth/discovery/discoveryGeoInference.ts", "utf8");
+assert.match(geoInf, /discoveryMarketSlug:\s*"chicagoland-il"/);
+assert.match(geoInf, /region:\s*null/);
+assert.equal(/CHICAGOLAND_HINT[\s\S]*region:\s*"IL"/.test(geoInf), false);
 
 {
   const prisma = memoryPrisma();

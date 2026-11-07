@@ -114,12 +114,13 @@ export async function enrichListingsMissingTrustedEvidence(
   }
 
   const now = new Date();
+  // Free official-site crawl may run for place-id-only rows (no googlePlaceVerifiedAt).
+  // VERIFIED still requires place strength + trusted evidence below.
   const rows = await prisma.publicOpenMicListing.findMany({
     where: {
       verificationStatus: "NEEDS_REVIEW",
       claimedVenueId: null,
       googlePlaceId: { not: null },
-      googlePlaceVerifiedAt: { not: null },
       OR: [{ evidenceEnrichNextAttemptAt: null }, { evidenceEnrichNextAttemptAt: { lte: now } }],
       evidenceAutomationStatus: { in: ["PENDING", "IN_PROGRESS", "NEEDS_HUMAN"] },
     },
@@ -275,15 +276,19 @@ export async function enrichListingsMissingTrustedEvidence(
           !pageIsNonVenue && pageHost && venueHost && hostsRelated(pageHost, venueHost),
         );
         // Ticket/third-party hosts are never treated as official venue domain.
+        // Score page content even when Details Pro has not stamped googlePlaceVerifiedAt.
+        // placeStrong still gates promotion to VERIFIED below.
         const trust = evaluateFetchedEvidenceTrust({
           pageText: text,
           excerpt,
           onOfficialVenueDomain: onOfficial,
           sourceKind: onOfficial ? "official_website" : "third_party",
-          placeIdentityStrong: placeStrong,
+          placeIdentityStrong: true,
           geoConflict: false,
           nameOk: true,
         });
+        const trustedForStorage = trust.trusted;
+        const trustedForPromote = trustedForStorage && placeStrong;
 
         await prisma.listingOpenMicEvidence.upsert({
           where: { listingId_evidenceUrl: { listingId: row.id, evidenceUrl: url } },
@@ -295,8 +300,8 @@ export async function enrichListingsMissingTrustedEvidence(
             detectedPhrase: excerpt ? detectExplicitPhrase(excerpt) : null,
             authorityScore: trust.authorityScore,
             currentnessScore: trust.currentnessScore,
-            trusted: trust.trusted,
-            reviewOnly: trust.reviewOnly,
+            trusted: trustedForPromote,
+            reviewOnly: trustedForStorage && !placeStrong ? true : trust.reviewOnly,
             reasonCode: trust.reasonCode,
           },
           update: {
@@ -304,8 +309,8 @@ export async function enrichListingsMissingTrustedEvidence(
             detectedPhrase: excerpt ? detectExplicitPhrase(excerpt) : null,
             authorityScore: trust.authorityScore,
             currentnessScore: trust.currentnessScore,
-            trusted: trust.trusted,
-            reviewOnly: trust.reviewOnly,
+            trusted: trustedForPromote,
+            reviewOnly: trustedForStorage && !placeStrong ? true : trust.reviewOnly,
             reasonCode: trust.reasonCode,
             fetchedAt: new Date(),
           },
@@ -313,8 +318,8 @@ export async function enrichListingsMissingTrustedEvidence(
         evidenceStored += 1;
 
         // Promote only when fetch trust AND listing-level evidence gate agree,
-        // after persisting the official source URL + structured title (not raw SERP).
-        if (trust.trusted && onOfficial && excerpt) {
+        // after place strength (Details) is confirmed — never on place-id-only alone.
+        if (trustedForPromote && onOfficial && excerpt) {
           const gate = evaluateOpenMicEvidence({
             listingName: row.name,
             schedules: row.schedules,

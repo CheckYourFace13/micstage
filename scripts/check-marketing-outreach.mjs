@@ -241,6 +241,15 @@ assert.equal(isResendHardBounce(null), true);
   });
   assert.equal(probationAfterSuppress.sendMultiplier, 0.25);
   assert.match(probationAfterSuppress.reason || "", /probation_suppressed/);
+  // Production path filters suppressed recipients out of hardBounces first —
+  // residual risk 0 must reopen full send (suppression itself unchanged).
+  const residualClean = evaluateOutreachHealthFromCounts({
+    sentSample: 21,
+    hardBounces: 0,
+    complaints: 0,
+    allHardBounceRecipientsSuppressed: true,
+  });
+  assert.equal(residualClean.sendMultiplier, 1);
 
   // Soft MailboxFull must never inflate hard numerator (even if bouncedAt leaked)
   const { countHardBouncesForHealth } = await import("../src/lib/growth/outreachHealthThrottle.ts");

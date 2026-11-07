@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { parseIntEnv } from "@/lib/marketing/emailConfig";
+import { readDiscoveryCursor, writeDiscoveryCursor } from "@/lib/growth/discovery/discoveryCursor";
 import { classifyListingName } from "@/lib/publicListings/listingQuality";
 import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 
@@ -8,6 +9,10 @@ export type AutoRejectJunkResult = {
   rejected: number;
   byReason: Record<string, number>;
 };
+
+const JUNK_CURSOR_ADAPTER = "listing_auto_reject_junk";
+const JUNK_CURSOR_MARKET = "_global";
+const JUNK_ROTATE_KEY = "rotateId";
 
 function autoRejectJunkPerRun(): number {
   return Math.min(400, Math.max(0, parseIntEnv("LISTING_AUTO_REJECT_JUNK_PER_RUN", 80)));
@@ -18,6 +23,9 @@ function appendNote(existing: string | null | undefined, reason: string): string
   const base = existing?.trim();
   return base ? `${base}\n${line}` : line;
 }
+
+/** Matches both "already on {slug}" and legacy "duplicate Google place ({slug})" notes. */
+const DUPLICATE_PLACE_NOTE_RE = /duplicate google place/i;
 
 /**
  * Deterministically demote obvious garbage to OUTDATED.
@@ -49,17 +57,65 @@ export async function autoRejectJunkListings(
     growthLead: { select: { discoveryMarketSlug: true } },
   } as const;
 
-  const needsReview = await prisma.publicOpenMicListing.findMany({
-    where: {
-      claimedVenueId: null,
-      verificationStatus: "NEEDS_REVIEW",
-    },
-    orderBy: [{ updatedAt: "desc" }],
-    take: limit,
-    select,
-  });
-  const seen = new Set(needsReview.map((r) => r.id));
-  let rows = [...needsReview];
+  // Fair rotation: half walk an id cursor so updatedAt-hot rows cannot starve the backlog.
+  const fairTake = Math.max(1, Math.ceil(limit / 2));
+  const hotTake = Math.max(0, limit - fairTake);
+  let cursorId = await readDiscoveryCursor(prisma, JUNK_CURSOR_ADAPTER, JUNK_CURSOR_MARKET, JUNK_ROTATE_KEY);
+  if (!cursorId?.trim()) cursorId = null;
+  type JunkRow = {
+    id: string;
+    name: string;
+    region: string | null;
+    city: string | null;
+    formattedAddress: string;
+    websiteUrl: string | null;
+    sourceUrl: string | null;
+    internalNotes: string | null;
+    evidenceTerminalReason: string | null;
+    evidenceEnrichAttemptCount: number | null;
+    verificationStatus: string;
+    growthLead: { discoveryMarketSlug: string | null } | null;
+  };
+  const rotating: JunkRow[] = [];
+  for (let page = 0; page < 2 && rotating.length < fairTake; page++) {
+    const pageRows = await prisma.publicOpenMicListing.findMany({
+      where: {
+        claimedVenueId: null,
+        verificationStatus: "NEEDS_REVIEW",
+      },
+      orderBy: [{ id: "asc" }],
+      take: fairTake - rotating.length,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+      select,
+    });
+    if (pageRows.length === 0) {
+      if (!cursorId) break;
+      cursorId = null;
+      continue;
+    }
+    rotating.push(...pageRows);
+    cursorId = pageRows[pageRows.length - 1]!.id;
+  }
+  await writeDiscoveryCursor(prisma, JUNK_CURSOR_ADAPTER, JUNK_CURSOR_MARKET, JUNK_ROTATE_KEY, cursorId ?? "");
+
+  const rotatingIds = new Set(rotating.map((r) => r.id));
+  const hot: JunkRow[] =
+    hotTake > 0
+      ? await prisma.publicOpenMicListing.findMany({
+          where: {
+            claimedVenueId: null,
+            verificationStatus: "NEEDS_REVIEW",
+            ...(rotatingIds.size > 0 ? { id: { notIn: [...rotatingIds] } } : {}),
+          },
+          orderBy: [{ updatedAt: "desc" }],
+          take: hotTake,
+          select,
+        })
+      : [];
+
+  let rows: JunkRow[] = [...hot, ...rotating];
+
+  const seen = new Set(rows.map((r) => r.id));
   if (rows.length < limit) {
     const extra = await prisma.publicOpenMicListing.findMany({
       where: {
@@ -96,9 +152,12 @@ export async function autoRejectJunkListings(
     });
     const mediaWeakPlace =
       row.verificationStatus === "VERIFIED" && isMediaOrDirectoryWeakPlace(row);
+    const duplicatePlace =
+      row.verificationStatus === "NEEDS_REVIEW" && DUPLICATE_PLACE_NOTE_RE.test(row.internalNotes ?? "");
 
     let reason: string | null = null;
     if (nameReject) reason = `JUNK_NAME_${nameReject}`;
+    else if (duplicatePlace) reason = "DUPLICATE_GOOGLE_PLACE";
     else if (mediaWeakPlace) reason = "WEAK_PLACE_MEDIA_OR_DIRECTORY";
     else if (geoConflict) reason = "PLACE_OR_REGION_CONFLICT";
     else if (

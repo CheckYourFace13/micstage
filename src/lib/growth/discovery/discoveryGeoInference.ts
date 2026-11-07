@@ -37,7 +37,8 @@ export function inferDiscoveryGeoForNationwideSearch(input: {
   }
 
   if (CHICAGOLAND_HINT.test(bundle)) {
-    return { discoveryMarketSlug: "chicagoland-il", city: null, region: "IL" };
+    // Market routing only — never invent listing city/region from the search market.
+    return { discoveryMarketSlug: "chicagoland-il", city: null, region: null };
   }
 
   try {

@@ -123,15 +123,17 @@ export function independentProcessingBudgets(runtime: {
   mine: number;
   leadReprocess: number;
 } {
+  // Smaller per-tick peaks, same daily throughput (~96 ticks/day).
+  // Aggressive floors (250 junk / 80 promote) spiked Hostinger process pressure.
   return {
-    publish: Math.max(runtime.backlogPublishPerTick.effective, 40),
-    junk: Math.max(runtime.autoRejectJunkPerRun.effective, 250),
-    googleVerify: Math.max(runtime.backlogGoogleVerifyPerTick.effective, 12),
-    promote: Math.max(runtime.backlogPromotePerTick.effective, 80),
-    evidence: Math.max(runtime.backlogEvidenceEnrichPerTick.effective, 40),
-    schedule: 32,
-    mine: Math.max(runtime.verifiedContactMinePerTick.effective, 32),
-    leadReprocess: 40,
+    publish: Math.max(runtime.backlogPublishPerTick.effective, 30),
+    junk: Math.max(runtime.autoRejectJunkPerRun.effective, 80),
+    googleVerify: Math.max(runtime.backlogGoogleVerifyPerTick.effective, 10),
+    promote: Math.max(runtime.backlogPromotePerTick.effective, 40),
+    evidence: Math.max(runtime.backlogEvidenceEnrichPerTick.effective, 20),
+    schedule: 20,
+    mine: Math.max(runtime.verifiedContactMinePerTick.effective, 16),
+    leadReprocess: 24,
   };
 }
 

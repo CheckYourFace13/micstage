@@ -49,10 +49,15 @@ import {
   growthRuntimeSnapshotForStatus,
   resolveGrowthPipelineRuntimeSnapshot,
 } from "@/lib/growth/growthRuntimeSettings";
-
-/** Session-scoped Postgres advisory lock (outreach only — do not hold during web discovery). */
-const GROWTH_OUTREACH_LOCK_K1 = 54_788_913;
-const GROWTH_OUTREACH_LOCK_K2 = 20_993_312;
+import {
+  acquireCronJobLease,
+  CRON_LEASE_ENRICHMENT,
+  CRON_LEASE_ENRICHMENT_TTL_MS,
+  CRON_LEASE_OUTREACH,
+  CRON_LEASE_OUTREACH_TTL_MS,
+  CRON_LEASE_TICK,
+  CRON_LEASE_TICK_TTL_MS,
+} from "@/lib/growth/cronJobLease";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -74,15 +79,13 @@ function parsePhase(request: Request): GrowthPipelinePhase {
 }
 
 async function tryOutreachLock(prisma: PrismaClient): Promise<{ release: () => Promise<void> } | null> {
-  const rows = await prisma.$queryRawUnsafe<Array<{ locked: boolean }>>(
-    `SELECT pg_try_advisory_lock(${GROWTH_OUTREACH_LOCK_K1}, ${GROWTH_OUTREACH_LOCK_K2}) AS locked`,
-  );
-  if (!rows[0]?.locked) return null;
-  return {
-    release: async () => {
-      await prisma.$queryRawUnsafe(`SELECT pg_advisory_unlock(${GROWTH_OUTREACH_LOCK_K1}, ${GROWTH_OUTREACH_LOCK_K2})`);
-    },
-  };
+  const lease = await acquireCronJobLease(prisma, {
+    leaseId: CRON_LEASE_OUTREACH,
+    requestId: `outreach-${Date.now()}`,
+    ttlMs: CRON_LEASE_OUTREACH_TTL_MS,
+  });
+  if (lease.status === "already_running") return null;
+  return { release: lease.release };
 }
 
 export async function POST(request: Request) {
@@ -150,7 +153,53 @@ async function handle(request: Request) {
   // Warm DB-backed growth knobs for Serp/backlog readers in this request.
   const growthRuntime = await resolveGrowthPipelineRuntimeSnapshot(prisma);
 
+  let tickLeaseRelease: (() => Promise<void>) | null = null;
+  let enrichmentLeaseRelease: (() => Promise<void>) | null = null;
+
   try {
+    if (phase === "tick") {
+      const tickLease = await acquireCronJobLease(prisma, {
+        leaseId: CRON_LEASE_TICK,
+        requestId: tickLog?.requestId ?? `tick-${Date.now()}`,
+        ttlMs: CRON_LEASE_TICK_TTL_MS,
+      });
+      if (tickLease.status === "already_running") {
+        await finishTickLog("already_running");
+        return NextResponse.json(
+          {
+            ok: true,
+            status: "already_running",
+            phase,
+            lockedByRequestId: tickLease.lockedByRequestId,
+            expiresAt: tickLease.expiresAt,
+          },
+          { status: 202, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      tickLeaseRelease = tickLease.release;
+    }
+
+    if (phase === "enrichment") {
+      const enrichmentLease = await acquireCronJobLease(prisma, {
+        leaseId: CRON_LEASE_ENRICHMENT,
+        requestId: `enrichment-${Date.now()}`,
+        ttlMs: CRON_LEASE_ENRICHMENT_TTL_MS,
+      });
+      if (enrichmentLease.status === "already_running") {
+        return NextResponse.json(
+          {
+            ok: true,
+            status: "already_running",
+            phase,
+            lockedByRequestId: enrichmentLease.lockedByRequestId,
+            expiresAt: enrichmentLease.expiresAt,
+          },
+          { status: 202, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      enrichmentLeaseRelease = enrichmentLease.release;
+    }
+
     let discovery: Awaited<ReturnType<typeof runGrowthLeadDiscovery>> | null = null;
     let discoveryError: string | null = null;
     let listingAutoPublish: Awaited<ReturnType<typeof autoPublishGrowthLeadsAsListings>> | null = null;
@@ -175,10 +224,9 @@ async function handle(request: Request) {
 
     if (phase === "enrichment") {
       try {
-        const [scheduleEnrich, contactMine] = await Promise.all([
-          enrichVerifiedListingSchedules(prisma, { limit: 32 }),
-          mineVerifiedListingOfficialEmails(prisma, { limit: 32 }),
-        ]);
+        // Sequential workers: lower peak DB/fetch concurrency than Promise.all.
+        const scheduleEnrich = await enrichVerifiedListingSchedules(prisma, { limit: 20 });
+        const contactMine = await mineVerifiedListingOfficialEmails(prisma, { limit: 16 });
         enrichmentWorkers = { scheduleEnrich, contactMine };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -443,8 +491,8 @@ async function handle(request: Request) {
       growthLeadsCreatedUtcTodayBySourceKind.map((r) => [r.sourceKind, r._count._all]),
     );
 
-    if (outreachSkippedReason && !discovery && !drafts) {
-      await finishTickLog("skipped");
+    // Outreach-only short-circuit: never mark a tick that already processed backlog as "skipped".
+    if (phase === "outreach" && outreachSkippedReason && !drafts) {
       return NextResponse.json(
         {
           ok: true,
@@ -487,9 +535,9 @@ async function handle(request: Request) {
         growthLeadsCreatedUtcTodayBySourceKind: growthLeadsCreatedUtcToday,
         hint:
           phase === "tick"
-            ? "One cron call: mine venue emails then draft/send outreach. Schedule every 15 min on Hostinger. Use ?phase=discovery for nationwide venue discovery and ?phase=enrichment for schedule/contact workers."
+            ? "Tick every 15m (:00/:15/:30/:45). Discovery :05/:35. Enrichment :10/:25/:40/:55. Single-flight skips overlaps."
             : phase === "all"
-              ? "On Hostinger, prefer ?phase=tick (every 15 min), ?phase=discovery (hourly), and optional ?phase=enrichment as separate cron calls to avoid 504 gateway timeouts."
+              ? "On Hostinger, prefer ?phase=tick (every 15 min), ?phase=discovery (twice hourly offset), and ?phase=enrichment staggered separately."
               : undefined,
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
@@ -505,5 +553,20 @@ async function handle(request: Request) {
       });
     }
     return NextResponse.json({ ok: false, error: message, phase }, { status: 500 });
+  } finally {
+    if (tickLeaseRelease) {
+      try {
+        await tickLeaseRelease();
+      } catch (e) {
+        console.error("[growth pipeline] tick lease release failed", e);
+      }
+    }
+    if (enrichmentLeaseRelease) {
+      try {
+        await enrichmentLeaseRelease();
+      } catch (e) {
+        console.error("[growth pipeline] enrichment lease release failed", e);
+      }
+    }
   }
 }

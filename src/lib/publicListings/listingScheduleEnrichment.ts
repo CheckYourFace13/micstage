@@ -366,7 +366,8 @@ async function enrichVerifiedListingSchedulesUnlocked(
       row.growthLead?.facebookUrl,
       row.growthLead?.instagramUrl,
     ].filter((u): u is string => Boolean(u?.trim()));
-    const urls = expandOfficialEvidenceUrls(seeds, 12).filter((u) => crawlableOfficial(listingHost, u, row));
+    // Cap official page fetches per listing to cut concurrent Hostinger/network pressure.
+    const urls = expandOfficialEvidenceUrls(seeds, 6).filter((u) => crawlableOfficial(listingHost, u, row));
     if (urls.length === 0) {
       skipped += 1;
       continue;

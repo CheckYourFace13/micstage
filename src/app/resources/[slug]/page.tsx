@@ -95,7 +95,7 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
           </section>
         ) : null}
 
-        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleTop} minHeight={100} />
+        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleTop} minHeight={100} trustedEditorialSurface />
 
         <div className="mt-8 grid gap-8">
           {sectionsBeforeMid.map((s) => (
@@ -110,7 +110,9 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
           ))}
         </div>
 
-        {sectionsAfterMid.length > 0 ? <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleMid} minHeight={100} /> : null}
+        {sectionsAfterMid.length > 0 ? (
+          <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleMid} minHeight={100} trustedEditorialSurface />
+        ) : null}
 
         {sectionsAfterMid.length > 0 ? (
           <div className="mt-8 grid gap-8">
@@ -168,7 +170,7 @@ export default async function ResourceArticlePage(props: { params: Promise<{ slu
           </section>
         ) : null}
 
-        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleBottom} minHeight={100} />
+        <AdSenseDisplayAd adSlot={ADSENSE_SLOTS.articleBottom} minHeight={100} trustedEditorialSurface />
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-xl font-semibold">Explore MicStage discovery pages</h2>

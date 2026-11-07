@@ -50,29 +50,56 @@ function sourceSkipsDiscoveredStrictGate(sourceKind: GrowthLeadSourceKind): bool
 }
 
 export const OUTREACH_DRAFT_SCAN_CURSOR_KEY = "GROWTH_OUTREACH_DRAFT_SCAN_CURSOR";
+export const OUTREACH_SEND_READY_SCAN_CURSOR_KEY = "GROWTH_OUTREACH_SEND_READY_SCAN_CURSOR";
 
-async function readDraftScanCursor(prisma: PrismaClient): Promise<string | null> {
+async function readScanCursor(prisma: PrismaClient, key: string): Promise<string | null> {
   const row = await prisma.operationalRuntimeSetting.findUnique({
-    where: { key: OUTREACH_DRAFT_SCAN_CURSOR_KEY },
+    where: { key },
     select: { value: true },
   });
   const id = row?.value?.trim();
   return id ? id : null;
 }
 
-async function writeDraftScanCursor(prisma: PrismaClient, leadId: string | null): Promise<void> {
+async function writeScanCursor(
+  prisma: PrismaClient,
+  key: string,
+  leadId: string | null,
+  reason: string,
+): Promise<void> {
   const value = leadId ?? "";
   const fields = {
     valueType: "string",
     value,
     updatedBy: "growth-draft-automation",
-    reason: "rotating_scan_position",
+    reason,
   };
   await prisma.operationalRuntimeSetting.upsert({
-    where: { key: OUTREACH_DRAFT_SCAN_CURSOR_KEY },
-    create: { key: OUTREACH_DRAFT_SCAN_CURSOR_KEY, ...fields },
+    where: { key },
+    create: { key, ...fields },
     update: fields,
   });
+}
+
+async function readDraftScanCursor(prisma: PrismaClient): Promise<string | null> {
+  return readScanCursor(prisma, OUTREACH_DRAFT_SCAN_CURSOR_KEY);
+}
+
+async function writeDraftScanCursor(prisma: PrismaClient, leadId: string | null): Promise<void> {
+  await writeScanCursor(prisma, OUTREACH_DRAFT_SCAN_CURSOR_KEY, leadId, "rotating_scan_position");
+}
+
+async function readSendReadyScanCursor(prisma: PrismaClient): Promise<string | null> {
+  return readScanCursor(prisma, OUTREACH_SEND_READY_SCAN_CURSOR_KEY);
+}
+
+async function writeSendReadyScanCursor(prisma: PrismaClient, leadId: string | null): Promise<void> {
+  await writeScanCursor(
+    prisma,
+    OUTREACH_SEND_READY_SCAN_CURSOR_KEY,
+    leadId,
+    "send_ready_rotating_scan_position",
+  );
 }
 
 function draftMarketSlug(d: { lead: { discoveryMarketSlug: string | null }; discoveryMarketSlug?: string | null }): string {
@@ -312,20 +339,46 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const hotTake = Math.max(1, Math.floor(priorityWindow / 2));
 
   /**
-   * Top-of-pool by fit surfaces freshly enriched leads, but on its own it re-scans the same
-   * highest-fit rows every tick: eligible leads deeper in the pool never get their `updatedAt`
-   * bumped, so they are never evaluated. Half the window sweeps from a persisted cursor instead,
-   * wrapping at the end, so every candidate is reached within a few ticks.
+   * AUTO_SEND_READY hint scan: half newest-updated, half rotating cursor.
+   * Without rotation, the same ineligible "send-ready" rows are re-evaluated every tick
+   * (their updatedAt never bumps) and starve deeper eligible leads.
    */
-  const sendReadyScan = await prisma.growthLead.findMany({
-    where: {
-      ...priorityWhere,
-      discoveryHints: { path: ["outreachEvidence", "opsState"], equals: "AUTO_SEND_READY" },
-    },
+  const sendReadyWhere: Prisma.GrowthLeadWhereInput = {
+    ...priorityWhere,
+    discoveryHints: { path: ["outreachEvidence", "opsState"], equals: "AUTO_SEND_READY" },
+  };
+  const sendReadyHotTake = Math.max(1, Math.floor(draftWorkTake / 2));
+  const sendReadyRecent = await prisma.growthLead.findMany({
+    where: sendReadyWhere,
     select: { id: true },
     orderBy: [{ updatedAt: "desc" }],
-    take: draftWorkTake,
+    take: sendReadyHotTake,
   });
+  const sendReadyRecentIds = new Set(sendReadyRecent.map((r) => r.id));
+  const sendReadyRotateTarget = Math.max(0, draftWorkTake - sendReadyRecent.length);
+  let sendReadyCursorId = await readSendReadyScanCursor(prisma);
+  const sendReadyRotating: { id: string }[] = [];
+  for (let page = 0; page < 2 && sendReadyRotating.length < sendReadyRotateTarget; page++) {
+    const rows = await prisma.growthLead.findMany({
+      where: sendReadyWhere,
+      select: { id: true },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: sendReadyRotateTarget - sendReadyRotating.length,
+      ...(sendReadyCursorId ? { cursor: { id: sendReadyCursorId }, skip: 1 } : {}),
+    });
+    if (rows.length === 0) {
+      if (!sendReadyCursorId) break;
+      sendReadyCursorId = null;
+      continue;
+    }
+    sendReadyRotating.push(...rows);
+    sendReadyCursorId = rows[rows.length - 1]!.id;
+  }
+  await writeSendReadyScanCursor(prisma, sendReadyCursorId);
+  const sendReadyScan = [
+    ...sendReadyRecent,
+    ...sendReadyRotating.filter((r) => !sendReadyRecentIds.has(r.id)),
+  ];
 
   const hotScan = await prisma.growthLead.findMany({
     where: priorityWhere,

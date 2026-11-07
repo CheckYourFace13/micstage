@@ -11,30 +11,31 @@ export const ADSENSE_ADS_TXT_LINE = `google.com, pub-${ADSENSE_PUBLISHER_NUMERIC
 export const ADSENSE_ENABLED =
   process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === "true";
 
-/** Affiliate-commerce resource pages — never stack AdSense on top of Amazon. */
-const ADS_BLOCKED_RESOURCE_SLUGS = new Set(["open-mic-gear"]);
-
 function normalizePath(pathname: string): string {
   return (pathname.split("?")[0] ?? pathname).replace(/\/$/, "") || "/";
 }
 
 /**
- * AdSense may load only on:
+ * Path-only AdSense gate (used by root `AdSenseScript`).
+ *
+ * Allows:
  * - /resources (index)
- * - editorial /resources/[slug] (not affiliate gear)
  * - /locations/[market]/open-mics (strong city open-mic hubs)
  *
- * Not on discovery product hubs, performers pages, homepage, host, FAQ, ops, or listing detail.
+ * Does NOT allow `/resources/[slug]` by path alone — unknown slugs call `notFound()`
+ * while keeping the URL, which would otherwise load ads on a 404. Real article pages
+ * pass `trustedEditorialSurface` into `AdSenseDisplayAd` (which loads the script).
+ *
+ * Not on discovery product hubs, performers pages, homepage, host, FAQ, ops, listing detail,
+ * auth, claim, or generic 404 URLs.
  */
 export function shouldShowAdsOnPath(pathname: string): boolean {
   const path = normalizePath(pathname);
 
   if (path === "/resources") return true;
 
-  const resourceMatch = /^\/resources\/([^/]+)$/.exec(path);
-  if (resourceMatch) {
-    return !ADS_BLOCKED_RESOURCE_SLUGS.has(resourceMatch[1]!);
-  }
+  // Never path-allow /resources/<slug> — including missing slugs that render not-found.
+  if (/^\/resources(\/|$)/.test(path)) return false;
 
   // City/market open-mic hubs only — not /locations index or /locations/.../performers.
   if (/^\/locations\/[^/]+\/open-mics$/.test(path)) return true;

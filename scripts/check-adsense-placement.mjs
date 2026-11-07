@@ -17,8 +17,6 @@ assert.equal(ADSENSE_PUBLISHER_ID, "ca-pub-9572509189594279");
 
 const allow = [
   "/resources",
-  "/resources/how-to-run-a-successful-open-mic-night",
-  "/resources/what-to-expect-at-your-first-open-mic",
   "/locations/chicago-il/open-mics",
   "/locations/open-mics-ca/open-mics",
 ];
@@ -38,6 +36,10 @@ const deny = [
   "/locations",
   "/locations/chicago-il/performers",
   "/resources/open-mic-gear",
+  // Unknown resource slug keeps URL under /resources/* while rendering not-found — must not ads.
+  "/resources/this-slug-does-not-exist-adsense-404",
+  "/resources/how-to-run-a-successful-open-mic-night",
+  "/resources/what-to-expect-at-your-first-open-mic",
   "/open-mics/some-listing",
   "/venues/some-venue",
   "/venues/some-venue/lineup",
@@ -89,10 +91,17 @@ assert.match(script, /pagead2\.googlesyndication\.com/);
 
 const display = read("src/components/ads/AdSenseDisplayAd.tsx");
 assert.match(display, /shouldShowAdsOnPath/);
+assert.match(display, /trustedEditorialSurface/);
+
+const articlePage = read("src/app/resources/[slug]/page.tsx");
+assert.match(articlePage, /trustedEditorialSurface/);
+assert.match(articlePage, /getResourceArticleBySlug/);
+assert.match(articlePage, /notFound\(\)/);
 
 const adsenseLib = read("src/lib/adsense.ts");
-assert.match(adsenseLib, /open-mic-gear/);
+assert.match(adsenseLib, /trustedEditorialSurface|Does NOT allow/);
 assert.match(adsenseLib, /\/locations\/\[market\]\/open-mics|\/locations\/\[^\/\]\+\/open-mics/);
+assert.equal(shouldShowAdsOnPath("/resources/this-slug-does-not-exist-adsense-404"), false);
 
 /** Display units must not be imported into ops / lineup / booking / product hubs. */
 const forbiddenImportRoots = [

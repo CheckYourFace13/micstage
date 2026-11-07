@@ -39,7 +39,7 @@ const PUBLIC_ABOUT_NOISE: RegExp[] = [
 ];
 
 const INTERNAL_SOURCE =
-  /autonomous|web[\s_-]?search|crawl|growth[\s_-]?discover|enrichment|serpapi|brave|discovered via|nationwide discovery/i;
+  /autonomous|web[\s_-]?search|crawl|growth[\s_-]?discover|enrichment|serpapi|brave|discovered via|nationwide discovery|claude[_-]?csv|micstage\s+growth|import\s+batch/i;
 
 const SEARCH_ENGINE_HOST =
   /(^|\.)(google|bing|duckduckgo|yahoo|serpapi|brave)\./i;
@@ -66,6 +66,8 @@ export function sanitizePublicListingAbout(about: string | null | undefined): st
   if (/https?:\/\//i.test(t)) return null;
   if (/events?\s*&\s*tickets/i.test(t)) return null;
   if (/[<>]/.test(t)) return null;
+  // Hard drop if provenance/import markers survived scrubbing.
+  if (/\bclaude_csv\b|\bbatch\s*=|\bimportKey\b|\binternal note\b/i.test(t)) return null;
   return t.length > 600 ? `${t.slice(0, 597)}…` : t;
 }
 

@@ -40,10 +40,11 @@ export function buildOwnerAttentionItems(input: OwnerAttentionInput): OwnerAtten
     items.push({ code: "outreach_disabled", message: "Outreach is disabled" });
   }
   const safeTarget = Math.max(0, Math.min(input.dailyCap, input.dailyCap + input.providerHeadroom));
+  // Gate on net-eligible inventory, not inflated pipeline-ready (AUTO_SEND_READY) hints.
   if (
     input.outreachEnabled &&
     !input.killSwitch &&
-    input.autoSendReady >= 20 &&
+    input.netEligibleOutreach >= 5 &&
     input.emailsSentToday < Math.min(10, Math.max(4, Math.floor(safeTarget * 0.25)))
   ) {
     items.push({

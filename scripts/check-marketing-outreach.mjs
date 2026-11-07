@@ -226,6 +226,21 @@ assert.equal(isResendHardBounce(null), true);
   assert.equal(half.sendMultiplier, 0.5);
   const ok = evaluateOutreachHealthFromCounts({ sentSample: 40, hardBounces: 1, complaints: 0 });
   assert.equal(ok.sendMultiplier, 1);
+  const stoppedUnsuppressed = evaluateOutreachHealthFromCounts({
+    sentSample: 21,
+    hardBounces: 2,
+    complaints: 0,
+    allHardBounceRecipientsSuppressed: false,
+  });
+  assert.equal(stoppedUnsuppressed.sendMultiplier, 0);
+  const probationAfterSuppress = evaluateOutreachHealthFromCounts({
+    sentSample: 21,
+    hardBounces: 2,
+    complaints: 0,
+    allHardBounceRecipientsSuppressed: true,
+  });
+  assert.equal(probationAfterSuppress.sendMultiplier, 0.25);
+  assert.match(probationAfterSuppress.reason || "", /probation_suppressed/);
 
   // Soft MailboxFull must never inflate hard numerator (even if bouncedAt leaked)
   const { countHardBouncesForHealth } = await import("../src/lib/growth/outreachHealthThrottle.ts");

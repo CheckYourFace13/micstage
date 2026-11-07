@@ -283,7 +283,8 @@ function renderGrowthEngineText(data: OwnerDailySummaryData): string[] {
   const m = data.marketing;
   return [
     "GROWTH ENGINE",
-    `  Ready to send: ${g.autoSendReady}`,
+    `  Pipeline ready (ops classification): ${g.autoSendReady}`,
+    `  Net eligible outreach now: ${data.listingsInventory.netEligibleOutreach}`,
     `  Researching: ${g.autoResearchRetry}`,
     `  Retry scheduled: ${g.retryScheduled}`,
     `  Hard rejected: ${g.hardReject}`,
@@ -293,7 +294,7 @@ function renderGrowthEngineText(data: OwnerDailySummaryData): string[] {
     `  Official sites checked: ${g.officialSitesCheckedToday}`,
     `  Open mics verified: ${g.openMicsVerifiedToday}`,
     `  New HIGH contacts: ${g.newHighContactsToday}`,
-    `  New send-ready: ${g.newSendReadyToday}`,
+    `  Newly classified pipeline-ready: ${g.newSendReadyToday}`,
     `  Emails sent: ${g.emailsSentToday}`,
     `  Delivered: ${g.deliveredToday}`,
     `  Clicks: ${g.clicksToday}`,
@@ -330,7 +331,8 @@ function renderGrowthEngineHtml(data: OwnerDailySummaryData): string {
   return `
   <h2 style="font-size:15px;margin:20px 0 8px">Growth engine</h2>
   <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6">
-    ${row("Ready to send", g.autoSendReady)}
+    ${row("Pipeline ready (ops classification)", g.autoSendReady)}
+    ${row("Net eligible outreach now", data.listingsInventory.netEligibleOutreach)}
     ${row("Researching", g.autoResearchRetry)}
     ${row("Retry scheduled", g.retryScheduled)}
     ${row("Hard rejected", g.hardReject)}
@@ -341,7 +343,7 @@ function renderGrowthEngineHtml(data: OwnerDailySummaryData): string {
     ${row("Official sites checked", g.officialSitesCheckedToday)}
     ${row("Open mics verified", g.openMicsVerifiedToday)}
     ${row("New HIGH contacts", g.newHighContactsToday)}
-    ${row("New send-ready", g.newSendReadyToday)}
+    ${row("Newly classified pipeline-ready", g.newSendReadyToday)}
     ${row("Emails sent", g.emailsSentToday)}
     ${row("Delivered", g.deliveredToday)}
     ${row("Clicks", g.clicksToday)}
@@ -610,12 +612,12 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
 }
 
 export function ownerDailySummarySubject(data: OwnerDailySummaryData): string {
-  const ready = data.growthEngine.autoSendReady;
+  const ready = data.listingsInventory.netEligibleOutreach;
   const verified = data.listingsInventory.verifiedListings;
   const sent = data.growthEngine.emailsSentToday;
   const attention = ownerAttentionFromSummary(data);
   const prefix = attention.length ? "ATTN · " : "";
-  return `${prefix}MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified · ${ready} send-ready · ${sent} sent`;
+  return `${prefix}MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified · ${ready} eligible · ${sent} sent`;
 }
 
 function ownerAttentionFromSummary(data: OwnerDailySummaryData) {

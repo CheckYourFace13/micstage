@@ -48,7 +48,7 @@ export function buildOwnerAttentionItems(input: OwnerAttentionInput): OwnerAtten
   ) {
     items.push({
       code: "outreach_below_capacity",
-      message: `Outreach sent ${input.emailsSentToday} vs safe target ~${safeTarget} (${input.autoSendReady} send-ready)`,
+      message: `Outreach sent ${input.emailsSentToday} vs safe target ~${safeTarget} (${input.netEligibleOutreach} eligible now; ${input.autoSendReady} pipeline-ready)`,
     });
   }
   if (input.providerHeadroom <= 0) {

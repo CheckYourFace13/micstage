@@ -10,7 +10,7 @@ const PERFORMANCE_LABEL: Record<GrowthLeadPerformanceTag, string> = {
   VARIETY: "variety",
 };
 
-/** Crawler / discovery wording that must never be the public listing description. */
+/** Crawler / discovery / import wording that must never be the public listing description. */
 const PUBLIC_ABOUT_NOISE: RegExp[] = [
   /open[\s-]?mic venue identified from public listings and web search\.?/gi,
   /live music venue with open mic or performer signup signals\.?/gi,
@@ -25,6 +25,17 @@ const PUBLIC_ABOUT_NOISE: RegExp[] = [
   /\bpublic listings and web search\b/gi,
   /\bgrowth discovery\b/gi,
   /\benrichment\s+[a-z0-9_]+\b/gi,
+  /\[claude_csv[^\]]*\]/gi,
+  /\bclaude_csv\b/gi,
+  /\bbatch\s*=\s*[a-z0-9_-]+/gi,
+  /\bfile\s*=\s*\S+/gi,
+  /\bimport\s+batch\b[^.]*\.?/gi,
+  /\binternal note:?\s*[^.]*\.?/gi,
+  /\bdiscovery notes?:?\s*[^.]*\.?/gi,
+  /\bparser notes?:?\s*[^.]*\.?/gi,
+  /\bquality gate\b[^.]*\.?/gi,
+  /\bverification gate\b[^.]*\.?/gi,
+  /\bPerformers:\s*[^.]{0,120}\.?/gi,
 ];
 
 const INTERNAL_SOURCE =

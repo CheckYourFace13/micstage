@@ -60,6 +60,10 @@ const deny = [
   "/internal/admin",
   "/api/health",
   "/unsubscribe",
+  "/this-page-definitely-does-not-exist-xyz-404",
+  "/reset",
+  "/reset/venue",
+  "/login",
 ];
 
 for (const p of allow) {
@@ -155,6 +159,10 @@ assert.match(privacy, /Advertising \(Google AdSense\)/);
 assert.match(privacy, /google\.com\/settings\/ads/);
 assert.match(privacy, /contact form/);
 assert.doesNotMatch(privacy, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+
+const notFound = read("src/app/not-found.tsx");
+assert.doesNotMatch(notFound, /AdSenseDisplayAd|adsbygoogle|ADSENSE_SLOTS/);
+assert.equal(shouldShowAdsOnPath("/does-not-exist-404-path"), false);
 
 const layoutNoVercelInsights = read("src/app/layout.tsx");
 assert.doesNotMatch(layoutNoVercelInsights, /@vercel\/analytics|\/_vercel\/insights/);

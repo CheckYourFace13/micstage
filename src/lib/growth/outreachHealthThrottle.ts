@@ -46,6 +46,8 @@ export function evaluateOutreachHealthFromCounts(input: {
   hardBounceStopRate?: number;
   hardBounceHalveRate?: number;
   complaintStopRate?: number;
+  /** True when every hard-bounce recipient in the window is already suppressed. */
+  allHardBounceRecipientsSuppressed?: boolean;
 }): OutreachHealthSnapshot {
   const minSample = input.minSample ?? outreachHealthMinSample();
   const stopRate = input.hardBounceStopRate ?? outreachHealthHardBounceStopRate();
@@ -91,6 +93,22 @@ export function evaluateOutreachHealthFromCounts(input: {
   }
 
   if (hardBounceRate >= stopRate) {
+    // When every hard-bounce recipient in-window is already suppressed, allow a
+    // tiny probationary drip so clean inventory can rebuild the sample. Do not
+    // reopen full send while the raw rate is still above the stop threshold.
+    if (input.allHardBounceRecipientsSuppressed && complaints === 0) {
+      return {
+        ok: true,
+        reason: `hard_bounce_probation_suppressed_${(hardBounceRate * 100).toFixed(2)}pct`,
+        sendMultiplier: 0.25,
+        sentSample,
+        hardBounces,
+        complaints,
+        hardBounceRate,
+        complaintRate,
+        rateDenominator,
+      };
+    }
     return {
       ok: false,
       reason: `hard_bounce_rate_${(hardBounceRate * 100).toFixed(2)}pct`,
@@ -151,25 +169,65 @@ export async function evaluateOutreachSendHealth(prisma: PrismaClient): Promise<
   const windowDays = parseIntEnv("GROWTH_OUTREACH_HEALTH_WINDOW_DAYS", 7);
   const since = new Date(Date.now() - windowDays * 86400000);
 
-  const [sentSample, hardBounces, complaints] = await Promise.all([
+  const [sentSample, hardBounceRows, complaints] = await Promise.all([
     prisma.marketingEmailSend.count({
       where: { category: "OUTREACH", status: "SENT", sentAt: { gte: since } },
     }),
     // Hard only: bouncedAt set, excluding soft_bounce lastError.
     // IMPORTANT: `NOT startsWith soft_bounce` alone excludes NULL lastError in SQL — include nulls.
-    prisma.marketingEmailSend.count({
+    prisma.marketingEmailSend.findMany({
       where: {
         category: "OUTREACH",
         bouncedAt: { gte: since },
         OR: [{ lastError: null }, { NOT: { lastError: { startsWith: "soft_bounce" } } }],
       },
+      select: { toEmailNormalized: true },
+      take: 200,
     }),
     prisma.marketingEmailSend.count({
       where: { category: "OUTREACH", complainedAt: { gte: since } },
     }),
   ]);
 
-  return evaluateOutreachHealthFromCounts({ sentSample, hardBounces, complaints });
+  const hardBounces = hardBounceRows.length;
+  const bounceEmails = [
+    ...new Set(hardBounceRows.map((r) => r.toEmailNormalized.trim().toLowerCase()).filter(Boolean)),
+  ];
+  let allHardBounceRecipientsSuppressed = false;
+  if (bounceEmails.length > 0) {
+    const [suppressedContacts, emailSuppressions] = await Promise.all([
+      prisma.marketingContact.findMany({
+        where: {
+          emailNormalized: { in: bounceEmails },
+          OR: [
+            { status: "BOUNCED" },
+            { status: "DO_NOT_CONTACT" },
+            { suppressionReason: "HARD_BOUNCE" },
+            { suppressedAt: { not: null } },
+          ],
+        },
+        select: { emailNormalized: true },
+      }),
+      prisma.marketingEmailSuppression.findMany({
+        where: { emailNormalized: { in: bounceEmails } },
+        select: { emailNormalized: true },
+      }),
+    ]);
+    const covered = new Set([
+      ...suppressedContacts.map((c) => c.emailNormalized),
+      ...emailSuppressions.map((s) => s.emailNormalized),
+    ]);
+    allHardBounceRecipientsSuppressed = bounceEmails.every((e) => covered.has(e));
+  } else {
+    allHardBounceRecipientsSuppressed = true;
+  }
+
+  return evaluateOutreachHealthFromCounts({
+    sentSample,
+    hardBounces,
+    complaints,
+    allHardBounceRecipientsSuppressed,
+  });
 }
 
 /** DB truth for ops: sends / hard / soft / complaints in the health window. */

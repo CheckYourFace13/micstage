@@ -53,8 +53,8 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Verified: ${inv.verifiedListings} · Unclaimed: ${inv.unclaimedListings}`,
     `  MicStage venues (registered): ${inv.claimedVenues} · Bookable with schedule: ${inv.bookableVenues}`,
     `  Discovery metros on map: ${inv.discoveryMarkets}`,
-    `  New listings (24h): ${inv.listingsCreatedCount}`,
-    `  Claim invites sent (24h): ${inv.claimInvitesSentCount}`,
+    `  New listings (prior 7 days): ${inv.listingsCreatedCount}`,
+    `  Claim invites sent (prior 7 days): ${inv.claimInvitesSentCount}`,
     `  Pending claim invites (eligible to send): ${inv.pendingClaimInvites}`,
     `  Venue leads waiting to publish: ${inv.leadsAwaitingPublish}`,
     `  Google Business verified: ${inv.googleVerifiedListings}`,
@@ -72,7 +72,7 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     "RAW GROWTH",
     `  New raw leads: ${data.growthLayers.rawCandidatesToday}`,
     `  Total raw reservoir: ${data.growthLayers.rawCandidatesTotal}`,
-    `  Junk rejected (24h): ${data.growthLayers.junkRejectedToday}`,
+    `  Junk rejected (prior 7 days): ${data.growthLayers.junkRejectedToday}`,
     "",
     "LISTING GROWTH",
     `  Verified: ${data.growthLayers.verifiedListings}`,
@@ -81,12 +81,12 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  City hubs with scheduled inventory: ${data.growthLayers.cityHubsWithScheduled}`,
     "",
     "CONTACT / CLAIM",
-    `  Official HIGH contacts mined (24h): ${inv.claimContactsMinedToday}`,
+    `  Official HIGH contacts mined (prior 7 days): ${inv.claimContactsMinedToday}`,
     `  Claim-invite eligible: ${inv.inviteReadyTotal}`,
     `  New invite-ready today: ${inv.inviteReadyNewToday}`,
-    `  Claim invites sent (24h): ${inv.claimInvitesSentCount}`,
-    `  Claims started (24h): ${data.marketing.claimsStartedToday}`,
-    `  Claims completed (24h): ${data.marketing.claimsCompletedToday}`,
+    `  Claim invites sent (prior 7 days): ${inv.claimInvitesSentCount}`,
+    `  Claims started (prior 7 days): ${data.marketing.claimsStartedToday}`,
+    `  Claims completed (prior 7 days): ${data.marketing.claimsCompletedToday}`,
     "",
     "OUTREACH",
     `  HIGH emails: ${inv.highEmailTotal}`,
@@ -124,23 +124,23 @@ function renderRecentListingsText(data: OwnerDailySummaryData): string[] {
     `  Failures: validation ${data.claimFunnelInstrumented.failedValidation} · session ${data.claimFunnelInstrumented.failedSession} · other ${data.claimFunnelInstrumented.failedOther}`,
     "",
     "PERFORMER",
-    `  Guest signups (24h): ${data.performerFunnel.guestSignupsToday}`,
-    `  Performer accounts (24h / 7d): ${data.performerFunnel.performerAccountsToday} / ${data.performerFunnel.performerAccounts7d}`,
+    `  Guest signups (prior 7 days): ${data.performerFunnel.guestSignupsToday}`,
+    `  Performer accounts (period / 7d): ${data.performerFunnel.performerAccountsToday} / ${data.performerFunnel.performerAccounts7d}`,
     `  Weekly alert opt-ins: ${data.performerFunnel.weeklyAlertOptInsNewToday} new / ${data.performerFunnel.weeklyAlertOptInsTotal} total`,
-    `  Shared signup visits (24h): ${data.performerFunnel.sharedSignupVisitsToday}`,
+    `  Shared signup visits (prior 7 days): ${data.performerFunnel.sharedSignupVisitsToday}`,
     "",
     "SEARCH",
     `  GSC 28d: not connected in production reporting (Search Console API not wired)`,
-    `  Outreach clicks (24h / 7d): ${data.marketing.uniqueClicksToday} / ${data.marketing.uniqueClicks7d}`,
+    `  Outreach clicks (period / 7d): ${data.marketing.uniqueClicksToday} / ${data.marketing.uniqueClicks7d}`,
     `  Indexed scheduled pages: ${data.growthLayers.indexableListings}`,
     "",
     "RETENTION",
     `  Weekly digest opt-ins: ${data.performerFunnel.weeklyAlertOptInsTotal}`,
-    `  New opt-ins (24h): ${data.performerFunnel.weeklyAlertOptInsNewToday}`,
-    `  Shared signup visits (24h): ${data.performerFunnel.sharedSignupVisitsToday}`,
+    `  New opt-ins (prior 7 days): ${data.performerFunnel.weeklyAlertOptInsNewToday}`,
+    `  Shared signup visits (prior 7 days): ${data.performerFunnel.sharedSignupVisitsToday}`,
     "",
     data.listingsInventory.listingsCreatedCount > 0
-      ? "NEW LISTINGS (24h)"
+      ? "NEW LISTINGS (prior 7 days)"
       : "RECENT LISTINGS (latest inventory)",
   ];
 
@@ -169,7 +169,7 @@ function renderHostAcquisitionText(data: OwnerDailySummaryData): string[] {
     `  Host lane prospects: ${h.prospectsHostLane}`,
     `  Outreach ready: ${h.outreachReady}`,
     "",
-    "  TODAY (24h)",
+    "  PERIOD (prior 7 days)",
     `  Emails sent: ${h.emailsSent24h}`,
     `  Delivered: ${h.delivered24h}`,
     `  Clicks: ${h.clicks24h}`,
@@ -203,7 +203,7 @@ function renderVenueAcquisitionText(data: OwnerDailySummaryData): string[] {
     "VENUE ACQUISITION",
     `  Prospects verified: ${v.prospectsVerified}`,
     "",
-    "  TODAY (24h)",
+    "  PERIOD (prior 7 days)",
     `  Emails sent: ${v.emailsSent24h}`,
     `  Delivered: ${v.delivered24h}`,
     `  Clicks: ${v.clicks24h}`,
@@ -230,7 +230,7 @@ function renderHostAcquisitionHtml(data: OwnerDailySummaryData): string {
   <tr><td style="padding:4px 0">Host lane</td><td style="text-align:right">${h.prospectsHostLane}</td></tr>
   <tr><td style="padding:4px 0">Outreach ready</td><td style="text-align:right">${h.outreachReady}</td></tr>
 </table>
-<p style="margin:12px 0 4px;font-weight:600;font-size:13px">Today (24h)</p>
+<p style="margin:12px 0 4px;font-weight:600;font-size:13px">Period (prior 7 days)</p>
 <table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
   <tr><td>Sent</td><td style="text-align:right">${h.emailsSent24h}</td></tr>
   <tr><td>Delivered</td><td style="text-align:right">${h.delivered24h}</td></tr>
@@ -260,7 +260,7 @@ function renderVenueAcquisitionHtml(data: OwnerDailySummaryData): string {
 <table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
   <tr><td style="padding:4px 0">Prospects verified</td><td style="text-align:right">${v.prospectsVerified}</td></tr>
 </table>
-<p style="margin:12px 0 4px;font-weight:600;font-size:13px">Today (24h)</p>
+<p style="margin:12px 0 4px;font-weight:600;font-size:13px">Period (prior 7 days)</p>
 <table style="border-collapse:collapse;width:100%;max-width:640px;font-size:14px">
   <tr><td>Sent</td><td style="text-align:right">${v.emailsSent24h}</td></tr>
   <tr><td>Delivered</td><td style="text-align:right">${v.delivered24h}</td></tr>
@@ -423,10 +423,10 @@ function renderFunnelText(data: OwnerDailySummaryData): string[] {
     `  Waiting evidence (place ok): ${f.waitingEnrichment}`,
     `  Waiting HIGH official email: ${f.waitingEmail}`,
     `  Invite-ready: ${f.inviteReady}`,
-    `  Backlog processed (approx 24h): ${f.backlogProcessedApprox}`,
-    `  Auto-verified (24h): ${f.autoVerifiedToday}`,
-    `  Auto-rejected (24h): ${f.autoRejectedToday}`,
-    `  HIGH contacts touched (24h): ${f.highContactsRecoveredToday}`,
+    `  Backlog processed (prior 7 days): ${f.backlogProcessedApprox}`,
+    `  Auto-verified (prior 7 days): ${f.autoVerifiedToday}`,
+    `  Auto-rejected (prior 7 days): ${f.autoRejectedToday}`,
+    `  HIGH contacts touched (prior 7 days): ${f.highContactsRecoveredToday}`,
     "",
   ];
   return lines;
@@ -467,8 +467,8 @@ function renderFunnelHtml(data: OwnerDailySummaryData): string {
     <li>Waiting evidence: <strong>${f.waitingEnrichment}</strong></li>
     <li>Waiting HIGH official email: <strong>${f.waitingEmail}</strong></li>
     <li>Invite-ready: <strong>${f.inviteReady}</strong></li>
-    <li>Auto-verified (24h): <strong>${f.autoVerifiedToday}</strong> · Auto-rejected: <strong>${f.autoRejectedToday}</strong></li>
-    <li>HIGH contacts touched (24h): <strong>${f.highContactsRecoveredToday}</strong></li>
+    <li>Auto-verified (prior 7 days): <strong>${f.autoVerifiedToday}</strong> · Auto-rejected: <strong>${f.autoRejectedToday}</strong></li>
+    <li>HIGH contacts touched (prior 7 days): <strong>${f.highContactsRecoveredToday}</strong></li>
   </ul>`;
 }
 
@@ -556,7 +556,7 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
   const base = esc(appBaseUrl().replace(/\/$/, ""));
   const heading =
     data.listingsInventory.listingsCreatedCount > 0
-      ? "New listings (last 24h)"
+      ? "New listings (prior 7 days)"
       : "Recent listings (latest inventory)";
 
   const listingRows =
@@ -587,7 +587,7 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
   <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6;font-size:13px">
     <li><strong>Discoverable listings:</strong> ${inv.totalListings} (${inv.verifiedListings} verified, ${inv.unclaimedListings} unclaimed)</li>
     <li><strong>MicStage venues:</strong> ${inv.claimedVenues} registered · ${inv.bookableVenues} bookable with schedule</li>
-    <li><strong>New listings (24h):</strong> ${inv.listingsCreatedCount} · <strong>Claim invites sent (24h):</strong> ${inv.claimInvitesSentCount}</li>
+    <li><strong>New listings (prior 7 days):</strong> ${inv.listingsCreatedCount} · <strong>Claim invites sent (prior 7 days):</strong> ${inv.claimInvitesSentCount}</li>
     <li><strong>Pending claim invites (eligible to send):</strong> ${inv.pendingClaimInvites} · <strong>Leads waiting to publish:</strong> ${inv.leadsAwaitingPublish} · <strong>Google verified:</strong> ${inv.googleVerifiedListings}</li>
     <li><strong>Hidden listing backlog (NEEDS_REVIEW):</strong> ${inv.needsReviewCount}</li>
     <li><strong>Verified with active schedule:</strong> ${inv.verifiedWithActiveSchedule} · <strong>Indexable:</strong> ${inv.indexableScheduledListings} · <strong>Schedules confirmed today:</strong> ${inv.schedulesAutoConfirmedToday}</li>
@@ -596,8 +596,8 @@ function renderRecentListingsHtml(data: OwnerDailySummaryData): string {
     <li><strong>Claim contacts mined today:</strong> ${inv.claimContactsMinedToday} · <strong>Invite-ready:</strong> ${inv.inviteReadyTotal} · <strong>New invite-ready today:</strong> ${inv.inviteReadyNewToday} · <strong>Invites sent:</strong> ${inv.claimInvitesSentCount} · <strong>Claims started/completed:</strong> ${data.marketing.claimsStartedToday}/${data.marketing.claimsCompletedToday}</li>
     <li><strong>Schedule recovery:</strong> unscheduled ${inv.scheduleRecovery.unscheduledVerified} · scanned ${inv.scheduleRecovery.scannedToday} · pages ${inv.scheduleRecovery.officialPagesFetched} · found ${inv.scheduleRecovery.explicitScheduleFound} · created ${inv.scheduleRecovery.scheduleCreated} · ambiguous ${inv.scheduleRecovery.ambiguous} · blocked ${inv.scheduleRecovery.fetchBlocked} · none ${inv.scheduleRecovery.noScheduleFound}</li>
     <li><strong>Claim funnel (post-0f4dde2):</strong> views ${data.claimFunnelInstrumented.pageViews} · roles ${data.claimFunnelInstrumented.roleSelections} · starts ${data.claimFunnelInstrumented.formStarts} · submits ${data.claimFunnelInstrumented.formSubmits} · completed ${data.claimFunnelInstrumented.completions} · fail ${data.claimFunnelInstrumented.failedValidation + data.claimFunnelInstrumented.failedSession + data.claimFunnelInstrumented.failedOther}</li>
-    <li><strong>Performer funnel (24h):</strong> ${data.performerFunnel.guestSignupsToday} guest signups · ${data.performerFunnel.performerAccountsToday} accounts · ${data.performerFunnel.weeklyAlertOptInsNewToday} new weekly alerts · ${data.performerFunnel.weeklyAlertOptInsTotal} alert opt-ins total</li>
-    <li><strong>Raw candidates:</strong> ${data.growthLayers.rawCandidatesTotal} total · ${data.growthLayers.rawCandidatesToday} new (24h) · ${data.growthLayers.junkRejectedToday} junk rejected</li>
+    <li><strong>Performer funnel (prior 7 days):</strong> ${data.performerFunnel.guestSignupsToday} guest signups · ${data.performerFunnel.performerAccountsToday} accounts · ${data.performerFunnel.weeklyAlertOptInsNewToday} new weekly alerts · ${data.performerFunnel.weeklyAlertOptInsTotal} alert opt-ins total</li>
+    <li><strong>Raw candidates:</strong> ${data.growthLayers.rawCandidatesTotal} total · ${data.growthLayers.rawCandidatesToday} new (prior 7 days) · ${data.growthLayers.junkRejectedToday} junk rejected</li>
     <li><strong>Qualified:</strong> ${data.growthLayers.realPlaceCandidates} real-place · ${data.growthLayers.verifiedListings} verified · ${data.growthLayers.scheduledListings} scheduled · ${data.growthLayers.indexableListings} indexable · <strong>City hubs with schedules:</strong> ${data.growthLayers.cityHubsWithScheduled}</li>
     <li><strong>Users (7d):</strong> ${data.growthLayers.venuesRegistered7d} venues · ${data.growthLayers.hostsRegistered7d} hosts · ${data.growthLayers.performersRegistered7d} performers · ${data.growthLayers.performerSignups7d} signups · ${data.growthLayers.weeklyDigestOptIns} digest opt-ins</li>
   </ul>
@@ -617,7 +617,7 @@ export function ownerDailySummarySubject(data: OwnerDailySummaryData): string {
   const sent = data.growthEngine.emailsSentToday;
   const attention = ownerAttentionFromSummary(data);
   const prefix = attention.length ? "ATTN · " : "";
-  return `${prefix}MicStage Daily Summary — ${data.reportChicagoDate} · ${verified} verified · ${ready} eligible · ${sent} sent`;
+  return `${prefix}MicStage Weekly Summary — ${data.reportChicagoDate} · ${verified} verified · ${ready} eligible · ${sent} sent`;
 }
 
 function ownerAttentionFromSummary(data: OwnerDailySummaryData) {
@@ -669,10 +669,10 @@ function renderAttentionHtml(data: OwnerDailySummaryData): string {
 
 export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string {
   const lines: string[] = [
-    `MicStage Daily Summary (${data.windowLabel})`,
+    `MicStage Weekly Summary (${data.windowLabel})`,
     "",
     ...renderAttentionText(data),
-    "SIGNUPS (24h)",
+    "SIGNUPS (prior 7 days)",
     `  Venues (new operator accounts): ${data.signupVenueCount}`,
     `  Artists: ${data.signupArtistCount}`,
     "",
@@ -695,7 +695,7 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
     `  Outreach emails sent (OUTREACH / SENT): ${data.outreachEmailsSentCount}`,
     `  Unique clicks (canonical, first-party): ${data.uniqueClickLeadsCount}`,
     `    Note: ${data.clicksNote}`,
-    `  Growth replies logged (24h): ${data.growthRepliesCount}`,
+    `  Growth replies logged (prior 7 days): ${data.growthRepliesCount}`,
     `    Note: ${data.repliesNote}`,
     "",
   );
@@ -759,11 +759,11 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
 
   return `<!DOCTYPE html>
 <html><body style="font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#111827;max-width:720px;margin:0 auto;padding:16px">
-  <h1 style="font-size:18px;margin:0 0 4px">MicStage Daily Summary</h1>
+  <h1 style="font-size:18px;margin:0 0 4px">MicStage Weekly Summary</h1>
   <p style="margin:0 0 16px;color:#6b7280;font-size:13px">${esc(data.windowLabel)}</p>
   ${renderAttentionHtml(data)}
 
-  <h2 style="font-size:15px;margin:20px 0 8px">Signups (last 24h)</h2>
+  <h2 style="font-size:15px;margin:20px 0 8px">Signups (prior 7 days)</h2>
   <p style="margin:0 0 8px"><strong>Venues:</strong> ${data.signupVenueCount} · <strong>Artists:</strong> ${data.signupArtistCount}</p>
   <table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="text-align:left;background:#f9fafb">

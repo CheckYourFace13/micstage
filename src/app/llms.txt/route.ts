@@ -5,7 +5,7 @@ export const dynamic = "force-static";
  * Links only to existing public canonical pages. No private APIs or admin routes.
  */
 const BODY = `# MicStage
-> Nationwide open-mic discovery plus free tools for hosts and venues.
+> MicStage is a free platform for finding and running open mic nights for performers, hosts and venues across the U.S. and around the world.
 
 Site: https://micstage.com
 Purpose: Help performers find verified open mics, and help hosts/venues run nights with free MicStage tools.
@@ -15,7 +15,6 @@ Purpose: Help performers find verified open mics, and help hosts/venues run nigh
 - https://micstage.com/map
 - https://micstage.com/venues
 - https://micstage.com/locations
-- https://micstage.com/locations/chicago-il/open-mics
 
 ## Resources and guides
 - https://micstage.com/resources

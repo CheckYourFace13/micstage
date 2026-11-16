@@ -40,6 +40,7 @@ const listingSelect = {
   verificationStatus: true,
   claimStatus: true,
   claimedVenueId: true,
+  googlePlaceId: true,
   removedAt: true,
   about: true,
   hostName: true,

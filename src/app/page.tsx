@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: homeTitle,
     description:
-      "Find open mics near you across the U.S. and around the world — music, comedy, and poetry. Check schedules and signup details, or run your night free — for performers, hosts, and venues.",
+      "MicStage is a free platform for finding and running open mic nights for performers, hosts and venues across the U.S. and around the world.",
     path: "/",
   }),
   title: { absolute: homeTitle },
@@ -38,8 +38,9 @@ export default function Home() {
               Perform. Free.
             </h1>
             <p className="mt-4 max-w-xl text-sm text-white/70 md:text-base">
-              Find open mics near you across the U.S. and around the world. Manage the schedule, organize performer
-              signups, share your lineup, and keep the night moving — in one place. Free for performers, hosts, and venues.
+              MicStage is a free platform for finding and running open mic nights for performers, hosts and venues
+              across the U.S. and around the world. Manage the schedule, organize performer signups, share your lineup,
+              and keep the night moving — in one place.
             </p>
 
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">

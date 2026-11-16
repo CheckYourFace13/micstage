@@ -22,7 +22,7 @@ function authorize(request: Request): boolean {
  * Query: ?force=1 — send now (ignore 8am window + idempotency). Auth required.
  *
  * Env: MICSTAGE_DISABLE_OWNER_SUMMARY=1 — no-op.
- *      MICSTAGE_OWNER_SUMMARY_EMAIL — override recipient (default chris@iscreamstudio.com).
+ *      MICSTAGE_OWNER_SUMMARY_EMAIL — override recipient.
  */
 export async function POST(request: Request) {
   return handle(request);

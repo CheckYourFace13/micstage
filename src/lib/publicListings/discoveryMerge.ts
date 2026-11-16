@@ -6,8 +6,8 @@ import {
   venueIncludedInDiscoveryPage,
 } from "@/lib/discoveryMarket";
 import { formatMiles, haversineDistanceMiles } from "@/lib/geo";
-import { loadDiscoverablePublicListings, publicListingWhereDiscoverable } from "@/lib/publicListings/queries";
-import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { loadDiscoverablePublicListings } from "@/lib/publicListings/queries";
+import { dedupeByPublicDiscoveryIdentity } from "@/lib/publicListings/publicDiscoveryIdentity";
 import type {
   DiscoveryListingKind,
   NearbyDiscoveryRow,
@@ -27,7 +27,12 @@ export type PublicDiscoveryLocationRow = {
   slug: string;
 };
 
-type CityRegionRow = { city: string | null; region: string | null };
+type CityRegionRow = {
+  city: string | null;
+  region: string | null;
+  name?: string;
+  googlePlaceId?: string | null;
+};
 
 function listingKind(verificationStatus: string): DiscoveryListingKind {
   if (verificationStatus === "VERIFIED" || verificationStatus === "NEEDS_REVIEW") return "verified";
@@ -107,21 +112,35 @@ function toFinderRow(
   };
 }
 
+/**
+ * One row per venue/open-mic identity for market rollups and /locations counts.
+ * Uses the same discoverable listing gate + identity dedupe as finder/hubs.
+ */
 async function combinedCityRegionRows(prisma: PrismaClient): Promise<CityRegionRow[]> {
   const [venues, listings] = await Promise.all([
     prisma.venue.findMany({
       where: { city: { not: null } },
-      select: { city: true, region: true },
+      select: { name: true, city: true, region: true, googlePlaceId: true },
     }),
-    prisma.publicOpenMicListing.findMany({
-      where: { city: { not: null }, ...publicListingWhereDiscoverable() },
-      select: { name: true, city: true, region: true },
-    }),
+    // Same public gate as finder (name + geo + trusted open-mic evidence).
+    loadDiscoverablePublicListings(prisma),
   ]);
-  const qualityListings = listings
-    .filter((l) => isPublicListingNameOk(l.name))
-    .map((l) => ({ city: l.city, region: l.region }));
-  return [...venues, ...qualityListings];
+  // Claimed venues first so they win identity ties against unclaimed listing mirrors.
+  const merged = [
+    ...venues.map((v) => ({ ...v, _kind: "claimed" as const })),
+    ...listings.map((l) => ({
+      name: l.name,
+      city: l.city,
+      region: l.region,
+      googlePlaceId: l.googlePlaceId,
+      _kind: "verified" as const,
+    })),
+  ];
+  return dedupeByPublicDiscoveryIdentity(
+    merged,
+    (r) => ({ googlePlaceId: r.googlePlaceId, name: r.name, city: r.city, region: r.region }),
+    (r) => ({ kind: r._kind }),
+  ).map((r) => ({ city: r.city, region: r.region, name: r.name, googlePlaceId: r.googlePlaceId }));
 }
 
 export async function getDiscoveryLocationCounts(prisma: PrismaClient): Promise<Map<string, number>> {
@@ -170,6 +189,7 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
         region: true,
         lat: true,
         lng: true,
+        googlePlaceId: true,
         bookingOpensDaysAhead: true,
         eventTemplates: {
           where: { isPublic: true },
@@ -222,7 +242,9 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
     nextHostSignupByVenue.set(night.venueId, { nightId: night.id, openSpots });
   }
 
-  const claimed = venues.map((v) => {
+  type FinderWithPlace = { row: OpenMicFinderVenue; googlePlaceId: string | null };
+
+  const claimed: FinderWithPlace[] = venues.map((v) => {
     const hasSchedule = v.eventTemplates.length > 0;
     const hostSignup = nextHostSignupByVenue.get(v.id);
     const bookable =
@@ -239,23 +261,26 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
         ? `OPEN SPOTS · Sign up →`
         : "Sign up for this night →"
       : null;
-    return toFinderRow(
-      v,
-      {
-        href,
-        kind: "claimed",
-        bookable,
-        hasSchedule,
-        scheduleWeekdays,
-        scheduleStarts,
-        performanceFormats,
-        ctaLabel,
-      },
-      counts,
-    );
+    return {
+      row: toFinderRow(
+        v,
+        {
+          href,
+          kind: "claimed",
+          bookable,
+          hasSchedule,
+          scheduleWeekdays,
+          scheduleStarts,
+          performanceFormats,
+          ctaLabel,
+        },
+        counts,
+      ),
+      googlePlaceId: v.googlePlaceId ?? null,
+    };
   });
 
-  const unclaimed = listings.map((l) => {
+  const unclaimed: FinderWithPlace[] = listings.map((l) => {
     const kind = listingKind(l.verificationStatus);
     const hasSchedule = l.schedules.length > 0;
     const scheduleWeekdays = [...new Set(l.schedules.map((s) => s.weekday))];
@@ -265,24 +290,42 @@ export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<Ope
     const performanceFormats = [
       ...new Set(l.schedules.map((s) => s.performanceFormat).filter(Boolean) as string[]),
     ];
-    return toFinderRow(
-      l,
-      {
-        href: listingPublicHref(l.slug),
-        kind,
-        bookable: false,
-        hasSchedule,
-        scheduleWeekdays,
-        scheduleStarts,
-        performanceFormats,
-        signupMethod: l.signupMethod,
-        cost: l.cost,
-      },
-      counts,
-    );
+    return {
+      row: toFinderRow(
+        l,
+        {
+          href: listingPublicHref(l.slug),
+          kind,
+          bookable: false,
+          hasSchedule,
+          scheduleWeekdays,
+          scheduleStarts,
+          performanceFormats,
+          signupMethod: l.signupMethod,
+          cost: l.cost,
+        },
+        counts,
+      ),
+      googlePlaceId: l.googlePlaceId ?? null,
+    };
   });
 
-  return [...claimed, ...unclaimed].sort((a, b) => a.name.localeCompare(b.name));
+  const deduped = dedupeByPublicDiscoveryIdentity(
+    [...claimed, ...unclaimed],
+    (r) => ({
+      googlePlaceId: r.googlePlaceId,
+      name: r.row.name,
+      city: r.row.city,
+      region: r.row.region,
+    }),
+    (r) => ({
+      kind: r.row.kind,
+      bookable: r.row.bookable,
+      hasSchedule: r.row.hasSchedule,
+    }),
+  ).map((r) => r.row);
+
+  return deduped.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function loadNearbyDiscoveryRows(
@@ -290,9 +333,8 @@ export async function loadNearbyDiscoveryRows(
   lat: number,
   lng: number,
 ): Promise<NearbyDiscoveryRow[]> {
-  // Reuse finder rows so host-night deep links and OPEN SPOTS CTAs stay consistent.
+  // Reuse deduped finder inventory so nearby matches hub/finder identity counts.
   const finder = await loadOpenMicFinderVenues(prisma);
-  const bySlug = new Map(finder.map((v) => [v.slug, v]));
 
   const [venues, listings] = await Promise.all([
     prisma.venue.findMany({
@@ -328,39 +370,31 @@ export async function loadNearbyDiscoveryRows(
     ctaLabel?: string | null;
   };
 
-  const rows: Raw[] = [
-    ...venues.map((v) => {
-      const f = bySlug.get(v.slug);
-      return {
-        slug: v.slug,
-        name: v.name,
-        city: v.city,
-        region: v.region,
-        formattedAddress: v.formattedAddress,
-        lat: v.lat,
-        lng: v.lng,
-        href: f?.href ?? venuePublicHref(v.slug),
-        kind: "claimed" as const,
-        bookable: f?.bookable ?? false,
-        hasSchedule: f?.hasSchedule ?? true,
-        ctaLabel: f?.ctaLabel ?? null,
-      };
-    }),
-    ...listings.map((l) => ({
-      slug: l.slug,
-      name: l.name,
-      city: l.city,
-      region: l.region,
-      formattedAddress: displayListingAddress(l.name, l.formattedAddress, l.city, l.region),
-      lat: l.lat,
-      lng: l.lng,
-      href: listingPublicHref(l.slug),
-      kind: listingKind(l.verificationStatus),
-      bookable: false,
-      hasSchedule: l.schedules.length > 0,
-      ctaLabel: null,
-    })),
-  ];
+  const venueBySlug = new Map(venues.map((v) => [v.slug, v]));
+  const listingBySlug = new Map(listings.map((l) => [l.slug, l]));
+
+  const rows: Raw[] = finder.map((f) => {
+    const v = venueBySlug.get(f.slug);
+    const l = listingBySlug.get(f.slug);
+    return {
+      slug: f.slug,
+      name: f.name,
+      city: f.city,
+      region: f.region,
+      formattedAddress: v
+        ? v.formattedAddress
+        : l
+          ? displayListingAddress(l.name, l.formattedAddress, l.city, l.region)
+          : [f.city, f.region].filter(Boolean).join(", "),
+      lat: f.lat ?? v?.lat ?? l?.lat ?? null,
+      lng: f.lng ?? v?.lng ?? l?.lng ?? null,
+      href: f.href,
+      kind: f.kind,
+      bookable: f.bookable,
+      hasSchedule: f.hasSchedule,
+      ctaLabel: f.ctaLabel ?? null,
+    };
+  });
 
   for (const v of rows) {
     const base = {

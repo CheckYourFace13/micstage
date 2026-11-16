@@ -250,7 +250,7 @@ export async function sendListingClaimInviteIfNeeded(
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { id: listingId },
     include: {
-      schedules: { select: { title: true, description: true } },
+      schedules: { select: { title: true, description: true, weekday: true, isActive: true } },
       openMicEvidenceRows: {
         select: {
           trusted: true,
@@ -275,6 +275,7 @@ export async function sendListingClaimInviteIfNeeded(
     },
   });
   if (!listing) return { sent: false, reason: "listing_not_found" };
+  if (listing.removedAt) return { sent: false, reason: "removed" };
   if (listing.claimInviteEmailSentAt) return { sent: false, reason: "already_sent" };
   if (listing.claimedVenueId || listing.claimStatus === "CLAIMED") {
     return { sent: false, reason: "already_claimed" };
@@ -512,6 +513,7 @@ export async function runPendingListingClaimInvites(
       claimedVenueId: null,
       claimStatus: { not: "CLAIMED" },
       verificationStatus: "VERIFIED",
+      removedAt: null,
       googlePlaceId: { not: null },
       growthLead: {
         contactEmailNormalized: { not: null },
@@ -535,7 +537,9 @@ export async function runPendingListingClaimInvites(
       evidenceTerminalReason: true,
       internalNotes: true,
       about: true,
-      schedules: { select: { title: true, description: true } },
+      lastVerifiedAt: true,
+      googlePlaceVerifiedAt: true,
+      schedules: { select: { title: true, description: true, weekday: true, isActive: true } },
       openMicEvidenceRows: {
         select: {
           trusted: true,
@@ -654,7 +658,7 @@ async function sendListingClaimInviteReminderIfNeeded(
   const listing = await prisma.publicOpenMicListing.findUnique({
     where: { id: listingId },
     include: {
-      schedules: { select: { title: true, description: true } },
+      schedules: { select: { title: true, description: true, weekday: true, isActive: true } },
       claimAuditEvents: { select: { eventType: true } },
       openMicEvidenceRows: {
         select: {
@@ -680,6 +684,7 @@ async function sendListingClaimInviteReminderIfNeeded(
     },
   });
   if (!listing) return { sent: false, reason: "listing_not_found" };
+  if (listing.removedAt) return { sent: false, reason: "removed" };
   if (!listing.claimInviteEmailSentAt) return { sent: false, reason: "not_sent" };
   if (listing.claimedVenueId || listing.claimStatus === "CLAIMED") {
     return { sent: false, reason: "already_claimed" };

@@ -126,12 +126,22 @@ assert.equal(
     hasPublicSchedule: true,
     requireMeaningfulInventory: true,
   }),
-  true,
+  false,
+  "hubs need ≥5 strong listings to index",
 );
 assert.equal(
   shouldIndexDiscoveryPage({
     venueCount: 3,
     listingCount: 3,
+    hasPublicSchedule: false,
+    requireMeaningfulInventory: true,
+  }),
+  false,
+);
+assert.equal(
+  shouldIndexDiscoveryPage({
+    venueCount: 5,
+    listingCount: 5,
     hasPublicSchedule: false,
     requireMeaningfulInventory: true,
   }),

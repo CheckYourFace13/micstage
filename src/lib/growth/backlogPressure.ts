@@ -71,18 +71,26 @@ export async function evaluateBacklogPressure(
     prisma.publicOpenMicListing.count({
       where: { claimedVenueId: null, verificationStatus: "NEEDS_REVIEW" },
     }),
+    // Any machine/admin stamp to VERIFIED in-window (Google verify + promote), not only "auto-promote" notes.
     prisma.publicOpenMicListing.count({
       where: {
+        claimedVenueId: null,
         verificationStatus: "VERIFIED",
         lastVerifiedAt: { gte: startUtc, lt: endUtc },
-        internalNotes: { contains: "auto-promote" },
       },
     }),
+    // Junk rejector, promote junk path, and Google duplicate outdates all clear NEEDS_REVIEW.
     prisma.publicOpenMicListing.count({
       where: {
         verificationStatus: "OUTDATED",
         updatedAt: { gte: startUtc, lt: endUtc },
-        internalNotes: { contains: "auto-reject" },
+        OR: [
+          { internalNotes: { contains: "auto-reject" } },
+          { evidenceTerminalReason: { startsWith: "JUNK_NAME_" } },
+          { evidenceTerminalReason: "DUPLICATE_GOOGLE_PLACE" },
+          { evidenceTerminalReason: "PLACE_OR_REGION_CONFLICT" },
+          { evidenceTerminalReason: "WEAK_PLACE_MEDIA_OR_DIRECTORY" },
+        ],
       },
     }),
     prisma.publicOpenMicListing.count({

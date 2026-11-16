@@ -96,10 +96,13 @@ export default function TermsPage() {
       </p>
       <p>
         This license continues for as long as needed to provide the service and the uses above, subject to your
-        account controls and applicable law. If you believe material on MicStage infringes your rights, contact us via
-        the{" "}
-        <Link className="text-[rgb(var(--om-neon))] underline hover:brightness-110" href="/contact">
-          contact form
+        account controls and applicable law. If you believe material on MicStage infringes your copyright or other rights,
+        submit a report via the{" "}
+        <Link
+          className="text-[rgb(var(--om-neon))] underline hover:brightness-110"
+          href="/contact?category=copyright_dmca"
+        >
+          Copyright / DMCA contact form
         </Link>
         .
       </p>

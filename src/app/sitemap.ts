@@ -9,6 +9,9 @@ import { marketingSitemapSupplements } from "@/lib/marketing/indexability";
 import { publicListingWhereDiscoverable } from "@/lib/publicListings/queries";
 import { listingMeetsPublicSeoIndexGate, venueIsSitemapEligible } from "@/lib/publicListings/listingSeo";
 import { isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
+import { evaluateOpenMicEvidence } from "@/lib/publicListings/openMicEvidence";
+import { dedupeByPublicDiscoveryIdentity } from "@/lib/publicListings/publicDiscoveryIdentity";
+import { listingHasGeoConflict } from "@/lib/publicListings/evidenceTrust";
 
 export const revalidate = 3600;
 
@@ -101,6 +104,7 @@ async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
           city: true,
           region: true,
           name: true,
+          googlePlaceId: true,
           verificationStatus: true,
           formattedAddress: true,
           lastVerifiedAt: true,
@@ -138,44 +142,64 @@ async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.72,
     }));
 
-    const combinedLocations = [
-      ...venues.map((v) => ({ city: v.city, region: v.region, updatedAt: v.updatedAt })),
-      ...listings.map((l) => ({ city: l.city, region: l.region, updatedAt: l.updatedAt })),
-    ];
-    const counts = computeCitySlugVenueCounts(combinedLocations);
+    // Same identity dedupe as /locations + hub pages — inflated duplicates must not force index.
+    const hubInventory = dedupeByPublicDiscoveryIdentity(
+      [
+        ...venues.map((v) => ({
+          name: v.name,
+          city: v.city,
+          region: v.region,
+          googlePlaceId: v.googlePlaceId,
+          updatedAt: v.updatedAt,
+          hasSchedule: (v.eventTemplates ?? []).length > 0,
+          kind: "claimed" as const,
+        })),
+        ...listings
+          .filter(
+            (l) =>
+              isPublicListingNameOk(l.name) &&
+              !listingHasGeoConflict({
+                region: l.region,
+                city: l.city,
+                formattedAddress: l.formattedAddress,
+                name: l.name,
+              }) &&
+              evaluateOpenMicEvidence({
+                listingName: l.name,
+                schedules: l.schedules,
+                sourceUrl: l.sourceUrl,
+                websiteUrl: l.websiteUrl,
+              }).trusted,
+          )
+          .map((l) => ({
+            name: l.name,
+            city: l.city,
+            region: l.region,
+            googlePlaceId: l.googlePlaceId,
+            updatedAt: l.updatedAt,
+            hasSchedule: l.schedules.length > 0,
+            kind: "verified" as const,
+          })),
+      ],
+      (r) => ({ googlePlaceId: r.googlePlaceId, name: r.name, city: r.city, region: r.region }),
+      (r) => ({ kind: r.kind, hasSchedule: r.hasSchedule }),
+    );
+    const counts = computeCitySlugVenueCounts(hubInventory);
     const locationUpdatedAt = new Map<string, Date>();
-    for (const v of combinedLocations) {
-      const city = (v.city ?? "").trim();
+    const listingCountBySlug = new Map<string, { count: number; hasSchedule: boolean }>();
+    for (const row of hubInventory) {
+      const city = (row.city ?? "").trim();
       if (!city) continue;
-      const slug = primaryDiscoverySlugForVenue(city, v.region, counts);
+      const slug = primaryDiscoverySlugForVenue(city, row.region, counts);
       if (!slug) continue;
       const prev = locationUpdatedAt.get(slug);
-      if (!prev || v.updatedAt > prev) {
-        locationUpdatedAt.set(slug, v.updatedAt);
+      if (!prev || row.updatedAt > prev) {
+        locationUpdatedAt.set(slug, row.updatedAt);
       }
-    }
-
-    const listingCountBySlug = new Map<string, { count: number; hasSchedule: boolean }>();
-    const addLocationInventory = (
-      city: string | null,
-      region: string | null,
-      hasSchedule: boolean,
-    ) => {
-      const place = (city ?? "").trim();
-      if (!place) return;
-      const slug = primaryDiscoverySlugForVenue(place, region, counts);
-      if (!slug) return;
       const cur = listingCountBySlug.get(slug) ?? { count: 0, hasSchedule: false };
       cur.count += 1;
-      if (hasSchedule) cur.hasSchedule = true;
+      if (row.hasSchedule) cur.hasSchedule = true;
       listingCountBySlug.set(slug, cur);
-    };
-    for (const v of venues) {
-      addLocationInventory(v.city, v.region, (v.eventTemplates ?? []).length > 0);
-    }
-    for (const l of listings) {
-      if (!isPublicListingNameOk(l.name)) continue;
-      addLocationInventory(l.city, l.region, l.schedules.length > 0);
     }
 
     const locationOpenMicEntries: MetadataRoute.Sitemap = [...locationUpdatedAt.entries()]

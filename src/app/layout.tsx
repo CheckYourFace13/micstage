@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { Bebas_Neue, Inter } from "next/font/google";
-import { AdSenseScript } from "@/components/ads/AdSenseScript";
+// AdSenseScript intentionally not mounted while awaiting AdSense approval.
+// Keep google-adsense-account meta + ads.txt for ownership verification.
 import { MarketingTrackingClient } from "@/components/MarketingTrackingClient";
 import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -42,8 +43,13 @@ export const metadata: Metadata = {
   description: siteTagline,
   applicationName: "MicStage",
   icons: {
-    icon: [{ url: "/favicon.png", type: "image/png" }],
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", type: "image/png" }],
   },
+
   openGraph: {
     siteName: "MicStage",
     type: "website",
@@ -73,8 +79,8 @@ export default async function RootLayout({
     name: "MicStage",
     description: OPEN_MIC_PLATFORM_DESCRIPTION,
     url: absoluteUrl("/"),
-    logo: absoluteUrl("/favicon.png"),
-    image: defaultOgImageUrls[0] ?? absoluteUrl("/favicon.png"),
+    logo: absoluteUrl("/apple-touch-icon.png"),
+    image: defaultOgImageUrls[0] ?? absoluteUrl("/apple-touch-icon.png"),
   };
   const siteJsonLd = buildWebSiteJsonLd();
   return (
@@ -82,14 +88,13 @@ export default async function RootLayout({
       <head>
         <meta charSet="utf-8" />
         <meta name="google-adsense-account" content="ca-pub-9572509189594279" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/favicon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
       </head>
       <body className="min-h-dvh overflow-x-hidden bg-black pb-[env(safe-area-inset-bottom)] font-[var(--font-body)] text-white">
-        <Suspense fallback={null}>
-          <AdSenseScript />
-        </Suspense>
         {!embed ? <SiteHeader /> : null}
         {children}
         {!embed ? <SiteFooter /> : null}

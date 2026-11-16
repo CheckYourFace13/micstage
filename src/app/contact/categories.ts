@@ -8,6 +8,7 @@ export const CONTACT_CATEGORIES = [
   { value: "booking", label: "Booking issue" },
   { value: "account", label: "Account/login issue" },
   { value: "bug", label: "Report a bug" },
+  { value: "copyright_dmca", label: "Copyright / DMCA report" },
   { value: "partnership", label: "Partnership / business inquiry" },
   { value: "other", label: "Other" },
 ] as const;

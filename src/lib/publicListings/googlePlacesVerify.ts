@@ -446,17 +446,21 @@ export async function verifyPublicListingsWithGoogle(
   const verifiedInventory = await prisma.publicOpenMicListing.count({
     where: { verificationStatus: "VERIFIED", removedAt: null, googlePlaceId: { not: null } },
   });
-  // Keep the Places cost cap for re-enrichment, but still place-check brand-new
-  // listings so NEEDS_REVIEW does not grow forever after the inventory target is met.
-  const onlyNeverChecked = verifiedInventory >= inventoryTarget;
+  /**
+   * When verified inventory is large, prefer brand-new rows (never place-touched).
+   * Still always allow IDs-only incompletes (`googlePlaceId` set, `googlePlaceVerifiedAt`
+   * null) — otherwise Details never stamps and promote/index stalls forever.
+   */
+  const preferNeverChecked = verifiedInventory >= inventoryTarget;
 
   const now = new Date();
   const rows = await prisma.publicOpenMicListing.findMany({
     where: {
       claimedVenueId: null,
       verificationStatus: { not: "OUTDATED" },
-      OR: onlyNeverChecked
-        ? [{ AND: [{ googlePlaceId: null }, { googlePlaceVerifiedAt: null }] }]
+      OR: preferNeverChecked
+        ? // Incomplete place stamps must stay eligible or promote/index never advances.
+          [{ googlePlaceVerifiedAt: null }]
         : [{ googlePlaceId: null }, { googlePlaceVerifiedAt: null }],
       AND: [
         {
@@ -486,6 +490,11 @@ export async function verifyPublicListingsWithGoogle(
       placeVerifyAttemptCount: true,
       createdAt: true,
       schedules: { select: { title: true, description: true } },
+      openMicEvidenceRows: {
+        where: { OR: [{ trusted: true }, { reviewOnly: true, detectedPhrase: { not: null } }] },
+        select: { trusted: true, reviewOnly: true, detectedPhrase: true },
+        take: 8,
+      },
       growthLead: {
         select: {
           sourceKind: true,
@@ -509,12 +518,16 @@ export async function verifyPublicListingsWithGoogle(
   for (const row of rows) {
     const attemptCount = (row.placeVerifyAttemptCount ?? 0) + 1;
     const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
+    const storedOfficial = (row.openMicEvidenceRows ?? []).some(
+      (e) => e.trusted || (e.reviewOnly && Boolean(e.detectedPhrase?.trim())),
+    );
+    const evidenceReady = evidence.trusted || storedOfficial;
     const result = await verifyListingWithGoogle(row, {
       prisma,
       listingId: row.id,
       detailsCheckedAt: row.googlePlaceDetailsCheckedAt,
       allowPaidDetails:
-        evidence.trusted && !row.googlePlaceVerifiedAt && !detailsCheckedRecently(row.googlePlaceDetailsCheckedAt),
+        evidenceReady && !row.googlePlaceVerifiedAt && !detailsCheckedRecently(row.googlePlaceDetailsCheckedAt),
     });
     const paidFinished = Boolean(result.detailsFetched || result.duplicateWithoutDetails);
     const noMatch = result.reason.includes("No Google Business listing");
@@ -584,9 +597,11 @@ export async function verifyPublicListingsWithGoogle(
       } else {
         // Google confirmed the place exists. Only publish (VERIFIED) when there is
         // ALSO explicit open-mic evidence from a trusted, venue-tied source
-        // (name/schedule, venue/event/admin source, or the venue's own domain).
+        // (name/schedule, venue/event/admin source, venue domain, or stored crawl).
         // Otherwise save the place fields + coordinates but hold for review.
         const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
+        // Place is confirmed in this branch — review-only official crawls may unlock VERIFIED.
+        const canVerify = evidence.trusted || storedOfficial;
         /**
          * Only the place id and the verification timestamp are persisted. Maps Platform terms
          * grant no retention for Google's business name, address, or website, and its
@@ -598,16 +613,16 @@ export async function verifyPublicListingsWithGoogle(
           googlePlaceVerifiedAt: new Date(),
           lastVerifiedAt: new Date(),
         };
-        if (evidence.trusted) {
+        if (canVerify) {
+          const evidenceNote = evidence.trusted
+            ? `${evidence.reason} (${evidence.field}: "${evidence.snippet}")`
+            : `${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (stored crawl evidence)`;
           await prisma.publicOpenMicListing.update({
             where: { id: row.id },
             data: {
               ...placeData,
               verificationStatus: "VERIFIED" satisfies PublicListingVerificationStatus,
-              internalNotes: appendInternalNote(
-                row.internalNotes,
-                `${result.reason}; ${evidence.reason} (${evidence.field}: "${evidence.snippet}")`,
-              ),
+              internalNotes: appendInternalNote(row.internalNotes, `${result.reason}; ${evidenceNote}`),
             },
           });
           verified += 1;
@@ -623,7 +638,9 @@ export async function verifyPublicListingsWithGoogle(
         } else {
           const evNote = evidence.hasEvidence
             ? `${OPEN_MIC_EVIDENCE_REASON.UNTRUSTED} (${evidence.field}: "${evidence.snippet}")`
-            : OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY;
+            : storedOfficial
+              ? `${OPEN_MIC_EVIDENCE_REASON.UNTRUSTED} (stored review-only crawl)`
+              : OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY;
           await prisma.publicOpenMicListing.update({
             where: { id: row.id },
             data: {

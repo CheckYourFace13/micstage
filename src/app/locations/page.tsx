@@ -70,7 +70,7 @@ export default async function LocationsPage() {
             <p className="max-w-2xl text-xs leading-relaxed text-white/55 md:text-sm md:text-white/70">
               Browse metro and regional hubs. Not every small town gets its own directory page yet. When a place has fewer than{" "}
               <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> MicStage venues, we group it into a
-              broader market (for example Chicagoland or Central Illinois) so discovery is easier. Addresses on each venue page
+              broader market (for example Chicagoland or Illinois) so discovery is easier. Addresses on each venue page
               stay exact.
             </p>
             <p className="text-xs leading-snug text-white/50 md:text-sm md:leading-normal md:text-white/65">

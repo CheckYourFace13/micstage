@@ -1191,7 +1191,8 @@ assert.equal(
 );
 assert.equal(mapOutreachReasonToScorecardBucket("eligible"), "sendable_now");
 assert.equal(mapOutreachReasonToScorecardBucket("no_target_bound_open_mic_evidence"), "no_explicit_open_mic_evidence");
-assert.equal(mapOutreachReasonToScorecardBucket("defer_claim_path"), "other");
+assert.equal(mapOutreachReasonToScorecardBucket("defer_claim_path"), "claim_path_deferred");
+assert.equal(mapOutreachReasonToScorecardBucket("pending_draft"), "queued_for_send");
 const claimMail = buildListingClaimInvitePayload({
   listingName: "Blue Note Open Mic",
   listingSlug: "blue-note-open-mic",

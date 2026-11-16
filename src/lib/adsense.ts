@@ -7,9 +7,12 @@ export const ADSENSE_PUBLISHER_NUMERIC_ID = "9572509189594279";
 /** IAB ads.txt authorized seller line for google.com (also written to public/ads.txt on build). */
 export const ADSENSE_ADS_TXT_LINE = `google.com, pub-${ADSENSE_PUBLISHER_NUMERIC_ID}, DIRECT, f08c47fec0942fa0`;
 
-/** True in production, or when explicitly enabled for local testing. */
-export const ADSENSE_ENABLED =
-  process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === "true";
+/**
+ * Ad unit / loader kill switch while awaiting AdSense approval.
+ * Ownership signals (ads.txt + google-adsense-account meta) stay live.
+ * Re-enable with NEXT_PUBLIC_ENABLE_ADSENSE=true after approval.
+ */
+export const ADSENSE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === "true";
 
 function normalizePath(pathname: string): string {
   return (pathname.split("?")[0] ?? pathname).replace(/\/$/, "") || "/";
@@ -17,19 +20,12 @@ function normalizePath(pathname: string): string {
 
 /**
  * Path-only AdSense gate (used by root `AdSenseScript`).
- *
- * Allows:
- * - /resources (index)
- * - /locations/[market]/open-mics (strong city open-mic hubs)
- *
- * Does NOT allow `/resources/[slug]` by path alone — unknown slugs call `notFound()`
- * while keeping the URL, which would otherwise load ads on a 404. Real article pages
- * pass `trustedEditorialSurface` into `AdSenseDisplayAd` (which loads the script).
- *
- * Not on discovery product hubs, performers pages, homepage, host, FAQ, ops, listing detail,
- * auth, claim, or generic 404 URLs.
+ * Currently returns false for all paths while ADSENSE_ENABLED is off.
+ * After approval, restore allowlist for /resources (+ trusted article surfaces)
+ * and strong /locations/{slug}/open-mics hubs only.
  */
 export function shouldShowAdsOnPath(pathname: string): boolean {
+  if (!ADSENSE_ENABLED) return false;
   const path = normalizePath(pathname);
 
   if (path === "/resources") return true;

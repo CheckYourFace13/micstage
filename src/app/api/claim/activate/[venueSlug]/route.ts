@@ -3,6 +3,7 @@ import { parseArtistTiming } from "@/lib/artistTiming";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { refreshListingPromotionEligible } from "@/lib/publicListings/listingClaimInviteEmail";
+import { ensureVenueScheduleMaterialized } from "@/lib/venue/materializeVenueScheduleInstances";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -114,6 +115,16 @@ export async function POST(
       });
     }
   });
+
+  // Publishing a recurring schedule must create real upcoming nights (instances + slots).
+  if (publishSchedule || enableBooking) {
+    try {
+      await ensureVenueScheduleMaterialized(prisma, venue.id, { extendExpiredEnd: true });
+    } catch (e) {
+      console.error("[claim activate] materialize schedule failed", venueSlug, e);
+      return NextResponse.json({ ok: false, error: "Could not generate upcoming nights" }, { status: 500 });
+    }
+  }
 
   if (venue.claimedFromListing?.id && publishSchedule) {
     await refreshListingPromotionEligible(prisma, venue.claimedFromListing.id);

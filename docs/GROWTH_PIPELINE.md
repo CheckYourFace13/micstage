@@ -74,7 +74,7 @@ GROWTH_DISCOVERY_MARKET_SLUGS=national-discovery-us
 GROWTH_DISCOVERY_MARKETS_PER_CRON_RUN=1
 ```
 
-Remove any `chicagoland-il` / `illinois-regional` entries from that env if present.
+Remove any `chicagoland-il` / `illinois-regional` / `central-illinois-il` entries from that env if present (legacy IL regionals redirect to `/locations/illinois`).
 
 ## Hostinger hPanel (hands-off)
 

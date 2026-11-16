@@ -547,6 +547,8 @@ export type OutreachScorecardBucket =
   | "domain_cap"
   | "listing_already_claimed"
   | "account_already_exists"
+  | "claim_path_deferred"
+  | "queued_for_send"
   | "other";
 
 export function mapOutreachReasonToScorecardBucket(reason: OutreachEligibilityReason): OutreachScorecardBucket {
@@ -565,6 +567,10 @@ export function mapOutreachReasonToScorecardBucket(reason: OutreachEligibilityRe
       return "unsubscribed";
     case "duplicate_recent_send":
       return "duplicate";
+    case "defer_claim_path":
+      return "claim_path_deferred";
+    case "pending_draft":
+      return "queued_for_send";
     case "no_target_bound_open_mic_evidence":
     case "stale_open_mic_evidence":
     case "weak_open_mic_signal":
@@ -653,6 +659,8 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
       domain_cap: 0,
       listing_already_claimed: 0,
       account_already_exists: 0,
+      claim_path_deferred: 0,
+      queued_for_send: 0,
       other: 0,
     },
     topBlockReasons: [] as Array<{ reason: string; count: number }>,
@@ -732,22 +740,34 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
         listings: row.publicListings,
       });
       const ident = identityFieldsFromListings(row.publicListings);
+      const hasInFlightDraft = row.outreachDrafts.length > 0;
+      /**
+       * Net-eligible = can receive a send if drafted/queued. An in-flight draft is inventory in the
+       * send path, not a quality block — counting it as ineligible falsely zeros the metric whenever
+       * automation has already drafted the HIGH pool.
+       */
       const { reason } = evaluateGrowthLeadOutreachEligibility({
         ...row,
         city: row.city ?? ident.listingCity,
         region: row.region ?? ident.listingRegion,
         ...ident,
         leadGooglePlaceId: row.googlePlaceId,
-        hasPendingDraft: row.outreachDrafts.length > 0,
+        hasPendingDraft: false,
         hasRecentOutreachSend: recentSet.has(email),
         deferClaimPath,
         listingRemoved: false,
         contact: contactMap.get(email) ?? null,
         suppressionBlocked: sup.suppressed,
       });
-      counts[reason] += 1;
-      if (reason === "eligible") counts.netSendEligible += 1;
-      counts.scorecardBuckets[mapOutreachReasonToScorecardBucket(reason)] += 1;
+      if (reason === "eligible" && hasInFlightDraft) {
+        counts.pending_draft += 1;
+        counts.netSendEligible += 1;
+        counts.scorecardBuckets.queued_for_send += 1;
+      } else {
+        counts[reason] += 1;
+        if (reason === "eligible") counts.netSendEligible += 1;
+        counts.scorecardBuckets[mapOutreachReasonToScorecardBucket(reason)] += 1;
+      }
     }
 
     cursor = rows[rows.length - 1]?.id;

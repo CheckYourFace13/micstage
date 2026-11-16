@@ -5,7 +5,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "About MicStage",
   description:
-    "What MicStage is, who it is for, how open mic listings are verified and updated, and the difference between Host and Venue accounts.",
+    "MicStage is a free platform for finding and running open mic nights for performers, hosts and venues across the U.S. and around the world. Who it is for, how listings are verified, and Host vs Venue accounts.",
   path: "/about",
 });
 
@@ -16,9 +16,9 @@ export default function AboutPage() {
         <p className="text-xs font-medium uppercase tracking-widest text-white/50">MicStage</p>
         <h1 className="om-heading mt-2 text-4xl tracking-wide text-white">About MicStage</h1>
         <p className="mt-4 text-sm leading-relaxed text-white/75">
-          MicStage is a free platform for finding and running open mic nights. Performers use it to see schedules and
-          sign up when a room offers online signup. Hosts and venues use it to publish a night, take signups, and share
-          a lineup.
+          MicStage is a free platform for finding and running open mic nights for performers, hosts and venues across
+          the U.S. and around the world. Performers use it to see schedules and sign up when a room offers online
+          signup. Hosts and venues use it to publish a night, take signups, and share a lineup.
         </p>
 
         <section className="mt-10">

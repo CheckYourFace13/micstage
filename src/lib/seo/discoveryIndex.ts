@@ -19,18 +19,18 @@ export function shouldIndexDiscoveryPage(opts: {
   /** Public-quality open-mic rows for the market (venues + verified listings). */
   listingCount?: number;
   /**
-   * Open-mic city hubs: index when inventory ≥ 3, or when inventory ≥ 2 and
-   * there is a trusted schedule signal. Never index a 1-listing city on schedule alone.
+   * Open-mic city/state hubs: index only with enough strong inventory (≥5),
+   * or ≥5 with schedule already implied by inventory. Never index thin 1–4 listing hubs.
    * Performers pages leave this false (legacy: venueCount≥3 OR future public schedule).
    */
   requireMeaningfulInventory?: boolean;
 }): boolean {
   if (Boolean(opts.hasEditorialContent)) return true;
   const inventory = typeof opts.listingCount === "number" ? opts.listingCount : opts.venueCount;
-  if (inventory >= 3) return true;
   if (opts.requireMeaningfulInventory) {
-    return inventory >= 2 && opts.hasPublicSchedule;
+    return inventory >= 5;
   }
+  if (inventory >= 3) return true;
   return opts.hasPublicSchedule;
 }
 

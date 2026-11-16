@@ -241,18 +241,21 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
   const allowMediumOutreach = false;
   const emailReadyLevels: GrowthLeadEmailConfidence[] = ["HIGH"];
 
-  // Approved drafts whose lead no longer qualifies block every cron send attempt — purge them first.
+  const staleDraftCutoff = new Date(Date.now() - STALE_PENDING_DRAFT_DAYS * 86_400_000);
+
+  // Approved drafts whose lead no longer qualifies (or whose evidence aged out) block the lead forever.
   const staleApprovedPurge = await prisma.growthLeadOutreachDraft.updateMany({
     where: {
       status: "APPROVED",
       marketingEmailSendId: null,
-      lead: {
-        OR: [{ contactEmailConfidence: { not: "HIGH" } }, { contactEmailNormalized: null }],
-      },
+      OR: [
+        { lead: { OR: [{ contactEmailConfidence: { not: "HIGH" } }, { contactEmailNormalized: null }] } },
+        { createdAt: { lt: staleDraftCutoff } },
+      ],
     },
     data: {
       status: "REJECTED",
-      lastError: "auto_purge: lead no longer HIGH confidence or missing email",
+      lastError: "auto_purge: approved draft can no longer send (contact downgraded or draft stale)",
     },
   });
   purgedStaleApproved = staleApprovedPurge.count;
@@ -270,7 +273,7 @@ export async function runAutoGrowthOutreachDrafts(prisma: PrismaClient): Promise
       marketingEmailSendId: null,
       OR: [
         { lead: { OR: [{ contactEmailConfidence: { not: "HIGH" } }, { contactEmailNormalized: null }] } },
-        { createdAt: { lt: new Date(Date.now() - STALE_PENDING_DRAFT_DAYS * 86_400_000) } },
+        { createdAt: { lt: staleDraftCutoff } },
       ],
     },
     data: {

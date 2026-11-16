@@ -6,7 +6,7 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 export const metadata: Metadata = buildPublicMetadata({
   title: "FAQ — open mics, hosts, venues, and listings",
   description:
-    "Answers about MicStage for performers, hosts, and venues: finding open mics, signups, lineups, claiming listings, verification, and free use.",
+    "MicStage is a free platform for finding and running open mic nights for performers, hosts and venues across the U.S. and around the world. FAQ on signups, lineups, claims, and verification.",
   path: "/faq",
 });
 
@@ -148,14 +148,42 @@ const SECTIONS: { heading: string; items: { q: string; a: ReactNode }[] }[] = [
   },
 ];
 
+function faqAnswerText(a: ReactNode): string {
+  if (typeof a === "string") return a;
+  // Flatten simple Link-wrapped answers to plain text for FAQPage schema.
+  if (Array.isArray(a)) return a.map((x) => faqAnswerText(x)).join("");
+  if (a && typeof a === "object" && "props" in a) {
+    const props = (a as { props?: { children?: ReactNode } }).props;
+    return faqAnswerText(props?.children ?? "");
+  }
+  return "";
+}
+
 export default function FaqPage() {
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: SECTIONS.flatMap((section) =>
+      section.items.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: faqAnswerText(item.a).replace(/\s+/g, " ").trim(),
+        },
+      })),
+    ),
+  };
+
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto w-full max-w-3xl px-6 py-12">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
         <h1 className="om-heading text-4xl tracking-wide">FAQ</h1>
         <p className="mt-3 text-base text-white/80">
-          Straight answers about finding open mics, running a night, claiming listings, and what MicStage does — and
-          does not — guarantee.
+          MicStage is a free platform for finding and running open mic nights for performers, hosts and venues across
+          the U.S. and around the world. Straight answers about finding open mics, running a night, claiming listings,
+          and what MicStage does — and does not — guarantee.
         </p>
 
         <div className="mt-10 grid gap-10">

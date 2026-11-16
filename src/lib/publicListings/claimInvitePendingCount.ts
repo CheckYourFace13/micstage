@@ -36,7 +36,7 @@ export async function countEligiblePendingListingClaimInvites(prisma: PrismaClie
       internalNotes: true,
       lastVerifiedAt: true,
       googlePlaceVerifiedAt: true,
-      schedules: { select: { title: true, description: true } },
+      schedules: { select: { title: true, description: true, weekday: true, isActive: true } },
       openMicEvidenceRows: {
         select: {
           trusted: true,

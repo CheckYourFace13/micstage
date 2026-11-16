@@ -91,6 +91,13 @@ export async function promotePlaceConfirmedListings(
     sourceUrl: true,
     websiteUrl: true,
     schedules: { select: { title: true, description: true } },
+    openMicEvidenceRows: {
+      where: {
+        OR: [{ trusted: true }, { reviewOnly: true, detectedPhrase: { not: null } }],
+      },
+      select: { trusted: true, reviewOnly: true, detectedPhrase: true },
+      take: 8,
+    },
     growthLead: {
       select: {
         sourceKind: true,
@@ -99,7 +106,7 @@ export async function promotePlaceConfirmedListings(
         discoveryMarketSlug: true,
       },
     },
-  } as const;
+  };
 
   // Rotate so skipped-no-evidence head rows cannot monopolize every promote tick.
   const fairTake = Math.max(1, Math.ceil(limit / 2));
@@ -234,7 +241,11 @@ export async function promotePlaceConfirmedListings(
     }
 
     const evidence = evaluateOpenMicEvidence(buildEvidenceInput(row));
-    if (!evidence.trusted) {
+    // Place Details already confirmed (query filter) — stored crawl evidence is enough.
+    const storedReady = (row.openMicEvidenceRows ?? []).some(
+      (e) => e.trusted || (e.reviewOnly && Boolean(e.detectedPhrase?.trim())),
+    );
+    if (!evidence.trusted && !storedReady) {
       skippedNoTrustedEvidence += 1;
       continue;
     }
@@ -243,6 +254,9 @@ export async function promotePlaceConfirmedListings(
       continue;
     }
 
+    const evidenceNote = evidence.trusted
+      ? `${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (${evidence.field}: "${evidence.snippet}")`
+      : `${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (stored crawl evidence)`;
     await prisma.publicOpenMicListing.update({
       where: { id: row.id },
       data: {
@@ -250,7 +264,7 @@ export async function promotePlaceConfirmedListings(
         lastVerifiedAt: new Date(),
         internalNotes: appendNote(
           row.internalNotes,
-          `auto-promote ${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (${evidence.field}: "${evidence.snippet}"); place identity confirmed`,
+          `auto-promote ${evidenceNote}; place identity confirmed`,
         ),
       },
     });

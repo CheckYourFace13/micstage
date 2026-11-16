@@ -26,7 +26,7 @@ export default async function AdminOwnerSummaryPage(props: {
   return (
     <main className="mx-auto max-w-4xl px-3 py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-white">Owner daily summary</h1>
+        <h1 className="text-lg font-semibold text-white">Owner weekly summary</h1>
         <Link href="/internal/admin/growth" className="text-sm text-zinc-400 hover:text-white">
           ← Growth hub
         </Link>

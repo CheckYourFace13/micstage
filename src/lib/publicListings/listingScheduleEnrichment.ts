@@ -275,69 +275,130 @@ async function enrichVerifiedListingSchedulesUnlocked(
   prisma: PrismaClient,
   limit: number,
 ): Promise<ScheduleEnrichResult> {
-
-  const allRows = await prisma.publicOpenMicListing.findMany({
-    where: {
-      verificationStatus: "VERIFIED",
-      removedAt: null,
-      claimedVenueId: null,
-      OR: [
-        { schedules: { none: { isActive: true } } },
-        { schedules: { some: { isActive: true, description: { startsWith: "TIME_UNCONFIRMED" } } } },
-      ],
-    },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      city: true,
-      region: true,
-      websiteUrl: true,
-      sourceUrl: true,
-      facebookUrl: true,
-      instagramUrl: true,
-      timeZone: true,
-      lat: true,
-      lng: true,
-      signupMethod: true,
-      lastVerifiedAt: true,
-      growthLead: {
-        select: {
-          websiteUrl: true,
-          facebookUrl: true,
-          instagramUrl: true,
-          contactEmailConfidence: true,
-        },
+  const where = {
+    verificationStatus: "VERIFIED" as const,
+    removedAt: null,
+    claimedVenueId: null,
+    OR: [
+      { schedules: { none: { isActive: true } } },
+      { schedules: { some: { isActive: true, description: { startsWith: "TIME_UNCONFIRMED" } } } },
+    ],
+  };
+  const select = {
+    id: true,
+    slug: true,
+    name: true,
+    city: true,
+    region: true,
+    websiteUrl: true,
+    sourceUrl: true,
+    facebookUrl: true,
+    instagramUrl: true,
+    timeZone: true,
+    lat: true,
+    lng: true,
+    signupMethod: true,
+    lastVerifiedAt: true,
+    growthLead: {
+      select: {
+        websiteUrl: true,
+        facebookUrl: true,
+        instagramUrl: true,
+        contactEmailConfidence: true,
       },
     },
-    orderBy: { id: "asc" },
-  });
+  } as const;
 
-  const cursorId = await readDiscoveryCursor(
+  /**
+   * Do not load the entire unscheduled VERIFIED set (Hostinger memory/time spike).
+   * Fair half walks an id cursor; priority half is scored from a capped pool.
+   */
+  const fairTake = Math.max(1, Math.ceil(limit / 2));
+  const priorityTake = Math.max(0, limit - fairTake);
+  const priorityPoolSize = Math.min(120, Math.max(priorityTake * 6, limit * 3));
+
+  let cursorId = await readDiscoveryCursor(
     prisma,
     SCHEDULE_CURSOR_ADAPTER,
     SCHEDULE_CURSOR_MARKET,
     SCHEDULE_ROTATE_KEY,
   );
-  const { batch: rows, nextCursorId } = rotateUnscheduledBatch(
-    allRows,
-    cursorId,
-    limit,
-    (row) =>
-      scheduleMiningPriorityScore({
-        ...row,
-        highContact: row.growthLead?.contactEmailConfidence === "HIGH",
-      }),
-  );
-  if (nextCursorId) {
-    await writeDiscoveryCursor(
-      prisma,
-      SCHEDULE_CURSOR_ADAPTER,
-      SCHEDULE_CURSOR_MARKET,
-      SCHEDULE_ROTATE_KEY,
-      nextCursorId,
-    );
+  if (!cursorId?.trim()) cursorId = null;
+
+  const rotating: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    city: string | null;
+    region: string | null;
+    websiteUrl: string | null;
+    sourceUrl: string | null;
+    facebookUrl: string | null;
+    instagramUrl: string | null;
+    timeZone: string;
+    lat: number | null;
+    lng: number | null;
+    signupMethod: string | null;
+    lastVerifiedAt: Date | null;
+    growthLead: {
+      websiteUrl: string | null;
+      facebookUrl: string | null;
+      instagramUrl: string | null;
+      contactEmailConfidence: string | null;
+    } | null;
+  }> = [];
+  for (let page = 0; page < 2 && rotating.length < fairTake; page++) {
+    const pageRows = await prisma.publicOpenMicListing.findMany({
+      where,
+      orderBy: { id: "asc" },
+      take: fairTake - rotating.length,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+      select,
+    });
+    if (pageRows.length === 0) {
+      if (!cursorId) break;
+      cursorId = null;
+      continue;
+    }
+    rotating.push(...pageRows);
+    cursorId = pageRows[pageRows.length - 1]!.id;
   }
+  await writeDiscoveryCursor(
+    prisma,
+    SCHEDULE_CURSOR_ADAPTER,
+    SCHEDULE_CURSOR_MARKET,
+    SCHEDULE_ROTATE_KEY,
+    cursorId ?? "",
+  );
+
+  const rotatingIds = new Set(rotating.map((r) => r.id));
+  const priorityPool =
+    priorityTake > 0
+      ? await prisma.publicOpenMicListing.findMany({
+          where: {
+            ...where,
+            ...(rotatingIds.size > 0 ? { id: { notIn: [...rotatingIds] } } : {}),
+          },
+          orderBy: [{ lastVerifiedAt: "desc" }, { id: "asc" }],
+          take: priorityPoolSize,
+          select,
+        })
+      : [];
+  const priority = [...priorityPool]
+    .sort(
+      (a, b) =>
+        scheduleMiningPriorityScore({
+          ...b,
+          highContact: b.growthLead?.contactEmailConfidence === "HIGH",
+        }) -
+        scheduleMiningPriorityScore({
+          ...a,
+          highContact: a.growthLead?.contactEmailConfidence === "HIGH",
+        }),
+    )
+    .slice(0, priorityTake);
+
+  const rows = [...priority, ...rotating];
 
   let confirmed = 0;
   let uncertain = 0;
@@ -519,10 +580,11 @@ async function enrichVerifiedListingSchedulesUnlocked(
       fetchBlocked,
       noScheduleFound,
     };
-    await recordScheduleRecoveryDayStats(prisma, allRows.length, result).catch(() => undefined);
+    // Cursor batch size — full unscheduled set is no longer loaded into memory.
+    await recordScheduleRecoveryDayStats(prisma, rows.length, result).catch(() => undefined);
   }
 
-  const result: ScheduleEnrichResult = {
+  return {
     scanned: rows.length,
     confirmed,
     uncertain,
@@ -533,7 +595,6 @@ async function enrichVerifiedListingSchedulesUnlocked(
     fetchBlocked,
     noScheduleFound,
   };
-  return result;
 }
 
 export async function enrichVerifiedListingSchedules(

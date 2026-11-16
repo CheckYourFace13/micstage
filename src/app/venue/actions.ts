@@ -23,6 +23,7 @@ import {
 } from "@/lib/bookingSlotAssign";
 import { notifyBookingTimeChanged } from "@/lib/bookingNotify";
 import { cancelOrDeleteVenueOwnedDay } from "@/lib/venue/cancelOrDeleteVenueOwnedDay";
+import { materializeVenueScheduleInstances } from "@/lib/venue/materializeVenueScheduleInstances";
 import { isValidScheduleWindow, resolveScheduleEndMin } from "@/lib/scheduleWindow";
 import {
   ALL_WEEKDAYS,
@@ -543,7 +544,7 @@ export async function createEventTemplate(formData: FormData): Promise<VenuePort
     return portalRedirect("/venue?scheduleError=duplicateWeekday");
   }
 
-  await prisma.eventTemplate.create({
+  const created = await prisma.eventTemplate.create({
     data: {
       venueId,
       title,
@@ -569,6 +570,26 @@ export async function createEventTemplate(formData: FormData): Promise<VenuePort
       seriesEndDate,
       bookingOpensDaysAhead,
     },
+  });
+
+  await materializeVenueScheduleInstances(prisma, {
+    templates: [
+      {
+        id: created.id,
+        weekday: created.weekday,
+        startTimeMin: created.startTimeMin,
+        endTimeMin: created.endTimeMin,
+        slotMinutes: created.slotMinutes,
+        breakMinutes: created.breakMinutes,
+      },
+    ],
+    venue: {
+      seriesStartDate,
+      seriesEndDate,
+      bookingOpensDaysAhead,
+      timeZone,
+    },
+    dateRange: { start: seriesStartDate, end: seriesEndDate },
   });
 
   revalidatePath("/venue");
@@ -892,110 +913,28 @@ export async function saveWeeklyScheduleAndGenerateSlots(formData: FormData): Pr
   });
   console.info("[venue weekly submit] deduped templates", { count: templates.length });
 
-  let generatedInstanceCount = 0;
-  let transactionCount = 0;
-  for (const template of templates) {
-    console.info("[venue weekly submit] generating template start", {
-      templateId: template.id,
-      weekday: template.weekday,
-    });
-    const specs = generateSlotsForWindow({
-      startTimeMin: template.startTimeMin,
-      endTimeMin: template.endTimeMin,
-      slotMinutes: template.slotMinutes,
-      breakMinutes: template.breakMinutes,
-    });
-    console.info("[venue weekly submit] slot specs ready", {
-      templateId: template.id,
-      slotsPerNight: specs.length,
-    });
-
-    const candidateDates =
-      isOneEvent
-        ? [{ storageDate: seriesStartDate, weekday: weekdays[0]! as Weekday }]
-        : [...iterStorageDatesInVenueSeries(seriesStartDate, seriesEndDate, venueForRules.timeZone ?? timeZone)];
-    console.info("[venue weekly submit] candidate dates prepared", {
-      templateId: template.id,
-      isOneEvent,
-      candidateCount: candidateDates.length,
-    });
-
-    for (const { storageDate, weekday } of candidateDates) {
-      console.info("[venue weekly submit] date loop begin", {
-        templateId: template.id,
-        storageDate: storageDate.toISOString(),
-        weekday,
-      });
-      if (weekday !== template.weekday) {
-        console.info("[venue weekly submit] date loop skip weekday mismatch", {
-          templateId: template.id,
-          templateWeekday: template.weekday,
-          weekday,
-        });
-        continue;
-      }
-      if (!isDateInSeriesRange(venueForRules, storageDate)) {
-        console.info("[venue weekly submit] date loop skip series range", {
-          templateId: template.id,
-          storageDate: storageDate.toISOString(),
-        });
-        continue;
-      }
-      if (!isWithinBookingWindow(venueForRules, storageDate)) {
-        console.info("[venue weekly submit] date loop skip booking window", {
-          templateId: template.id,
-          storageDate: storageDate.toISOString(),
-        });
-        continue;
-      }
-
-      transactionCount += 1;
-      if (transactionCount % 25 === 0) {
-        console.info("[venue weekly submit] generation progress", {
-          transactionCount,
-          generatedInstanceCount,
-          templateId: template.id,
-          storageDate: storageDate.toISOString(),
-        });
-      }
-      console.info("[venue weekly submit] transaction begin", {
-        templateId: template.id,
-        storageDate: storageDate.toISOString(),
-      });
-      await prisma.$transaction(async (tx) => {
-        console.info("[venue weekly submit] tx start", {
-          templateId: template.id,
-          storageDate: storageDate.toISOString(),
-        });
-        const inst =
-          (await tx.eventInstance.findUnique({
-            where: { templateId_date: { templateId: template.id, date: storageDate } },
-          })) ??
-          (await tx.eventInstance.create({
-            data: { templateId: template.id, date: storageDate },
-          }));
-
-        if (inst.isCancelled) return;
-
-        await syncSlotsForInstance(tx, inst.id, specs);
-        generatedInstanceCount += 1;
-        console.info("[venue weekly submit] tx done", {
-          templateId: template.id,
-          instanceId: inst.id,
-          generatedInstanceCount,
-        });
-      });
-      console.info("[venue weekly submit] transaction end", {
-        templateId: template.id,
-        storageDate: storageDate.toISOString(),
-      });
-    }
-    console.info("[venue weekly submit] generating template done", {
-      templateId: template.id,
-    });
-  }
+  console.info("[venue weekly submit] materialize start", {
+    templateCount: templates.length,
+    isOneEvent,
+  });
+  const { generatedInstanceCount } = await materializeVenueScheduleInstances(prisma, {
+    templates: templates.map((t) => ({
+      id: t.id,
+      weekday: t.weekday,
+      startTimeMin: t.startTimeMin,
+      endTimeMin: t.endTimeMin,
+      slotMinutes: t.slotMinutes,
+      breakMinutes: t.breakMinutes,
+    })),
+    venue: {
+      seriesStartDate: venueForRules.seriesStartDate,
+      seriesEndDate: venueForRules.seriesEndDate,
+      bookingOpensDaysAhead: venueForRules.bookingOpensDaysAhead,
+      timeZone: venueForRules.timeZone ?? timeZone,
+    },
+    dateRange: { start: seriesStartDate, end: seriesEndDate },
+  });
   console.info("[venue weekly submit] generation complete", {
-    transactionCount,
     generatedInstanceCount,
   });
 

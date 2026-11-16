@@ -1,11 +1,11 @@
 /**
- * Regression guard: AdSense only on editorial resources + city open-mic hubs.
+ * AdSense ownership stays live; ad units/loaders stay off until approval.
  * Run: npx tsx scripts/check-adsense-placement.mjs
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { shouldShowAdsOnPath, ADSENSE_PUBLISHER_ID } from "../src/lib/adsense.ts";
+import { shouldShowAdsOnPath, ADSENSE_PUBLISHER_ID, ADSENSE_ENABLED } from "../src/lib/adsense.ts";
 
 const root = process.cwd();
 
@@ -14,166 +14,48 @@ function read(rel) {
 }
 
 assert.equal(ADSENSE_PUBLISHER_ID, "ca-pub-9572509189594279");
+assert.equal(
+  ADSENSE_ENABLED,
+  process.env.NEXT_PUBLIC_ENABLE_ADSENSE === "true",
+  "ADSENSE_ENABLED must require explicit NEXT_PUBLIC_ENABLE_ADSENSE while awaiting approval",
+);
 
-const allow = [
-  "/resources",
-  "/locations/chicago-il/open-mics",
-  "/locations/open-mics-ca/open-mics",
-];
-
-const deny = [
+// Pending approval: path gate must deny everything (including former allowlist).
+for (const p of [
   "/",
-  "/host",
-  "/faq",
-  "/about",
-  "/contact",
-  "/find-open-mics",
-  "/venues",
-  "/artists",
-  "/performers",
-  "/map",
-  "/compare",
-  "/locations",
-  "/locations/chicago-il/performers",
-  "/resources/open-mic-gear",
-  // Unknown resource slug keeps URL under /resources/* while rendering not-found — must not ads.
-  "/resources/this-slug-does-not-exist-adsense-404",
+  "/resources",
   "/resources/how-to-run-a-successful-open-mic-night",
-  "/resources/what-to-expect-at-your-first-open-mic",
-  "/open-mics/some-listing",
-  "/venues/some-venue",
-  "/venues/some-venue/lineup",
-  "/venues/some-venue/lineup/2026-01-01",
-  "/nights/abc/lineup",
-  "/register/venue",
-  "/register/musician",
-  "/register/promoter",
-  "/login/venue",
-  "/login/musician",
-  "/login/promoter",
-  "/promoter",
-  "/venue",
-  "/artist",
-  "/dashboard",
-  "/claim/some-listing",
-  "/messages",
-  "/media",
-  "/media/how-to-artists",
-  "/internal/admin",
-  "/api/health",
-  "/unsubscribe",
+  "/locations/chicago-il/open-mics",
+  "/locations/oklahoma/open-mics",
   "/this-page-definitely-does-not-exist-xyz-404",
-  "/reset",
-  "/reset/venue",
-  "/login",
-];
-
-for (const p of allow) {
-  assert.equal(shouldShowAdsOnPath(p), true, `expected ads allowed on ${p}`);
-}
-for (const p of deny) {
-  assert.equal(shouldShowAdsOnPath(p), false, `expected ads blocked on ${p}`);
+  "/register/venue",
+  "/claim/some-listing",
+]) {
+  assert.equal(shouldShowAdsOnPath(p), false, `expected ads blocked on ${p} while awaiting approval`);
 }
 
 const layout = read("src/app/layout.tsx");
 assert.match(layout, /google-adsense-account/);
 assert.match(layout, /ca-pub-9572509189594279/);
-assert.match(layout, /AdSenseScript/);
+assert.doesNotMatch(layout, /<AdSenseScript/);
 assert.doesNotMatch(
   layout,
   /pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js/,
   "root layout must not load AdSense JS globally",
 );
 
-const script = read("src/components/ads/AdSenseScript.tsx");
-assert.match(script, /shouldShowAdsOnPath/);
-assert.match(script, /pagead2\.googlesyndication\.com/);
-
-const display = read("src/components/ads/AdSenseDisplayAd.tsx");
-assert.match(display, /shouldShowAdsOnPath/);
-assert.match(display, /trustedEditorialSurface/);
+const resourcesIndex = read("src/app/resources/page.tsx");
+assert.doesNotMatch(resourcesIndex, /AdSenseDisplayAd|ADSENSE_SLOTS|adsbygoogle/);
 
 const articlePage = read("src/app/resources/[slug]/page.tsx");
-assert.match(articlePage, /trustedEditorialSurface/);
+assert.doesNotMatch(articlePage, /AdSenseDisplayAd|ADSENSE_SLOTS|adsbygoogle/);
 assert.match(articlePage, /getResourceArticleBySlug/);
 assert.match(articlePage, /notFound\(\)/);
 
-const adsenseLib = read("src/lib/adsense.ts");
-assert.match(adsenseLib, /trustedEditorialSurface|Does NOT allow/);
-assert.match(adsenseLib, /\/locations\/\[market\]\/open-mics|\/locations\/\[^\/\]\+\/open-mics/);
-assert.equal(shouldShowAdsOnPath("/resources/this-slug-does-not-exist-adsense-404"), false);
-
-/** Display units must not be imported into ops / lineup / booking / product hubs. */
-const forbiddenImportRoots = [
-  "src/app/promoter",
-  "src/app/venue",
-  "src/app/artist",
-  "src/app/register",
-  "src/app/login",
-  "src/app/claim",
-  "src/app/nights",
-  "src/app/dashboard",
-  "src/app/messages",
-  "src/app/media",
-  "src/app/open-mics",
-  "src/app/find-open-mics",
-  "src/app/compare",
-  "src/app/map",
-  "src/app/artists",
-  "src/app/performers",
-  "src/app/venues",
-  "src/app/host",
-  "src/app/faq",
-  "src/app/resources/open-mic-gear",
-  "src/components/venue",
-  "src/components/host",
-];
-
-/** @type {string[]} */
-const offenders = [];
-function walk(dir) {
-  const abs = path.join(root, dir);
-  if (!fs.existsSync(abs)) return;
-  const st0 = fs.statSync(abs);
-  if (st0.isFile()) {
-    const text = fs.readFileSync(abs, "utf8");
-    if (/AdSenseDisplayAd|AdSenseScript|adsbygoogle|ADSENSE_SLOTS/.test(text)) {
-      offenders.push(dir.replace(/\\/g, "/"));
-    }
-    return;
-  }
-  for (const name of fs.readdirSync(abs)) {
-    const full = path.join(abs, name);
-    const st = fs.statSync(full);
-    if (st.isDirectory()) {
-      walk(path.relative(root, full).replace(/\\/g, "/"));
-      continue;
-    }
-    if (!/\.(tsx|ts|jsx|js)$/.test(name)) continue;
-    const text = fs.readFileSync(full, "utf8");
-    if (/AdSenseDisplayAd|AdSenseScript|adsbygoogle|ADSENSE_SLOTS/.test(text)) {
-      offenders.push(path.relative(root, full).replace(/\\/g, "/"));
-    }
-  }
-}
-for (const dir of forbiddenImportRoots) walk(dir);
-assert.equal(offenders.length, 0, `AdSense imports in forbidden surfaces:\n${offenders.join("\n")}`);
-
-// Performers market pages must not ship display ad units (path gate also blocks).
-const performersPage = read("src/app/locations/[locationSlug]/performers/page.tsx");
-assert.doesNotMatch(performersPage, /AdSenseDisplayAd|ADSENSE_SLOTS/);
-
-const privacy = read("src/app/privacy/page.tsx");
-assert.match(privacy, /Advertising \(Google AdSense\)/);
-assert.match(privacy, /google\.com\/settings\/ads/);
-assert.match(privacy, /contact form/);
-assert.doesNotMatch(privacy, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+const adsTxtRoute = read("src/app/ads.txt/route.ts");
+assert.match(adsTxtRoute, /ADSENSE_ADS_TXT_LINE|pub-9572509189594279|google\.com/);
 
 const notFound = read("src/app/not-found.tsx");
 assert.doesNotMatch(notFound, /AdSenseDisplayAd|adsbygoogle|ADSENSE_SLOTS/);
-assert.equal(shouldShowAdsOnPath("/does-not-exist-404-path"), false);
 
-const layoutNoVercelInsights = read("src/app/layout.tsx");
-assert.doesNotMatch(layoutNoVercelInsights, /@vercel\/analytics|\/_vercel\/insights/);
-
-console.log("ok: adsense placement guard (editorial + city open-mics only)");
+console.log("ok: adsense pending-approval guard (meta+ads.txt keep; loaders/slots off)");

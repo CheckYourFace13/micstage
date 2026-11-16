@@ -31,7 +31,7 @@ export type SendOwnerDailySummaryResult =
   | { ok: false; error: string; chicagoDate: string };
 
 /**
- * Build and email the owner daily summary. Uses Resend (`deliverResendEmail`, transactional).
+ * Build and email the owner weekly summary (Friday CT gate in cron). Uses Resend (`deliverResendEmail`, transactional).
  * @param opts.force — send even if already sent for this Chicago calendar date (manual trigger).
  * @param opts.dryRun — build only, no email (preview).
  */

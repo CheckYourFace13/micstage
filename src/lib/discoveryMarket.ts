@@ -16,16 +16,15 @@ export const MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY = 10;
  */
 export const ROLLUP_DISCOVERY_SLUGS = [
   "chicagoland-il",
-  "central-illinois-il",
-  "illinois-regional",
   /** Pipeline bucket for nationwide autonomous venue discovery (not tied to an ACTIVE launch market). */
   "national-discovery-us",
 ] as const;
 
+/** Legacy IL regional hubs — 301 to named state slug `illinois` (no redirect chains). */
+const ILLINOIS_LEGACY_ROLLUP_ALIASES = ["illinois-regional", "central-illinois-il"] as const;
+
 const ROLLUP_LABELS: Record<string, string> = {
   "chicagoland-il": "Chicagoland",
-  "central-illinois-il": "Central Illinois",
-  "illinois-regional": "Illinois (regional)",
   "national-discovery-us": "United States (discovery queue)",
 };
 
@@ -85,7 +84,7 @@ const US_STATE_NAMES: Record<string, string> = {
 
 /**
  * Illinois communities commonly treated as Chicago metro for discovery (lowercase).
- * Excludes downstate college / central hubs (e.g. Champaign, Bloomington) covered separately.
+ * Other IL thin cities roll up to the named state hub `illinois`.
  */
 const CHICAGOLAND_IL_CITIES = new Set(
   [
@@ -225,38 +224,6 @@ const CHICAGOLAND_IL_CITIES = new Set(
   ].map((c) => c.toLowerCase()),
 );
 
-/** Central / downstate Illinois hubs (lowercase). */
-const CENTRAL_ILLINOIS_CITIES = new Set(
-  [
-    "bloomington",
-    "normal",
-    "champaign",
-    "urbana",
-    "peoria",
-    "pekin",
-    "east peoria",
-    "springfield",
-    "decatur",
-    "charleston",
-    "mattoon",
-    "danville",
-    "rantoul",
-    "macomb",
-    "galesburg",
-    "kankakee",
-    "quincy",
-    "jacksonville",
-    "taylorville",
-    "lincoln",
-    "carbondale",
-    "marion",
-    "benton",
-    "effingham",
-    "mt vernon",
-    "mount vernon",
-  ].map((c) => c.toLowerCase()),
-);
-
 function normCity(city: string): string {
   return city.trim().toLowerCase();
 }
@@ -278,20 +245,24 @@ function isIllinois(region: string | null | undefined): boolean {
 }
 
 function thinMarketRollupSlug(city: string, region: string | null | undefined): string {
-  if (isIllinois(region)) {
-    const c = normCity(city);
-    if (CHICAGOLAND_IL_CITIES.has(c)) return "chicagoland-il";
-    if (CENTRAL_ILLINOIS_CITIES.has(c)) return "central-illinois-il";
-    return "illinois-regional";
+  if (isIllinois(region) && CHICAGOLAND_IL_CITIES.has(normCity(city))) {
+    return "chicagoland-il";
   }
   const st = stateCodeFromRegion(region);
-  if (st) return `open-mics-${st.toLowerCase()}`;
+  if (st) {
+    const stateName = US_STATE_NAMES[st];
+    if (stateName) {
+      const named = slugify(stateName);
+      if (named) return named; // e.g. illinois, oklahoma — not open-mics-xx
+    }
+    return `open-mics-${st.toLowerCase()}`;
+  }
   return locationDirectorySlug(city, region);
 }
 
 /**
- * Growth / nationwide SERP geo: same Illinois city allowlists as venue thin rollup (`CHICAGOLAND_IL_CITIES`,
- * `CENTRAL_ILLINOIS_CITIES`), then `illinois-regional` for other IL; other US states → `open-mics-{st}`.
+ * Growth / nationwide SERP geo: Chicagoland IL cities → `chicagoland-il`; other IL thin cities →
+ * named state `illinois`; other US states → named state slug (legacy `open-mics-{st}` alias).
  * Does **not** apply venue-density “own city slug” rules — use `primaryDiscoverySlugForVenue` for that.
  */
 export function discoveryRollupSlugFromCityRegion(city: string, region: string | null | undefined): string {
@@ -331,13 +302,34 @@ export function primaryDiscoverySlugForVenue(
 
 export function rollupDiscoveryLabel(slug: string): string | null {
   if (ROLLUP_LABELS[slug]) return ROLLUP_LABELS[slug];
-  const m = /^open-mics-([a-z]{2})$/i.exec(slug);
-  if (m) {
-    const code = m[1].toUpperCase();
-    const name = US_STATE_NAMES[code] ?? code;
-    return `${name} open mics`;
+  const legacy = /^open-mics-([a-z]{2})$/i.exec(slug);
+  if (legacy) {
+    const code = legacy[1]!.toUpperCase();
+    return US_STATE_NAMES[code] ?? code;
+  }
+  // Named state slug e.g. "oklahoma" → "Oklahoma"
+  for (const [code, name] of Object.entries(US_STATE_NAMES)) {
+    if (slugify(name) === slug) return name;
+    void code;
   }
   return null;
+}
+
+/** True when slug is a US state rollup (named or legacy open-mics-xx), not a city/metro. */
+export function isUsStateRollupSlug(slug: string): boolean {
+  if (/^open-mics-[a-z]{2}$/i.test(slug)) return true;
+  for (const name of Object.values(US_STATE_NAMES)) {
+    if (slugify(name) === slug) return true;
+  }
+  return false;
+}
+
+/** Canonical state slug for a US state code (oklahoma), plus legacy open-mics-ok alias. */
+export function usStateRollupSlug(stateCode: string): string | null {
+  const code = stateCode.trim().toUpperCase();
+  const name = US_STATE_NAMES[code];
+  if (!name) return null;
+  return slugify(name) || `open-mics-${code.toLowerCase()}`;
 }
 
 export function venueIncludedInDiscoveryPage(
@@ -403,6 +395,24 @@ export function buildDiscoveryValidationData(
   for (const slug of ROLLUP_DISCOVERY_SLUGS) {
     validSlugs.add(slug);
     aliasToCanonical.set(slug, slug);
+  }
+
+  // Named US state hubs + legacy open-mics-{st} → named state (301 via canonical redirect).
+  for (const [code, name] of Object.entries(US_STATE_NAMES)) {
+    const named = slugify(name);
+    if (!named) continue;
+    validSlugs.add(named);
+    aliasToCanonical.set(named, named);
+    const legacy = `open-mics-${code.toLowerCase()}`;
+    validSlugs.add(legacy);
+    aliasToCanonical.set(legacy, named);
+  }
+
+  // Legacy IL regional hubs → illinois (direct alias; never chain through each other).
+  const illinoisCanonical = slugify(US_STATE_NAMES.IL!) || "illinois";
+  for (const legacy of ILLINOIS_LEGACY_ROLLUP_ALIASES) {
+    validSlugs.add(legacy);
+    aliasToCanonical.set(legacy, illinoisCanonical);
   }
 
   return { validSlugs, aliasToCanonical };

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
-import { chicagoLast24hWindow } from "@/lib/ownerSummary/chicagoWindow";
+import { chicagoLast7dWindow } from "@/lib/ownerSummary/chicagoWindow";
 import { appBaseUrl } from "@/lib/marketing/emailConfig";
 import { loadDiscoveryInventoryStats } from "@/lib/publicListings/inventoryStats";
 import { classifyListingName, isPublicListingNameOk } from "@/lib/publicListings/listingQuality";
@@ -276,7 +276,7 @@ export async function buildOwnerDailySummary(
   prisma: PrismaClient,
   now: Date = new Date(),
 ): Promise<OwnerDailySummaryData> {
-  const { startUtc, endUtc, reportChicagoDate, reportLabel } = chicagoLast24hWindow(now);
+  const { startUtc, endUtc, reportChicagoDate, reportLabel } = chicagoLast7dWindow(now);
 
   const [venueOwners, musicians, leadsCreated, outreachSends, clickLeads, responses] = await Promise.all([
     prisma.venueOwner.findMany({
@@ -634,16 +634,22 @@ export async function buildOwnerDailySummary(
     countEligiblePendingListingClaimInvites(prisma),
     prisma.publicOpenMicListing.count({
       where: {
+        claimedVenueId: null,
         verificationStatus: "VERIFIED",
         lastVerifiedAt: { gte: startUtc, lt: endUtc },
-        internalNotes: { contains: "auto-promote" },
       },
     }),
     prisma.publicOpenMicListing.count({
       where: {
         verificationStatus: "OUTDATED",
         updatedAt: { gte: startUtc, lt: endUtc },
-        internalNotes: { contains: "auto-reject" },
+        OR: [
+          { internalNotes: { contains: "auto-reject" } },
+          { evidenceTerminalReason: { startsWith: "JUNK_NAME_" } },
+          { evidenceTerminalReason: "DUPLICATE_GOOGLE_PLACE" },
+          { evidenceTerminalReason: "PLACE_OR_REGION_CONFLICT" },
+          { evidenceTerminalReason: "WEAK_PLACE_MEDIA_OR_DIRECTORY" },
+        ],
       },
     }),
     prisma.growthLead.count({
@@ -932,7 +938,7 @@ export async function buildOwnerDailySummary(
         : 0;
 
   return {
-    windowLabel: `${reportLabel} (America/Chicago, last 24h through end of window)`,
+    windowLabel: `${reportLabel} (America/Chicago, prior 7 days through end of window)`,
     reportChicagoDate,
     signups,
     signupVenueCount: venueOwners.length,

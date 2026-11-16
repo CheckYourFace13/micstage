@@ -1,5 +1,6 @@
 import { getPrismaOrNull } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
+import { ensureVenueScheduleMaterialized } from "@/lib/venue/materializeVenueScheduleInstances";
 
 /**
  * Public venue + lineup graph. Requires DB columns on `Slot`:
@@ -29,11 +30,41 @@ export type PublicVenueForLineup = Prisma.VenueGetPayload<{ include: typeof publ
 export type LineupTemplate = PublicVenueForLineup["eventTemplates"][number];
 export type LineupInstance = LineupTemplate["instances"][number];
 
+function hasUpcomingInstance(venue: PublicVenueForLineup, now: Date): boolean {
+  const cutoff = now.getTime() - 12 * 3600 * 1000;
+  for (const t of venue.eventTemplates) {
+    for (const i of t.instances) {
+      if (!i.isCancelled && i.date.getTime() >= cutoff) return true;
+    }
+  }
+  return false;
+}
+
 export async function loadPublicVenueForLineup(slug: string): Promise<PublicVenueForLineup | null> {
   const prisma = getPrismaOrNull();
   if (!prisma) return null;
-  return prisma.venue.findUnique({
+  let venue = await prisma.venue.findUnique({
     where: { slug },
     include: publicVenueLineupInclude,
   });
+  if (!venue) return null;
+
+  // Claimed / published recurring templates with no nights yet: materialize from real weekdays.
+  const now = new Date();
+  const venueOwnedPublic = venue.eventTemplates.filter((t) => !t.promoterNightId);
+  if (venueOwnedPublic.length > 0 && !hasUpcomingInstance(venue, now)) {
+    try {
+      const result = await ensureVenueScheduleMaterialized(prisma, venue.id, { now });
+      if (result.generatedInstanceCount > 0 || result.windowUpdated) {
+        venue = await prisma.venue.findUnique({
+          where: { slug },
+          include: publicVenueLineupInclude,
+        });
+      }
+    } catch (e) {
+      console.error("[loadPublicVenueForLineup] ensure materialize failed", slug, e);
+    }
+  }
+
+  return venue;
 }

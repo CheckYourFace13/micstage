@@ -13,7 +13,7 @@ import { loadDiscoveryMarketOpenMics } from "@/lib/publicListings/discoveryMerge
 import type { OpenMicFinderVenue } from "@/lib/publicListings/types";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { relatedLocationsForLocationSlug } from "@/lib/relatedLocations";
-import { rollupDiscoveryLabel } from "@/lib/discoveryMarket";
+import { isUsStateRollupSlug, rollupDiscoveryLabel } from "@/lib/discoveryMarket";
 import { shouldIndexDiscoveryPage } from "@/lib/seo/discoveryIndex";
 import { jsDayToWeekday } from "@/lib/publicListings/listingSeo";
 import { minutesToTimeLabel, weekdayToLabel } from "@/lib/time";
@@ -21,7 +21,8 @@ import { performanceFormatLabel } from "@/lib/venueDisplay";
 import type { Weekday } from "@/generated/prisma/client";
 import { ShareLinks } from "@/components/publicListings/ShareLinks";
 
-export const dynamic = "force-dynamic";
+/** Anonymous city hubs change slowly; allow short CDN/ISR cache. */
+export const revalidate = 300;
 
 const WEEKDAY_ORDER: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
@@ -91,13 +92,17 @@ export async function generateMetadata(props: { params: Promise<{ locationSlug: 
       index = false;
     }
   }
+  const stateHub = isUsStateRollupSlug(slug);
+  const titlePlace = place.replace(/\s+open mics$/i, "").trim() || place;
   return buildPublicMetadata({
-    title: hasSchedule
-      ? `Open Mics in ${place} Tonight | Music, Comedy & Poetry`
-      : `Open Mics in ${place} | Music, Comedy & Poetry`,
+    title: stateHub
+      ? `Open Mics in ${titlePlace}`
+      : hasSchedule
+        ? `Open Mics in ${titlePlace} Tonight | Music, Comedy & Poetry`
+        : `Open Mics in ${titlePlace} | Music, Comedy & Poetry`,
     description: hasSchedule
-      ? `Find open mics near you in ${place} — tonight and this week for music, comedy, and poetry. See schedules and signup details on MicStage.`
-      : `Find open mics near you in ${place} for music, comedy, and poetry. See schedules and signup details on MicStage.`,
+      ? `Find open mics near you in ${titlePlace} — tonight and this week for music, comedy, and poetry. See schedules and signup details on MicStage.`
+      : `Find open mics near you in ${titlePlace} for music, comedy, and poetry. See schedules and signup details on MicStage.`,
     path: `/locations/${slug}/open-mics`,
     index,
   });
@@ -110,7 +115,10 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
     permanentRedirect(`/locations/${canonical}/open-mics`);
   }
   await assertKnownLocationSlugOrNotFound(locationSlug);
-  const placeTitle = await resolveLocationPlaceTitle(locationSlug);
+  const rawPlaceTitle = await resolveLocationPlaceTitle(locationSlug);
+  const placeTitle = isUsStateRollupSlug(locationSlug)
+    ? rawPlaceTitle.replace(/\s+open mics$/i, "").trim() || rawPlaceTitle
+    : rawPlaceTitle;
 
   const prisma = getPrismaOrNull();
   let listings: Awaited<ReturnType<typeof loadDiscoveryMarketOpenMics>> = [];
@@ -131,7 +139,10 @@ export default async function LocationOpenMicsPage(props: { params: Promise<{ lo
     const c = (l.city ?? "").trim().toLowerCase();
     return c && hubCity && c !== hubCity && !c.includes(hubCity);
   });
-  const isMetroHub = Boolean(rollupDiscoveryLabel(locationSlug) || includesOtherCities);
+  // State hubs are not metros — only show metro disclaimer for real metro/city mix hubs.
+  const isMetroHub =
+    !isUsStateRollupSlug(locationSlug) &&
+    Boolean(rollupDiscoveryLabel(locationSlug) || includesOtherCities);
   const nearbyLocations = await relatedLocationsForLocationSlug(locationSlug, 6);
 
   const todayWeekday = jsDayToWeekday(new Date().getDay());

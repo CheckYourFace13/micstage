@@ -74,9 +74,10 @@ export default function PrivacyPage() {
 
       <h2>Advertising (Google AdSense)</h2>
       <p>
-        Some MicStage pages may show ads served by Google AdSense. Google and its partners may use cookies or similar
-        identifiers to serve and measure ads. Where permitted, ads may be personalized based on your prior visits to this
-        site or other sites. You can review and change ad personalization in{" "}
+        MicStage may display ads served by Google AdSense on some pages after ads are enabled. While ads are off, we still
+        publish ads.txt and account ownership meta for verification. When ads run, Google and its partners may use cookies
+        or similar identifiers to serve and measure ads. Where permitted, ads may be personalized based on your prior
+        visits to this site or other sites. You can review and change ad personalization in{" "}
         <a
           className="text-[rgb(var(--om-neon))] underline hover:brightness-110"
           href="https://www.google.com/settings/ads"

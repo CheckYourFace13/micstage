@@ -112,7 +112,7 @@ const DATE_ARTICLE =
  * Keep in sync with scripts/lib/listingNameClassifier.mjs.
  */
 const DIRECTORY_OR_ORG_SHELL =
-  /(\bdiscover\s+(local\s+)?(spots?|places?|venues?|open|arts?|events?)\b)|(\bthat\s+feature\s+this\b)|(\bplaces\s+to\s+(go|visit|eat|drink|see|hear|be)\b)|(\bbreweries\s+in\b)|(\b\d{1,3}\s*\+?\s*breweries\s+in\b)|(^\s*(?:the\s+)?(?:best\s+|top\s+)?(?:bars?|restaurants?|venues?|clubs?|spots?)\s+in\b)|(\b(?:bars|restaurants|venues|clubs|spots)\s+in\b)|(\blive\s+music\s+venues?\s+in\b)/i;
+  /(\bvenues?\s+hosting\s+open[\s-]?mi)|(\bdiscover\s+(local\s+)?(spots?|places?|venues?|open|arts?|events?)\b)|(\bthat\s+feature\s+this\b)|(\bplaces\s+to\s+(go|visit|eat|drink|see|hear|be)\b)|(\bbreweries\s+in\b)|(\b\d{1,3}\s*\+?\s*breweries\s+in\b)|(^\s*(?:the\s+)?(?:best\s+|top\s+)?(?:bars?|restaurants?|venues?|clubs?|spots?)\s+in\b)|(\b(?:bars|restaurants|venues|clubs|spots)\s+in\b)|(\blive\s+music\s+venues?\s+in\b)/i;
 
 const ORG_OR_FORUM_SHELL =
   /(\bcity[\s-]?data\b)|(\bdiscussion\s+forum\b)|(\b(brewers?|restaurant|bar|nightlife|music)\s+(guild|association)\b)|(\bchamber\s+of\s+commerce\b)|(\bconvention\s+(?:and|&)\s+visitors?\b)|(\bvisitors?\s+bureau\b)|(\bbest\s+of\s+\w)/i;
@@ -158,7 +158,7 @@ const VENUE_IDENTITY =
   /(\bat\s+[a-z0-9])|@|(\bpresented\s+by\b)|(\bhosted\s+by\b)|(\bfeat(?:uring)?\.?\s+[a-z])|([a-z](?:'|\u2019)s\b)|(\bw\/\s*[a-z])/i;
 
 const OPEN_MIC_DIRECTORY =
-  /\bfind\s+open[\s-]?mi[ck]es?\b|\bopen[\s-]?mi[ck]es?\s+(?:near|around|in|by|across|throughout|of)\b|\bopen[\s-]?mic\s+nights?\s+(?:in|near|around|across)\b|\bopen[\s-]?mic\s+(?:venues?|events?|calendar|schedule|lists?|listings?|info|guide|directory|resources?|roundup)\b|\b(?:list|directory|calendar|guide|resource|roundup)\s+of\s+open[\s-]?mi[ck]es?\b|\bopen[\s-]?mi[ck]es?\s*(?:and|&)\s*jams?\b|\bopen[\s-]?mi[ck]es?\s+near\s+(?:me|you)\b/i;
+  /\bfind\s+open[\s-]?mi(?:c|ke)s?\b|\bopen[\s-]?mi(?:c|ke)s?\s+(?:near|around|in|by|across|throughout|of)\b|\bopen[\s-]?mic\s+nights?\s+(?:in|near|around|across)\b|\bopen[\s-]?mic\s+(?:venues?|events?|calendar|schedule|lists?|listings?|info|guide|directory|resources?|roundup)\b|\b(?:list|directory|calendar|guide|resource|roundup)\s+of\s+open[\s-]?mi(?:c|ke)s?\b|\bopen[\s-]?mi(?:c|ke)s?\s*(?:and|&)\s*jams?\b|\bopen[\s-]?mi(?:c|ke)s?\s+near\s+(?:me|you)\b|\bvenues?\s+hosting\s+open[\s-]?mi(?:c|ke)s?\b/i;
 
 /**
  * Article / landing-page / aggregator phrasing that disqualifies a name even
@@ -182,7 +182,7 @@ const AGG_GENERIC_TOKENS = new Set([
   "all", "every", "weekly", "monthly", "biweekly", "daily", "nightly", "free", "live", "new",
   "list", "lists", "listing", "listings", "info", "information", "directory", "guide", "guides", "calendar",
   "calendars", "resource", "resources", "roundup", "schedule", "schedules", "near", "me", "you", "find", "finder",
-  "events", "event", "venue", "venues", "around", "nearby", "upcoming", "best", "top", "featured",
+  "events", "event", "venue", "venues", "hosting", "around", "nearby", "upcoming", "best", "top", "featured",
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
 ]);
 

@@ -12,6 +12,8 @@ import { classifyListingName, isPublicListingNameOk } from "./lib/listingNameCla
 
 // Aggregator / directory / bare city+open-mic names — must be rejected.
 const MUST_REJECT = [
+  "Venues Hosting Open Mics in Eugene",
+  "Venues Hosting Open Mics in the Oklahoma City Metropolitan Area",
   "Open Mic Portland",
   "Open Mic Los Angeles",
   "Open Mic Chicago",

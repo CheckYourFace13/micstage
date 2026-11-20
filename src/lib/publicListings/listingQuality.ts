@@ -469,10 +469,11 @@ export function listingIsPubliclyIndexable(listing: {
   if (listing.removedAt) return false;
   if (listing.verificationStatus !== "VERIFIED") return false;
   if (!isPublicListingNameOk(listing.name)) return false;
-  const hasLocation = Boolean(listing.formattedAddress?.trim() || listing.city?.trim());
-  if (!hasLocation) return false;
+  // Strong indexable pages need a real city + street/place address, not city alone.
+  if (!listing.city?.trim()) return false;
+  if ((listing.formattedAddress ?? "").trim().length < 8) return false;
+  if (!listing.lastVerifiedAt) return false;
   const confirmedSchedules = listing.schedules.filter(scheduleHasConfirmedPublicTime);
-  if (confirmedSchedules.length > 0) return true;
-  // lastVerifiedAt is a stamp, not a schedule. Unscheduled/template-only pages stay reachable but noindex.
-  return false;
+  // Unscheduled / time-unconfirmed pages stay reachable but noindex.
+  return confirmedSchedules.length > 0;
 }

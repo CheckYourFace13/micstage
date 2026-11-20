@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic artist activity by metro & region",
   description:
-    "Discover open mic activity by metro and regional markets. Smaller towns roll into larger hubs until there are enough local venues for a dedicated market page. Each venue still keeps its exact address on its profile.",
+    "Browse open mic markets across the U.S. and around the world. Smaller towns roll into broader hubs until there are enough strong local listings for a dedicated city page. Each listing keeps its own address.",
   path: "/locations",
 });
 
@@ -68,10 +68,10 @@ export default async function LocationsPage() {
 
           <div className="order-2 flex flex-col gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-4 md:order-1 md:gap-4 md:rounded-none md:border-0 md:bg-transparent md:px-0 md:py-0">
             <p className="max-w-2xl text-xs leading-relaxed text-white/55 md:text-sm md:text-white/70">
-              Browse metro and regional hubs. Not every small town gets its own directory page yet. When a place has fewer than{" "}
-              <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> MicStage venues, we group it into a
-              broader market (for example Chicagoland or Illinois) so discovery is easier. Addresses on each venue page
-              stay exact.
+              Browse city, state, and regional hubs. MicStage is US-first and international — not limited to one metro.
+              When a place has fewer than{" "}
+              <span className="text-white/85">{MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY}</span> listed rooms, we roll it into a
+              broader market so discovery stays useful. Addresses on each listing stay exact.
             </p>
             <p className="text-xs leading-snug text-white/50 md:text-sm md:leading-normal md:text-white/65">
               Looking for venues near you? Start with{" "}

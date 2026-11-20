@@ -174,7 +174,25 @@ export async function loadPublicDiscoveryLocationRows(prisma: PrismaClient): Pro
       count: v.count,
       slug,
     }))
+    .filter((r) => isPublicDiscoveryMarketRow(r))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/** Public /locations directory: drop empty, pipeline, and junk-labeled markets. */
+export function isPublicDiscoveryMarketRow(row: {
+  slug: string;
+  label: string;
+  count: number;
+}): boolean {
+  if (!row.count || row.count < 1) return false;
+  const slug = (row.slug ?? "").trim().toLowerCase();
+  const label = (row.label ?? "").trim();
+  if (!slug || !label) return false;
+  if (slug === "national-discovery-us") return false;
+  if (/discovery queue|united states \(discovery/i.test(label)) return false;
+  if (/^(test|asdf|xxx|null|undefined)$/i.test(label)) return false;
+  if (label.length < 2) return false;
+  return true;
 }
 
 export async function loadOpenMicFinderVenues(prisma: PrismaClient): Promise<OpenMicFinderVenue[]> {

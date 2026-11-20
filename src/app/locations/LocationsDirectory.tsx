@@ -26,7 +26,7 @@ export function LocationsDirectory({ rows }: { rows: PublicDiscoveryLocationRow[
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="e.g. Chicagoland, Austin TX, Illinois..."
+          placeholder="e.g. Austin TX, New York, Illinois, London..."
           className="h-11 rounded-md border border-white/15 bg-black/50 px-3 text-base text-white placeholder:text-white/35 md:text-sm md:placeholder:text-white/40"
           autoComplete="off"
         />

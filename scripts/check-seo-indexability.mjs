@@ -278,10 +278,30 @@ assert.equal(
   ),
   null,
 );
+assert.equal(
+  sanitizePublicListingAbout(
+    "Irish pub on Irving Park; no public email [ import .073Z b… Open mic Wed & Thu confirmed on OpenMicChicago",
+  ),
+  null,
+);
+{
+  const scrubbed = sanitizePublicListingAbout(
+    "3203 W Irving Park Rd, Chicago, IL. Weekly Events. Monday. Pro Blues Jam Night. Starting at 9:00 PM. [claude_csv import 2026-04-15T01:49:27.297Z batch=77c41c61 file=micstage_leads.csv]",
+  );
+  assert.ok(scrubbed === null || (!/claude_csv|batch=|\[?\s*import/i.test(scrubbed) && /Irving Park/.test(scrubbed)));
+}
+assert.equal(
+  sanitizePublicListingAbout(
+    "legacyContactRole=general | phone=317-356-3355 | address=5505 E Washington St | category=music venue | openMicType=comedy open mic",
+  ),
+  null,
+);
 assert.match(
   sanitizePublicListingAbout("Typical formats: comedy, live music. A weekly songwriter night with a posted door list.") ?? "",
   /songwriter/,
 );
+assert.equal(listingIsPubliclyIndexable(baseListing({ formattedAddress: "Chicago" })), false);
+assert.equal(listingIsPubliclyIndexable(baseListing({ city: null })), false);
 assert.equal(publicListingSourceLabel("autonomous web search"), null);
 assert.equal(publicListingSourceLabel("The Hideout events calendar"), "The Hideout events calendar");
 assert.equal(isPublicListingSourceUrl("https://www.google.com/search?q=open+mic"), false);

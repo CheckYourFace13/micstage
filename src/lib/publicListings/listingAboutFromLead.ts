@@ -25,7 +25,9 @@ const PUBLIC_ABOUT_NOISE: RegExp[] = [
   /\bpublic listings and web search\b/gi,
   /\bgrowth discovery\b/gi,
   /\benrichment\s+[a-z0-9_]+\b/gi,
-  /\[claude_csv[^\]]*\]/gi,
+  // Full import tags and truncated remnants (e.g. "[ import .073Z b…")
+  /\[[^\]]*(?:claude_csv|import(?:\s+batch)?|importkey|batch\s*=|file\s*=)[^\]]*\]?/gi,
+  /\[[^\]]{0,40}\bimport\b[^\]]{0,80}(?:…|\.{2,}|$)/gi,
   /\bclaude_csv\b/gi,
   /\bbatch\s*=\s*[a-z0-9_-]+/gi,
   /\bfile\s*=\s*\S+/gi,
@@ -35,6 +37,21 @@ const PUBLIC_ABOUT_NOISE: RegExp[] = [
   /\bparser notes?:?\s*[^.]*\.?/gi,
   /\bquality gate\b[^.]*\.?/gi,
   /\bverification gate\b[^.]*\.?/gi,
+  /\bno public email\b/gi,
+  /\bOpenMic(?:Chicago|X)\b/gi,
+  /\blisted on\s+openmicx\b/gi,
+  /\blisted on\s*;?/gi,
+  /\bOfficial [^.]*\blists? direct contact email\.?/gi,
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+  /\btwo emails?\b[^.]*\.?/gi,
+  /\bemails?\s+(found|directly)\b[^.]*\.?/gi,
+  /\blegacyContactRole\s*=[^.|]*\|?/gi,
+  /\bopenMic(?:Type|Day|Time)\s*=[^.|]*\|?/gi,
+  /\b(?:phone|address|category)\s*=[^.|]*\|?/gi,
+  /\bVisit Us\s*[·•]\s*Contact\s*[·•]\s*Privacy Policy\b[^.]*\.?/gi,
+  /\bWork with Us\b\.?/gi,
+  /\bSign Up For Exclusives\b[^.]*\.?/gi,
+  /\bconfirmed on\s*;?/gi,
   /\bPerformers:\s*[^.]{0,120}\.?/gi,
 ];
 
@@ -61,14 +78,63 @@ export function sanitizePublicListingAbout(about: string | null | undefined): st
   t = t.replace(/\b\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?\b/g, " ");
   t = t.replace(/\bPerformers:\s*[^.]{0,120}\./gi, " ");
   t = t.replace(/\bAlso known for:\s*[^.]{0,120}\./gi, " ");
+  // Drop dangling incomplete bracket tags left by truncation.
+  t = t.replace(/\[[^\]]*$/g, " ");
   t = t.replace(/\s+/g, " ").trim();
+  // Collapse duplicated sentences/clauses.
+  t = dedupeRepeatedClauses(t);
   if (t.length < 40) return null;
   if (/https?:\/\//i.test(t)) return null;
   if (/events?\s*&\s*tickets/i.test(t)) return null;
   if (/[<>]/.test(t)) return null;
-  // Hard drop if provenance/import markers survived scrubbing.
-  if (/\bclaude_csv\b|\bbatch\s*=|\bimportKey\b|\binternal note\b/i.test(t)) return null;
-  return t.length > 600 ? `${t.slice(0, 597)}…` : t;
+  // Hard drop if provenance/import/ops markers survived scrubbing.
+  if (
+    /\bclaude_csv\b|\bbatch\s*=|\bimportKey\b|\binternal note\b|\bdiscovery note\b|\bparser\b|\bno public email\b|\b\[?\s*import\b|\blegacyContactRole\b|\bopenMicType\b|\bemails?\s+found\b|\bOpenMicX\b|\blisted on\s*;|\bcontact email\b/i.test(
+      t,
+    )
+  ) {
+    return null;
+  }
+  // Pipe-delimited scrape metadata (role=… | phone=…) is never public copy.
+  if (/\b[a-zA-Z][a-zA-Z0-9_]*\s*=\s*[^|]{1,80}\|/.test(t)) return null;
+  if (/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(t)) return null;
+  if (t.length <= 600) return t;
+  // Truncate on a word boundary so we never leave mid-tag crumbs.
+  const cut = t.slice(0, 597);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 400 ? cut.slice(0, lastSpace) : cut).trim()}…`;
+}
+
+function dedupeRepeatedClauses(text: string): string {
+  const parts = text
+    .split(/(?<=[.!;])\s+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length <= 1) {
+    // Also catch semicolon-joined duplicates without sentence breaks.
+    const semi = text.split(/\s*;\s*/).map((p) => p.trim()).filter(Boolean);
+    if (semi.length > 1) {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const p of semi) {
+        const key = p.toLowerCase().replace(/\s+/g, " ");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(p);
+      }
+      return out.join("; ");
+    }
+    return text;
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const key = p.toLowerCase().replace(/\s+/g, " ");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out.join(" ");
 }
 
 /** Hide internal pipeline labels; keep a human source name when it looks like a real site/org. */

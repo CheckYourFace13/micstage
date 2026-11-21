@@ -5,6 +5,7 @@ import { autoRejectJunkListings } from "@/lib/publicListings/autoRejectJunkListi
 import { enrichListingsMissingTrustedEvidence } from "@/lib/publicListings/evidenceEnrichment";
 import { verifyPublicListingsWithGoogle } from "@/lib/publicListings/googlePlacesVerify";
 import { promotePlaceConfirmedListings } from "@/lib/publicListings/promotePlaceConfirmedListings";
+import { stampListingPlaceIdsFromLeads } from "@/lib/publicListings/stampListingPlaceIdsFromLeads";
 import { mineVerifiedListingOfficialEmails } from "@/lib/publicListings/mineVerifiedListingContacts";
 import { enrichGrowthLeadOfficialEvidence } from "@/lib/growth/outreachEvidenceEnrichment";
 import { EMPTY_SCHEDULE_ENRICH_RESULT, enrichVerifiedListingSchedules } from "@/lib/publicListings/listingScheduleEnrichment";
@@ -151,6 +152,13 @@ export async function runListingBacklogProcessor(
     stagesSkippedForBudget.push("publish");
   }
 
+  if (canRun(2_000)) {
+    await stampListingPlaceIdsFromLeads(prisma, { limit: 40 });
+    stagesRun.push("stamp_place_from_lead");
+  } else {
+    stagesSkippedForBudget.push("stamp_place_from_lead");
+  }
+
   let googleVerify = emptyVerify;
   if (canRun(10_000)) {
     googleVerify = await verifyPublicListingsWithGoogle(prisma, {
@@ -171,6 +179,21 @@ export async function runListingBacklogProcessor(
     stagesSkippedForBudget.push("promote");
   }
 
+  /**
+   * Schedule recovery runs before heavy evidence/outreach crawls so the dedicated
+   * enrichment cron is not the only path — and tick budget cannot starve it every day.
+   */
+  let scheduleEnrich = emptyScheduleEnrich;
+  if (canRun(12_000)) {
+    scheduleEnrich = await enrichVerifiedListingSchedules(prisma, {
+      limit: Math.min(8, limits.schedule),
+      budgetMs: Math.min(45_000, Math.max(8_000, remaining() - 8_000)),
+    });
+    stagesRun.push("schedule_enrich");
+  } else {
+    stagesSkippedForBudget.push("schedule_enrich");
+  }
+
   let evidenceEnrich = emptyEnrich;
   if (canRun(12_000)) {
     evidenceEnrich = await enrichListingsMissingTrustedEvidence(prisma, {
@@ -179,14 +202,6 @@ export async function runListingBacklogProcessor(
     stagesRun.push("evidence_enrich");
   } else {
     stagesSkippedForBudget.push("evidence_enrich");
-  }
-
-  let scheduleEnrich = emptyScheduleEnrich;
-  if (canRun(10_000)) {
-    scheduleEnrich = await enrichVerifiedListingSchedules(prisma, { limit: limits.schedule });
-    stagesRun.push("schedule_enrich");
-  } else {
-    stagesSkippedForBudget.push("schedule_enrich");
   }
 
   let outreachEvidenceEnrich = emptyOutreachEvidence;

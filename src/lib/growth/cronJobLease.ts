@@ -12,8 +12,11 @@ export const CRON_LEASE_OUTREACH = "growth-outreach";
 
 /** Tick often runs 90–150s; TTL must exceed that but stay under 15m cadence. */
 export const CRON_LEASE_TICK_TTL_MS = 12 * 60_000;
-/** Enrichment is lighter; keep short so staggered runs are not blocked long. */
-export const CRON_LEASE_ENRICHMENT_TTL_MS = 8 * 60_000;
+/**
+ * Enrichment curl timeout is 180s. Keep lease barely above that so a killed
+ * request cannot block the next :10/:25/:40/:55 slot for many minutes.
+ */
+export const CRON_LEASE_ENRICHMENT_TTL_MS = 3 * 60_000 + 30_000;
 export const CRON_LEASE_OUTREACH_TTL_MS = 10 * 60_000;
 
 export type CronLeaseAcquireResult =

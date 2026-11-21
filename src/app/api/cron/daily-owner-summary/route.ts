@@ -15,14 +15,17 @@ function authorize(request: Request): boolean {
 }
 
 /**
- * Daily owner summary email (~8:00 AM America/Chicago). Schedule externally with TZ=America/Chicago,
- * or call hourly and rely on in-handler window guard.
+ * Weekly owner summary email (Friday 6:05 PM America/Chicago).
  *
  * POST or GET /api/cron/daily-owner-summary
- * Query: ?force=1 — send now (ignore 8am window + idempotency). Auth required.
+ * Query: ?force=1 — send now (ignore Friday window + week idempotency). Auth required.
  *
  * Env: MICSTAGE_DISABLE_OWNER_SUMMARY=1 — no-op.
  *      MICSTAGE_OWNER_SUMMARY_EMAIL — override recipient.
+ *
+ * MICSTAGE_OWNER_SUMMARY_SKIP_TIME_GUARD is intentionally IGNORED for auto-sends.
+ * Only ?force=1 bypasses the Friday window (so accidental cron/route calls cannot
+ * email Mon–Thu/Sat/Sun).
  */
 export async function POST(request: Request) {
   return handle(request);
@@ -55,23 +58,24 @@ async function handle(request: Request) {
   const now = new Date();
   const slot = shouldAutoSendDailyOwnerSummary(now);
 
-  if (!force && process.env.MICSTAGE_OWNER_SUMMARY_SKIP_TIME_GUARD !== "1") {
-    if (!slot.shouldSend) {
-      console.info("[owner summary cron] skip: outside Chicago 8:00 window", {
-        chicagoDate: slot.chicagoDate,
-        chicagoHour: slot.chicagoHour,
-        chicagoMinute: slot.chicagoMinute,
-      });
-      return NextResponse.json(
-        {
-          ok: true,
-          skipped: true,
-          reason: "outside_chicago_8am_window",
-          chicago: slot,
-        },
-        { status: 200, headers: { "Cache-Control": "no-store" } },
-      );
-    }
+  // Hard Friday gate for every non-force call — never honor SKIP_TIME_GUARD.
+  if (!force && !slot.shouldSend) {
+    console.info("[owner summary cron] skip: outside Friday 6:05 PM Chicago window", {
+      chicagoDate: slot.chicagoDate,
+      chicagoWeek: slot.chicagoWeek,
+      chicagoWeekday: slot.chicagoWeekday,
+      chicagoHour: slot.chicagoHour,
+      chicagoMinute: slot.chicagoMinute,
+    });
+    return NextResponse.json(
+      {
+        ok: true,
+        skipped: true,
+        reason: "outside_friday_chicago_1805_window",
+        chicago: slot,
+      },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   try {

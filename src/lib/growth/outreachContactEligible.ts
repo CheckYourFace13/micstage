@@ -549,6 +549,10 @@ export type OutreachScorecardBucket =
   | "account_already_exists"
   | "claim_path_deferred"
   | "queued_for_send"
+  | "place_unverified"
+  | "needs_manual_review"
+  | "contact_identity_mismatch"
+  | "lead_status_blocked"
   | "other";
 
 export function mapOutreachReasonToScorecardBucket(reason: OutreachEligibilityReason): OutreachScorecardBucket {
@@ -590,6 +594,19 @@ export function mapOutreachReasonToScorecardBucket(reason: OutreachEligibilityRe
       return "chamber_tourism_directory";
     case "auto_research_retry":
       return "retry_cooldown";
+    case "place_unverified":
+      return "place_unverified";
+    case "needs_manual_review":
+      return "needs_manual_review";
+    case "free_mail_mismatch":
+    case "domain_mismatch":
+    case "role_mismatch":
+      return "contact_identity_mismatch";
+    case "lead_status_blocked":
+    case "wrong_status":
+    case "do_not_contact":
+    case "removed_listing":
+      return "lead_status_blocked";
     default:
       return "other";
   }
@@ -661,6 +678,10 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
       account_already_exists: 0,
       claim_path_deferred: 0,
       queued_for_send: 0,
+      place_unverified: 0,
+      needs_manual_review: 0,
+      contact_identity_mismatch: 0,
+      lead_status_blocked: 0,
       other: 0,
     },
     topBlockReasons: [] as Array<{ reason: string; count: number }>,
@@ -774,11 +795,31 @@ export async function auditGeneralOutreachEligibility(prisma: PrismaClient): Pro
     if (rows.length < batchSize) break;
   }
 
-  counts.topBlockReasons = (Object.entries(counts.scorecardBuckets) as Array<[OutreachScorecardBucket, number]>)
-    .filter(([bucket, n]) => bucket !== "sendable_now" && n > 0)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([reason, count]) => ({ reason, count }));
+  /** Prefer raw eligibility reasons so "other" is not an opaque dump. */
+  const rawReasonKeys = Object.keys(counts).filter(
+    (k) =>
+      ![
+        "totalLeads",
+        "highConfidenceContacts",
+        "netSendEligible",
+        "scorecardBuckets",
+        "topBlockReasons",
+        "eligible",
+      ].includes(k),
+  ) as OutreachEligibilityReason[];
+  const rawTop = rawReasonKeys
+    .map((reason) => ({ reason, count: counts[reason] as number }))
+    .filter((r) => r.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 16);
+  counts.topBlockReasons =
+    rawTop.length > 0
+      ? rawTop
+      : (Object.entries(counts.scorecardBuckets) as Array<[OutreachScorecardBucket, number]>)
+          .filter(([bucket, n]) => bucket !== "sendable_now" && n > 0)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([reason, count]) => ({ reason, count }));
 
   return counts;
 }

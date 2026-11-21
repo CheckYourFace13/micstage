@@ -274,7 +274,9 @@ function crawlableOfficial(
 async function enrichVerifiedListingSchedulesUnlocked(
   prisma: PrismaClient,
   limit: number,
+  budgetMs: number,
 ): Promise<ScheduleEnrichResult> {
+  const deadline = Date.now() + Math.max(5_000, budgetMs);
   const where = {
     verificationStatus: "VERIFIED" as const,
     removedAt: null,
@@ -399,7 +401,9 @@ async function enrichVerifiedListingSchedulesUnlocked(
     .slice(0, priorityTake);
 
   const rows = [...priority, ...rotating];
+  const unscheduledVerifiedCount = await prisma.publicOpenMicListing.count({ where });
 
+  let scanned = 0;
   let confirmed = 0;
   let uncertain = 0;
   let skipped = 0;
@@ -411,6 +415,8 @@ async function enrichVerifiedListingSchedulesUnlocked(
 
   try {
   for (const row of rows) {
+    if (Date.now() >= deadline) break;
+    scanned += 1;
     const site = row.websiteUrl || row.growthLead?.websiteUrl || row.sourceUrl;
     const listingHost = hostFromUrl(site);
     const timeZone = resolveTrustedListingTimeZone(row);
@@ -570,7 +576,7 @@ async function enrichVerifiedListingSchedulesUnlocked(
   }
   } finally {
     const result: ScheduleEnrichResult = {
-      scanned: rows.length,
+      scanned,
       confirmed,
       uncertain,
       skipped,
@@ -580,12 +586,14 @@ async function enrichVerifiedListingSchedulesUnlocked(
       fetchBlocked,
       noScheduleFound,
     };
-    // Cursor batch size — full unscheduled set is no longer loaded into memory.
-    await recordScheduleRecoveryDayStats(prisma, rows.length, result).catch(() => undefined);
+    // Persist after each successful unlock so owner summary is not stuck at scanned=0.
+    await recordScheduleRecoveryDayStats(prisma, unscheduledVerifiedCount, result).catch((e) => {
+      console.error("[schedule enrich] day stats write failed", e);
+    });
   }
 
   return {
-    scanned: rows.length,
+    scanned,
     confirmed,
     uncertain,
     skipped,
@@ -599,11 +607,12 @@ async function enrichVerifiedListingSchedulesUnlocked(
 
 export async function enrichVerifiedListingSchedules(
   prisma: PrismaClient,
-  opts?: { limit?: number },
+  opts?: { limit?: number; budgetMs?: number },
 ): Promise<ScheduleEnrichResult> {
-  const limit = Math.min(48, Math.max(0, opts?.limit ?? 24));
+  const limit = Math.min(24, Math.max(0, opts?.limit ?? 8));
   if (limit <= 0) return { ...EMPTY_SCHEDULE_ENRICH_RESULT };
+  const budgetMs = Math.min(120_000, Math.max(8_000, opts?.budgetMs ?? 70_000));
   return withPgAdvisoryLock(prisma, SCHEDULE_ENRICH_LOCK, { ...EMPTY_SCHEDULE_ENRICH_RESULT }, () =>
-    enrichVerifiedListingSchedulesUnlocked(prisma, limit),
+    enrichVerifiedListingSchedulesUnlocked(prisma, limit, budgetMs),
   );
 }

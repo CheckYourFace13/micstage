@@ -978,7 +978,7 @@ export async function buildOwnerDailySummary(
       topOutreachBlockReasons: eligibilityAudit.topBlockReasons,
       cityHubsWithScheduled: cityHubsWithScheduledRows.filter((r) => r.city?.trim()).length,
       scheduleRecovery: {
-        unscheduledVerified: scheduleRecovery.unscheduledVerified || unscheduledVerified,
+        unscheduledVerified: unscheduledVerified || scheduleRecovery.unscheduledVerified,
         scannedToday: scheduleRecovery.scanned,
         officialPagesFetched: scheduleRecovery.officialPagesFetched,
         explicitScheduleFound: scheduleRecovery.explicitFound,

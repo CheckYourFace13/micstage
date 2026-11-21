@@ -224,9 +224,27 @@ async function handle(request: Request) {
 
     if (phase === "enrichment") {
       try {
-        // Sequential workers: lower peak DB/fetch concurrency than Promise.all.
-        const scheduleEnrich = await enrichVerifiedListingSchedules(prisma, { limit: 20 });
-        const contactMine = await mineVerifiedListingOfficialEmails(prisma, { limit: 16 });
+        /**
+         * Wall-clock budget under Hostinger curl -m 180. Finish and release leases
+         * before the gateway kills the request (which previously left scanned=0).
+         */
+        const enrichStarted = Date.now();
+        const ENRICH_BUDGET_MS = 140_000;
+        const scheduleEnrich = await enrichVerifiedListingSchedules(prisma, {
+          limit: 8,
+          budgetMs: Math.min(90_000, ENRICH_BUDGET_MS - 20_000),
+        });
+        const remainingMs = ENRICH_BUDGET_MS - (Date.now() - enrichStarted);
+        const contactMine =
+          remainingMs > 25_000
+            ? await mineVerifiedListingOfficialEmails(prisma, { limit: 8 })
+            : {
+                scanned: 0,
+                mined: 0,
+                highOfficial: 0,
+                failed: 0,
+                byFailureReason: { skipped_for_enrichment_budget: 1 },
+              };
         enrichmentWorkers = { scheduleEnrich, contactMine };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

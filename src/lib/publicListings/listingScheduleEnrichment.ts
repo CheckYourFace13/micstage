@@ -53,6 +53,8 @@ export const EMPTY_SCHEDULE_ENRICH_RESULT: ScheduleEnrichResult = {
 };
 
 const SCHEDULE_CURSOR_ADAPTER = "schedule_enrich";
+/** Separate adapter: prod DB unique (adapterId, marketSlug) allows only one cursor key per pair. */
+const SCHEDULE_DAY_STATS_ADAPTER = "schedule_enrich_day";
 const SCHEDULE_CURSOR_MARKET = "verified";
 const SCHEDULE_ROTATE_KEY = "rotateId";
 const SCHEDULE_DAY_STATS_KEY = "day_funnel";
@@ -123,7 +125,7 @@ export async function readScheduleRecoveryDayStats(
   const { reportChicagoDate } = chicagoLast24hWindow(now);
   const prev = await readDiscoveryCursorJson<ScheduleRecoveryDayStats>(
     prisma,
-    SCHEDULE_CURSOR_ADAPTER,
+    SCHEDULE_DAY_STATS_ADAPTER,
     SCHEDULE_CURSOR_MARKET,
     SCHEDULE_DAY_STATS_KEY,
   );
@@ -139,7 +141,7 @@ async function recordScheduleRecoveryDayStats(
   const { reportChicagoDate } = chicagoLast24hWindow();
   const prev = await readScheduleRecoveryDayStats(prisma);
   const base = prev.chicagoDate === reportChicagoDate ? prev : emptyScheduleRecoveryDayStats(reportChicagoDate);
-  await writeDiscoveryCursorJson(prisma, SCHEDULE_CURSOR_ADAPTER, SCHEDULE_CURSOR_MARKET, SCHEDULE_DAY_STATS_KEY, {
+  await writeDiscoveryCursorJson(prisma, SCHEDULE_DAY_STATS_ADAPTER, SCHEDULE_CURSOR_MARKET, SCHEDULE_DAY_STATS_KEY, {
     chicagoDate: reportChicagoDate,
     unscheduledVerified,
     scanned: base.scanned + delta.scanned,
@@ -401,7 +403,6 @@ async function enrichVerifiedListingSchedulesUnlocked(
     .slice(0, priorityTake);
 
   const rows = [...priority, ...rotating];
-  const unscheduledVerifiedCount = await prisma.publicOpenMicListing.count({ where });
 
   let scanned = 0;
   let confirmed = 0;
@@ -586,7 +587,13 @@ async function enrichVerifiedListingSchedulesUnlocked(
       fetchBlocked,
       noScheduleFound,
     };
-    // Persist after each successful unlock so owner summary is not stuck at scanned=0.
+    // Never block day-stats persistence on a heavy inventory count.
+    let unscheduledVerifiedCount = scanned;
+    try {
+      unscheduledVerifiedCount = await prisma.publicOpenMicListing.count({ where });
+    } catch (e) {
+      console.error("[schedule enrich] unscheduled count failed; using batch scanned", e);
+    }
     await recordScheduleRecoveryDayStats(prisma, unscheduledVerifiedCount, result).catch((e) => {
       console.error("[schedule enrich] day stats write failed", e);
     });

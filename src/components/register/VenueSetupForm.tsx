@@ -16,6 +16,8 @@ export type ClaimListingSeed = {
   lng: number | null;
 };
 
+type EntryMode = "listing" | "search" | "manual";
+
 export function VenueSetupForm(props: {
   submitPath: string;
   /** Always post this slug when present so claim context survives even if seed/prefill is unavailable. */
@@ -32,9 +34,12 @@ export function VenueSetupForm(props: {
     Number.isFinite(claimListing.lat) &&
     Number.isFinite(claimListing.lng);
 
-  const [mode, setMode] = useState<"listing" | "search">(canUseListingPlace ? "listing" : "search");
+  const [mode, setMode] = useState<EntryMode>(canUseListingPlace ? "listing" : "search");
   const [place, setPlace] = useState<PlaceData | null>(null);
+  const [googleUnavailable, setGoogleUnavailable] = useState(false);
   const claimSlug = (claimListingSlug || claimListing?.slug || "").trim();
+
+  const showManual = mode === "manual" || (mode === "search" && googleUnavailable);
 
   return (
     <form method="post" action={submitPath} className="mt-6 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
@@ -43,7 +48,12 @@ export function VenueSetupForm(props: {
 
       {error === "place" ? (
         <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white">
-          Select your venue from the suggestions list, or use the listing location if shown.
+          Select your venue from the suggestions list, enter it manually, or use the listing location if shown.
+        </div>
+      ) : null}
+      {error === "manual" ? (
+        <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white">
+          Enter venue name, street address, city, and country to continue.
         </div>
       ) : null}
       {error === "unavailable" ? (
@@ -53,7 +63,8 @@ export function VenueSetupForm(props: {
       ) : null}
       {error === "taken" ? (
         <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-white">
-          That Google place is already connected to another MicStage venue. Search for a different location or contact support.
+          That Google place is already connected to another MicStage venue. Search for a different location, enter it
+          manually, or contact support.
         </div>
       ) : null}
 
@@ -62,23 +73,37 @@ export function VenueSetupForm(props: {
           <div className="flex flex-wrap gap-2 text-sm">
             <button
               type="button"
-              onClick={() => setMode("listing")}
+              onClick={() => {
+                setMode("listing");
+                setGoogleUnavailable(false);
+              }}
               className={`rounded-md px-3 py-2 ${mode === "listing" ? "bg-[rgb(var(--om-neon))] font-semibold text-black" : "border border-white/20 text-white/80"}`}
             >
               Use listing location
             </button>
             <button
               type="button"
-              onClick={() => setMode("search")}
-              className={`rounded-md px-3 py-2 ${mode === "search" ? "bg-[rgb(var(--om-neon))] font-semibold text-black" : "border border-white/20 text-white/80"}`}
+              onClick={() => {
+                setMode("search");
+                setGoogleUnavailable(false);
+              }}
+              className={`rounded-md px-3 py-2 ${mode === "search" && !showManual ? "bg-[rgb(var(--om-neon))] font-semibold text-black" : "border border-white/20 text-white/80"}`}
             >
               Search a different place
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("manual")}
+              className={`rounded-md px-3 py-2 ${showManual ? "bg-[rgb(var(--om-neon))] font-semibold text-black" : "border border-white/20 text-white/80"}`}
+            >
+              Enter manually
             </button>
           </div>
           {mode === "listing" ? (
             <div className="rounded-xl border border-white/10 bg-black/30 p-4 text-sm">
               <div className="font-semibold text-white">{claimListing.name}</div>
               <div className="mt-1 text-white/70">{claimListing.formattedAddress}</div>
+              <input type="hidden" name="entryMode" value="google" />
               <input type="hidden" name="venueName" value={claimListing.name} />
               <input type="hidden" name="googlePlaceId" value={claimListing.googlePlaceId ?? ""} />
               <input type="hidden" name="formattedAddress" value={claimListing.formattedAddress} />
@@ -92,9 +117,16 @@ export function VenueSetupForm(props: {
         </div>
       ) : null}
 
-      {mode === "search" ? (
+      {mode === "search" && !showManual ? (
         <div className="grid gap-3">
-          <VenuePlacePicker onPlace={setPlace} />
+          <VenuePlacePicker
+            onPlace={setPlace}
+            onUnavailable={() => {
+              setGoogleUnavailable(true);
+              setMode("manual");
+            }}
+          />
+          <input type="hidden" name="entryMode" value="google" />
           <input type="hidden" name="venueName" value={place?.venueName ?? ""} />
           <input type="hidden" name="googlePlaceId" value={place?.placeId ?? ""} />
           <input type="hidden" name="formattedAddress" value={place?.formattedAddress ?? ""} />
@@ -109,8 +141,94 @@ export function VenueSetupForm(props: {
               <div className="mt-1 text-white/70">{place.formattedAddress}</div>
             </div>
           ) : (
-            <p className="text-xs text-white/50">Select a suggestion from the list before continuing.</p>
+            <p className="text-xs text-white/50">Select a suggestion from the list before continuing, or enter manually.</p>
           )}
+        </div>
+      ) : null}
+
+      {showManual ? (
+        <div className="grid gap-3">
+          <p className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-white">
+            Venue search is unavailable right now. Enter your venue manually.
+          </p>
+          <input type="hidden" name="entryMode" value="manual" />
+          <label className="grid gap-1 text-sm">
+            <span className="text-white/80">Venue name</span>
+            <input
+              name="venueName"
+              required
+              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+              placeholder="Your venue or room name"
+              autoComplete="organization"
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="text-white/80">Street address</span>
+            <input
+              name="street"
+              required
+              className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+              placeholder="Street number and name"
+              autoComplete="street-address"
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">City</span>
+              <input
+                name="city"
+                required
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                placeholder="City"
+                autoComplete="address-level2"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">State / province / region</span>
+              <input
+                name="region"
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                placeholder="State, province, or region"
+                autoComplete="address-level1"
+              />
+            </label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">Postal / ZIP code</span>
+              <input
+                name="postal"
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                placeholder="Postal or ZIP code"
+                autoComplete="postal-code"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-white/80">Country</span>
+              <input
+                name="country"
+                required
+                className="h-11 rounded-md border border-white/10 bg-black/40 px-3 text-white placeholder:text-white/40"
+                placeholder="Country"
+                autoComplete="country-name"
+              />
+            </label>
+          </div>
+          <p className="text-xs text-white/50">
+            Manual entries are not marked Google-verified. You can refine the listing later from your venue dashboard.
+          </p>
+          {!canUseListingPlace ? (
+            <button
+              type="button"
+              className="justify-self-start text-xs text-white/70 underline hover:text-white"
+              onClick={() => {
+                setGoogleUnavailable(false);
+                setMode("search");
+              }}
+            >
+              Try Google search again
+            </button>
+          ) : null}
         </div>
       ) : null}
 

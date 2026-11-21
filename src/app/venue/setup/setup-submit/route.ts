@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import tzLookup from "tz-lookup";
 import { getPrismaOrNull } from "@/lib/prisma";
@@ -6,6 +7,11 @@ import { getSession } from "@/lib/session";
 import { sendVenueSignupThankYouEmailIfNeeded } from "@/lib/venueSignupThankYouEmail";
 import { absoluteServerRedirectUrl } from "@/lib/publicSeo";
 import { refreshListingPromotionEligible } from "@/lib/publicListings/listingClaimInviteEmail";
+import {
+  composeManualVenueAddress,
+  isManualVenuePlaceId,
+  makeManualVenuePlaceId,
+} from "@/lib/venues/manualVenuePlaceId";
 
 export const runtime = "nodejs";
 
@@ -45,23 +51,48 @@ export async function POST(request: Request) {
     return redirectTo("/venue/setup?error=unavailable");
   }
 
+  const entryModeRaw = optString(formData, "entryMode");
+  const entryMode = entryModeRaw === "manual" ? "manual" : "google";
   const venueName = optString(formData, "venueName");
-  const googlePlaceId = optString(formData, "googlePlaceId");
-  const formattedAddress = optString(formData, "formattedAddress");
-  const city = optString(formData, "city");
-  const region = optString(formData, "region");
-  const country = optString(formData, "country");
   const claimListing = optString(formData, "claimListing");
   const growthTraceLeadId = optString(formData, "growthTraceLeadId");
+
+  let googlePlaceId = optString(formData, "googlePlaceId");
+  let formattedAddress = optString(formData, "formattedAddress");
+  let city = optString(formData, "city");
+  let region = optString(formData, "region");
+  let country = optString(formData, "country");
   const latRaw = formData.get("lat");
   const lngRaw = formData.get("lng");
-  const lat =
+  let lat =
     typeof latRaw === "string" && latRaw.trim() ? Number.parseFloat(latRaw.trim()) : Number.NaN;
-  const lng =
+  let lng =
     typeof lngRaw === "string" && lngRaw.trim() ? Number.parseFloat(lngRaw.trim()) : Number.NaN;
 
-  if (!googlePlaceId || !venueName || !formattedAddress || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return redirectTo(setupErrorPath("place", claimListing, growthTraceLeadId));
+  if (entryMode === "manual") {
+    const street = optString(formData, "street");
+    const postal = optString(formData, "postal");
+    city = optString(formData, "city");
+    region = optString(formData, "region");
+    country = optString(formData, "country");
+    if (!venueName || !street || !city || !country) {
+      return redirectTo(setupErrorPath("manual", claimListing, growthTraceLeadId));
+    }
+    // Synthetic id — never a Google Place ID; not Google-verified.
+    googlePlaceId = makeManualVenuePlaceId(randomUUID().replace(/-/g, ""));
+    formattedAddress = composeManualVenueAddress({
+      street,
+      city,
+      region,
+      postal,
+      country,
+    });
+    lat = Number.NaN;
+    lng = Number.NaN;
+  } else {
+    if (!googlePlaceId || isManualVenuePlaceId(googlePlaceId) || !venueName || !formattedAddress || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return redirectTo(setupErrorPath("place", claimListing, growthTraceLeadId));
+    }
   }
 
   const prisma = getPrismaOrNull();
@@ -83,7 +114,8 @@ export async function POST(request: Request) {
     return redirectTo(setupErrorPath("taken", claimListing, growthTraceLeadId));
   }
 
-  const timeZone = tzLookup(lat, lng);
+  const timeZone =
+    Number.isFinite(lat) && Number.isFinite(lng) ? tzLookup(lat, lng) : "America/Chicago";
   const baseSlug = slugify(venueName) || "venue";
   let slug = baseSlug;
   for (let i = 0; i < 25; i++) {
@@ -104,23 +136,23 @@ export async function POST(request: Request) {
                 city,
                 region,
                 country,
-                lat,
-                lng,
+                lat: Number.isFinite(lat) ? lat : null,
+                lng: Number.isFinite(lng) ? lng : null,
                 timeZone,
               },
             })
           : await tx.venue.create({
               data: {
                 ownerId,
-                name: venueName,
+                name: venueName!,
                 slug,
-                googlePlaceId,
-                formattedAddress,
+                googlePlaceId: googlePlaceId!,
+                formattedAddress: formattedAddress!,
                 city,
                 region,
                 country,
-                lat,
-                lng,
+                lat: Number.isFinite(lat) ? lat : null,
+                lng: Number.isFinite(lng) ? lng : null,
                 timeZone,
               },
             });

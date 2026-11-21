@@ -20,6 +20,7 @@
     "test:discovery-quality": "npx tsx scripts/check-discovery-quality.mjs",
     "test:places-compliance": "npx tsx scripts/check-places-compliance.mjs",
     "test:places-cost": "npx tsx scripts/check-places-cost.mjs",
+    "test:venue-setup-manual": "npx tsx scripts/check-venue-setup-manual.mjs",
     "test:open-mic-evidence": "node scripts/check-public-open-mic-evidence.mjs",
     "test:instant-claim": "node scripts/check-instant-claim.mjs",
     "test:claim-conversion": "npx tsx scripts/check-claim-conversion-pass.mjs",

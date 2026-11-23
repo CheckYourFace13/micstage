@@ -91,13 +91,15 @@ export function VenueSetupForm(props: {
             >
               Search a different place
             </button>
-            <button
-              type="button"
-              onClick={() => setMode("manual")}
-              className={`rounded-md px-3 py-2 ${showManual ? "bg-[rgb(var(--om-neon))] font-semibold text-black" : "border border-white/20 text-white/80"}`}
-            >
-              Enter manually
-            </button>
+            {googleUnavailable || mode === "manual" ? (
+              <button
+                type="button"
+                onClick={() => setMode("manual")}
+                className={`rounded-md px-3 py-2 ${showManual ? "bg-[rgb(var(--om-neon))] font-semibold text-black" : "border border-white/20 text-white/80"}`}
+              >
+                Enter manually
+              </button>
+            ) : null}
           </div>
           {mode === "listing" ? (
             <div className="rounded-xl border border-white/10 bg-black/30 p-4 text-sm">

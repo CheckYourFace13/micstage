@@ -188,7 +188,11 @@ export default function FaqPage() {
 
         <div className="mt-10 grid gap-10">
           {SECTIONS.map((section) => (
-            <section key={section.heading} aria-labelledby={`faq-${section.heading}`}>
+            <section
+              key={section.heading}
+              id={section.heading === "Pricing and trust" ? "pricing-and-trust" : undefined}
+              aria-labelledby={`faq-${section.heading}`}
+            >
               <h2 id={`faq-${section.heading}`} className="text-2xl font-semibold">
                 {section.heading}
               </h2>

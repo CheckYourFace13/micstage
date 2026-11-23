@@ -14,7 +14,6 @@ export type HomepageVerifiedListing = {
 };
 
 const WEEKDAY_ORDER: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-const UNCONFIRMED_SCHEDULE_LABEL = "Schedule being confirmed";
 const MAX_PER_METRO = 3;
 const HOMEPAGE_LIMIT = 12;
 
@@ -221,7 +220,7 @@ export async function loadHomepageVerifiedOpenMics(
       );
       const scheduleLabel =
         days.length === 0
-          ? UNCONFIRMED_SCHEDULE_LABEL
+          ? null
           : days.length === 1
             ? `${weekdayToLabel(days[0]!)}s`
             : days.map((d) => weekdayToLabel(d).slice(0, 3)).join(" · ");
@@ -240,7 +239,8 @@ export async function loadHomepageVerifiedOpenMics(
         geoBucket: homepageGeoBucket(city, region),
       };
     })
-    .filter((r) => Boolean(r.city));
+    // Homepage strip: real place names + confirmed schedules only (no "schedule being confirmed").
+    .filter((r) => Boolean(r.city) && r.hasConfirmedSchedule && Boolean(r.scheduleLabel));
 
   return selectHomepageVerifiedMix(candidates, take).map(({ slug, name, city, scheduleLabel, formatLabel }) => ({
     slug,

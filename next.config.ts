@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
     workerThreads: false,
     cpus: 1,
   },
+  async redirects() {
+    return [{ source: "/pricing", destination: "/faq#pricing-and-trust", permanent: true }];
+  },
   async rewrites() {
     const key = process.env.INDEXNOW_API_KEY?.trim();
     if (!key) return [];

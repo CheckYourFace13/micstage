@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { HomeDiscoveryPanel } from "@/components/home/HomeDiscoveryPanel";
+import { YouTubeEmbed } from "@/components/media/YouTubeEmbed";
+import { MICSTAGE_VIDEO_OVERVIEW } from "@/lib/media/micstageVideos";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 const homeTitle = "Find open mics near you | MicStage";
@@ -106,6 +108,14 @@ export default function Home() {
             </div>
           </div>
         </header>
+
+        <section className="mt-14 max-w-3xl" aria-labelledby="micstage-overview-video">
+          <h2 id="micstage-overview-video" className="text-sm font-semibold text-white/90 md:text-base">
+            See MicStage in action
+          </h2>
+          <p className="mt-1 text-xs text-white/55 md:text-sm">A short overview of finding and running open mics on MicStage.</p>
+          <YouTubeEmbed video={MICSTAGE_VIDEO_OVERVIEW} className="mt-4" />
+        </section>
       </main>
     </div>
   );

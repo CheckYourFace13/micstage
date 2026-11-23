@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { YouTubeEmbed } from "@/components/media/YouTubeEmbed";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
+import { MICSTAGE_VIDEO_HOST } from "@/lib/media/micstageVideos";
 import { getPrismaOrNull } from "@/lib/prisma";
 import { ShareLinks } from "@/components/publicListings/ShareLinks";
 import { absoluteUrl } from "@/lib/publicSeo";
@@ -103,6 +105,14 @@ export default async function HostLandingPage(props: {
           </Link>{" "}
           instead — that&apos;s a separate account.
         </p>
+
+        <section className="mt-12" aria-labelledby="host-video">
+          <h2 id="host-video" className="text-lg font-semibold text-white">Watch: MicStage for hosts</h2>
+          <p className="mt-2 text-sm text-white/70">
+            Schedules, signups, and shareable lineups for every night you run.
+          </p>
+          <YouTubeEmbed video={MICSTAGE_VIDEO_HOST} className="mt-4" />
+        </section>
 
         <section className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-lg font-semibold text-white">Open mic host app — built for real hosts</h2>

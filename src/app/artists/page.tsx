@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { YouTubeEmbed } from "@/components/media/YouTubeEmbed";
+import { MICSTAGE_VIDEO_PERFORMER } from "@/lib/media/micstageVideos";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 
 const pageTitle = "Find Open Mics & Book Performance Spots | MicStage";
@@ -108,6 +110,14 @@ export default function ArtistsLandingPage() {
             Artist sign in
           </Link>
         </p>
+
+        <section className="mt-12" aria-labelledby="artist-video">
+          <h2 id="artist-video" className="text-lg font-semibold text-white">Watch: MicStage for performers</h2>
+          <p className="mt-2 text-sm text-white/70">
+            Find verified open mics, see schedules, and sign up for available times.
+          </p>
+          <YouTubeEmbed video={MICSTAGE_VIDEO_PERFORMER} className="mt-4" />
+        </section>
 
         <section className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h2 className="text-lg font-semibold text-white">Built for performers, not spreadsheets</h2>

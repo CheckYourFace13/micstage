@@ -78,8 +78,15 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
       firstFilterEffect.current = false;
       return;
     }
+    // Keep the current map location when filters match nothing.
+    const stillVisible = allVenues.some((v) => {
+      if (formatFilter && !v.performanceFormats.includes(formatFilter)) return false;
+      if (acceptingOnly && !v.acceptingSignups) return false;
+      return true;
+    });
+    if (!stillVisible) return;
     queueMicrotask(() => setRefitNonce((n) => n + 1));
-  }, [filterSig]);
+  }, [filterSig, allVenues, formatFilter, acceptingOnly]);
 
   /** Format + booking only — map pins always include every setup venue; weekday is highlight-only on the map. */
   const filteredForMap = useMemo(() => {
@@ -335,24 +342,24 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
               <div className="rounded-xl border border-white/12 bg-zinc-900/45 px-4 py-6 text-sm leading-relaxed text-white/70">
                 {filtered.length === 0 ? (
                   <>
-                    <p className="font-medium text-white/90">No venues match these filters.</p>
-                    <p className="mt-2 text-white/60">
-                      Try another night, turn off &ldquo;Online signup open,&rdquo; or switch format. You can also search
-                      by place in{" "}
-                      <Link href="/find-open-mics" className="font-semibold text-[rgb(var(--om-neon))] underline">
-                        Find open mics
-                      </Link>
-                      .
-                    </p>
+                    <p className="font-medium text-white/90">No mics match these filters</p>
                     {hasActiveFilters ? (
                       <button
                         type="button"
                         onClick={clearAllFilters}
                         className="mt-4 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:border-white/35"
                       >
-                        Reset filters
+                        Clear filters
                       </button>
-                    ) : null}
+                    ) : (
+                      <p className="mt-2 text-white/60">
+                        Search by place in{" "}
+                        <Link href="/find-open-mics" className="font-semibold text-[rgb(var(--om-neon))] underline">
+                          Find open mics
+                        </Link>
+                        .
+                      </p>
+                    )}
                   </>
                 ) : (
                   <>

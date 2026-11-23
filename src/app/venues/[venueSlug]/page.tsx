@@ -281,40 +281,25 @@ export default async function VenuePublicPage(props: {
               </p>
             ) : null}
           </div>
-          <nav
-            className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:shrink-0 sm:items-end sm:gap-2"
-            aria-label="Page shortcuts"
-          >
-            {session?.kind === "venue" && isStaffForThisVenue ? (
+          {session?.kind === "venue" && isStaffForThisVenue ? (
+            <nav className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:shrink-0 sm:items-end" aria-label="Venue tools">
               <Link
                 className="inline-flex min-h-11 items-center rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white sm:justify-end sm:px-3"
                 href="/venue"
               >
                 Venue portal
               </Link>
-            ) : null}
-            {isMusician ? (
+            </nav>
+          ) : isMusician ? (
+            <nav className="flex w-full flex-col gap-1 text-sm sm:w-auto sm:shrink-0 sm:items-end" aria-label="Artist tools">
               <Link
                 className="inline-flex min-h-11 items-center rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white sm:justify-end sm:px-3"
                 href={ARTIST_DASHBOARD_HREF}
               >
                 Artist portal
               </Link>
-            ) : (
-              <Link
-                className="inline-flex min-h-11 items-center rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white sm:justify-end sm:px-3"
-                href="/login/musician"
-              >
-                Artist login
-              </Link>
-            )}
-            <Link
-              className="inline-flex min-h-11 items-center rounded-md px-2 text-white/70 hover:bg-white/10 hover:text-white sm:justify-end sm:px-3"
-              href="/"
-            >
-              Home
-            </Link>
-          </nav>
+            </nav>
+          ) : null}
         </div>
 
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />

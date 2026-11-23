@@ -617,39 +617,51 @@ export async function verifyPublicListingsWithGoogle(
           const evidenceNote = evidence.trusted
             ? `${evidence.reason} (${evidence.field}: "${evidence.snippet}")`
             : `${OPEN_MIC_EVIDENCE_REASON.CONFIRMED} (stored crawl evidence)`;
-          await prisma.publicOpenMicListing.update({
-            where: { id: row.id },
-            data: {
-              ...placeData,
-              verificationStatus: "VERIFIED" satisfies PublicListingVerificationStatus,
-              internalNotes: appendInternalNote(row.internalNotes, `${result.reason}; ${evidenceNote}`),
-            },
-          });
-          verified += 1;
-          // One-touch claim invite once the listing is publicly VERIFIED.
-          await sendListingClaimInviteIfNeeded(prisma, row.id).catch((e) => {
-            console.error("[googlePlacesVerify] claim invite failed", {
-              listingId: row.id,
-              error: e instanceof Error ? e.message : String(e),
+          try {
+            await prisma.publicOpenMicListing.update({
+              where: { id: row.id },
+              data: {
+                ...placeData,
+                verificationStatus: "VERIFIED" satisfies PublicListingVerificationStatus,
+                internalNotes: appendInternalNote(row.internalNotes, `${result.reason}; ${evidenceNote}`),
+              },
             });
-          });
-          const base = appBaseUrl().replace(/\/$/, "");
-          await submitUrlsToIndexNow([`${base}/open-mics/${encodeURIComponent(row.slug)}`]).catch(() => {});
+            verified += 1;
+            // One-touch claim invite once the listing is publicly VERIFIED.
+            await sendListingClaimInviteIfNeeded(prisma, row.id).catch((e) => {
+              console.error("[googlePlacesVerify] claim invite failed", {
+                listingId: row.id,
+                error: e instanceof Error ? e.message : String(e),
+              });
+            });
+            const base = appBaseUrl().replace(/\/$/, "");
+            await submitUrlsToIndexNow([`${base}/open-mics/${encodeURIComponent(row.slug)}`]).catch(() => {});
+          } catch (e) {
+            if (!isPrismaUniqueViolation(e)) throw e;
+            await markDuplicateGooglePlace(prisma, row, result.placeId, result.reason);
+            outdated += 1;
+          }
         } else {
           const evNote = evidence.hasEvidence
             ? `${OPEN_MIC_EVIDENCE_REASON.UNTRUSTED} (${evidence.field}: "${evidence.snippet}")`
             : storedOfficial
               ? `${OPEN_MIC_EVIDENCE_REASON.UNTRUSTED} (stored review-only crawl)`
               : OPEN_MIC_EVIDENCE_REASON.PLACE_ONLY;
-          await prisma.publicOpenMicListing.update({
-            where: { id: row.id },
-            data: {
-              ...placeData,
-              verificationStatus: "NEEDS_REVIEW" satisfies PublicListingVerificationStatus,
-              internalNotes: appendInternalNote(row.internalNotes, `${result.reason}; ${evNote}`),
-            },
-          });
-          needsReview += 1;
+          try {
+            await prisma.publicOpenMicListing.update({
+              where: { id: row.id },
+              data: {
+                ...placeData,
+                verificationStatus: "NEEDS_REVIEW" satisfies PublicListingVerificationStatus,
+                internalNotes: appendInternalNote(row.internalNotes, `${result.reason}; ${evNote}`),
+              },
+            });
+            needsReview += 1;
+          } catch (e) {
+            if (!isPrismaUniqueViolation(e)) throw e;
+            await markDuplicateGooglePlace(prisma, row, result.placeId, result.reason);
+            outdated += 1;
+          }
         }
       }
     } else {
@@ -692,8 +704,14 @@ export async function verifyPublicListingsWithGoogle(
         if (shouldStampPlaceVerifiedAt(result)) {
           data.googlePlaceVerifiedAt = new Date();
         }
-        await prisma.publicOpenMicListing.update({ where: { id: row.id }, data });
-        needsReview += 1;
+        try {
+          await prisma.publicOpenMicListing.update({ where: { id: row.id }, data });
+          needsReview += 1;
+        } catch (e) {
+          if (!isPrismaUniqueViolation(e) || !result.placeId) throw e;
+          await markDuplicateGooglePlace(prisma, row, result.placeId, result.reason);
+          outdated += 1;
+        }
       }
     }
 
@@ -701,4 +719,33 @@ export async function verifyPublicListingsWithGoogle(
   }
 
   return { verified, needsReview, outdated, skipped, noApiKey: false };
+}
+
+function isPrismaUniqueViolation(e: unknown): boolean {
+  return typeof e === "object" && e !== null && "code" in e && String((e as { code?: unknown }).code) === "P2002";
+}
+
+async function markDuplicateGooglePlace(
+  prisma: PrismaClient,
+  row: { id: string; internalNotes: string | null },
+  placeId: string,
+  reason: string,
+) {
+  const duplicate = await prisma.publicOpenMicListing.findFirst({
+    where: { googlePlaceId: placeId, NOT: { id: row.id } },
+    select: { slug: true },
+  });
+  await prisma.publicOpenMicListing.update({
+    where: { id: row.id },
+    data: {
+      verificationStatus: "OUTDATED",
+      lastVerifiedAt: new Date(),
+      evidenceTerminalReason: "DUPLICATE_GOOGLE_PLACE",
+      placeVerifyNextAttemptAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+      internalNotes: appendInternalNote(
+        row.internalNotes,
+        `${reason}; Duplicate Google place${duplicate ? ` (already on ${duplicate.slug})` : ""}`,
+      ),
+    },
+  });
 }

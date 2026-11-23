@@ -32,15 +32,28 @@ export async function stampListingPlaceIdsFromLeads(
   for (const row of rows) {
     const placeId = row.growthLead?.googlePlaceId?.trim();
     if (!placeId) continue;
-    const note = `[${new Date().toISOString().slice(0, 10)}] stamped googlePlaceId from growth lead`;
-    await prisma.publicOpenMicListing.update({
-      where: { id: row.id },
-      data: {
-        googlePlaceId: placeId,
-        internalNotes: row.internalNotes?.trim() ? `${row.internalNotes.trim()}\n${note}` : note,
-      },
+    // googlePlaceId is unique — never stamp a place already claimed by another listing.
+    const taken = await prisma.publicOpenMicListing.findFirst({
+      where: { googlePlaceId: placeId, NOT: { id: row.id } },
+      select: { id: true },
     });
-    stamped += 1;
+    if (taken) continue;
+    const note = `[${new Date().toISOString().slice(0, 10)}] stamped googlePlaceId from growth lead`;
+    try {
+      await prisma.publicOpenMicListing.update({
+        where: { id: row.id },
+        data: {
+          googlePlaceId: placeId,
+          internalNotes: row.internalNotes?.trim() ? `${row.internalNotes.trim()}\n${note}` : note,
+        },
+      });
+      stamped += 1;
+    } catch (e) {
+      // Race / unique constraint: skip and continue the backlog (do not abort the tick).
+      const code = typeof e === "object" && e && "code" in e ? String((e as { code?: unknown }).code) : "";
+      if (code === "P2002") continue;
+      throw e;
+    }
   }
 
   return { scanned: rows.length, stamped };

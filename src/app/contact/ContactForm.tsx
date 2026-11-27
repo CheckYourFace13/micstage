@@ -1,21 +1,30 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { TurnstileField } from "@/components/contact/TurnstileField";
+import { CONTACT_HONEYPOT_FIELD } from "@/lib/contact/contactFormFields";
 import { CONTACT_CATEGORIES } from "./categories";
 import { submitContactForm, type ContactFormState } from "./actions";
 
 const initial: ContactFormState = { status: "idle" };
 
-export function ContactForm(props: { defaultCategory?: string; defaultDetails?: string }) {
+export function ContactForm(props: {
+  defaultCategory?: string;
+  defaultDetails?: string;
+}) {
   const [state, formAction, pending] = useActionState(submitContactForm, initial);
   const formRef = useRef<HTMLFormElement>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null;
 
   useEffect(() => {
     if (!props.defaultCategory && !props.defaultDetails) return;
     const form = formRef.current;
     if (!form) return;
     if (props.defaultCategory) {
-      const radio = form.querySelector<HTMLInputElement>(`input[name="category"][value="${props.defaultCategory}"]`);
+      const radio = form.querySelector<HTMLInputElement>(
+        `input[name="category"][value="${props.defaultCategory}"]`,
+      );
       if (radio) radio.checked = true;
     }
     if (props.defaultDetails) {
@@ -23,6 +32,10 @@ export function ContactForm(props: { defaultCategory?: string; defaultDetails?: 
       if (details && !details.value) details.value = props.defaultDetails;
     }
   }, [props.defaultCategory, props.defaultDetails]);
+
+  useEffect(() => {
+    if (state.status === "error") setTurnstileReset((n) => n + 1);
+  }, [state]);
 
   if (state.status === "success") {
     return (
@@ -36,8 +49,8 @@ export function ContactForm(props: { defaultCategory?: string; defaultDetails?: 
         </p>
         {state.devLogged ? (
           <p className="mt-3 text-xs text-white/60">
-            Development: no Resend key or inbox configured, so your message was logged on the server console instead of being
-            emailed.
+            Development: no Resend key or inbox configured, so your message was logged on the server console instead of
+            being emailed.
           </p>
         ) : null}
         <p className="mt-4 text-sm">
@@ -50,7 +63,7 @@ export function ContactForm(props: { defaultCategory?: string; defaultDetails?: 
   }
 
   return (
-    <form ref={formRef} action={formAction} className="grid gap-6">
+    <form ref={formRef} action={formAction} className="relative grid gap-6">
       {state.status === "error" && state.message ? (
         <p
           className="rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-100"
@@ -59,6 +72,24 @@ export function ContactForm(props: { defaultCategory?: string; defaultDetails?: 
           {state.message}
         </p>
       ) : null}
+
+      {/* Honeypot: hidden from humans; bots often fill it. */}
+      <div
+        aria-hidden="true"
+        className="absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
+        style={{ position: "absolute", left: "-9999px", height: 0, width: 0, overflow: "hidden" }}
+      >
+        <label>
+          Company website
+          <input
+            type="text"
+            name={CONTACT_HONEYPOT_FIELD}
+            tabIndex={-1}
+            autoComplete="off"
+            defaultValue=""
+          />
+        </label>
+      </div>
 
       <label className="grid gap-2 text-sm">
         <span className="font-medium text-white">Name</span>
@@ -134,6 +165,8 @@ export function ContactForm(props: { defaultCategory?: string; defaultDetails?: 
           <span className="text-xs text-red-300">{state.fieldErrors.details}</span>
         ) : null}
       </label>
+
+      {turnstileSiteKey ? <TurnstileField siteKey={turnstileSiteKey} resetSignal={turnstileReset} /> : null}
 
       <button
         type="submit"

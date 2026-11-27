@@ -1,7 +1,16 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { sendEmail } from "@/lib/mailer";
 import { getContactInboxForServer } from "@/lib/contactInbox";
+import { CONTACT_HONEYPOT_FIELD } from "@/lib/contact/contactFormFields";
+import {
+  CONTACT_ACCEPTED_EVENT_KIND,
+  CONTACT_QUARANTINE_EVENT_KIND,
+  contactDuplicateHash,
+  guardContactSubmission,
+  recordContactAudit,
+} from "@/lib/contactFormGuard";
 import { CONTACT_CATEGORIES } from "./categories";
 
 export type ContactFormState =
@@ -24,6 +33,10 @@ function categoryLabel(value: string): string {
   return row ? row.label : value;
 }
 
+function emailHash(email: string): string {
+  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex").slice(0, 24);
+}
+
 export async function submitContactForm(
   _prev: ContactFormState,
   formData: FormData,
@@ -32,21 +45,58 @@ export async function submitContactForm(
   const email = String(formData.get("email") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
   const details = String(formData.get("details") ?? "").trim();
+  const companyWebsite = String(formData.get(CONTACT_HONEYPOT_FIELD) ?? "");
+  const turnstileToken = String(
+    formData.get("cf-turnstile-response") ?? formData.get("turnstileToken") ?? "",
+  );
 
   const fieldErrors: Record<string, string> = {};
   if (!name) fieldErrors.name = "Name is required.";
   else if (name.length > 200) fieldErrors.name = "Name is too long.";
   if (!email) fieldErrors.email = "Email is required.";
   else if (!EMAIL_RE.test(email)) fieldErrors.email = "Enter a valid email address.";
+  else if (email.length > 320) fieldErrors.email = "Email is too long.";
   if (!category) fieldErrors.category = "Choose a category.";
   else if (!CONTACT_CATEGORIES.some((c) => c.value === category)) {
     fieldErrors.category = "Invalid category.";
   }
   if (!details) fieldErrors.details = "Please add a message.";
+  else if (details.length < 8) fieldErrors.details = "Please add a bit more detail.";
   else if (details.length > 10000) fieldErrors.details = "Message is too long.";
 
   if (Object.keys(fieldErrors).length > 0) {
     return { status: "error", message: "Fix the highlighted fields.", fieldErrors };
+  }
+
+  const guard = await guardContactSubmission({
+    name,
+    email,
+    category,
+    details,
+    companyWebsite,
+    turnstileToken,
+  });
+
+  const detailsHash = contactDuplicateHash(email, details);
+  const eHash = emailHash(email);
+
+  if (guard.action === "reject") {
+    return {
+      status: "error",
+      message: guard.message,
+      fieldErrors: guard.fieldErrors,
+    };
+  }
+
+  if (guard.action === "quarantine") {
+    await recordContactAudit({
+      kind: CONTACT_QUARANTINE_EVENT_KIND,
+      reason: guard.reason,
+      category,
+      emailHash: eHash,
+      detailsHash,
+    });
+    return { status: "success" };
   }
 
   const inbox = getContactInboxForServer();
@@ -62,8 +112,6 @@ export async function submitContactForm(
       };
     }
     console.log("[contact] no inbox env — would send:", {
-      name,
-      email,
       category,
       detailsPreview: details.slice(0, 200),
     });
@@ -101,6 +149,12 @@ export async function submitContactForm(
       return { status: "success", devLogged: true };
     }
     await sendEmail({ to: inbox, subject, text, html });
+    await recordContactAudit({
+      kind: CONTACT_ACCEPTED_EVENT_KIND,
+      category,
+      emailHash: eHash,
+      detailsHash,
+    });
     return { status: "success" };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

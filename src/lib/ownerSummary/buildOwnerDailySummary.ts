@@ -24,6 +24,7 @@ import {
   type InstrumentedClaimFunnelCounts,
 } from "@/lib/publicListings/claimFunnelEvents";
 import { listingMeetsPublicSeoIndexGate } from "@/lib/publicListings/listingSeo";
+import { countContactQuarantinesSince } from "@/lib/contactFormGuard";
 
 export type OwnerSummarySignupRow = {
   kind: "venue" | "artist";
@@ -255,6 +256,16 @@ export type OwnerDailySummaryData = {
   };
   hostAcquisition: HostAcquisitionMetrics;
   venueAcquisition: VenueAcquisitionMetrics;
+  /** Inbox / auth hygiene for Friday summary (no PII). */
+  inboxHealth: {
+    dmarcReportsMailbox: string;
+    contactQuarantined7d: number;
+    bounced7d: number;
+    complaints7d: number;
+    bounceRate: number;
+    complaintRate: number;
+    authAttention: string[];
+  };
 };
 
 function cityState(city: string | null | undefined, region: string | null | undefined): string | null {
@@ -1115,5 +1126,33 @@ export async function buildOwnerDailySummary(
     },
     hostAcquisition,
     venueAcquisition,
+    inboxHealth: await (async () => {
+      const contactQuarantined7d = await countContactQuarantinesSince(startUtc);
+      const authAttention: string[] = [];
+      if (outreachHealth.complaintRate > 0) {
+        authAttention.push(`Complaint rate ${(outreachHealth.complaintRate * 100).toFixed(3)}%`);
+      }
+      if (outreachHealth.hardBounceRate >= 0.03) {
+        authAttention.push(`Hard bounce rate ${(outreachHealth.hardBounceRate * 100).toFixed(2)}%`);
+      }
+      if (complaints7d > 0) {
+        authAttention.push(`${complaints7d} complaint event(s) in the prior 7 days`);
+      }
+      if (bounced7d >= 5) {
+        authAttention.push(`${bounced7d} bounce event(s) in the prior 7 days`);
+      }
+      if (contactQuarantined7d > 0) {
+        authAttention.push(`${contactQuarantined7d} contact form submission(s) quarantined (not forwarded)`);
+      }
+      return {
+        dmarcReportsMailbox: "dmarc@micstage.com",
+        contactQuarantined7d,
+        bounced7d,
+        complaints7d,
+        bounceRate: outreachHealth.hardBounceRate,
+        complaintRate: outreachHealth.complaintRate,
+        authAttention,
+      };
+    })(),
   };
 }

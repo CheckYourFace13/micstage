@@ -372,6 +372,48 @@ function renderGrowthEngineHtml(data: OwnerDailySummaryData): string {
   </ul>`;
 }
 
+function renderInboxHealthText(data: OwnerDailySummaryData): string[] {
+  const h = data.inboxHealth;
+  const lines = [
+    "INBOX & EMAIL AUTH",
+    `  DMARC aggregate reports: archived at ${h.dmarcReportsMailbox} (not forwarded to owner inbox)`,
+    `  Contact form quarantined (7d): ${h.contactQuarantined7d}`,
+    `  Bounces (7d): ${h.bounced7d} · Complaints (7d): ${h.complaints7d}`,
+    `  Bounce rate: ${(h.bounceRate * 100).toFixed(2)}% · Complaint rate: ${(h.complaintRate * 100).toFixed(3)}%`,
+  ];
+  if (h.authAttention.length === 0) {
+    lines.push("  Meaningful auth problems: none");
+  } else {
+    lines.push("  Meaningful auth / inbox problems:");
+    for (const a of h.authAttention) lines.push(`    - ${a}`);
+  }
+  lines.push("");
+  return lines;
+}
+
+function renderInboxHealthHtml(data: OwnerDailySummaryData): string {
+  const h = data.inboxHealth;
+  const row = (label: string, value: string | number) =>
+    `<li><strong>${esc(label)}:</strong> ${typeof value === "number" ? value : esc(value)}</li>`;
+  const attn =
+    h.authAttention.length === 0
+      ? `<li><strong>Meaningful auth problems:</strong> none</li>`
+      : `<li><strong>Meaningful auth / inbox problems:</strong><ul style="margin:4px 0 0;padding-left:18px">${h.authAttention
+          .map((a) => `<li>${esc(a)}</li>`)
+          .join("")}</ul></li>`;
+  return `
+  <h2 style="font-size:15px;margin:20px 0 8px">Inbox &amp; email auth</h2>
+  <ul style="margin:0 0 12px;padding-left:18px;line-height:1.6;font-size:13px">
+    ${row("DMARC aggregate reports", `archived at ${h.dmarcReportsMailbox} (not forwarded)`)}
+    ${row("Contact form quarantined (7d)", h.contactQuarantined7d)}
+    ${row("Bounces (7d)", h.bounced7d)}
+    ${row("Complaints (7d)", h.complaints7d)}
+    ${row("Bounce rate", `${(h.bounceRate * 100).toFixed(2)}%`)}
+    ${row("Complaint rate", `${(h.complaintRate * 100).toFixed(3)}%`)}
+    ${attn}
+  </ul>`;
+}
+
 function renderGrowthAutomationText(data: OwnerDailySummaryData): string[] {
   return renderGrowthEngineText(data);
 }
@@ -703,6 +745,7 @@ export function renderOwnerDailySummaryText(data: OwnerDailySummaryData): string
   lines.push(...renderHostAcquisitionText(data));
   lines.push(...renderVenueAcquisitionText(data));
   lines.push(...renderGrowthEngineText(data));
+  lines.push(...renderInboxHealthText(data));
   lines.push(...renderMarketingText(data));
   lines.push(...renderFunnelText(data));
   lines.push(
@@ -787,6 +830,8 @@ export function renderOwnerDailySummaryHtml(data: OwnerDailySummaryData): string
   ${renderVenueAcquisitionHtml(data)}
 
   ${renderGrowthEngineHtml(data)}
+
+  ${renderInboxHealthHtml(data)}
 
   ${renderFunnelHtml(data)}
 

@@ -46,6 +46,15 @@ for (const [path, re] of [
   assert.match(read(path), re, path);
 }
 
+assert.match(
+  read("src/app/open-mics/[listingSlug]/page.tsx"),
+  /export async function generateStaticParams/,
+);
+assert.match(
+  read("src/app/locations/[locationSlug]/open-mics/page.tsx"),
+  /export async function generateStaticParams/,
+);
+
 const authUi = read("src/app/api/public/auth-ui/route.ts");
 assert.match(authUi, /private, no-store/);
 

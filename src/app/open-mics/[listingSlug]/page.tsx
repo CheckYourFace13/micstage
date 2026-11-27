@@ -36,6 +36,22 @@ import { primaryDiscoverySlugForVenue, getVenueCityDiscoveryCounts } from "@/lib
 /** Anonymous listing HTML — growthLead clicks advance via client beacon, not this render. */
 export const revalidate = 300;
 
+/** Prerender known public listings so Hostinger CDN can serve s-maxage HTML (not on-demand private). */
+export async function generateStaticParams() {
+  const prisma = getPrismaOrNull();
+  if (!prisma) return [];
+  const rows = await prisma.publicOpenMicListing.findMany({
+    where: {
+      removedAt: null,
+      verificationStatus: { in: ["VERIFIED", "NEEDS_REVIEW"] },
+    },
+    select: { slug: true, name: true, verificationStatus: true, removedAt: true },
+  });
+  return rows
+    .filter((r) => isPublicListingRenderable(r))
+    .map((r) => ({ listingSlug: r.slug }));
+}
+
 export async function generateMetadata(props: { params: Promise<{ listingSlug: string }> }): Promise<Metadata> {
   const { listingSlug } = await props.params;
   if (!isValidPublicSlug(listingSlug)) notFound();

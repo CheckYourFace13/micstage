@@ -9,7 +9,10 @@ import {
   resolveLocationPlaceTitle,
 } from "@/lib/locationSlugValidation";
 import { getPrismaOrNull } from "@/lib/prisma";
-import { loadDiscoveryMarketOpenMics } from "@/lib/publicListings/discoveryMerge";
+import {
+  loadDiscoveryMarketOpenMics,
+  loadPublicDiscoveryLocationRows,
+} from "@/lib/publicListings/discoveryMerge";
 import type { OpenMicFinderVenue } from "@/lib/publicListings/types";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
 import { relatedLocationsForLocationSlug } from "@/lib/relatedLocations";
@@ -23,6 +26,18 @@ import { ShareLinks } from "@/components/publicListings/ShareLinks";
 
 /** Anonymous city hubs change slowly; allow short CDN/ISR cache. */
 export const revalidate = 300;
+
+/** Prerender known market hubs so CDN can cache hub HTML (dynamic [slug] alone stays private). */
+export async function generateStaticParams() {
+  const prisma = getPrismaOrNull();
+  if (!prisma) return [];
+  try {
+    const rows = await loadPublicDiscoveryLocationRows(prisma);
+    return rows.map((r) => ({ locationSlug: r.slug }));
+  } catch {
+    return [];
+  }
+}
 
 const WEEKDAY_ORDER: Weekday[] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 

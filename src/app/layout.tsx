@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import { Suspense } from "react";
 import { Bebas_Neue, Inter } from "next/font/google";
 // AdSenseScript intentionally not mounted while awaiting AdSense approval.
 // Keep google-adsense-account meta + ads.txt for ownership verification.
+import { EmbedAwareChrome } from "@/components/EmbedAwareChrome";
 import { MarketingTrackingClient } from "@/components/MarketingTrackingClient";
 import { MicStageProductAnalytics } from "@/components/MicStageProductAnalytics";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -67,12 +67,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const embed = (await headers()).get("x-micstage-embed") === "1";
+  // Keep this layout free of request headers and session reads so public HTML can use ISR/CDN.
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -95,9 +95,13 @@ export default async function RootLayout({
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
       </head>
       <body className="min-h-dvh overflow-x-hidden bg-black pb-[env(safe-area-inset-bottom)] font-[var(--font-body)] text-white">
-        {!embed ? <SiteHeader /> : null}
+        <EmbedAwareChrome>
+          <SiteHeader />
+        </EmbedAwareChrome>
         {children}
-        {!embed ? <SiteFooter /> : null}
+        <EmbedAwareChrome>
+          <SiteFooter />
+        </EmbedAwareChrome>
         {!isAnalyticsDisabled() ? (
           <Suspense fallback={null}>
             <MarketingTrackingClient />

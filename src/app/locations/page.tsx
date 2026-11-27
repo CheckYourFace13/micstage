@@ -6,7 +6,8 @@ import { loadPublicDiscoveryLocationRows, type PublicDiscoveryLocationRow } from
 import { MIN_VENUES_FOR_PRIMARY_CITY_DISCOVERY } from "@/lib/discoveryMarket";
 import { buildPublicMetadata } from "@/lib/publicSeo";
 import { LocationsDirectory } from "./LocationsDirectory";
-export const dynamic = "force-dynamic";
+/** Anonymous markets index — shared CDN / ISR. */
+export const revalidate = 300;
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Open mic artist activity by metro & region",

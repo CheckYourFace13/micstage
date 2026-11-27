@@ -23,16 +23,18 @@ import {
   buildListingEventJsonLd,
 } from "@/lib/publicListings/listingSeo";
 import { absoluteUrl, buildPublicMetadata } from "@/lib/publicSeo";
-import { advanceGrowthLeadAcquisitionStage } from "@/lib/growth/growthLeadAcquisitionStage";
 import { displayListingAddress } from "@/lib/publicListings/discoveryMerge";
 import { scheduleWindowLabel } from "@/lib/scheduleWindow";
 import { scheduleTimesArePubliclyConfirmed } from "@/lib/publicListings/scheduleTimeSanity";
 import { weekdayToLabel } from "@/lib/time";
 import { performanceFormatLabel } from "@/lib/venueDisplay";
 import { ShareLinks } from "@/components/publicListings/ShareLinks";
+import { GrowthLeadClickBeacon } from "@/components/publicListings/GrowthLeadClickBeacon";
+import { ListingClaimCtas } from "@/components/publicListings/ListingClaimCtas";
 import { primaryDiscoverySlugForVenue, getVenueCityDiscoveryCounts } from "@/lib/discoveryMarket";
 
-export const dynamic = "force-dynamic";
+/** Anonymous listing HTML — growthLead clicks advance via client beacon, not this render. */
+export const revalidate = 300;
 
 export async function generateMetadata(props: { params: Promise<{ listingSlug: string }> }): Promise<Metadata> {
   const { listingSlug } = await props.params;
@@ -67,29 +69,12 @@ export async function generateMetadata(props: { params: Promise<{ listingSlug: s
 
 export default async function PublicOpenMicListingPage(props: {
   params: Promise<{ listingSlug: string }>;
-  searchParams: Promise<{ growthLead?: string }>;
 }) {
   const { listingSlug } = await props.params;
-  const { growthLead } = await props.searchParams;
   if (!isValidPublicSlug(listingSlug)) notFound();
-
-  const GROWTH_LEAD_ID_RE = /^c[a-z0-9]{24}$/i;
-  const traceId = typeof growthLead === "string" && GROWTH_LEAD_ID_RE.test(growthLead.trim()) ? growthLead.trim() : "";
 
   const prisma = getPrismaOrNull();
   if (!prisma) return <PublicDataUnavailable title="Listing unavailable" />;
-
-  let leadType: "VENUE" | "PROMOTER_ACCOUNT" | "ARTIST" | null = null;
-  if (traceId) {
-    const lead = await prisma.growthLead.findUnique({
-      where: { id: traceId },
-      select: { leadType: true },
-    });
-    leadType = lead?.leadType === "PROMOTER_ACCOUNT" || lead?.leadType === "ARTIST" || lead?.leadType === "VENUE"
-      ? lead.leadType
-      : "VENUE";
-    await advanceGrowthLeadAcquisitionStage(prisma, traceId, "CLICKED", { leadType: leadType ?? "VENUE" });
-  }
 
   const listing = await loadPublicOpenMicListingBySlug(prisma, listingSlug);
   if (!listing) notFound();
@@ -198,6 +183,7 @@ export default async function PublicOpenMicListingPage(props: {
 
   return (
     <div className="min-h-dvh bg-black text-white">
+      <GrowthLeadClickBeacon />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdLocalBusiness) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }} />
       {eventJsonLd.map((ev, i) => (
@@ -250,9 +236,7 @@ export default async function PublicOpenMicListingPage(props: {
         </header>
 
         <div className="mt-4 rounded-lg border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-50/95">
-          {traceId
-            ? "This is your open mic on MicStage — claim it free to manage schedule, signups, and lineup."
-            : "Listed by MicStage. This open mic is not yet managed by the venue."}
+          Listed by MicStage. This open mic is not yet managed by the venue.
         </div>
 
         {publicAbout ? (
@@ -368,55 +352,7 @@ export default async function PublicOpenMicListingPage(props: {
 
           <div>
             <h2 className="text-lg font-semibold">Run this open mic?</h2>
-            {leadType === "PROMOTER_ACCOUNT" ? (
-              <>
-                <p className="mt-1 text-sm text-white/65">
-                  MicStage is free — no credit card. Manage this night as the host.
-                </p>
-                <Link
-                  href={`/host${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
-                  className="mt-3 inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-                >
-                  Manage as host — free
-                </Link>
-              </>
-            ) : leadType === "VENUE" ? (
-              <>
-                <p className="mt-1 text-sm text-white/65">
-                  We found this listing. Claim it free — no credit card — to correct details and manage the night.
-                </p>
-                <Link
-                  href={`/claim/${listing.slug}${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
-                  className="mt-3 inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-                  data-track-event="listing_claim_cta_click"
-                  data-listing-slug={listing.slug}
-                >
-                  Claim this open mic free
-                </Link>
-              </>
-            ) : (
-              <>
-                <p className="mt-1 text-sm text-white/65">
-                  MicStage is free — no credit card. Claim the listing as the venue, or manage nights as the host.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href={`/claim/${listing.slug}${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
-                    className="inline-flex h-11 items-center rounded-md bg-[rgb(var(--om-neon))] px-5 text-sm font-semibold text-black hover:brightness-110"
-                    data-track-event="listing_claim_cta_click"
-                    data-listing-slug={listing.slug}
-                  >
-                    I&apos;m the venue
-                  </Link>
-                  <Link
-                    href={`/host${traceId ? `?growthLead=${encodeURIComponent(traceId)}` : ""}`}
-                    className="inline-flex h-11 items-center rounded-md border border-white/20 px-5 text-sm font-semibold text-white hover:bg-white/10"
-                  >
-                    I&apos;m the host
-                  </Link>
-                </div>
-              </>
-            )}
+            <ListingClaimCtas listingSlug={listing.slug} />
           </div>
 
           <div>

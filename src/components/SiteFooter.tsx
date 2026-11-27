@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { getAuthUiState } from "@/lib/authUiState";
+import { SiteFooterAdminLink } from "@/components/SiteFooterAdminLink";
 
-export async function SiteFooter() {
-  const { role } = await getAuthUiState();
-  const adminOk = role === "admin";
-
+/**
+ * Cacheable public footer. Admin link hydrates only when the session is admin.
+ */
+export function SiteFooter() {
   return (
     <footer className="border-t border-white/10 bg-black">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-5">
@@ -43,16 +43,10 @@ export async function SiteFooter() {
             <Link className="hover:text-white" href="/media">
               Media
             </Link>
-            {adminOk ? (
-              <Link className="hover:text-white" href="/internal/admin">
-                Admin
-              </Link>
-            ) : null}
+            <SiteFooterAdminLink />
           </nav>
           <div className="text-xs text-white/45">
-            <span>
-              (c) {new Date().getFullYear()} MicStage
-            </span>
+            <span>(c) {new Date().getFullYear()} MicStage</span>
           </div>
         </div>
       </div>

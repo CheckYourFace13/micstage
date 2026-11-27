@@ -7,6 +7,8 @@ import { buildPublicMetadata } from "@/lib/publicSeo";
 
 const homeTitle = "Find open mics near you | MicStage";
 
+/** Anonymous homepage — discovery panels may still fetch live nearby data client-side. */
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   ...buildPublicMetadata({

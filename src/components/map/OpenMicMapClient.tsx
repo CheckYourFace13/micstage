@@ -55,8 +55,9 @@ function nextBadgeClass(badge: "live" | "tonight" | "upcoming"): string {
   }
 }
 
-export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
-  const { venues: allVenues } = props;
+export function OpenMicMapClient() {
+  const [allVenues, setAllVenues] = useState<OpenMicMapVenueDto[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [dayFilter, setDayFilter] = useState<Weekday | null>(null);
   const [formatFilter, setFormatFilter] = useState<VenuePerformanceFormat | "">("");
   const [acceptingOnly, setAcceptingOnly] = useState(false);
@@ -71,9 +72,29 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
   const firstFilterEffect = useRef(true);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/public/map/venues", { credentials: "same-origin" });
+        if (!res.ok) throw new Error(`map_venues_${res.status}`);
+        const data = (await res.json()) as { venues?: OpenMicMapVenueDto[] };
+        if (cancelled) return;
+        setAllVenues(Array.isArray(data.venues) ? data.venues : []);
+        setLoadState("ready");
+      } catch {
+        if (!cancelled) setLoadState("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filterSig = `${dayFilter ?? "any"}-${formatFilter || "any"}-${acceptingOnly ? "1" : "0"}`;
 
   useEffect(() => {
+    if (loadState !== "ready") return;
     if (firstFilterEffect.current) {
       firstFilterEffect.current = false;
       return;
@@ -86,7 +107,7 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
     });
     if (!stillVisible) return;
     queueMicrotask(() => setRefitNonce((n) => n + 1));
-  }, [filterSig, allVenues, formatFilter, acceptingOnly]);
+  }, [filterSig, allVenues, formatFilter, acceptingOnly, loadState]);
 
   /** Format + booking only — map pins always include every setup venue; weekday is highlight-only on the map. */
   const filteredForMap = useMemo(() => {
@@ -167,6 +188,48 @@ export function OpenMicMapClient(props: { venues: OpenMicMapVenueDto[] }) {
   };
 
   const hasActiveFilters = dayFilter !== null || formatFilter !== "" || acceptingOnly;
+
+  if (loadState === "loading") {
+    return (
+      <div className="flex h-[min(60vh,520px)] min-h-[280px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-white/15 bg-zinc-900/50 px-4 text-center sm:h-[min(52vh,440px)] sm:min-h-[320px]">
+        <span className="text-sm font-medium text-white/70">Loading map venues...</span>
+        <span className="max-w-xs text-xs text-white/45">Pins load from a shared cache — inventory is not reduced.</span>
+      </div>
+    );
+  }
+
+  if (loadState === "error") {
+    return (
+      <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-4 text-sm leading-relaxed text-white/90">
+        <p className="font-medium text-amber-50/95">The map couldn&apos;t load venue data.</p>
+        <p className="mt-2 text-white/75">Refresh the page in a moment. If this keeps happening, our database may be updating.</p>
+      </div>
+    );
+  }
+
+  if (allVenues.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/15 bg-gradient-to-b from-zinc-900/50 to-zinc-950/80 px-5 py-6 text-sm leading-relaxed text-white/75">
+        <p className="font-semibold text-white/90">Map-first discovery fills in as venues go live</p>
+        <p className="mt-2">
+          Pins appear when venues have coordinates on file and a public schedule to browse. That keeps the map honest: only
+          real rooms you can visit. Until your area has pins, search by ZIP or city, browse markets, or scan all venue
+          pages; listings grow as more rooms join.
+        </p>
+        <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+          <Link href="/find-open-mics" className="font-semibold text-[rgb(var(--om-neon))] underline">
+            Find open mics by location
+          </Link>
+          <Link href="/locations" className="font-semibold underline hover:text-white">
+            Markets directory
+          </Link>
+          <Link href="/venues" className="font-semibold underline hover:text-white">
+            Full venue list
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3 md:gap-5 lg:gap-6">

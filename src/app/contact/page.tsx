@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPublicMetadata } from "@/lib/publicSeo";
-import { ContactForm } from "./ContactForm";
+import { ContactQueryDefaults } from "./ContactQueryDefaults";
+
+export const revalidate = 600;
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Contact & support",
@@ -10,12 +12,7 @@ export const metadata: Metadata = buildPublicMetadata({
   path: "/contact",
 });
 
-export default async function ContactPage(props: { searchParams: Promise<{ category?: string; listing?: string }> }) {
-  const params = await props.searchParams;
-  const category = params.category?.trim();
-  const listing = params.listing?.trim();
-  const defaultDetails = listing ? `Listing: ${listing}\n\n` : undefined;
-
+export default function ContactPage() {
   return (
     <div className="min-h-dvh bg-black text-white">
       <main className="mx-auto max-w-2xl px-6 py-14 pb-24">
@@ -32,7 +29,7 @@ export default async function ContactPage(props: { searchParams: Promise<{ categ
             Tell us how we can help. We will reply to the email address you provide.
           </p>
           <div className="mt-6">
-            <ContactForm defaultCategory={category} defaultDetails={defaultDetails} />
+            <ContactQueryDefaults />
           </div>
         </div>
 

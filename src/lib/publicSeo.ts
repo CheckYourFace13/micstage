@@ -16,6 +16,16 @@ function normalizeSiteOrigin(raw: string): string {
   if (!isLocal && r.startsWith("http://")) {
     r = `https://${r.slice("http://".length)}`;
   }
+  // Apex canonical: never emit www.micstage.com in metadata, JSON-LD, or sitemaps.
+  try {
+    const u = new URL(r);
+    if (u.hostname.toLowerCase() === "www.micstage.com") {
+      u.hostname = "micstage.com";
+      r = u.origin;
+    }
+  } catch {
+    // keep normalized string
+  }
   return r;
 }
 

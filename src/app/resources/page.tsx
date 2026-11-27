@@ -139,6 +139,12 @@ export default function ResourcesIndexPage() {
           >
             Open Mic Gear
           </Link>
+          <Link
+            className="rounded-md border border-white/15 bg-white/5 px-2 py-1 hover:text-white"
+            href="/resources/open-mic-sign-up-sheet"
+          >
+            Sign-up sheet PDF
+          </Link>
         </div>
 
         <section className="mt-10" aria-labelledby="featured-guides">

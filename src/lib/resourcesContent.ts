@@ -312,11 +312,11 @@ const ARTICLES: ResourceArticle[] = [
     slug: "how-to-run-a-successful-open-mic-night",
     title: "How to run a successful open mic night",
     description:
-      "How to host an open mic that stays on time: open mic signups workflows, slot design for live music venues, host communication, and week-to-week improvements that build a stronger local music scene.",
+      "How to host an open mic that stays on time: open mic sign-up sheet basics, signups workflows, slot design for live music venues, host communication, and week-to-week improvements that build a stronger local music scene.",
     category: "strategy",
-    readingMinutes: 16,
+    readingMinutes: 17,
     publishedAt: "2026-03-31",
-    updatedAt: "2026-04-14",
+    updatedAt: "2026-11-27",
     intro:
       "Learning how to host an open mic is less about charisma and more about systems: a clear open mic night schedule, predictable open mic signups, and a host who can protect time without picking fights. Successful rooms treat the open mic like a small weekly production with repeatable checklists-sound, doors, list management, and audience expectations. This guide is for venue managers, volunteer hosts, and musician-leaders who want performer opportunities to feel fair and sustainable. You will get operational detail you can implement next week, not abstract inspiration.",
     practicalTips: [
@@ -342,6 +342,15 @@ const ARTICLES: ResourceArticle[] = [
           "Whether you use digital booking or a clipboard, the best open mic signups systems are boring and consistent. Publish when the list opens, whether remote signups exist, and how tie-breaks work.",
           "If you prioritize returning performers, say so. If you prioritize first-timers on rotation, say that too. Hidden rules feel like favoritism even when intentions are good.",
           "For busy rooms, consider a short waitlist policy and a clear cutoff so the host is not improvising ethics at 7:58 pm.",
+        ],
+      },
+      {
+        heading: "Open mic sign-up sheet: paper vs online",
+        paragraphs: [
+          "A good open mic sign-up sheet is simple: signup order, performer or stage name, set length, and a short notes column for host cues (first timer, needs DI, duo, leave by 9). One sheet, one host, one cutoff time. That is enough to run a fair night without debating who wrote what on whose phone.",
+          "Paper still works when the room is small, the Wi-Fi is unreliable, or you want a backup at the door. Print a clean sheet, keep a pen on a string, and close the list out loud when you say you will. MicStage publishes a free printable open mic sign-up sheet PDF you can download without creating an account: micstage.com/resources/open-mic-sign-up-sheet.",
+          "Online signup replaces the clipboard when you want people to reserve before they leave home. On MicStage, venues publish bookable slots on their public page; performers claim a slot, the host sees the running order, and you avoid two competing lists. Start free at micstage.com/host, claim or list your venue, then turn on the night schedule and booking settings your room already uses.",
+          "Hybrid is fine: keep MicStage as the authoritative list, and print a short door copy for people who walk in without a phone. Do not run a silent second clipboard that the host never sees.",
         ],
       },
       {
@@ -380,7 +389,7 @@ const ARTICLES: ResourceArticle[] = [
       },
       {
         q: "Digital vs in-person open mic signups-which is better?",
-        a: "The best is the one your room can run consistently. Tools do not fix unclear rules.",
+        a: "The best is the one your room can run consistently. Tools do not fix unclear rules. Many rooms use MicStage slots as the main list and keep a printed backup only for walk-ins.",
       },
       {
         q: "How do I handle a performer who goes long?",
@@ -399,10 +408,12 @@ const ARTICLES: ResourceArticle[] = [
     keyTakeaways: [
       "Reliable open mic nights start with schedule truth and staff alignment.",
       "Fair open mic signups are simple, published, and consistently enforced.",
+      "A sign-up sheet needs order, name, set length, and notes—one list beats two.",
       "Hosting is operations plus crowd leadership-train it like a skill.",
       "Weekly reviews turn good intentions into a stable local music scene hub.",
     ],
     relatedDiscoveryLinks: [
+      { href: "/resources/open-mic-sign-up-sheet", label: "Free open mic sign-up sheet PDF" },
       { href: "/venues", label: "Use venue pages as your public schedule hub" },
       { href: "/find-open-mics", label: "Find open mics (discovery)" },
       { href: "/locations", label: "Explore locations" },
@@ -614,11 +625,11 @@ const ARTICLES: ResourceArticle[] = [
     slug: "what-to-expect-at-your-first-open-mic",
     title: "What to expect at your first open mic (and how to prepare)",
     description:
-      "Open mic for beginners: what happens at the door, how open mic signups usually work, how long slots run, and how to find open mics you can trust using maps and venue pages.",
+      "Open mic for beginners: what happens at the door, how open mic signups usually work, open mic song ideas that fit your slot, how long sets run, and how to find open mics you can trust using maps and venue pages.",
     category: "performer",
-    readingMinutes: 14,
+    readingMinutes: 15,
     publishedAt: "2026-04-13",
-    updatedAt: "2026-04-14",
+    updatedAt: "2026-11-27",
     intro:
       "If you are reading this, you are probably closer than you think. A first open mic is mostly logistics with a few minutes of spotlight: arrive, understand open mic signups, wait your turn, perform, and decompress. Anxiety spikes when beginners cannot find clear answers about door time, slot length, and what the host expects. Good live music venues publish those basics because it reduces chaos for everyone-not only for newcomers. This guide is written for open mic for beginners in any format (music, comedy, poetry), with an emphasis on respectful audience behavior and realistic goals. You will also see how to find open mics using the same discovery patterns locals use: venue pages, maps, and curated browsing.",
     practicalTips: [
@@ -652,6 +663,16 @@ const ARTICLES: ResourceArticle[] = [
           "Fair signups usually means one list, one deadline, and one decision-maker. If the room uses digital booking, confirm your slot status before you leave home.",
           "If the list is in-person, ask when it closes and whether you must be physically present to keep a slot.",
           "Do not pressure the host for special exceptions on your first visit-build trust first.",
+        ],
+      },
+      {
+        heading: "Choosing songs for an open mic",
+        paragraphs: [
+          "Open mic song ideas start with the slot, not the playlist. Confirm length (often three to seven minutes for newer acts), then pick material you can finish cleanly with room to breathe. One strong opener you know cold beats three almost-ready songs. If the host cuts you, leave them wanting one more line—not apologizing for a song that never landed.",
+          "Beginners: bring one piece you can play or recite half-asleep. A familiar cover in your range, a short original you have finished in practice, or a two-minute poem you can recover if you blank. Skip brand-new material on night one. Example set: introduce yourself in one sentence, play a mid-tempo song you have rehearsed standing up, thank the room, and get off while the applause is still warm.",
+          "Acoustic and singer-songwriter rooms: favor two songs that share tuning or capo so changeovers stay short. Open with something mid-tempo so the PA and your hands settle, then follow with a quieter piece that shows dynamics—or the reverse if the room is already chatty and you need attention. Avoid a three-ballad stack in a five-minute slot. Example: capo-2 folk cover you know, then an original in the same shape with a clear ending.",
+          "Experienced performers: use the open mic to test one new piece after a proven warm-up, not three experiments. Watch the room—if conversation is loud, lead with something rhythm-forward; if people are listening, risk the quieter material. Leave a closer that ends on a firm last note or punchline so the host can take the mic without guessing. Example: trusted opener, one workshop song, short thank-you—no encore negotiation on someone else's clock.",
+          "Comedy and spoken word follow the same math: time your set with a phone timer, cut the weakest bit first, and write the exit line before you leave home. When you are ready to find a room, start at micstage.com/find-open-mics and read the venue page for format and slot length before you pack the car.",
         ],
       },
       {
@@ -701,6 +722,7 @@ const ARTICLES: ResourceArticle[] = [
     keyTakeaways: [
       "Most first-night stress is logistics: arrival, signups, and posted rules.",
       "Fair open mic signups depend on clarity-ask once, early.",
+      "Song choice should fit the slot: known cold, one strong opener, clean exit.",
       "Beginners improve fastest with one measurable goal per night.",
       "Discovery tools help you choose a room that matches your comfort level.",
     ],

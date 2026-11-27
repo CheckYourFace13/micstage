@@ -33,6 +33,7 @@ async function baseSitemap(): Promise<MetadataRoute.Sitemap> {
     "/venues",
     "/resources",
     "/resources/open-mic-gear",
+    "/resources/open-mic-sign-up-sheet",
     "/faq",
     "/artists",
     "/register/venue",
